@@ -113,6 +113,11 @@ impl Core {
         self.state.focus_source = source;
         self.shared.set_active(active);
         enforce::apply_network(active);
+        if active {
+            // Tear down live browser sockets so the new block takes effect immediately rather
+            // than coasting on already-open connections.
+            self.shared.request_reset();
+        }
         self.persist();
         self.emit(
             "focusChanged",
@@ -153,6 +158,11 @@ impl Core {
     fn set_policy(&mut self, policy: Policy) {
         self.state.policy = policy.clone();
         self.shared.set_policy(policy.clone());
+        // A policy change while focused may newly block a site the user has open — reset live
+        // flows so it takes effect now.
+        if self.state.focus_active {
+            self.shared.request_reset();
+        }
         self.persist();
         self.emit("policyChanged", json!({ "policy": policy }));
     }

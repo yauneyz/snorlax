@@ -5,18 +5,17 @@
 use std::sync::Arc;
 use std::time::Duration;
 
-use tokio::sync::{watch, Mutex};
+use tokio::sync::{mpsc, watch, Mutex};
 
 use crate::core::Core;
 use crate::enforce::{self, EnforceShared};
 use crate::ipc;
 use crate::secure_store::SecureStore;
 use crate::state::PersistentState;
-use crate::{enforce::apps, enforce::dns};
+use crate::{enforce::apps, enforce::divert};
 
 const PRESENCE_POLL: Duration = Duration::from_secs(3);
 const SCHEDULE_POLL: Duration = Duration::from_secs(30);
-const DNS_REASSERT: Duration = Duration::from_secs(15);
 
 /// Async entry point. Runs until `shutdown` flips to true.
 pub async fn serve(pipe_path: String, shutdown: watch::Receiver<bool>) {
@@ -24,13 +23,29 @@ pub async fn serve(pipe_path: String, shutdown: watch::Receiver<bool>) {
 
     let state = PersistentState::load();
     let store = SecureStore::load();
-    let shared = Arc::new(EnforceShared::new(state.policy.clone(), state.focus_active));
+    let (reset_tx, reset_rx) = mpsc::unbounded_channel::<()>();
+    let shared = Arc::new(EnforceShared::new(
+        state.policy.clone(),
+        state.focus_active,
+        reset_tx,
+    ));
 
     let core = Arc::new(Mutex::new(Core::new(state, store, shared.clone())));
     core.lock().await.rearm_on_boot();
 
-    // Always-on enforcement tasks (self-gate on focus_active).
-    tokio::spawn(dns::run_sinkhole(shared.clone(), shutdown.clone()));
+    // The WinDivert packet engine and reset worker run on dedicated OS threads (WinDivert recv
+    // is blocking). They self-gate on focus_active and are cleaned up on process exit.
+    {
+        let shared = shared.clone();
+        let shutdown = shutdown.clone();
+        std::thread::spawn(move || divert::run_engine(shared, shutdown));
+    }
+    {
+        let shared = shared.clone();
+        std::thread::spawn(move || divert::run_reset_worker(shared, reset_rx));
+    }
+
+    // Always-on app blocker (self-gates on focus_active).
     tokio::spawn(apps::run_app_blocker(shared.clone(), shutdown.clone()));
 
     // USB presence poll.
@@ -59,25 +74,6 @@ pub async fn serve(pipe_path: String, shutdown: watch::Receiver<bool>) {
                     _ = sd.changed() => { if *sd.borrow() { break; } }
                     _ = tokio::time::sleep(SCHEDULE_POLL) => {
                         core.lock().await.schedule_tick();
-                    }
-                }
-            }
-        });
-    }
-
-    // Periodically re-assert adapter DNS so casual "change my DNS server" edits are reverted
-    // while focus is active (the v1 stand-in for a WFP redirect callout).
-    {
-        let shared = shared.clone();
-        let mut sd = shutdown.clone();
-        tokio::spawn(async move {
-            loop {
-                tokio::select! {
-                    _ = sd.changed() => { if *sd.borrow() { break; } }
-                    _ = tokio::time::sleep(DNS_REASSERT) => {
-                        if shared.is_active() {
-                            dns::point_adapters_to_sinkhole();
-                        }
                     }
                 }
             }

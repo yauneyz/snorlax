@@ -38,16 +38,31 @@ tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 windows-service = "0.7"
 
+# Raw WinDivert bindings for the packet engine (enforce::divert). The build links WinDivert.lib
+# via the WINDIVERT_PATH env var (set to native/windows/vendor/windivert); the matching
+# WinDivert.dll + WinDivert64.sys are shipped next to focuslock-svc.exe.
+windivert-sys = "0.10"
+
 [dependencies.windows]
 version = "0.58"
 features = [
     "Win32_Foundation",
+    "Win32_NetworkManagement_IpHelper",
+    "Win32_Networking_WinSock",
     "Win32_Security",
     "Win32_Security_Authorization",
     "Win32_Storage_FileSystem",
     "Win32_System_SystemInformation",
     "Win32_System_Threading",
 ]
+
+# windivert-sys 0.10 links windows 0.48, so its WinDivertOpen/Recv/Send signatures use that
+# version's HANDLE/BOOL — distinct types from our 0.58 above. Pull 0.48 in under an alias purely
+# to name those FFI types in enforce::divert; everything else uses 0.58.
+[dependencies.windivert_win]
+package = "windows"
+version = "0.48"
+features = ["Win32_Foundation"]
 
 [profile.release]
 opt-level = 2
