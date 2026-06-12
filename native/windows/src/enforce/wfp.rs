@@ -18,6 +18,7 @@ const DOT_TCP_RULE: &str = "FocusLock-DoT-TCP";
 const DOT_UDP_RULE: &str = "FocusLock-DoT-UDP";
 const DOH_TCP_RULE: &str = "FocusLock-DoH-TCP";
 const DOH_UDP_RULE: &str = "FocusLock-DoH-UDP";
+const QUIC_UDP_RULE: &str = "FocusLock-QUIC-UDP";
 
 /// Well-known public DoH resolver endpoint IPs (v4 + v6, CIDR where providers use anycast
 /// ranges). Blocking 443 to these closes the hardcoded-IP DoH path; an app would need an
@@ -94,12 +95,26 @@ pub fn block_doh_resolvers() {
     add_block_rule(DOH_UDP_RULE, "UDP", 443, Some(&ips));
 }
 
+/// Block all outbound UDP 443 (HTTP/3 / QUIC). This forces browsers to fall back to TCP, where
+/// the SNI inspector (enforce::divert) can read the cleartext ClientHello — QUIC carries an
+/// encrypted SNI we can't yet parse (see quic-upgrade.md). Trade-off: a possible one-time
+/// TCP-fallback delay on h3 sites while focused; bulk throughput is unaffected.
+///
+/// This rule is the kill-resistant *backstop*: the primary QUIC kill is the data-plane drop in
+/// the 443 inspection engine (enforce::divert), which also starves QUIC sessions that were
+/// already established when focus turned on — a firewall rule added mid-flow may not cut those
+/// (WFP flow reauthorization is not reliable for them).
+pub fn block_quic() {
+    add_block_rule(QUIC_UDP_RULE, "UDP", 443, None);
+}
+
 /// Remove all FocusLock firewall rules.
 pub fn clear_rules() {
     delete_rule(DOT_TCP_RULE);
     delete_rule(DOT_UDP_RULE);
     delete_rule(DOH_TCP_RULE);
     delete_rule(DOH_UDP_RULE);
+    delete_rule(QUIC_UDP_RULE);
 }
 
 fn add_block_rule(name: &str, protocol: &str, port: u16, remote_ips: Option<&str>) {

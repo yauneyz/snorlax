@@ -114,9 +114,12 @@ impl Core {
         self.shared.set_active(active);
         enforce::apply_network(active);
         if active {
-            // Tear down live browser sockets so the new block takes effect immediately rather
-            // than coasting on already-open connections.
-            self.shared.request_reset();
+            // Taint destinations of already-open blocked flows immediately (in-memory, from the
+            // recorded SNIs) so pooled/coalesced sockets — which send no new ClientHello — die at
+            // once instead of coasting for the ~1s the reset worker's enumeration takes. The
+            // reset burst below still runs as the clean-slate teardown + safety-net seed.
+            self.shared.seed_taints_from_flows();
+            self.shared.request_reset(enforce::ResetKind::FocusOn);
         }
         self.persist();
         self.emit(
@@ -159,9 +162,12 @@ impl Core {
         self.state.policy = policy.clone();
         self.shared.set_policy(policy.clone());
         // A policy change while focused may newly block a site the user has open — reset live
-        // flows so it takes effect now.
+        // flows so it takes effect now. Only the newly-blocked flows are reset (by recorded SNI),
+        // so allowed sites' connections are left alone. Taint their destinations first (fast,
+        // in-memory) so a newly-blocked site's pooled socket dies immediately.
         if self.state.focus_active {
-            self.shared.request_reset();
+            self.shared.seed_taints_from_flows();
+            self.shared.request_reset(enforce::ResetKind::PolicyChange);
         }
         self.persist();
         self.emit("policyChanged", json!({ "policy": policy }));

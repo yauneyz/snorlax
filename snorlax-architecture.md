@@ -70,9 +70,9 @@ here leads to bad architecture.
 | Attack | Defense |
 |---|---|
 | Kill the Electron UI in Task Manager | No effect — enforcement is in the service, not the UI. |
-| Kill the service process | Service is configured to auto-restart (Windows SCM recovery actions / launchd `KeepAlive`). On Windows the network filters are installed as **persistent/boot-time** filters, so blocking continues even in the gap before the service restarts. |
-| Edit the `hosts` file | No effect — we enforce at the network filtering layer (WFP / Network Extension), which sits below `hosts` resolution. `hosts` is irrelevant to us. |
-| Change DNS server | We force all DNS through our local resolver via a firewall rule and block DNS-over-TLS / known DNS-over-HTTPS endpoints. |
+| Kill the service process | Service is configured to auto-restart (Windows SCM recovery actions / launchd `KeepAlive`). The packet-engine (WinDivert) layers die with the process, but the **persistent Windows Firewall rules** (DoT/DoH-IP/QUIC) remain in force in the ~1s gap before the SCM restarts the service and re-arms the engines. |
+| Edit the `hosts` file | No effect — we intercept DNS and inspect connections at the packet layer (WinDivert / Network Extension), below `hosts` resolution. `hosts` is irrelevant to us. |
+| Change DNS server | We intercept outbound DNS by **port** at the packet layer (not by adapter config), so pointing at any resolver — even a hardcoded IP — still hits our sinkhole; we also block DNS-over-TLS and known DNS-over-HTTPS endpoints, and read the TLS SNI on 443 so a leaked lookup still can't open a blocked connection. |
 | Uninstall the app | The uninstaller refuses to remove the service while focus mode is active unless a paired USB key is present. (Details in §9.) |
 | Stop the service via `sc stop` / `launchctl` as a *standard* user | Service DACL / launchd permissions deny control to non-admins. |
 
@@ -125,9 +125,10 @@ just doing the work.** That's the achievable and correct goal.
 │   │   IPC server  ──►  State (authoritative)  ──►  Enforcement       │  │
 │   │                     - focus on/off              ┌───────────────┐ │  │
 │   │   USB monitor ──►   - active policy             │ Windows:      │ │  │
-│   │   (event-driven)    - schedule                  │  WFP filters  │ │  │
-│   │                     - paired key set            │  local DNS    │ │  │
-│   │   Schedule timer ─► (flips focus on/off)        │  proc monitor │ │  │
+│   │   (event-driven)    - schedule                  │  WinDivert    │ │  │
+│   │                     - paired key set            │  DNS+SNI eng. │ │  │
+│   │   Schedule timer ─► (flips focus on/off)        │  fw backstop  │ │  │
+│   │                                                 │  proc monitor │ │  │
 │   │                                                 ├───────────────┤ │  │
 │   │   Secure store ──►  paired serials + secrets    │ macOS:        │ │  │
 │   │   (DPAPI / Keychain)                            │  NE filter    │ │  │
@@ -166,37 +167,131 @@ defensive. Its responsibilities:
 
 ### 4.1 Windows enforcement
 
-Built in **Rust** with the [`windows`](https://crates.io/crates/windows) crate (full WFP,
-SetupAPI, Service Control Manager, DPAPI bindings). Rust is recommended over C++/C# because
-it gives us memory safety in a SYSTEM-level process and first-class bindings to every Win32
-API we need. (C++ is a fine alternative if the team prefers it.)
+Built in **Rust** with the [`windows`](https://crates.io/crates/windows) crate (SetupAPI,
+Service Control Manager, IpHelper/WinSock, DPAPI bindings) plus a vendored **WinDivert 2.2**
+packet-capture driver. Rust gives us memory safety in a SYSTEM-level process and first-class
+bindings to every Win32 API we need.
 
-**Website / network blocking — Windows Filtering Platform (WFP):**
+> **Why WinDivert, not a hand-written WFP callout?** The strong enforcement we want — seeing the
+> hostname on each connection and dropping/resetting flows — needs the packet data plane, which
+> in the kernel means a **WFP callout driver**, and that requires EV-cert + Microsoft-attestation
+> **driver signing**. WinDivert ships an already-signed kernel driver (`WinDivert64.sys`), so we
+> do the capture through it and keep all our logic in **user mode**, with no driver-signing
+> pipeline of our own. The cost: WinDivert blocking only holds while our process runs (see the
+> firewall backstop below). All packet code lives in `enforce::divert`; the pure wire helpers it
+> reuses are in `enforce::dns` (DNS) and `enforce::sni` (TLS), unit-tested without the driver.
 
-We do *not* touch the `hosts` file. Instead:
+There is **no** loopback resolver, no `hosts` edits, and no rewriting of the adapter's DNS
+settings. We filter by destination **port** at the packet layer, which also catches apps that
+hard-code a resolver IP — the gap an adapter-DNS approach leaves open.
 
-- A small **local DNS resolver** (sinkhole) runs inside the service on `127.0.0.1:53`.
-  For blocked domains it returns `NXDOMAIN`/`0.0.0.0`; for allowed domains it forwards
-  upstream. Whitelist mode inverts the default; "block all internet" sinkholes everything.
-- **WFP filters** force the policy at the network layer:
-  - Redirect all outbound port-53 traffic to our local resolver (so changing the system
-    DNS server does nothing).
-  - Block outbound port 853 (DNS-over-TLS) and a maintained list of DNS-over-HTTPS
-    endpoint IPs, so browsers can't bypass our resolver via DoH.
-  - In **whitelist** and **block-all** modes, add `FWPM_LAYER_ALE_AUTH_CONNECT_V4/V6`
-    filters that block all outbound connections except to allowed destinations.
-- Filters are added with `FWPM_FILTER_FLAG_PERSISTENT` and the provider/sublayer are
-  **boot-time persistent**. This is the key anti-tamper trick: **if the service is killed,
-  the filters remain in force** until the OS clears them, and the service re-arms on boot.
+**Layered website/network blocking.** Four cooperating mechanisms, ordered from "names" to "the
+hostname actually on the wire":
 
-**App blocking — process monitoring:**
+1. **Blocklist expansion (`enforce::properties`).** Many sites serve content from sibling/CDN
+   domains whose names don't match the parent (Reddit → `redditmedia.com`, `redditstatic.com`;
+   YouTube → `googlevideo.com`, `ytimg.com`). A curated `PROPERTY_GROUPS` table expands a blocked
+   canonical to its siblings. The expansion is applied to the *enforced* copy of the policy only
+   (`EnforceShared`), so the user's authored/persisted list stays clean; both the DNS and SNI
+   layers below consult the expanded set. This is the load-bearing fix for the CDN-sibling and
+   HTTP/2-coalescing leak documented in `limitation.md`.
 
-- Subscribe to process-creation events (ETW `Microsoft-Windows-Kernel-Process`, or WMI
-  `__InstanceCreationEvent` on `Win32_Process`).
-- On a match against the blocked-app list, `TerminateProcess` immediately.
-- v1 uses this user-mode SYSTEM approach. *Pre-execution* denial (stopping the process
-  before it ever runs) requires a signed kernel minifilter driver — noted as a future
-  hardening step, not a v1 requirement, because driver signing is expensive and slow.
+2. **DNS interception — always-on packet engine (`divert::run_engine`).** One WinDivert
+   NETWORK-layer handle runs for the whole service lifetime and self-gates on `focusActive`. Its
+   filter captures outbound UDP/TCP **53** and **853**. While focus is active it:
+   - parses the query name and, for a blocked name or a known DoH-endpoint/canary host
+     (`policy_match::is_host_blocked` / `DOH_BYPASS_HOSTS`), **injects a spoofed `NXDOMAIN`**
+     reply and drops the original query — no upstream lookup happens;
+   - **drops DNS-over-TLS/QUIC** on port 853;
+   - **suppresses ECH bootstrap**: answers `HTTPS`/`SVCB` resource-record queries (type 65/64)
+     with **NODATA** while focused, so a browser can't fetch an Encrypted-ClientHello config and
+     hide its SNI from layer 3. (Trade-off: no ECH / no HTTP-3 hints while focused.)
+
+   Whitelist and block-all modes fall out of the same predicate: `is_host_blocked` returns true
+   for any non-allowed (resp. every) name, so the engine sinkholes everything outside the
+   allow-list.
+
+3. **SNI inspection — the correctness layer (`divert::run_sni_engine`).** DNS blocking is a proxy
+   for the real goal and is leaky (coalesced sockets make no query; cached/hardcoded IPs skip
+   DNS). This layer enforces on the hostname the browser literally puts on the wire — the **SNI**
+   in the cleartext TLS ClientHello — so it's immune to CDN sharing, hardcoded IPs, and stale
+   DNS. It is an **always-on** WinDivert handle whose filter tracks focus: while unfocused it is
+   **record-only** with the deliberately narrow filter
+
+   ```
+   outbound and tcp.DstPort == 443 and tcp.PayloadLength > 0
+     and tcp.Payload[0] == 0x16 and tcp.Payload[1] == 0x03
+   ```
+
+   (one packet per new TLS connection), and while focused it widens to also capture UDP 443 for
+   the QUIC drop. The `0x16 0x03` payload match is evaluated **in the kernel**, so only TLS
+   *handshake* packets are copied to user space — bulk application data (`0x17…`, i.e.
+   downloads/streaming/uploads) never leaves the kernel and steady-state throughput is untouched.
+   For each captured ClientHello we extract the SNI (`enforce::sni`) and record the flow→SNI
+   mapping — *always*, even unfocused, so a later focus-on knows the hostname behind every
+   already-open socket (used by the reset worker and the taint layer, below). While focused, if
+   the host is blocked we **drop the ClientHello, inject an inbound TCP RST** to the client
+   (sequence number taken from the observed ack so the stack accepts it), and **taint the
+   destination IP** (below). The connection fails fast instead of timing out. This layer also
+   enforces whitelist/block-all on 443.
+
+3b. **Tainted-destination drop — the pooled-socket killer (`divert::run_taint_drop`).** A
+   pooled/coalesced HTTP/2-3 socket opened before a block took effect sends no new ClientHello,
+   so neither DNS nor SNI inspection ever fires on it, and the reset burst (below) is a
+   find-and-reset race that can miss. Borrowing the stateless-drop idea from the Linux sibling
+   `focusd` (see [`blocking-upgrade.md`](./blocking-upgrade.md)): when the SNI engine positively
+   observes a blocked SNI go to a destination IP — or the reset worker finds a live flow whose
+   recorded SNI is blocked — that IP is **tainted** (`EnforceShared::taint`), and a dedicated
+   WinDivert handle opened with the **DROP flag** silently discards *all* outbound 443 (TCP +
+   UDP) to tainted IPs in the driver — no recv loop, zero per-packet user-space cost. A socket
+   whose destination is tainted simply can't send (not even ACKs), so it dies regardless of when
+   it was opened. Precision guards against CDN over-block: an IP is only tainted on an *observed*
+   blocked SNI (never pre-resolved), never if it recently served an *allowed* SNI, and taints age
+   out after a 5-minute TTL. All taint state clears on focus-off.
+
+4. **QUIC / HTTP-3.** QUIC (UDP 443) encrypts its ClientHello, so layer 3 can't read the SNI off
+   the wire. For now we **block outbound UDP 443** (firewall rule, below), forcing browsers to
+   fall back to TCP where SNI inspection works. The principled upgrade — decrypting the QUIC
+   Initial packet (keys derivable from the connection ID) to read its SNI and block per-flow — is
+   designed in [`quic-upgrade.md`](./quic-upgrade.md) and deferred.
+
+**Persistent firewall backstop (`enforce::wfp`).** The WinDivert layers above die with the
+process. As a kill-survival backstop we install **Windows Firewall** rules (via `netsh
+advfirewall`, a front-end to WFP — no callout driver) when focus turns on, removed when it turns
+off:
+
+- block outbound **853** (DoT/DoQ), TCP + UDP;
+- block outbound **443 to a maintained list of public DoH resolver IPs** (closes the
+  hardcoded-IP DoH path);
+- block outbound **UDP 443** (the QUIC force-to-TCP rule above).
+
+These are ordinary firewall rules, so they **persist if the service is killed** until focus is
+cleared, while the SCM restarts the service (~1s) to re-arm the WinDivert layers.
+
+**Connection reset (`divert::run_reset_worker`).** A newly-enabled block must also tear down
+sockets already open (a browser will otherwise coast on an established connection). On a signal
+from the core the worker flushes the DNS cache and RSTs live flows, using a short-lived WinDivert
+handle and an RFC-5961 challenge-ACK trick (an injected SYN elicits a challenge-ACK we turn into a
+correctly-sequenced RST — this reaps even idle sockets, v4 and v6). It distinguishes two cases:
+
+- **focus-on** → broad reset of *all* browser (and blocked-app) flows for a clean slate;
+- **policy change while focused** → **surgical**: only flows whose recorded SNI is now blocked are
+  reset, so a mid-session blocklist edit doesn't nuke your allowed tabs' connections.
+
+In both cases the worker first **seeds the taint set** (3b above) from live flows whose recorded
+SNI is blocked — so even if every RST probe misses a socket (challenge ACKs are rate-limited),
+its destination is dropped and the socket goes dead anyway.
+
+**App blocking — process termination (`enforce::apps`).** A ~1s poll of the process list
+`TerminateProcess`es any image-name match on the blocked-app list while focused. *Pre-execution*
+denial (an ETW/WMI process-create hook, or a minifilter) is a future hardening step; polling is
+simple and robust for v1.
+
+**Deferred hardening (all require their own driver signing, hence out of v1):** a kernel-WFP
+**connect-redirect callout** (transparent redirect and kill-resistant, flow-level filtering that
+survives the process being killed — the only thing that closes the "raw IP-literal with no SNI"
+gap in block-all mode), raw `FWPM_FILTER_FLAG_PERSISTENT` ALE_AUTH_CONNECT filters, and QUIC
+Initial parsing (no signing, but deferred — see `quic-upgrade.md`).
 
 **Persistence & self-protection:**
 
@@ -726,10 +821,13 @@ focuslock/
 │  │  │  ├─ pairing.rs               # verify a present device matches a paired key
 │  │  │  ├─ schedule.rs              # timer driving the (shared-logic-equivalent) engine
 │  │  │  └─ enforce/
-│  │  │     ├─ mod.rs                # Enforcer trait: apply(policy, focusActive)
-│  │  │     ├─ wfp.rs                # WFP filters (persistent/boot-time)
-│  │  │     ├─ dns.rs                # local DNS sinkhole + DoH/DoT blocking
-│  │  │     └─ apps.rs               # process-creation monitor + terminate
+│  │  │     ├─ mod.rs                # EnforceShared state; apply_network; reset signalling
+│  │  │     ├─ divert.rs             # WinDivert engines: DNS sinkhole + 443 SNI + reset worker
+│  │  │     ├─ dns.rs                # pure DNS wire helpers (QNAME/QTYPE, NXDOMAIN/NODATA)
+│  │  │     ├─ sni.rs                # pure TLS ClientHello → SNI extraction
+│  │  │     ├─ properties.rs         # multi-domain property groups + blocklist expansion
+│  │  │     ├─ wfp.rs                # persistent firewall backstop (DoT/DoH-IP/QUIC via netsh)
+│  │  │     └─ apps.rs               # process-list poll + TerminateProcess on match
 │  │  └─ installer/
 │  │     ├─ service-install.rs       # tiny elevated CLI: create/configure/recover/remove svc
 │  │     └─ nsis-include.nsh         # NSIS hooks: install/start svc; guard uninstall
@@ -870,10 +968,13 @@ focuslock/
 | `src/usb.rs` | `WM_DEVICECHANGE` listener + SetupAPI/CfgMgr32 enumeration; safety poll. |
 | `src/pairing.rs` | Decides whether a currently-connected device satisfies a paired key (serial + key-file secret). |
 | `src/schedule.rs` | Timer that evaluates the schedule and flips focus. |
-| `src/enforce/mod.rs` | The `Enforcer` trait: `apply(policy, focusActive)`. |
-| `src/enforce/wfp.rs` | Installs/removes WFP filters (persistent + boot-time). |
-| `src/enforce/dns.rs` | Local DNS sinkhole/forwarder; DoH/DoT bypass blocking. |
-| `src/enforce/apps.rs` | Process-creation monitor + terminate on match. |
+| `src/enforce/mod.rs` | `EnforceShared` (live policy/focus/flow-SNI/tainted-IP state shared with the engine threads); `apply_network` toggles the firewall backstop; reset signalling. |
+| `src/enforce/divert.rs` | WinDivert packet engines: always-on DNS/DoT engine (NXDOMAIN injection, DoT drop, ECH/HTTPS-RR suppression), always-on 443 SNI inspector (record-only unfocused; RST + taint on blocked SNI while focused), the tainted-destination DROP-flag handle (stateless 443 drop to IPs seen serving blocked SNIs), and the connection-reset worker (broad on focus-on, SNI-surgical on policy change, taint-seeding in both). |
+| `src/enforce/dns.rs` | Pure DNS wire helpers (parse QNAME/QTYPE, build NXDOMAIN/NODATA replies) used by the engine. |
+| `src/enforce/sni.rs` | Pure TLS ClientHello → SNI extraction used by the 443 inspector. |
+| `src/enforce/properties.rs` | Curated multi-domain "property group" table + blocklist expansion (sibling/CDN domains). |
+| `src/enforce/wfp.rs` | Installs/removes the persistent Windows-Firewall backstop (DoT 853, DoH resolver IPs, QUIC UDP 443) via `netsh`. |
+| `src/enforce/apps.rs` | Process-list poll + `TerminateProcess` on a blocked-app match. |
 | `installer/service-install.rs` | Tiny elevated CLI invoked at install/update to create/configure/recover/remove the service. |
 | `installer/nsis-include.nsh` | NSIS hooks: register+start service on install; guard the uninstall path (§9). |
 
@@ -994,9 +1095,10 @@ bits:
 
 1. **Skeleton:** monorepo, config system, Electron app with the UI shell and the mock
    service. Category-1 tests green. (No real blocking yet — but the whole app "works.")
-2. **Windows service v1:** IPC, state, persistence, USB pairing + presence, WFP domain
-   blocking + local DNS, user-mode app blocking, persistence/recovery. Category-2 tests green.
-   This is your first genuinely-enforcing Windows build.
+2. **Windows service v1:** IPC, state, persistence, USB pairing + presence, WinDivert
+   packet-engine domain blocking (DNS sinkhole + 443 SNI inspection) with the firewall backstop,
+   user-mode app blocking, persistence/recovery. Category-2 tests green. This is your first
+   genuinely-enforcing Windows build.
 3. **Auth + payments:** Supabase sign-in, the edge function, entitlement gating, the billing
    redirect + deep-link return.
 4. **Auto-update + signing:** Authenticode, electron-updater, the elevated service-upgrade

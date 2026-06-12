@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import type { Mode, Policy } from '@focuslock/shared';
+import { siblingsFor } from '@focuslock/core/browser';
 import { request } from '../lib/bridge.js';
 import { useFocusStore } from '../store/useFocusStore.js';
 import { Badge, Button, Card, CardTitle, Input } from '../components/ui/index.js';
@@ -75,14 +76,22 @@ export function Blocklists() {
           <Button onClick={addDomain}>Add</Button>
         </div>
         <ul className="flex flex-col gap-2">
-          {policy.domains.map((d) => (
-            <li key={d} className="flex items-center justify-between rounded-lg bg-panel2 px-3 py-2">
-              <span className="text-sm text-slate-200">{d}</span>
-              <button onClick={() => removeDomain(d)} className="text-xs text-red-400 hover:underline">
-                remove
-              </button>
-            </li>
-          ))}
+          {policy.domains.map((d) => {
+            const siblings = siblingsFor(d);
+            return (
+              <li key={d} className="rounded-lg bg-panel2 px-3 py-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-slate-200">{d}</span>
+                  <button onClick={() => removeDomain(d)} className="text-xs text-red-400 hover:underline">
+                    remove
+                  </button>
+                </div>
+                {siblings.length > 0 && (
+                  <p className="mt-1 text-xs text-slate-500">also blocks: {siblings.join(', ')}</p>
+                )}
+              </li>
+            );
+          })}
           {policy.domains.length === 0 && <p className="text-sm text-slate-500">No domains yet.</p>}
         </ul>
       </Card>

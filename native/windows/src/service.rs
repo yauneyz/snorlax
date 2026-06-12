@@ -23,7 +23,7 @@ pub async fn serve(pipe_path: String, shutdown: watch::Receiver<bool>) {
 
     let state = PersistentState::load();
     let store = SecureStore::load();
-    let (reset_tx, reset_rx) = mpsc::unbounded_channel::<()>();
+    let (reset_tx, reset_rx) = mpsc::unbounded_channel::<enforce::ResetKind>();
     let shared = Arc::new(EnforceShared::new(
         state.policy.clone(),
         state.focus_active,
@@ -33,12 +33,26 @@ pub async fn serve(pipe_path: String, shutdown: watch::Receiver<bool>) {
     let core = Arc::new(Mutex::new(Core::new(state, store, shared.clone())));
     core.lock().await.rearm_on_boot();
 
-    // The WinDivert packet engine and reset worker run on dedicated OS threads (WinDivert recv
+    // The WinDivert packet engines and reset worker run on dedicated OS threads (WinDivert recv
     // is blocking). They self-gate on focus_active and are cleaned up on process exit.
     {
         let shared = shared.clone();
         let shutdown = shutdown.clone();
         std::thread::spawn(move || divert::run_engine(shared, shutdown));
+    }
+    // 443 SNI inspection engine — always-on (record-only while unfocused, blocking while
+    // focused; the handle's filter tracks focus transitions).
+    {
+        let shared = shared.clone();
+        let shutdown = shutdown.clone();
+        std::thread::spawn(move || divert::run_sni_engine(shared, shutdown));
+    }
+    // Tainted-destination drop manager — focus-gated DROP-flag handle that kills all 443 egress
+    // to destinations observed serving blocked SNIs (see blocking-upgrade.md).
+    {
+        let shared = shared.clone();
+        let shutdown = shutdown.clone();
+        std::thread::spawn(move || divert::run_taint_drop(shared, shutdown));
     }
     {
         let shared = shared.clone();

@@ -8,7 +8,7 @@
  * fall back to the in-process mock so the whole UI still works.
  */
 
-import { app, BrowserWindow } from 'electron';
+import { app } from 'electron';
 import { DEEP_LINK_SCHEME } from '@focuslock/shared';
 import { config } from './config.js';
 import { logger } from './logging.js';
@@ -19,7 +19,7 @@ import type { ServiceConnection } from './service/connection.js';
 import { ensureServiceInstalled } from './service/installer.js';
 import { initUpdater } from './updater.js';
 import { createTray } from './tray.js';
-import { createWindow, handleDeepLink } from './window.js';
+import { createWindow, handleDeepLink, showMainWindow } from './window.js';
 
 const CONNECT_TIMEOUT_MS = 2000;
 
@@ -70,11 +70,7 @@ if (!gotLock) {
   app.on('second-instance', (_e, argv) => {
     const deepLink = argv.find((a) => a.startsWith(`${DEEP_LINK_SCHEME}://`));
     if (deepLink) handleDeepLink(deepLink);
-    const win = BrowserWindow.getAllWindows()[0];
-    if (win) {
-      if (win.isMinimized()) win.restore();
-      win.focus();
-    }
+    else showMainWindow();
   });
 
   // macOS deep link (harmless on Windows).
@@ -91,6 +87,6 @@ if (!gotLock) {
   });
 
   app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) createWindow();
+    showMainWindow();
   });
 }

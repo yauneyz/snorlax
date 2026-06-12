@@ -46,6 +46,32 @@ pub(crate) fn nxdomain_reply(query: &[u8], question_end: usize) -> Vec<u8> {
     reply
 }
 
+/// Build a NODATA reply (NOERROR, no answers) — "the name exists but has no record of this
+/// type". Used to suppress `HTTPS`/`SVCB` (type 65/64) records while focus is active so a browser
+/// can't fetch an Encrypted-ClientHello config and hide its SNI from the 443 inspector.
+pub(crate) fn nodata_reply(query: &[u8], question_end: usize) -> Vec<u8> {
+    let mut reply = query[..question_end].to_vec();
+    reply[2] = 0x81; // QR=1, RD=1
+    reply[3] = 0x80; // RA=1, RCODE=0 (NOERROR)
+    for i in 6..12 {
+        reply[i] = 0; // ANCOUNT/NSCOUNT/ARCOUNT = 0
+    }
+    reply
+}
+
+/// The QTYPE of a parsed query (the 2 bytes just before `question_end`, which `read_qname`
+/// returns as the offset past QTYPE+QCLASS).
+pub(crate) fn qtype(query: &[u8], question_end: usize) -> Option<u16> {
+    let hi = question_end.checked_sub(4)?;
+    let b = query.get(hi..hi + 2)?;
+    Some(u16::from_be_bytes([b[0], b[1]]))
+}
+
+/// DNS QTYPE for the `HTTPS` resource record (RFC 9460), which carries the ECH config.
+pub(crate) const QTYPE_HTTPS: u16 = 65;
+/// DNS QTYPE for the generic `SVCB` resource record (RFC 9460).
+pub(crate) const QTYPE_SVCB: u16 = 64;
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -72,5 +98,26 @@ mod tests {
         assert_eq!(reply[3], 0x83);
         assert_eq!(&reply[6..12], &[0, 0, 0, 0, 0, 0]); // counts zeroed
         assert_eq!(reply[0], 0xab); // txn id preserved
+    }
+
+    #[test]
+    fn nodata_is_noerror_with_no_answers() {
+        let mut q = vec![0x11, 0x22, 0x01, 0x00, 0, 1, 0, 0, 0, 0, 0, 0];
+        q.extend_from_slice(&[3, b'a', b'b', b'c', 0, 0, 65, 0, 1]); // QTYPE=HTTPS(65)
+        let end = q.len();
+        let reply = nodata_reply(&q, end);
+        assert_eq!(reply[2], 0x81);
+        assert_eq!(reply[3], 0x80); // RCODE 0
+        assert_eq!(&reply[6..12], &[0, 0, 0, 0, 0, 0]);
+        assert_eq!(reply[0], 0x11);
+    }
+
+    #[test]
+    fn reads_qtype() {
+        // header(12) + "a"(label) + root + QTYPE=65 + QCLASS=1
+        let mut q = vec![0, 0, 0x01, 0x00, 0, 1, 0, 0, 0, 0, 0, 0];
+        q.extend_from_slice(&[1, b'a', 0, 0, 65, 0, 1]);
+        let (_name, end) = read_qname(&q).unwrap();
+        assert_eq!(qtype(&q, end), Some(QTYPE_HTTPS));
     }
 }

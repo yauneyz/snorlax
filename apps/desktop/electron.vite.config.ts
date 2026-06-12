@@ -22,6 +22,7 @@ export default defineConfig(({ mode }) => {
     '@shared': resolve(__dirname, '../../packages/shared/src'),
     '@core': resolve(__dirname, '../../packages/core/src'),
     '@focuslock/shared': resolve(__dirname, '../../packages/shared/src/index.ts'),
+    '@focuslock/core/browser': resolve(__dirname, '../../packages/core/src/browser.ts'),
     '@focuslock/core': resolve(__dirname, '../../packages/core/src/index.ts'),
   };
 

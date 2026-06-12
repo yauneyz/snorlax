@@ -25,6 +25,7 @@
 use std::collections::HashSet;
 use std::ffi::{c_void, CString};
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -44,8 +45,11 @@ use windivert_sys::{
 };
 use windivert_win::Win32::Foundation::HANDLE;
 
-use crate::enforce::dns::{nxdomain_reply, read_qname};
-use crate::enforce::EnforceShared;
+use crate::enforce::dns::{
+    nodata_reply, nxdomain_reply, qtype, read_qname, QTYPE_HTTPS, QTYPE_SVCB,
+};
+use crate::enforce::sni::extract_sni;
+use crate::enforce::{EnforceShared, FlowKey, ResetKind};
 use crate::model::Policy;
 use crate::policy_match::{is_app_blocked, is_browser_image, is_doh_bypass_host, is_host_blocked};
 
@@ -53,10 +57,16 @@ const PROTO_TCP: u8 = 6;
 const PROTO_UDP: u8 = 17;
 const PORT_DNS: u16 = 53;
 const PORT_DOT: u16 = 853;
+const PORT_HTTPS: u16 = 443;
 /// MIB_TCP_STATE_ESTAB — only reset connections that are actually established.
 const TCP_STATE_ESTAB: i32 = 5;
 /// How long the reset burst captures browser TCP traffic looking for flows to RST.
 const RESET_BURST: Duration = Duration::from_secs(8);
+/// How often the burst re-sends its SYN probe salvo. A single salvo can fail to reap an idle
+/// pooled socket — the RFC 5961 challenge ACK we depend on is rate-limited by Windows and a stray
+/// SYN can be dropped — which let a browser keep riding a connection opened before focus turned
+/// on. Repeating the salvo across the burst makes the clean-slate reset reliable.
+const PROBE_INTERVAL: Duration = Duration::from_millis(1000);
 /// Cap on distinct remote IPs baked into the burst filter (keeps the filter string sane).
 const MAX_BURST_IPS: usize = 120;
 /// TCP flag bytes (the 13th byte of the TCP header).
@@ -78,11 +88,11 @@ struct Diverter {
 unsafe impl Send for Diverter {}
 
 impl Diverter {
-    fn open(filter: &str, flags: WinDivertFlags) -> std::io::Result<Self> {
+    fn open(filter: &str, priority: i16, flags: WinDivertFlags) -> std::io::Result<Self> {
         let cfilter = CString::new(filter)
             .map_err(|_| std::io::Error::new(std::io::ErrorKind::InvalidInput, "filter has NUL"))?;
         let handle =
-            unsafe { WinDivertOpen(cfilter.as_ptr(), WinDivertLayer::Network, 0, flags) };
+            unsafe { WinDivertOpen(cfilter.as_ptr(), WinDivertLayer::Network, priority, flags) };
         if handle.0 == 0 || handle.0 == -1 {
             return Err(std::io::Error::last_os_error());
         }
@@ -169,7 +179,7 @@ const ENGINE_FILTER: &str =
     "outbound and (udp.DstPort == 53 or tcp.DstPort == 53 or udp.DstPort == 853 or tcp.DstPort == 853)";
 
 pub fn run_engine(shared: Arc<EnforceShared>, shutdown: tokio::sync::watch::Receiver<bool>) {
-    let diverter = match Diverter::open(ENGINE_FILTER, WinDivertFlags::new()) {
+    let diverter = match Diverter::open(ENGINE_FILTER, 0, WinDivertFlags::new()) {
         Ok(d) => d,
         Err(e) => {
             tracing::error!("WinDivert engine open failed: {e} (driver missing or no privilege?)");
@@ -236,15 +246,15 @@ fn handle_packet(
                         tracing::debug!("sinkholed {name}");
                         // Spoof a reply server->app: swap addrs + ports, inject inbound.
                         let reply = nxdomain_reply(payload, qend);
-                        let mut out =
-                            build_udp_reply(pkt.dst, pkt.src, dport, sport, &reply);
-                        if out.is_empty() {
-                            return false;
-                        }
-                        let mut reply_addr = inbound_addr_from(addr);
-                        calc_checksums(&mut out, &mut reply_addr);
-                        let _ = diverter.send(&out, &reply_addr);
-                        return true; // drop original query
+                        return inject_dns_reply(diverter, &pkt, sport, dport, &reply, addr);
+                    }
+                    // ECH suppression: refuse HTTPS/SVCB records so a browser can't fetch an
+                    // Encrypted-ClientHello config and hide its SNI from the 443 inspector. The
+                    // browser falls back to A/AAAA with a cleartext SNI.
+                    if matches!(qtype(payload, qend), Some(QTYPE_HTTPS) | Some(QTYPE_SVCB)) {
+                        tracing::debug!("ECH-suppressed HTTPS/SVCB query for {name}");
+                        let reply = nodata_reply(payload, qend);
+                        return inject_dns_reply(diverter, &pkt, sport, dport, &reply, addr);
                     }
                 }
                 false // allowed name → reinject so it reaches the real resolver
@@ -263,6 +273,316 @@ fn handle_packet(
     }
 }
 
+/// Inject a spoofed DNS reply back to the querying app (server->app), dropping the original
+/// query. Returns true (consumed) on success, false if the reply couldn't be built.
+fn inject_dns_reply(
+    diverter: &Diverter,
+    pkt: &IpPkt,
+    sport: u16,
+    dport: u16,
+    reply: &[u8],
+    addr: &WINDIVERT_ADDRESS,
+) -> bool {
+    let mut out = build_udp_reply(pkt.dst, pkt.src, dport, sport, reply);
+    if out.is_empty() {
+        return false;
+    }
+    let mut reply_addr = inbound_addr_from(addr);
+    calc_checksums(&mut out, &mut reply_addr);
+    let _ = diverter.send(&out, &reply_addr);
+    true
+}
+
+// ---------------------------------------------------------------------------
+// SNI inspection engine (TCP 443)
+// ---------------------------------------------------------------------------
+
+/// Narrow filter used while focus is active: the first TLS handshake record of each outbound
+/// TCP 443 connection (record content-type 0x16, version 0x03xx), plus all outbound UDP 443
+/// (QUIC). Application-data TCP packets (0x17) — i.e. all bulk traffic — never match, so they
+/// stay in the kernel and steady-state throughput is untouched. UDP 443 is dropped wholesale
+/// while focused: unlike the `FocusLock-QUIC-UDP` firewall rule (which authorizes per *flow* and
+/// may not cut sessions established while focus was off), a data-plane drop starves pooled h3
+/// sessions mid-flight, so the browser falls back to TCP where the SNI check applies. Dropped
+/// flows go quiet immediately, so the per-packet user-space cost is transient.
+const SNI_FILTER: &str = "outbound and ((tcp.DstPort == 443 and tcp.PayloadLength > 0 and tcp.Payload[0] == 0x16 and tcp.Payload[1] == 0x03) or udp.DstPort == 443)";
+
+/// Record-only filter used while focus is off: just the TCP ClientHello clause of SNI_FILTER —
+/// one packet per new TLS connection, so the always-on cost is negligible (and QUIC bulk traffic
+/// never touches user space when unfocused). Recording SNIs while unfocused is what lets
+/// focus-on seed the taint set for pooled sockets opened *before* the session started — a pooled
+/// socket never sends another ClientHello, so this is the only chance to learn its hostname
+/// (see blocking-upgrade.md).
+const SNI_RECORD_FILTER: &str = "outbound and tcp.DstPort == 443 and tcp.PayloadLength > 0 and tcp.Payload[0] == 0x16 and tcp.Payload[1] == 0x03";
+
+/// How often the SNI engine and taint-drop manager poll for a focus transition (to swap/tear
+/// down their handles). Cheap: only runs while idle-waiting, four times a second.
+const FOCUS_POLL: Duration = Duration::from_millis(250);
+
+/// Priority of the taint-drop handle: below the SNI/burst handles (priority 0), so they see
+/// packets first and packets they *reinject* still traverse the drop filter.
+const TAINT_DROP_PRIORITY: i16 = -100;
+
+/// How often the taint-drop manager polls the taint generation. Tighter than FOCUS_POLL so a
+/// taint seeded at focus-on (or on a policy change) becomes an installed DROP filter within a
+/// few tens of ms — the pooled-socket window the x.com HAR exposed shrinks from ~1s to this.
+/// The poll is just an atomic load + sleep, so a fast cadence is essentially free.
+const TAINT_POLL: Duration = Duration::from_millis(50);
+
+/// 443 inspection engine. Always-on: a WinDivert handle is open for the whole service lifetime,
+/// but its filter tracks focus — record-only ClientHello capture when unfocused
+/// (SNI_RECORD_FILTER), full inspection + QUIC capture when focused (SNI_FILTER). While focused
+/// it parses each captured TCP ClientHello, records the flow's SNI (for surgical reset and
+/// taint seeding), taints destinations seen serving blocked SNIs, and RSTs connections whose
+/// SNI is blocked — blocking by the hostname the browser actually requests on the wire, immune
+/// to CDN-shared domains, hardcoded IPs, and stale DNS. It also drops all outbound QUIC
+/// (UDP 443), including sessions that were established while focus was off, forcing h3 traffic
+/// onto TCP where the SNI check works (see quic-upgrade.md). While unfocused it only records
+/// flow SNIs, so a later focus-on knows the hostname behind every already-open socket.
+pub fn run_sni_engine(shared: Arc<EnforceShared>, shutdown: tokio::sync::watch::Receiver<bool>) {
+    loop {
+        if *shutdown.borrow() {
+            break;
+        }
+        // Open with the filter matching the current focus state; reopen on every transition.
+        let was_active = shared.is_active();
+        let filter = if was_active { SNI_FILTER } else { SNI_RECORD_FILTER };
+        let diverter = match Diverter::open(filter, 0, WinDivertFlags::new()) {
+            Ok(d) => d,
+            Err(e) => {
+                tracing::error!("WinDivert SNI engine open failed: {e}");
+                std::thread::sleep(FOCUS_POLL);
+                continue;
+            }
+        };
+        tracing::info!(
+            "WinDivert SNI engine running ({})",
+            if was_active { "blocking" } else { "record-only" }
+        );
+
+        // Watcher: when focus flips (or we shut down) break the blocking recv so the handle
+        // tears down; the outer loop reopens it with the other filter. Mirrors the reset-burst
+        // shutdown pattern. `done` lets the main loop retire the watcher (e.g. after a spurious
+        // recv error) without it shutting down a handle we're already closing; we join it before
+        // the handle drops, so the watcher never references a closed/reused handle.
+        let done = Arc::new(AtomicBool::new(false));
+        let watcher = {
+            let raw = diverter.raw();
+            let shared = shared.clone();
+            let shutdown = shutdown.clone();
+            let done = done.clone();
+            std::thread::spawn(move || {
+                while shared.is_active() == was_active
+                    && !*shutdown.borrow()
+                    && !done.load(Ordering::Relaxed)
+                {
+                    std::thread::sleep(FOCUS_POLL);
+                }
+                if !done.load(Ordering::Relaxed) {
+                    unsafe {
+                        let _ = WinDivertShutdown(HANDLE(raw), WinDivertShutdownMode::Recv);
+                    }
+                }
+            })
+        };
+
+        let mut buf = vec![0u8; 65535];
+        loop {
+            let (n, addr) = match diverter.recv(&mut buf) {
+                Ok(x) => x,
+                Err(_) => break, // recv shut down (focus flipped) or drained
+            };
+            let data = &buf[..n];
+            let consumed = handle_sni_packet(&diverter, &shared, data, &addr);
+            if !consumed {
+                let _ = diverter.send(data, &addr);
+            }
+        }
+        done.store(true, Ordering::Relaxed);
+        let _ = watcher.join();
+        tracing::info!("WinDivert SNI engine handle closed (focus transition)");
+        // `diverter` dropped here (handle closed); loop back to reopen for the new state.
+    }
+    tracing::info!("WinDivert SNI engine exited");
+}
+
+/// Inspect one captured outbound 443 packet. While focused, UDP (QUIC) is dropped outright; for
+/// a TCP handshake, records the flow's SNI (always — even unfocused, so focus-on can seed taints
+/// for already-open sockets) and, while focused, taints the destination and drops/RSTs the
+/// connection if that SNI is blocked. Returns true if consumed (dropped).
+fn handle_sni_packet(
+    diverter: &Diverter,
+    shared: &EnforceShared,
+    data: &[u8],
+    addr: &WINDIVERT_ADDRESS,
+) -> bool {
+    let active = shared.is_active();
+    let Some(pkt) = parse_ip(data) else {
+        return false;
+    };
+    if pkt.proto == PROTO_UDP {
+        // QUIC. Dropping (not RSTing — UDP has no RST) starves the session; the browser marks
+        // the origin h3-broken and retries over TCP. (Only captured while focused — the
+        // record-only filter has no UDP clause — but gate anyway for the transition window.)
+        return active && matches!(udp_ports_payload(data, pkt.l4_off), Some((_, PORT_HTTPS, _)));
+    }
+    if pkt.proto != PROTO_TCP {
+        return false;
+    }
+    let Some(tcp) = tcp_fields(data, pkt.l4_off) else {
+        return false;
+    };
+    let Some(poff) = tcp_payload_offset(data, pkt.l4_off) else {
+        return false;
+    };
+    let Some(payload) = data.get(poff..) else {
+        return false;
+    };
+    let Some(host) = extract_sni(payload) else {
+        return false; // not a (complete) ClientHello, or ECH-encrypted SNI
+    };
+
+    // Record (local, local_port, remote, remote_port) -> SNI so a later focus-on / policy change
+    // can taint and reset this flow if it is (or becomes) blocked.
+    shared.record_flow_sni((pkt.src, tcp.sport, pkt.dst, tcp.dport), host.clone());
+
+    if !active {
+        return false; // record-only while unfocused
+    }
+
+    let policy = shared.policy_snapshot();
+    if is_host_blocked(&policy, &host) || is_doh_bypass_host(&host) {
+        // This destination provably serves blocked content — drop all further 443 egress to it
+        // so pooled/coalesced sockets to it die too (taint-drop layer).
+        shared.taint(pkt.dst);
+        // Inject an inbound RST to the local client (appears to come from the server), seq = the
+        // server's next expected seq (the ack we just observed) so the stack accepts it.
+        let mut rst = build_rst(pkt.dst, pkt.src, tcp.dport, tcp.sport, tcp.ack);
+        if !rst.is_empty() {
+            let mut rst_addr = inbound_addr_from(addr);
+            calc_checksums(&mut rst, &mut rst_addr);
+            let _ = diverter.send(&rst, &rst_addr);
+        }
+        tracing::debug!("SNI-blocked {host}");
+        return true; // drop the ClientHello so the handshake never completes
+    }
+    // Allowed SNI: shield this destination from tainting, and untaint it if a blanket focus-on
+    // teardown (or a stale taint) had caught it — so an allowed site recovers on its next
+    // handshake instead of waiting out the TTL.
+    shared.note_allowed(pkt.dst);
+    shared.untaint(pkt.dst);
+    false // allowed → reinject
+}
+
+/// Offset of the TCP payload within the packet, honoring the data-offset field (TCP options).
+fn tcp_payload_offset(data: &[u8], l4: usize) -> Option<usize> {
+    let data_off = *data.get(l4 + 12)?;
+    let thl = ((data_off >> 4) as usize) * 4;
+    if thl < 20 {
+        return None;
+    }
+    Some(l4 + thl)
+}
+
+// ---------------------------------------------------------------------------
+// Tainted-destination drop (stateless egress block — blocking-upgrade.md)
+// ---------------------------------------------------------------------------
+
+/// Enforcement layer for the SNI-learned taint set: while focused, keeps a DROP-flag WinDivert
+/// handle open whose filter matches all outbound 443 traffic (TCP + UDP) to tainted
+/// destinations. The DROP flag makes the driver silently discard matching packets — no recv
+/// loop, zero per-packet user-space cost — giving us focusd's "the socket simply can't send"
+/// semantics for exactly the IPs proven to serve blocked SNIs. Unlike the RST burst's
+/// find-and-reset hunt, this is stateless: a pooled/coalesced socket the burst missed goes dead
+/// the moment its destination is tainted, because none of its egress (including ACKs) gets out.
+///
+/// The filter is rebuilt whenever the taint set's membership changes (new taint, TTL eviction,
+/// clear) — new handle opened first, then the old one closed, so there is no enforcement gap.
+/// On focus-off the handle is dropped and all taint state cleared: each session starts clean.
+pub fn run_taint_drop(shared: Arc<EnforceShared>, shutdown: tokio::sync::watch::Receiver<bool>) {
+    let mut handle: Option<Diverter> = None;
+    let mut last_gen = shared.taint_generation();
+    while !*shutdown.borrow() {
+        if !shared.is_active() {
+            if handle.take().is_some() {
+                tracing::info!("taint drop disabled (focus off)");
+            }
+            shared.clear_taints();
+            std::thread::sleep(FOCUS_POLL);
+            continue;
+        }
+        // Read the generation *before* the eviction sweep: a mutation racing us bumps it past
+        // what we record, so it is caught next tick. The sweep's own eviction bump just costs
+        // one redundant rebuild.
+        let gen = shared.taint_generation();
+        let ips = shared.tainted_ips(); // TTL-evicts as a side effect
+        let flows = shared.dropped_flows(); // TTL-evicts as a side effect
+        if gen != last_gen {
+            if ips.is_empty() && flows.is_empty() {
+                if handle.take().is_some() {
+                    tracing::info!("taint drop cleared (nothing to drop)");
+                }
+            } else {
+                let filter = build_drop_filter(&ips, &flows);
+                match Diverter::open(&filter, TAINT_DROP_PRIORITY, WinDivertFlags::new().set_drop())
+                {
+                    Ok(d) => {
+                        // Assigning drops the old handle only after the new one is open.
+                        handle = Some(d);
+                        tracing::info!(
+                            "taint drop active ({} dest IP(s), {} flow(s))",
+                            ips.len(),
+                            flows.len()
+                        );
+                    }
+                    Err(e) => {
+                        // Keep the old handle/filter; last_gen stays stale so we retry next tick.
+                        tracing::warn!("taint drop open failed: {e}");
+                        std::thread::sleep(FOCUS_POLL);
+                        continue;
+                    }
+                }
+            }
+            last_gen = gen;
+        }
+        std::thread::sleep(TAINT_POLL);
+    }
+    tracing::info!("taint drop manager exited");
+}
+
+/// Build the taint-drop filter from two sets:
+///   * per-IP taints — all outbound 443 (TCP h2 + UDP h3) to a destination proven (by SNI) to
+///     serve blocked content; scoped to 443 so other services on a shared IP are untouched.
+///   * per-flow drops — exact `(local_port, remote, 443)` tuples of established browser sockets
+///     torn down at focus-on; per-tuple so an already-open socket dies reliably while a new
+///     connection to the same IP (a different local port) is unaffected.
+fn build_drop_filter(ips: &[IpAddr], flows: &[FlowKey]) -> String {
+    let mut clauses: Vec<String> = Vec::new();
+    if !ips.is_empty() {
+        let mut parts = Vec::with_capacity(ips.len());
+        for ip in ips {
+            match ip {
+                IpAddr::V4(a) => parts.push(format!("ip.DstAddr == {a}")),
+                IpAddr::V6(a) => parts.push(format!("ipv6.DstAddr == {a}")),
+            }
+        }
+        clauses.push(format!(
+            "((tcp.DstPort == 443 or udp.DstPort == 443) and ({}))",
+            parts.join(" or ")
+        ));
+    }
+    for (_local, lport, remote, rport) in flows {
+        let addr = match remote {
+            IpAddr::V4(a) => format!("ip.DstAddr == {a}"),
+            IpAddr::V6(a) => format!("ipv6.DstAddr == {a}"),
+        };
+        clauses.push(format!(
+            "(tcp.DstPort == {rport} and tcp.SrcPort == {lport} and {addr})"
+        ));
+    }
+    format!("outbound and ({})", clauses.join(" or "))
+}
+
 // ---------------------------------------------------------------------------
 // Connection reset
 // ---------------------------------------------------------------------------
@@ -272,16 +592,21 @@ fn handle_packet(
 /// its own thread so the DNS engine keeps filtering during the burst.
 pub fn run_reset_worker(
     shared: Arc<EnforceShared>,
-    mut signals: tokio::sync::mpsc::UnboundedReceiver<()>,
+    mut signals: tokio::sync::mpsc::UnboundedReceiver<ResetKind>,
 ) {
-    while let Some(()) = signals.blocking_recv() {
-        // Coalesce a flurry of signals into one pass.
-        while signals.try_recv().is_ok() {}
+    while let Some(first) = signals.blocking_recv() {
+        // Coalesce a flurry of signals into one pass; a focus-on (broad) wins over policy-change.
+        let mut kind = first;
+        while let Ok(more) = signals.try_recv() {
+            if more == ResetKind::FocusOn {
+                kind = ResetKind::FocusOn;
+            }
+        }
         if shared.is_active() {
             // Drop stale allowed entries the OS resolver cached (e.g. while focus was off), so
             // every subsequent lookup re-hits the engine instead of reusing a cached IP.
             flush_dns_cache();
-            reset_browser_connections(&shared.policy_snapshot());
+            reset_browser_connections(&shared, kind);
         }
     }
 }
@@ -292,12 +617,53 @@ fn flush_dns_cache() {
     crate::run::run_command("ipconfig", &["/flushdns"], "flush DNS cache");
 }
 
-fn reset_browser_connections(policy: &Policy) {
-    let targets = target_pids(policy);
+fn reset_browser_connections(shared: &EnforceShared, kind: ResetKind) {
+    let policy = shared.policy_snapshot();
+    let targets = target_pids(&policy);
     if targets.is_empty() {
         return;
     }
-    let conns = established_conns(&targets);
+    let all = established_conns(&targets);
+    if all.is_empty() {
+        return;
+    }
+
+    // Seed the taint set: any live flow whose recorded SNI is blocked gets its destination
+    // dropped by the taint layer, so even a socket every RST probe misses goes dead (its egress
+    // — including ACKs — can't flow). This is what catches a pooled socket opened *before*
+    // focus-on: its ClientHello was recorded by the always-on SNI engine, and it will never send
+    // another one for the burst-failure path to learn from.
+    for c in &all {
+        if flow_now_blocked(shared, &policy, c) {
+            shared.taint(c.remote);
+        }
+    }
+
+    // Focus-on clean slate: also seed a per-tuple drop for *every* established browser 443 socket,
+    // not just the SNI-blocked ones. This is the reliable form of the RST burst — it mutes a
+    // socket whose hostname we never observed (opened before recording, so no taint seed and no
+    // new ClientHello to catch). Per-tuple, not per-IP, so an allowed site reconnects on a fresh
+    // local port (a new tuple, not in the set) with no collateral; a blocked site's reconnect is
+    // killed at DNS. The SNI engine untaints any per-IP taint on an allowed handshake; per-tuple
+    // drops need no such recovery since the allowed reconnect uses a different tuple.
+    if kind == ResetKind::FocusOn {
+        for c in &all {
+            if c.remote_port == PORT_HTTPS {
+                shared.drop_flow((c.local, c.local_port, c.remote, c.remote_port));
+            }
+        }
+    }
+
+    // Focus-on resets everything (clean slate). A policy change resets only flows whose recorded
+    // SNI is now blocked — so allowed sites' sockets survive. (Newly-blocked *apps* are reaped by
+    // the process-kill poller, so they need no RST here.)
+    let conns: Vec<Conn> = match kind {
+        ResetKind::FocusOn => all,
+        ResetKind::PolicyChange => all
+            .into_iter()
+            .filter(|c| flow_now_blocked(shared, &policy, c))
+            .collect(),
+    };
     if conns.is_empty() {
         return;
     }
@@ -312,7 +678,7 @@ fn reset_browser_connections(policy: &Policy) {
     ips.truncate(MAX_BURST_IPS);
 
     let filter = build_burst_filter(&ips);
-    let burst = match Diverter::open(&filter, WinDivertFlags::new()) {
+    let burst = match Diverter::open(&filter, 0, WinDivertFlags::new()) {
         Ok(d) => d,
         Err(e) => {
             tracing::warn!("reset burst open failed: {e}");
@@ -320,39 +686,32 @@ fn reset_browser_connections(policy: &Policy) {
         }
     };
 
-    // Bound the burst: a timer thread shuts down recv after RESET_BURST so idle flows don't
-    // block us forever. WinDivertShutdown(Recv) makes the recv loop drain and then exit.
+    // Idle sockets emit no packets, so passive RST never fires on them. We poke each target with
+    // an inbound SYN: per RFC 5961 the local stack answers an established connection's stray SYN
+    // with a "challenge ACK" — an outbound packet the recv loop below catches and turns into a
+    // properly-sequenced RST. This is what lets us reap idle browser connections (v4 and v6).
+    //
+    // A burst-driver thread sends that probe salvo immediately, then re-sends it every
+    // PROBE_INTERVAL until RESET_BURST elapses (one salvo can be missed — see PROBE_INTERVAL),
+    // and finally shuts recv down so the loop below drains and exits. Probing an
+    // already-killed connection is harmless (the stack has no matching socket).
     let raw = burst.raw();
+    let probes: Vec<(Vec<u8>, WINDIVERT_ADDRESS)> = conns.iter().filter_map(build_syn_probe).collect();
     std::thread::spawn(move || {
-        std::thread::sleep(RESET_BURST);
+        let deadline = std::time::Instant::now() + RESET_BURST;
+        loop {
+            for (probe, paddr) in &probes {
+                send_on_raw(raw, probe, paddr);
+            }
+            if std::time::Instant::now() >= deadline {
+                break;
+            }
+            std::thread::sleep(PROBE_INTERVAL);
+        }
         unsafe {
             let _ = WinDivertShutdown(HANDLE(raw), WinDivertShutdownMode::Recv);
         }
     });
-
-    // Idle sockets emit no packets, so passive RST never fires on them. Poke each target with
-    // an inbound SYN: per RFC 5961 the local stack answers an established connection's stray SYN
-    // with a "challenge ACK" — an outbound packet the recv loop below catches and turns into a
-    // properly-sequenced RST. This is what lets us reap idle browser connections (v4 and v6).
-    for conn in &conns {
-        if let Some(ifindex) = best_iface(conn.remote) {
-            let probe = build_tcp(
-                conn.remote,
-                conn.local,
-                conn.remote_port,
-                conn.local_port,
-                0,
-                0,
-                TCP_FLAG_SYN,
-            );
-            if !probe.is_empty() {
-                let mut probe = probe;
-                let mut paddr = injected_inbound_addr(ifindex, conn.remote.is_ipv6());
-                calc_checksums(&mut probe, &mut paddr);
-                let _ = burst.send(&probe, &paddr);
-            }
-        }
-    }
 
     let mut buf = vec![0u8; 65535];
     let mut killed = 0usize;
@@ -392,6 +751,15 @@ fn reset_browser_connections(policy: &Policy) {
         }
     }
     tracing::info!("connection-reset burst complete ({killed} RST injected)");
+}
+
+/// For a policy-change reset: is this flow now blocked by its recorded SNI? Flows we never saw a
+/// ClientHello for (no recorded SNI) are left alone.
+fn flow_now_blocked(shared: &EnforceShared, policy: &Policy, c: &Conn) -> bool {
+    match shared.flow_sni(&(c.local, c.local_port, c.remote, c.remote_port)) {
+        Some(sni) => is_host_blocked(policy, &sni) || is_doh_bypass_host(&sni),
+        None => false,
+    }
 }
 
 /// PIDs of processes whose live TCP flows we should reset: browsers + anything on the
@@ -716,14 +1084,49 @@ fn best_iface(remote: IpAddr) -> Option<u32> {
     }
 }
 
+/// Build the inbound SYN probe + its injection address for a connection, ready to send on the
+/// burst handle. Returns None if the outbound interface can't be resolved (we then rely on the
+/// connection's own traffic to trigger a reset).
+fn build_syn_probe(conn: &Conn) -> Option<(Vec<u8>, WINDIVERT_ADDRESS)> {
+    let ifindex = best_iface(conn.remote)?;
+    let mut probe = build_tcp(
+        conn.remote,
+        conn.local,
+        conn.remote_port,
+        conn.local_port,
+        0,
+        0,
+        TCP_FLAG_SYN,
+    );
+    if probe.is_empty() {
+        return None;
+    }
+    let mut addr = injected_inbound_addr(ifindex, conn.remote.is_ipv6());
+    calc_checksums(&mut probe, &mut addr);
+    Some((probe, addr))
+}
+
+/// Send a manufactured packet on a raw WinDivert handle. Used by the burst-driver thread, which
+/// shares the handle with the recv loop; WinDivert's send is thread-safe (see `Diverter`).
+fn send_on_raw(raw: isize, data: &[u8], addr: &WINDIVERT_ADDRESS) {
+    let mut sent = 0u32;
+    unsafe {
+        let _ = WinDivertSend(
+            HANDLE(raw),
+            data.as_ptr() as *const c_void,
+            data.len() as u32,
+            &mut sent,
+            addr,
+        );
+    }
+}
+
 /// A zeroed network-layer address set up to inject an inbound packet on a given interface.
 fn injected_inbound_addr(ifindex: u32, v6: bool) -> WINDIVERT_ADDRESS {
     let mut addr = WINDIVERT_ADDRESS::default(); // layer=Network, event=NetworkPacket (both 0)
     addr.set_outbound(false);
     addr.set_ipv6(v6);
-    unsafe {
-        addr.union_field.Network.interface_id = ifindex;
-    }
+    addr.union_field.Network.interface_id = ifindex;
     addr
 }
 
@@ -804,5 +1207,34 @@ mod tests {
         assert!(f.contains("ip.DstAddr == 1.2.3.4"));
         assert!(f.contains("ipv6.DstAddr == ::1"));
         assert!(f.starts_with("outbound and tcp and ("));
+    }
+
+    #[test]
+    fn taint_filter_mixes_families() {
+        let ips = [
+            Ipv4Addr::new(151, 101, 1, 140).into(),
+            Ipv6Addr::LOCALHOST.into(),
+        ];
+        let f = build_drop_filter(&ips, &[]);
+        assert!(f.contains("ip.DstAddr == 151.101.1.140"));
+        assert!(f.contains("ipv6.DstAddr == ::1"));
+        assert!(f.contains("(tcp.DstPort == 443 or udp.DstPort == 443)"));
+        assert!(f.starts_with("outbound and ("));
+    }
+
+    #[test]
+    fn drop_filter_includes_per_flow_tuple() {
+        let flows: Vec<FlowKey> = vec![(
+            Ipv4Addr::new(192, 168, 1, 5).into(),
+            54321,
+            Ipv4Addr::new(151, 101, 1, 140).into(),
+            443,
+        )];
+        let f = build_drop_filter(&[], &flows);
+        // Per-tuple: keyed on remote IP + local source port + remote dest port.
+        assert!(f.contains("tcp.DstPort == 443"));
+        assert!(f.contains("tcp.SrcPort == 54321"));
+        assert!(f.contains("ip.DstAddr == 151.101.1.140"));
+        assert!(f.starts_with("outbound and ("));
     }
 }

@@ -5,7 +5,7 @@
  */
 
 import { join } from 'node:path';
-import { BrowserWindow, shell } from 'electron';
+import { app, BrowserWindow, shell } from 'electron';
 import { config } from './config.js';
 import { logger } from './logging.js';
 
@@ -56,11 +56,33 @@ export function createWindow(): BrowserWindow {
   return win;
 }
 
+function presentWindow(win: BrowserWindow): void {
+  if (win.isMinimized()) win.restore();
+  win.show();
+  win.focus();
+}
+
+/** Show the existing main window, or recreate it after the user closed it to the tray. */
+export function showMainWindow(): BrowserWindow | null {
+  if (!app.isReady()) {
+    void app.whenReady().then(() => showMainWindow());
+    return mainWindow;
+  }
+
+  const existingWindow = mainWindow && !mainWindow.isDestroyed() ? mainWindow : null;
+  const win = existingWindow ?? createWindow();
+  if (existingWindow) {
+    presentWindow(win);
+  } else {
+    win.once('ready-to-show', () => {
+      if (!win.isDestroyed()) presentWindow(win);
+    });
+  }
+  return win;
+}
+
 /** Handle a focuslock:// deep link (focus the window; billing return handled in Phase 3). */
 export function handleDeepLink(url: string): void {
   logger.info(`[deeplink] ${url}`);
-  if (mainWindow) {
-    if (mainWindow.isMinimized()) mainWindow.restore();
-    mainWindow.focus();
-  }
+  showMainWindow();
 }

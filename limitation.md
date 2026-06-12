@@ -77,6 +77,17 @@ have (capture outbound 443, parse the ClientHello SNI, RST if blocked).
 The fully general fix noted in `lib.rs` — redirect/deny at the connection layer with app + flow
 context. Overkill for this specific issue; SNI inspection (option 2) gets ~all the value sooner.
 
+**Signing note (decision-relevant):**
+- A WFP **callout driver** — connect-redirect, or any payload/stream inspection in the kernel —
+  is a kernel-mode driver and **requires signing** (EV cert + Microsoft attestation). This is the
+  cost we avoided by using WinDivert.
+- Pure user-mode **WFP filters** (`FwpmFilterAdd`, block/permit at `ALE_AUTH_CONNECT` by
+  IP/port/app) need **no driver and no signing** — but they're connect-time only and can't see
+  SNI or redirect.
+- **Option 2 (SNI) needs no signing from us**: WinDivert's already-signed driver does the capture;
+  we just parse the ClientHello in user mode. Only pursue option 3 if we later want transparent
+  redirect (vs. RST) or kill-resistant filtering that survives the service being killed.
+
 ## Recommendation
 
 Tomorrow: do **option 1** now (covers the common case in minutes), and scope **option 2 (SNI

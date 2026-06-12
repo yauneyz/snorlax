@@ -10,7 +10,7 @@ import { config } from './config.js';
 import { logger } from './logging.js';
 import type { ServiceConnection } from './service/connection.js';
 import type { MockServiceConnection } from './service/mockService.js';
-import { getMainWindow } from './window.js';
+import { showMainWindow } from './window.js';
 
 let tray: Tray | null = null;
 
@@ -31,7 +31,7 @@ export function createTray(service: ServiceConnection, mock?: MockServiceConnect
     const items: Electron.MenuItemConstructorOptions[] = [
       { label: present ? 'Key present ✅' : 'No key ❌', enabled: false },
       { type: 'separator' },
-      { label: 'Open FocusLock', click: () => getMainWindow()?.show() },
+      { label: 'Open FocusLock', click: () => showMainWindow() },
     ];
     if (mock) {
       items.push({
@@ -51,7 +51,7 @@ export function createTray(service: ServiceConnection, mock?: MockServiceConnect
     rebuildMenu(present);
   });
 
-  tray.on('click', () => getMainWindow()?.show());
+  tray.on('click', () => showMainWindow());
 
   if (config.isDev) logger.debug('[tray] dev mode: simulated-key toggle available');
   return tray;
