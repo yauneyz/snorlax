@@ -15,9 +15,10 @@ use crate::pairing;
 use crate::secure_store::{KeySecret, SecureStore};
 
 use windows::core::PCWSTR;
-use windows::Win32::Storage::FileSystem::{GetDriveTypeW, GetVolumeInformationW, DRIVE_REMOVABLE};
+use windows::Win32::Storage::FileSystem::{GetDriveTypeW, GetVolumeInformationW};
 
 const KEY_REL_PATH: &str = r".focuslock\key.bin";
+const DRIVE_REMOVABLE: u32 = 2;
 
 #[derive(Clone, Debug)]
 pub struct DriveInfo {

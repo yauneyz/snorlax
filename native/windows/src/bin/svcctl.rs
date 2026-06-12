@@ -17,10 +17,11 @@ use focuslock::constants::{pipe_path, PIPE_BASE_PROD, SERVICE_DISPLAY_NAME, SERV
 use focuslock::pairing;
 use focuslock::paths;
 use focuslock::secure_store::SecureStore;
+use windows::Win32::Foundation::ERROR_SERVICE_EXISTS;
 
 use windows_service::service::{
     ServiceAccess, ServiceAction, ServiceActionType, ServiceErrorControl, ServiceFailureActions,
-    ServiceFailureResetPeriod, ServiceInfo, ServiceStartType, ServiceType,
+    ServiceFailureResetPeriod, ServiceInfo, ServiceStartType, ServiceState, ServiceType,
 };
 use windows_service::service_manager::{ServiceManager, ServiceManagerAccess};
 
@@ -38,7 +39,39 @@ fn install() -> Result<()> {
         ServiceManagerAccess::CONNECT | ServiceManagerAccess::CREATE_SERVICE,
     )?;
 
-    let service_info = ServiceInfo {
+    let service_info = service_info()?;
+    let access = ServiceAccess::CHANGE_CONFIG
+        | ServiceAccess::START
+        | ServiceAccess::STOP
+        | ServiceAccess::QUERY_STATUS;
+    let service = match manager.create_service(&service_info, access) {
+        Ok(service) => {
+            println!("Service '{SERVICE_NAME}' created.");
+            service
+        }
+        Err(windows_service::Error::Winapi(err))
+            if err.raw_os_error() == Some(ERROR_SERVICE_EXISTS.0 as i32) =>
+        {
+            println!("Service '{SERVICE_NAME}' already exists; repairing configuration.");
+            let service = manager.open_service(SERVICE_NAME, access)?;
+            stop_if_running(&service)?;
+            service
+                .change_config(&service_info)
+                .context("update service configuration")?;
+            service
+        }
+        Err(err) => return Err(err.into()),
+    };
+
+    configure_service(&service)?;
+    start_if_needed(&service)?;
+
+    gen_code()?;
+    Ok(())
+}
+
+fn service_info() -> Result<ServiceInfo> {
+    Ok(ServiceInfo {
         name: OsString::from(SERVICE_NAME),
         display_name: OsString::from(SERVICE_DISPLAY_NAME),
         service_type: ServiceType::OWN_PROCESS,
@@ -49,18 +82,24 @@ fn install() -> Result<()> {
         dependencies: vec![],
         account_name: None, // LocalSystem
         account_password: None,
-    };
+    })
+}
 
-    let service = manager.create_service(
-        &service_info,
-        ServiceAccess::CHANGE_CONFIG | ServiceAccess::START | ServiceAccess::QUERY_STATUS,
-    )?;
-
+fn configure_service(service: &windows_service::service::Service) -> Result<()> {
     // SCM recovery: restart three times with a 1s delay, resetting the count daily.
     let actions = vec![
-        ServiceAction { action_type: ServiceActionType::Restart, delay: Duration::from_secs(1) },
-        ServiceAction { action_type: ServiceActionType::Restart, delay: Duration::from_secs(1) },
-        ServiceAction { action_type: ServiceActionType::Restart, delay: Duration::from_secs(1) },
+        ServiceAction {
+            action_type: ServiceActionType::Restart,
+            delay: Duration::from_secs(1),
+        },
+        ServiceAction {
+            action_type: ServiceActionType::Restart,
+            delay: Duration::from_secs(1),
+        },
+        ServiceAction {
+            action_type: ServiceActionType::Restart,
+            delay: Duration::from_secs(1),
+        },
     ];
     let failure_actions = ServiceFailureActions {
         reset_period: ServiceFailureResetPeriod::After(Duration::from_secs(86_400)),
@@ -75,10 +114,41 @@ fn install() -> Result<()> {
     // NOTE: LocalSystem services already deny STOP/DELETE to non-admins by default DACL.
     // A tighter explicit DACL (deny even other admins) is a documented hardening upgrade.
 
-    service.start::<OsString>(&[]).ok(); // best-effort immediate start
-    println!("Service '{SERVICE_NAME}' installed and started.");
+    Ok(())
+}
 
-    gen_code()?;
+fn stop_if_running(service: &windows_service::service::Service) -> Result<()> {
+    let status = service.query_status().context("query service status")?;
+    if status.current_state == ServiceState::Stopped {
+        println!("Service '{SERVICE_NAME}' is already stopped.");
+        return Ok(());
+    }
+
+    println!("Stopping existing service '{SERVICE_NAME}'.");
+    if status.current_state != ServiceState::StopPending {
+        service.stop().context("stop service")?;
+    }
+
+    for _ in 0..30 {
+        let status = service.query_status().context("query service status")?;
+        if status.current_state == ServiceState::Stopped {
+            println!("Service '{SERVICE_NAME}' stopped.");
+            return Ok(());
+        }
+        std::thread::sleep(Duration::from_millis(500));
+    }
+
+    anyhow::bail!("service did not stop within 15 seconds");
+}
+
+fn start_if_needed(service: &windows_service::service::Service) -> Result<()> {
+    let status = service.query_status().context("query service status")?;
+    if status.current_state == ServiceState::Stopped {
+        service.start::<OsString>(&[]).context("start service")?;
+        println!("Service '{SERVICE_NAME}' started.");
+    } else {
+        println!("Service '{SERVICE_NAME}' is {:?}.", status.current_state);
+    }
     Ok(())
 }
 
@@ -149,7 +219,8 @@ fn guard_uninstall() -> Result<()> {
         Err(_) => return Ok(()), // service not running → nothing to guard
     };
 
-    (&file).write_all(b"{\"kind\":\"request\",\"id\":1,\"method\":\"getState\",\"params\":{}}\n")?;
+    (&file)
+        .write_all(b"{\"kind\":\"request\",\"id\":1,\"method\":\"getState\",\"params\":{}}\n")?;
 
     let mut reader = BufReader::new(&file);
     let mut line = String::new();

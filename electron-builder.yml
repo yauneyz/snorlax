@@ -6,6 +6,9 @@ directories:
   output: dist
   buildResources: apps/desktop/build
 
+extraMetadata:
+  main: apps/desktop/out/main/index.js
+
 files:
   - apps/desktop/out/**/*
   - package.json
@@ -18,6 +21,7 @@ extraResources:
       - '**/*'
 
 win:
+  signAndEditExecutable: false
   target:
     - nsis
   # No explicit icon: electron-builder auto-generates the .ico from build/icon.png (256×256).

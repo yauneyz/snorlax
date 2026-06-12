@@ -12,7 +12,7 @@ use crate::enforce::{self, EnforceShared};
 use crate::ipc;
 use crate::secure_store::SecureStore;
 use crate::state::PersistentState;
-use crate::{enforce::dns, enforce::apps};
+use crate::{enforce::apps, enforce::dns};
 
 const PRESENCE_POLL: Duration = Duration::from_secs(3);
 const SCHEDULE_POLL: Duration = Duration::from_secs(30);

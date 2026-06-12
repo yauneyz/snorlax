@@ -13,7 +13,10 @@ use crate::policy_match::is_app_blocked;
 
 const POLL: Duration = Duration::from_millis(1000);
 
-pub async fn run_app_blocker(shared: Arc<EnforceShared>, mut shutdown: tokio::sync::watch::Receiver<bool>) {
+pub async fn run_app_blocker(
+    shared: Arc<EnforceShared>,
+    mut shutdown: tokio::sync::watch::Receiver<bool>,
+) {
     let mut sys = System::new();
     tracing::info!("app blocker started");
     loop {

@@ -20,8 +20,11 @@ pub fn pipe_path(base: &str) -> String {
 /// Upstream DNS used by the sinkhole to resolve *allowed* domains.
 pub const UPSTREAM_DNS: &str = "1.1.1.1:53";
 
-/// Loopback address the sinkhole binds to and adapters are pointed at.
+/// Loopback addresses the sinkhole binds to and adapters are pointed at. Both families are
+/// required: adapters commonly get IPv6 DNS servers from RA/DHCPv6, and the Windows resolver
+/// will happily use those to bypass an IPv4-only sinkhole.
 pub const SINKHOLE_ADDR: &str = "127.0.0.1:53";
+pub const SINKHOLE_ADDR_V6: &str = "[::1]:53";
 
 /// Error codes mirrored from constants.ts ErrorCode.
 pub mod err {

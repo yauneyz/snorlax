@@ -47,7 +47,8 @@ async fn try_pipe(base: &str, code: &str) -> Result<bool> {
     };
 
     let (reader, mut writer) = tokio::io::split(client);
-    let req = json!({ "kind": "request", "id": 1, "method": "recover", "params": { "code": code } });
+    let req =
+        json!({ "kind": "request", "id": 1, "method": "recover", "params": { "code": code } });
     writer.write_all(format!("{req}\n").as_bytes()).await?;
 
     let mut lines = BufReader::new(reader).lines();
@@ -56,12 +57,17 @@ async fn try_pipe(base: &str, code: &str) -> Result<bool> {
     while tokio::time::Instant::now() < deadline {
         let line = tokio::time::timeout(Duration::from_secs(5), lines.next_line()).await;
         let Ok(Ok(Some(line))) = line else { break };
-        let Ok(value) = serde_json::from_str::<Value>(&line) else { continue };
+        let Ok(value) = serde_json::from_str::<Value>(&line) else {
+            continue;
+        };
         if value.get("kind").and_then(|v| v.as_str()) == Some("response") {
             if value.get("ok").and_then(|v| v.as_bool()) == Some(true) {
                 return Ok(true);
             }
-            let msg = value.get("message").and_then(|v| v.as_str()).unwrap_or("recover rejected");
+            let msg = value
+                .get("message")
+                .and_then(|v| v.as_str())
+                .unwrap_or("recover rejected");
             bail!("service rejected recovery: {msg}");
         }
     }
@@ -97,7 +103,8 @@ fn offline_recover(code: &str) -> Result<()> {
 fn stop_service_best_effort() {
     use windows_service::service::ServiceAccess;
     use windows_service::service_manager::{ServiceManager, ServiceManagerAccess};
-    if let Ok(manager) = ServiceManager::local_computer(None::<&str>, ServiceManagerAccess::CONNECT) {
+    if let Ok(manager) = ServiceManager::local_computer(None::<&str>, ServiceManagerAccess::CONNECT)
+    {
         if let Ok(service) =
             manager.open_service(focuslock::constants::SERVICE_NAME, ServiceAccess::STOP)
         {

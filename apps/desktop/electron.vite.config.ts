@@ -37,6 +37,10 @@ export default defineConfig(({ mode }) => {
         rollupOptions: {
           input: resolve(__dirname, 'src/main/index.ts'),
           external: ['electron-updater', 'electron-log'],
+          output: {
+            format: 'cjs',
+            entryFileNames: 'index.js',
+          },
         },
       },
     },
@@ -44,6 +48,10 @@ export default defineConfig(({ mode }) => {
       build: {
         rollupOptions: {
           input: resolve(__dirname, 'src/preload/index.ts'),
+          output: {
+            format: 'cjs',
+            entryFileNames: 'index.js',
+          },
         },
       },
     },

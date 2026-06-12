@@ -1,8 +1,10 @@
 //! Local DNS sinkhole + adapter-DNS redirection (architecture §4.1).
 //!
-//! The sinkhole binds 127.0.0.1:53. For a blocked name it answers NXDOMAIN; for an allowed
-//! name it forwards the original query to UPSTREAM_DNS and relays the reply. We point every
-//! adapter's DNS at 127.0.0.1 (via PowerShell) so the OS resolver path flows through us.
+//! The sinkhole binds 127.0.0.1:53 and [::1]:53. For a blocked name it answers NXDOMAIN; for
+//! an allowed name it forwards the original query to UPSTREAM_DNS and relays the reply. We
+//! point every adapter's DNS (both families) at loopback via PowerShell so the OS resolver
+//! path flows through us. Setting only the IPv4 family is not enough: adapters pick up IPv6
+//! DNS servers from RA/DHCPv6 and the resolver uses them, bypassing the sinkhole entirely.
 //!
 //! Known v1 gap (accepted in the plan): an app that hard-codes an external resolver IP, or
 //! uses DNS-over-HTTPS, can bypass the sinkhole. Closing that needs the WFP connect-redirect
@@ -15,7 +17,7 @@ use std::time::Duration;
 
 use tokio::net::UdpSocket;
 
-use crate::constants::{SINKHOLE_ADDR, UPSTREAM_DNS};
+use crate::constants::{SINKHOLE_ADDR, SINKHOLE_ADDR_V6, UPSTREAM_DNS};
 use crate::enforce::EnforceShared;
 use crate::policy_match::is_host_blocked;
 use crate::run::run_command;
@@ -73,17 +75,34 @@ async fn forward_upstream(query: &[u8]) -> Option<Vec<u8>> {
     Some(buf)
 }
 
-/// Run the sinkhole until `shutdown` fires. Always running; self-gates on focus state. Each
-/// query is handled in its own task so a slow upstream lookup never blocks other queries.
-pub async fn run_sinkhole(shared: Arc<EnforceShared>, mut shutdown: tokio::sync::watch::Receiver<bool>) {
-    let socket = match UdpSocket::bind(SINKHOLE_ADDR).await {
+/// Run the sinkhole until `shutdown` fires. Always running; self-gates on focus state.
+/// Listens on both loopback families — adapters' IPv6 DNS is pointed at ::1, so without the
+/// v6 socket every IPv6-family lookup would stall before falling back to IPv4.
+pub async fn run_sinkhole(
+    shared: Arc<EnforceShared>,
+    shutdown: tokio::sync::watch::Receiver<bool>,
+) {
+    tokio::join!(
+        serve(SINKHOLE_ADDR, shared.clone(), shutdown.clone()),
+        serve(SINKHOLE_ADDR_V6, shared, shutdown),
+    );
+}
+
+/// Serve one loopback socket. Each query is handled in its own task so a slow upstream lookup
+/// never blocks other queries.
+async fn serve(
+    addr: &str,
+    shared: Arc<EnforceShared>,
+    mut shutdown: tokio::sync::watch::Receiver<bool>,
+) {
+    let socket = match UdpSocket::bind(addr).await {
         Ok(s) => Arc::new(s),
         Err(e) => {
-            tracing::error!("sinkhole bind {SINKHOLE_ADDR} failed: {e} (port 53 in use or no privilege?)");
+            tracing::error!("sinkhole bind {addr} failed: {e} (port 53 in use or no privilege?)");
             return;
         }
     };
-    tracing::info!("DNS sinkhole listening on {SINKHOLE_ADDR}");
+    tracing::info!("DNS sinkhole listening on {addr}");
     let mut buf = vec![0u8; 1500];
 
     loop {
@@ -104,7 +123,7 @@ pub async fn run_sinkhole(shared: Arc<EnforceShared>, mut shutdown: tokio::sync:
             }
         }
     }
-    tracing::info!("DNS sinkhole stopped");
+    tracing::info!("DNS sinkhole on {addr} stopped");
 }
 
 async fn handle_query(shared: &EnforceShared, query: &[u8]) -> Option<Vec<u8>> {
@@ -120,16 +139,26 @@ async fn handle_query(shared: &EnforceShared, query: &[u8]) -> Option<Vec<u8>> {
     forward_upstream(query).await
 }
 
-/// Point every up physical adapter's DNS at the loopback sinkhole.
+/// Point every up physical adapter's DNS at the loopback sinkhole, both address families.
+/// Passing only '127.0.0.1' would leave RA/DHCPv6-assigned IPv6 DNS servers in place, and the
+/// resolver would use those instead of the sinkhole.
 pub fn point_adapters_to_sinkhole() {
     let script = "Get-NetAdapter -Physical | Where-Object { $_.Status -eq 'Up' } | \
-        Set-DnsClientServerAddress -ServerAddresses '127.0.0.1'";
-    run_command("powershell", &["-NoProfile", "-NonInteractive", "-Command", script], "point adapter DNS to sinkhole");
+        Set-DnsClientServerAddress -ServerAddresses '127.0.0.1','::1'";
+    run_command(
+        "powershell",
+        &["-NoProfile", "-NonInteractive", "-Command", script],
+        "point adapter DNS to sinkhole",
+    );
 }
 
 /// Reset adapters' DNS back to automatic (DHCP).
 pub fn restore_adapter_dns() {
     let script = "Get-NetAdapter -Physical | \
         Set-DnsClientServerAddress -ResetServerAddresses";
-    run_command("powershell", &["-NoProfile", "-NonInteractive", "-Command", script], "restore adapter DNS");
+    run_command(
+        "powershell",
+        &["-NoProfile", "-NonInteractive", "-Command", script],
+        "restore adapter DNS",
+    );
 }

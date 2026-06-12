@@ -101,7 +101,13 @@ mod tests {
     fn win(id: &str, locked: bool) -> ScheduleWindow {
         ScheduleWindow {
             id: id.into(),
-            days: vec!["mon".into(), "tue".into(), "wed".into(), "thu".into(), "fri".into()],
+            days: vec![
+                "mon".into(),
+                "tue".into(),
+                "wed".into(),
+                "thu".into(),
+                "fri".into(),
+            ],
             start: "09:00".into(),
             end: "17:00".into(),
             policy_id: None,
@@ -118,7 +124,9 @@ mod tests {
 
     #[test]
     fn active_window() {
-        let s = Schedule { windows: vec![win("w1", false)] };
+        let s = Schedule {
+            windows: vec![win("w1", false)],
+        };
         let e = evaluate_at(&s, "mon", 10 * 60);
         assert!(e.active);
         assert_eq!(e.window_id.as_deref(), Some("w1"));
@@ -127,7 +135,9 @@ mod tests {
 
     #[test]
     fn locked_wins() {
-        let s = Schedule { windows: vec![win("a", false), win("b", true)] };
+        let s = Schedule {
+            windows: vec![win("a", false), win("b", true)],
+        };
         let e = evaluate_at(&s, "mon", 10 * 60);
         assert!(e.locked);
         assert_eq!(e.window_id.as_deref(), Some("b"));

@@ -25,7 +25,10 @@ pub struct RpcError {
 
 impl RpcError {
     fn new(code: &str, message: impl Into<String>) -> Self {
-        RpcError { code: code.into(), message: message.into() }
+        RpcError {
+            code: code.into(),
+            message: message.into(),
+        }
     }
 }
 
@@ -56,7 +59,9 @@ impl Core {
     }
 
     fn emit(&self, event: &str, payload: Value) {
-        let _ = self.events.send(json!({ "kind": "event", "event": event, "payload": payload }));
+        let _ = self
+            .events
+            .send(json!({ "kind": "event", "event": event, "payload": payload }));
     }
 
     fn schedule_locked(&self) -> bool {
@@ -127,11 +132,17 @@ impl Core {
     fn disable_focus(&mut self, source: FocusSource, bypass: bool) -> Result<(), RpcError> {
         if !bypass {
             if self.schedule_locked() {
-                return Err(RpcError::new(err::LOCKED, "A locked schedule window is active."));
+                return Err(RpcError::new(
+                    err::LOCKED,
+                    "A locked schedule window is active.",
+                ));
             }
             self.recompute_presence();
             if !self.key_present {
-                return Err(RpcError::new(err::KEY_REQUIRED, "Insert your paired key to unlock."));
+                return Err(RpcError::new(
+                    err::KEY_REQUIRED,
+                    "Insert your paired key to unlock.",
+                ));
             }
         }
         self.set_focus(false, source);
@@ -156,14 +167,20 @@ impl Core {
         let drive = drives
             .into_iter()
             .find(|d| d.id == drive_id)
-            .ok_or_else(|| RpcError::new(err::BAD_REQUEST, "Drive not found or no longer connected."))?;
+            .ok_or_else(|| {
+                RpcError::new(err::BAD_REQUEST, "Drive not found or no longer connected.")
+            })?;
 
         let secret = pairing::generate_secret();
         usb::write_key_file(&drive.mount_point, &secret)
             .map_err(|e| RpcError::new(err::INTERNAL, format!("Could not write key file: {e}")))?;
 
         let id = format!("key-{}", random_id());
-        let label = if label.is_empty() { drive.label.clone() } else { label.to_string() };
+        let label = if label.is_empty() {
+            drive.label.clone()
+        } else {
+            label.to_string()
+        };
 
         self.store.keys.push(KeySecret {
             id: id.clone(),
@@ -187,7 +204,10 @@ impl Core {
         // Removing a key is itself key-gated (architecture §6).
         self.recompute_presence();
         if !self.key_present {
-            return Err(RpcError::new(err::KEY_REQUIRED, "Insert a paired key to remove a key."));
+            return Err(RpcError::new(
+                err::KEY_REQUIRED,
+                "Insert a paired key to remove a key.",
+            ));
         }
         self.state.paired_keys.retain(|k| k.id != key_id);
         self.store.remove_key(key_id);
@@ -198,10 +218,16 @@ impl Core {
 
     fn recover(&mut self, code: &str) -> Result<(), RpcError> {
         let Some(stored) = &self.store.recovery else {
-            return Err(RpcError::new(err::BAD_RECOVERY_CODE, "No recovery code is configured."));
+            return Err(RpcError::new(
+                err::BAD_RECOVERY_CODE,
+                "No recovery code is configured.",
+            ));
         };
         if !pairing::verify_recovery_code(code, stored) {
-            return Err(RpcError::new(err::BAD_RECOVERY_CODE, "Recovery code did not match."));
+            return Err(RpcError::new(
+                err::BAD_RECOVERY_CODE,
+                "Recovery code did not match.",
+            ));
         }
         tracing::warn!("recovery code accepted — force-disabling focus");
         // Bypass the USB + locked gates entirely.
@@ -240,7 +266,9 @@ impl Core {
     pub fn dispatch(&mut self, method: &str, params: &Value) -> Result<Value, RpcError> {
         match method {
             "getState" => Ok(serde_json::to_value(self.snapshot()).unwrap()),
-            "ping" => Ok(json!({ "version": SERVICE_VERSION, "protocolVersion": PROTOCOL_VERSION })),
+            "ping" => {
+                Ok(json!({ "version": SERVICE_VERSION, "protocolVersion": PROTOCOL_VERSION }))
+            }
             "getKeyPresence" => {
                 Ok(json!({ "present": self.key_present, "keyId": self.present_key_id }))
             }
@@ -293,7 +321,10 @@ impl Core {
                 self.recover(&code)?;
                 Ok(ok())
             }
-            other => Err(RpcError::new(err::BAD_REQUEST, format!("Unknown method: {other}"))),
+            other => Err(RpcError::new(
+                err::BAD_REQUEST,
+                format!("Unknown method: {other}"),
+            )),
         }
     }
 }

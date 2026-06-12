@@ -9,6 +9,7 @@
  */
 
 import { execFileSync } from 'node:child_process';
+import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
 
@@ -20,6 +21,11 @@ const target = targetIdx !== -1 ? args[targetIdx + 1] : 'win';
 function run(cmd, cmdArgs, cwd = root) {
   console.log(`\n› ${cmd} ${cmdArgs.join(' ')}`);
   execFileSync(cmd, cmdArgs, { cwd, stdio: 'inherit', shell: process.platform === 'win32' });
+}
+
+function desktopElectronVersion() {
+  const pkg = resolve(root, 'apps/desktop/node_modules/electron/package.json');
+  return JSON.parse(readFileSync(pkg, 'utf8')).version;
 }
 
 if (target !== 'win') {
@@ -34,6 +40,13 @@ run('node', ['scripts/build-native-win.mjs']);
 run('pnpm', ['--filter', '@focuslock/desktop', 'build']);
 
 // 3. Package + NSIS installer.
-run('pnpm', ['exec', 'electron-builder', '--win', '--config', 'electron-builder.yml']);
+run('pnpm', [
+  'exec',
+  'electron-builder',
+  '--win',
+  '--config',
+  'electron-builder.yml',
+  `--config.electronVersion=${desktopElectronVersion()}`,
+]);
 
 console.log('\n✓ Build complete. Installer is in dist/.');
