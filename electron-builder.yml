@@ -1,0 +1,38 @@
+appId: com.focuslock.app
+productName: FocusLock
+copyright: Copyright © 2026
+
+directories:
+  output: dist
+  buildResources: apps/desktop/build
+
+files:
+  - apps/desktop/out/**/*
+  - package.json
+
+# Embed the native Windows service binaries produced by scripts/build-native-win.mjs.
+extraResources:
+  - from: apps/desktop/resources/bin/win
+    to: bin
+    filter:
+      - '**/*'
+
+win:
+  target:
+    - nsis
+  # No explicit icon: electron-builder auto-generates the .ico from build/icon.png (256×256).
+  # Replace build/icon.png with real branding before shipping.
+  # Code signing (Authenticode) is required for auto-update + to avoid SmartScreen.
+  # Wired in Phase 4; leave unsigned for local dev builds.
+
+nsis:
+  oneClick: false
+  perMachine: true # service install needs machine scope + elevation
+  allowElevation: true
+  allowToChangeInstallationDirectory: true
+  include: native/windows/installer/nsis-include.nsh
+  artifactName: ${productName}-Setup-${version}.${ext}
+
+publish:
+  provider: generic
+  url: https://example.invalid/updates # replaced via UPDATE_FEED_URL in Phase 4

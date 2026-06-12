@@ -1,0 +1,17 @@
+{
+  "blacklistBasic": {
+    "mode": "blacklist",
+    "domains": ["youtube.com", "*.reddit.com"],
+    "apps": [{ "windowsImageName": "chrome.exe", "label": "Chrome" }]
+  },
+  "whitelistWork": {
+    "mode": "whitelist",
+    "domains": ["mail.google.com", "github.com"],
+    "apps": []
+  },
+  "blockAll": {
+    "mode": "block-all",
+    "domains": [],
+    "apps": []
+  }
+}

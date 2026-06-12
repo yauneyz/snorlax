@@ -1,0 +1,34 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build output
+dist/
+out/
+build/
+*.tsbuildinfo
+apps/desktop/out/
+apps/desktop/resources/bin/win/*.exe
+apps/desktop/resources/bin/win/*.pdb
+
+# Rust
+native/windows/target/
+
+# Env (machine-local secrets/overrides)
+.env.local
+.env.*.local
+
+# Logs
+*.log
+logs/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+*:Zone.Identifier
+.idea/
+.vscode/
+*.swp
+
+# Recovery codes must never be committed
+recovery-code.txt

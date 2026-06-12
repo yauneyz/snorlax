@@ -1,0 +1,195 @@
+//! focuslock-svcctl.exe — the elevated install/configure/recover/remove CLI (architecture
+//! §4, §13). Invoked by the NSIS installer (and usable by support). Must run as administrator.
+//!
+//! Subcommands:
+//!   install     create + auto-start the service, configure SCM restart recovery, and generate
+//!               the one-time recovery code (prints it + writes recovery-code.txt)
+//!   uninstall   stop + delete the service
+//!   start | stop | status
+//!   gen-code    regenerate the recovery code
+
+use std::ffi::OsString;
+use std::time::Duration;
+
+use anyhow::{Context, Result};
+
+use focuslock::constants::{pipe_path, PIPE_BASE_PROD, SERVICE_DISPLAY_NAME, SERVICE_NAME};
+use focuslock::pairing;
+use focuslock::paths;
+use focuslock::secure_store::SecureStore;
+
+use windows_service::service::{
+    ServiceAccess, ServiceAction, ServiceActionType, ServiceErrorControl, ServiceFailureActions,
+    ServiceFailureResetPeriod, ServiceInfo, ServiceStartType, ServiceType,
+};
+use windows_service::service_manager::{ServiceManager, ServiceManagerAccess};
+
+fn svc_exe_path() -> Result<std::path::PathBuf> {
+    let dir = std::env::current_exe()?
+        .parent()
+        .context("no parent dir for current exe")?
+        .to_path_buf();
+    Ok(dir.join("focuslock-svc.exe"))
+}
+
+fn install() -> Result<()> {
+    let manager = ServiceManager::local_computer(
+        None::<&str>,
+        ServiceManagerAccess::CONNECT | ServiceManagerAccess::CREATE_SERVICE,
+    )?;
+
+    let service_info = ServiceInfo {
+        name: OsString::from(SERVICE_NAME),
+        display_name: OsString::from(SERVICE_DISPLAY_NAME),
+        service_type: ServiceType::OWN_PROCESS,
+        start_type: ServiceStartType::AutoStart,
+        error_control: ServiceErrorControl::Normal,
+        executable_path: svc_exe_path()?,
+        launch_arguments: vec![],
+        dependencies: vec![],
+        account_name: None, // LocalSystem
+        account_password: None,
+    };
+
+    let service = manager.create_service(
+        &service_info,
+        ServiceAccess::CHANGE_CONFIG | ServiceAccess::START | ServiceAccess::QUERY_STATUS,
+    )?;
+
+    // SCM recovery: restart three times with a 1s delay, resetting the count daily.
+    let actions = vec![
+        ServiceAction { action_type: ServiceActionType::Restart, delay: Duration::from_secs(1) },
+        ServiceAction { action_type: ServiceActionType::Restart, delay: Duration::from_secs(1) },
+        ServiceAction { action_type: ServiceActionType::Restart, delay: Duration::from_secs(1) },
+    ];
+    let failure_actions = ServiceFailureActions {
+        reset_period: ServiceFailureResetPeriod::After(Duration::from_secs(86_400)),
+        reboot_msg: None,
+        command: None,
+        actions: Some(actions),
+    };
+    service
+        .update_failure_actions(failure_actions)
+        .context("set SCM recovery actions")?;
+
+    // NOTE: LocalSystem services already deny STOP/DELETE to non-admins by default DACL.
+    // A tighter explicit DACL (deny even other admins) is a documented hardening upgrade.
+
+    service.start::<OsString>(&[]).ok(); // best-effort immediate start
+    println!("Service '{SERVICE_NAME}' installed and started.");
+
+    gen_code()?;
+    Ok(())
+}
+
+fn uninstall() -> Result<()> {
+    let manager = ServiceManager::local_computer(None::<&str>, ServiceManagerAccess::CONNECT)?;
+    let service = manager.open_service(
+        SERVICE_NAME,
+        ServiceAccess::STOP | ServiceAccess::DELETE | ServiceAccess::QUERY_STATUS,
+    )?;
+    let _ = service.stop();
+    service.delete()?;
+    println!("Service '{SERVICE_NAME}' deleted.");
+    Ok(())
+}
+
+fn start() -> Result<()> {
+    let manager = ServiceManager::local_computer(None::<&str>, ServiceManagerAccess::CONNECT)?;
+    let service = manager.open_service(SERVICE_NAME, ServiceAccess::START)?;
+    service.start::<OsString>(&[])?;
+    println!("started");
+    Ok(())
+}
+
+fn stop() -> Result<()> {
+    let manager = ServiceManager::local_computer(None::<&str>, ServiceManagerAccess::CONNECT)?;
+    let service = manager.open_service(SERVICE_NAME, ServiceAccess::STOP)?;
+    service.stop()?;
+    println!("stop signalled");
+    Ok(())
+}
+
+fn status() -> Result<()> {
+    let manager = ServiceManager::local_computer(None::<&str>, ServiceManagerAccess::CONNECT)?;
+    let service = manager.open_service(SERVICE_NAME, ServiceAccess::QUERY_STATUS)?;
+    let s = service.query_status()?;
+    println!("state: {:?}", s.current_state);
+    Ok(())
+}
+
+/// Generate a fresh recovery code, store its hash, and surface the plaintext once.
+fn gen_code() -> Result<()> {
+    let code = pairing::generate_recovery_code();
+    let mut store = SecureStore::load();
+    store.recovery = Some(pairing::hash_recovery_code(&code));
+    store.save().context("save secure store")?;
+
+    let path = paths::recovery_code_file();
+    let _ = std::fs::write(&path, format!("FocusLock recovery code: {code}\n"));
+
+    println!("\n==================== FocusLock RECOVERY CODE ====================");
+    println!("  {code}");
+    println!("  Save this somewhere safe. If you ever get locked out and can't");
+    println!("  use your USB key, run:  focuslock-recover.exe --code {code}");
+    println!("  (also written to {})", path.display());
+    println!("================================================================\n");
+    Ok(())
+}
+
+/// Exit 10 if focus is active AND no paired key is present (so the NSIS uninstaller can abort).
+/// If the service can't be reached, allow uninstall (exit 0).
+fn guard_uninstall() -> Result<()> {
+    use std::fs::OpenOptions;
+    use std::io::{BufRead, BufReader, Write};
+
+    let path = pipe_path(PIPE_BASE_PROD);
+    let file = match OpenOptions::new().read(true).write(true).open(&path) {
+        Ok(f) => f,
+        Err(_) => return Ok(()), // service not running → nothing to guard
+    };
+
+    (&file).write_all(b"{\"kind\":\"request\",\"id\":1,\"method\":\"getState\",\"params\":{}}\n")?;
+
+    let mut reader = BufReader::new(&file);
+    let mut line = String::new();
+    while reader.read_line(&mut line)? != 0 {
+        if let Ok(v) = serde_json::from_str::<serde_json::Value>(line.trim()) {
+            if v.get("kind").and_then(|k| k.as_str()) == Some("response") {
+                let r = &v["result"];
+                let focus = r["focusActive"].as_bool().unwrap_or(false);
+                let key = r["keyPresent"].as_bool().unwrap_or(false);
+                if focus && !key {
+                    eprintln!("uninstall blocked: focus active and no key present");
+                    std::process::exit(10);
+                }
+                return Ok(());
+            }
+        }
+        line.clear();
+    }
+    Ok(())
+}
+
+fn main() {
+    let cmd = std::env::args().nth(1).unwrap_or_else(|| "help".into());
+    let result = match cmd.as_str() {
+        "install" => install(),
+        "uninstall" => uninstall(),
+        "start" => start(),
+        "stop" => stop(),
+        "status" => status(),
+        "gen-code" => gen_code(),
+        "guard-uninstall" => guard_uninstall(),
+        _ => {
+            eprintln!(
+                "usage: focuslock-svcctl <install|uninstall|start|stop|status|gen-code|guard-uninstall>"
+            );
+            std::process::exit(2);
+        }
+    };
+    if let Err(e) = result {
+        eprintln!("error: {e:#}");
+        std::process::exit(1);
+    }
+}

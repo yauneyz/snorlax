@@ -1,0 +1,10 @@
+{
+  "name": "@focuslock/config",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "load.ts",
+  "dependencies": {
+    "zod": "^3.23.8"
+  }
+}

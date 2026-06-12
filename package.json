@@ -1,0 +1,28 @@
+{
+  "name": "focuslock",
+  "version": "0.1.0",
+  "private": true,
+  "description": "FocusLock — a USB-key-gated distraction blocker (Electron UI + privileged native service).",
+  "packageManager": "pnpm@9.7.0",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "dev": "node scripts/dev.mjs",
+    "build:win": "cross-env APP_ENV=production node scripts/build.mjs --target win",
+    "build:dev": "cross-env APP_ENV=development node scripts/build.mjs --target win",
+    "build:native:win": "node scripts/build-native-win.mjs",
+    "typecheck": "tsc -b && tsc -p apps/desktop/tsconfig.json --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "eslint ."
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.0",
+    "cross-env": "^7.0.3",
+    "electron-builder": "^24.13.3",
+    "typescript": "^5.5.4",
+    "vitest": "^2.0.5",
+    "zod": "^3.23.8"
+  }
+}

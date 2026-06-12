@@ -1,0 +1,38 @@
+{
+  "$comment": "Language-neutral mirror of packages/shared/src/protocol.ts + events.ts. The TypeScript types are the source of truth; this file documents the same contract for the Rust service. Wire format: newline-delimited JSON, one message per line.",
+  "protocolVersion": 1,
+  "transport": {
+    "windows": "named pipe \\\\.\\pipe\\focuslock (dev: focuslock-dev)"
+  },
+  "envelopes": {
+    "request": { "kind": "request", "id": "number", "method": "string", "params": "object" },
+    "responseOk": { "kind": "response", "id": "number", "ok": true, "result": "object" },
+    "responseErr": { "kind": "response", "id": "number", "ok": false, "code": "string", "message": "string" },
+    "event": { "kind": "event", "event": "string", "payload": "object" }
+  },
+  "methods": {
+    "getState": { "params": null, "result": "ServiceState" },
+    "ping": { "params": null, "result": { "version": "string", "protocolVersion": "number" } },
+    "getKeyPresence": { "params": null, "result": { "present": "boolean", "keyId": "string?" } },
+    "setPolicy": { "params": { "policy": "Policy" }, "result": { "ok": true } },
+    "setSchedule": { "params": { "schedule": "Schedule" }, "result": { "ok": true } },
+    "enableFocus": { "params": { "reason": "string?" }, "result": { "ok": true } },
+    "disableFocus": { "params": {}, "result": { "ok": true }, "errors": ["KEY_REQUIRED", "LOCKED"] },
+    "listRemovableDrives": { "params": null, "result": { "drives": "Drive[]" } },
+    "pairKey": { "params": { "driveId": "string", "label": "string" }, "result": { "key": "PairedKey" } },
+    "unpairKey": { "params": { "keyId": "string" }, "result": { "ok": true }, "errors": ["KEY_REQUIRED"] },
+    "recover": {
+      "params": { "code": "string" },
+      "result": { "ok": true },
+      "errors": ["BAD_RECOVERY_CODE"],
+      "$comment": "Privileged out-of-band killswitch — not surfaced in the UI; used by focuslock-recover.exe. Bypasses the USB + locked gates when the code matches."
+    }
+  },
+  "events": {
+    "keyPresenceChanged": { "present": "boolean", "keyId": "string?" },
+    "focusChanged": { "active": "boolean", "source": "user|schedule|boot|recover" },
+    "policyChanged": { "policy": "Policy" },
+    "scheduleFired": { "windowId": "string", "active": "boolean" }
+  },
+  "errorCodes": ["KEY_REQUIRED", "LOCKED", "BAD_RECOVERY_CODE", "BAD_REQUEST", "INTERNAL"]
+}

@@ -1,0 +1,24 @@
+{
+  "workdays": {
+    "windows": [
+      {
+        "id": "work",
+        "days": ["mon", "tue", "wed", "thu", "fri"],
+        "start": "09:00",
+        "end": "17:00",
+        "locked": false
+      }
+    ]
+  },
+  "lockedEvening": {
+    "windows": [
+      {
+        "id": "evening-lock",
+        "days": ["mon", "tue", "wed", "thu", "fri"],
+        "start": "20:00",
+        "end": "23:00",
+        "locked": true
+      }
+    ]
+  }
+}
