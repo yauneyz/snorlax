@@ -1,5 +1,32 @@
 # Blocking upgrade: learned data-plane drop (stateless egress block by destination)
 
+> **Status: SUPERSEDED → IP-FIRST (2026-06-12).** The learned-taint mechanism below is now the
+> *enforcement* half of a **guilty-until-proven-innocent, IP-first** model. The drop set is no
+> longer purely additive-from-live-observation: it is **pre-armed at focus-on** from three sources
+> so a pooled/coalesced/opaque socket dies instantly instead of being observed first —
+>   1. the **persisted antibody store** (`enforce::observations`, `%PROGRAMDATA%\FocusLock\
+>      observations.json`): host→IP learned by the always-on SNI recorder, **including while
+>      unfocused**, surviving restarts/reboots (`EnforceShared::prearm_from_store`);
+>   2. the **active resolver** (`enforce::resolve`): a hand-rolled UDP DNS client bound to a fixed
+>      source port (exempted from our own sinkhole in `ENGINE_FILTER`) that resolves the policy's
+>      domains against pinned upstreams on focus-on + a 5-min ticker (focusd's approach);
+>   3. the in-memory recorded flows (`seed_taints_from_flows`, retained).
+>
+> The **SNI engine flips from accusation to exoneration**: the drop handle now drops only outbound
+> 443 **application-data** (`tcp.PayloadLength > 0` and not a `0x16 0x03` handshake record) + all
+> QUIC, *exempting* SYN/ACK/ClientHello so the SNI engine still adjudicates every new connection
+> (allowed SNI → `note_allowed` + `untaint`; blocked → RST + taint). That makes a wrongly-scoped
+> shared-CDN IP recoverable on its next allowed handshake instead of dead for the whole TTL, while
+> a pooled socket (no handshake) still can't get a request out. The filter is **mode-aware**:
+> blacklist drops to the tainted set, whitelist drops to everything *not* in the durable **clean**
+> allow-exception set, block-all drops all 443 (`build_drop_filter`).
+>
+> The **reset worker was removed entirely** (RST burst, RFC-5961 challenge-ACK SYN probes,
+> `SetTcpEntry` kill, per-flow drop) — the pre-armed stateless drop replaces the find-and-reset
+> race. Accepted cost: occasional **false positives** on shared IPs (brief, self-healing on the
+> allowed co-tenant's reconnect), traded for instant, DoH/coalescing-immune blocking. The original
+> proposal and its decision record follow.
+
 > **Status: IMPLEMENTED (2026-06-12).** Decisions taken: per-IP taint learned from SNI with
 > allowed-SNI guard and TTL; drop scoped to **port 443 only** (TCP + UDP); enforcement is a
 > dedicated WinDivert handle opened with the **DROP flag** (`WinDivertFlags::set_drop()` —

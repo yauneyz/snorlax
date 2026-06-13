@@ -1,0 +1,11 @@
+We currently have a distraction blocker. The problem it has is that when we turn it on, existing sockets still work - there is a delay where sites have to be closed before they are blocked. This is a  problem because we want our blocking to be more instant than this.
+
+The sibling project to snorlax, focusd, uses ip-based blocking. Study how exactly it does it, how it knows which domains to block. This setup works 100% perfectly, except it sometimes is overkill because there can be things like shared hosting providers.
+
+What I want is to move our blocking from being primarily networking/packet-layer to primarily ip-based, with a "guilty until proven innocent" model.
+
+That is, our first pass looks at IP. If IP is clean, we don't interfere. This keeps non-blocked traffic incredibly fast. If it isn't, we inspect the packet to try to find some sort of information that suggests that it shouldn't be blocked. So this is where we get SNI, QUIC, dns, whatever. But if we can't find anything suggesting that we should mark it as allowed, then we cut it off. We will get some false positives maybe, but that is a worthwhile price to have instant blocking control and avoid dns over https and whatnot.
+
+We can also perhaps aid ourselves by keeping information stored on the machine, keeping track of what ips/hosts/etc we've seen, for example when the blocker is not running. By occasionally inspecting traffic to blocked sites (if there is any) when blocking is off, we can tune our "antibodies" to block it better.
+
+Let me know what you think and how this refactoring would impact our stratgy, given that we are willing to have the occasional false positive as opposed to false negative.

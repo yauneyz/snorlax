@@ -5,9 +5,10 @@
 use std::sync::Arc;
 use std::time::Duration;
 
-use tokio::sync::{mpsc, watch, Mutex};
+use tokio::sync::{watch, Mutex};
 
 use crate::core::Core;
+use crate::enforce::observations::ObservationStore;
 use crate::enforce::{self, EnforceShared};
 use crate::ipc;
 use crate::secure_store::SecureStore;
@@ -23,11 +24,13 @@ pub async fn serve(pipe_path: String, shutdown: watch::Receiver<bool>) {
 
     let state = PersistentState::load();
     let store = SecureStore::load();
-    let (reset_tx, reset_rx) = mpsc::unbounded_channel::<enforce::ResetKind>();
+    // Persisted antibody store: learned host→IP observations that pre-arm the suspect/clean set
+    // at focus-on (survives restarts). Shared with the SNI recorder + resolver via EnforceShared.
+    let observations = Arc::new(ObservationStore::load());
     let shared = Arc::new(EnforceShared::new(
         state.policy.clone(),
         state.focus_active,
-        reset_tx,
+        observations,
     ));
 
     let core = Arc::new(Mutex::new(Core::new(state, store, shared.clone())));
@@ -47,16 +50,20 @@ pub async fn serve(pipe_path: String, shutdown: watch::Receiver<bool>) {
         let shutdown = shutdown.clone();
         std::thread::spawn(move || divert::run_sni_engine(shared, shutdown));
     }
-    // Tainted-destination drop manager — focus-gated DROP-flag handle that kills all 443 egress
-    // to destinations observed serving blocked SNIs (see blocking-upgrade.md).
+    // Pre-armed suspect-IP drop manager — focus-gated DROP-flag handle that silently discards
+    // 443 application-data to in-scope destinations (blacklist: tainted set; whitelist: not the
+    // clean set; block-all: all). This is the IP-first enforcement point (see blocking-upgrade.md).
     {
         let shared = shared.clone();
         let shutdown = shutdown.clone();
         std::thread::spawn(move || divert::run_taint_drop(shared, shutdown));
     }
+    // Active blocked-domain resolver ticker — re-resolves the policy's domains on a cadence to
+    // pre-arm the suspect/clean set against current CDN IPs and grow the antibody store.
     {
         let shared = shared.clone();
-        std::thread::spawn(move || divert::run_reset_worker(shared, reset_rx));
+        let shutdown = shutdown.clone();
+        std::thread::spawn(move || enforce::resolve::run_resolver(shared, shutdown));
     }
 
     // Always-on app blocker (self-gates on focus_active).
@@ -96,6 +103,9 @@ pub async fn serve(pipe_path: String, shutdown: watch::Receiver<bool>) {
 
     tracing::info!("FocusLock service running; IPC at {pipe_path}");
     ipc::run_server(core, pipe_path, shutdown).await;
+
+    // Persist any pending learned observations before we exit.
+    shared.observations().flush();
 
     // NOTE: we intentionally do NOT tear down enforcement on a clean stop — if focus is active,
     // blocking should persist (the SCM restarts us on kill). The killswitch / focus-off path is

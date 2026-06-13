@@ -114,12 +114,18 @@ impl Core {
         self.shared.set_active(active);
         enforce::apply_network(active);
         if active {
-            // Taint destinations of already-open blocked flows immediately (in-memory, from the
-            // recorded SNIs) so pooled/coalesced sockets — which send no new ClientHello — die at
-            // once instead of coasting for the ~1s the reset worker's enumeration takes. The
-            // reset burst below still runs as the clean-slate teardown + safety-net seed.
+            // Hand the blocklist to policy-honoring browsers (Chrome/Edge/Brave/Firefox), which
+            // enforce it at the request layer — defeating pooled/coalesced sockets the packet
+            // layer can't see. Uses the *expanded* domain set (siblings/CDNs) from the shared copy.
+            enforce::browser_policy::apply(&self.shared.policy_snapshot());
+            // Pre-arm the suspect/clean drop set instantly, in-memory, so a pooled/coalesced/
+            // opaque socket to a blocked destination — which sends no new ClientHello — dies at
+            // focus-on instead of coasting. Three sources: the recorded in-session flows, and the
+            // persisted antibody store (both synchronous here), plus the active resolver kicked in
+            // the background to augment within a second or two.
             self.shared.seed_taints_from_flows();
-            self.shared.request_reset(enforce::ResetKind::FocusOn);
+            self.shared.prearm_from_store();
+            kick_resolver(self.shared.clone());
         }
         self.persist();
         self.emit(
@@ -166,8 +172,14 @@ impl Core {
         // so allowed sites' connections are left alone. Taint their destinations first (fast,
         // in-memory) so a newly-blocked site's pooled socket dies immediately.
         if self.state.focus_active {
+            // Re-push the (expanded) blocklist to browsers so a mid-session edit takes effect.
+            enforce::browser_policy::apply(&self.shared.policy_snapshot());
+            // Re-arm the drop set for the new policy (a newly-blocked site's pooled socket dies
+            // immediately; a newly-allowed site recovers as the SNI engine untaints it). The
+            // resolver re-resolves the new domain set in the background.
             self.shared.seed_taints_from_flows();
-            self.shared.request_reset(enforce::ResetKind::PolicyChange);
+            self.shared.prearm_from_store();
+            kick_resolver(self.shared.clone());
         }
         self.persist();
         self.emit("policyChanged", json!({ "policy": policy }));
@@ -255,6 +267,11 @@ impl Core {
         if self.state.focus_active {
             self.shared.set_active(true);
             enforce::apply_network(true);
+            enforce::browser_policy::apply(&self.shared.policy_snapshot());
+            // Pre-arm the suspect set from the persisted antibody store so blocking is in force
+            // before the first packet — no cold-start leak across a restart/reboot.
+            self.shared.prearm_from_store();
+            kick_resolver(self.shared.clone());
             tracing::info!("re-armed enforcement on boot (focus was active)");
         }
         self.recompute_presence();
@@ -343,6 +360,13 @@ impl Core {
             )),
         }
     }
+}
+
+/// Fire a one-shot background resolve of the current policy's domains (focus-on / policy-change /
+/// boot). Runs on a detached thread because `resolve_and_ingest` blocks on UDP; it self-no-ops if
+/// focus isn't active or there are no targets, so a stale kick is harmless.
+fn kick_resolver(shared: Arc<EnforceShared>) {
+    std::thread::spawn(move || crate::enforce::resolve::resolve_and_ingest(&shared));
 }
 
 fn ok() -> Value {

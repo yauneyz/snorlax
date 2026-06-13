@@ -1,5 +1,14 @@
 # Known limitation: CDN-shared domains & HTTP/2 connection coalescing
 
+> **CLOSED (2026-06-12) by the IP-first rework.** Enforcement is now **guilty until proven
+> innocent at the IP layer**: a destination IP associated with a blocked domain is dropped by
+> default (pre-armed at focus-on from the persisted antibody store + the active resolver + the
+> recorded flows), and the SNI engine only *exonerates* a connection that proves an allowed
+> hostname on the wire. A pooled/coalesced/opaque socket carries no new ClientHello, so it cannot
+> prove innocence and is dropped — the leak described below no longer survives focus-on. See
+> `blocking-upgrade.md` for the mechanism. The text below is retained as the historical diagnosis
+> that motivated the change.
+
 _Last updated 2026-06-12. Context: the WinDivert blocker now (a) sinkholes blocked DNS names
 even via hardcoded resolvers, and (b) RSTs live browser sockets (incl. idle ones) on toggle /
 policy change. Despite that, a blocked site can still partially load. Here's why and what to do._

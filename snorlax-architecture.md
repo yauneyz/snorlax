@@ -228,26 +228,34 @@ hostname actually on the wire":
    *handshake* packets are copied to user space — bulk application data (`0x17…`, i.e.
    downloads/streaming/uploads) never leaves the kernel and steady-state throughput is untouched.
    For each captured ClientHello we extract the SNI (`enforce::sni`) and record the flow→SNI
-   mapping — *always*, even unfocused, so a later focus-on knows the hostname behind every
-   already-open socket (used by the reset worker and the taint layer, below). While focused, if
-   the host is blocked we **drop the ClientHello, inject an inbound TCP RST** to the client
-   (sequence number taken from the observed ack so the stack accepts it), and **taint the
-   destination IP** (below). The connection fails fast instead of timing out. This layer also
-   enforces whitelist/block-all on 443.
+   mapping *and* the host→IP mapping in the persisted antibody store (`enforce::observations`) —
+   *always*, even unfocused, so a later focus-on knows the hostname behind every already-open
+   socket and can pre-arm the suspect set against it (3b, below). While focused, if the host is
+   blocked we **drop the ClientHello, inject an inbound TCP RST** to the client (sequence number
+   taken from the observed ack so the stack accepts it), and **taint the destination IP** (below);
+   if it is allowed we `note_allowed` + `untaint` it (exoneration). The connection fails fast
+   instead of timing out. This layer also enforces whitelist/block-all on 443.
 
-3b. **Tainted-destination drop — the pooled-socket killer (`divert::run_taint_drop`).** A
-   pooled/coalesced HTTP/2-3 socket opened before a block took effect sends no new ClientHello,
-   so neither DNS nor SNI inspection ever fires on it, and the reset burst (below) is a
-   find-and-reset race that can miss. Borrowing the stateless-drop idea from the Linux sibling
-   `focusd` (see [`blocking-upgrade.md`](./blocking-upgrade.md)): when the SNI engine positively
-   observes a blocked SNI go to a destination IP — or the reset worker finds a live flow whose
-   recorded SNI is blocked — that IP is **tainted** (`EnforceShared::taint`), and a dedicated
-   WinDivert handle opened with the **DROP flag** silently discards *all* outbound 443 (TCP +
-   UDP) to tainted IPs in the driver — no recv loop, zero per-packet user-space cost. A socket
-   whose destination is tainted simply can't send (not even ACKs), so it dies regardless of when
-   it was opened. Precision guards against CDN over-block: an IP is only tainted on an *observed*
-   blocked SNI (never pre-resolved), never if it recently served an *allowed* SNI, and taints age
-   out after a 5-minute TTL. All taint state clears on focus-off.
+3b. **Pre-armed suspect-IP drop — the pooled-socket killer (`divert::run_taint_drop`).** This is
+   the **IP-first** enforcement point (guilty until proven innocent). A pooled/coalesced/opaque
+   HTTP/2-3 socket opened before a block took effect sends no new ClientHello, so SNI inspection
+   never fires on it. Borrowing the stateless-drop idea from the Linux sibling `focusd` (see
+   [`blocking-upgrade.md`](./blocking-upgrade.md)): the suspect-IP set is **pre-armed at focus-on**
+   from the persisted antibody store (`enforce::observations`), the active resolver
+   (`enforce::resolve`), and the recorded in-session flows (`seed_taints_from_flows`) — so a
+   destination associated with a blocked domain is already in the set before its first packet. A
+   dedicated WinDivert handle opened with the **DROP flag** silently discards outbound 443
+   **application-data** (`tcp.PayloadLength > 0` and not a `0x16 0x03` handshake record) + all QUIC
+   (UDP 443) to in-scope destinations — no recv loop, zero per-packet user-space cost. SYN/ACK and
+   the cleartext ClientHello are **let through**, so the SNI engine (3, above) still adjudicates
+   every *new* connection: an allowed SNI → `note_allowed` + `untaint` (the IP recovers on its next
+   handshake); a blocked SNI → RST + `taint`. A pooled socket (no handshake) can't get a request
+   out and dies. The filter is **mode-aware** (`build_drop_filter`): **blacklist** drops to the
+   tainted set; **whitelist** drops to everything *not* in the durable **clean** allow-exception
+   set; **block-all** drops all 443. Precision guards against CDN over-block: an IP recently seen
+   serving an *allowed* SNI is never tainted, taints age out after a 5-minute TTL, and a
+   wrongly-scoped shared IP self-heals via the let-through handshake. All session sets clear on
+   focus-off; the durable antibody store on disk is retained.
 
 4. **QUIC / HTTP-3.** QUIC (UDP 443) encrypts its ClientHello, so layer 3 can't read the SNI off
    the wire. For now we **block outbound UDP 443** (firewall rule, below), forcing browsers to
@@ -268,19 +276,39 @@ off:
 These are ordinary firewall rules, so they **persist if the service is killed** until focus is
 cleared, while the SCM restarts the service (~1s) to re-arm the WinDivert layers.
 
-**Connection reset (`divert::run_reset_worker`).** A newly-enabled block must also tear down
-sockets already open (a browser will otherwise coast on an established connection). On a signal
-from the core the worker flushes the DNS cache and RSTs live flows, using a short-lived WinDivert
-handle and an RFC-5961 challenge-ACK trick (an injected SYN elicits a challenge-ACK we turn into a
-correctly-sequenced RST — this reaps even idle sockets, v4 and v6). It distinguishes two cases:
+**Browser-policy blocking (`enforce::browser_policy`).** A request-layer layer for Chromium
+(Chrome/Edge/Brave/Chromium), which honor the managed `URLBlocklist`/`URLAllowlist` policies set
+via HKLM registry keys our `LocalSystem` service writes on focus-on (and re-writes on a policy
+change), removed by `teardown_network`. The browser enforces these **above the socket** — so they
+defeat the pooled/coalesced-socket reuse the packet layer can't see (every request on a reused
+HTTP/2 socket is still checked) — and a machine policy can't be overridden by the user. Chromium
+watches the policy keys and reloads within seconds of a write *or* delete, so focus-on/off both
+reflect near-live. Modes map directly: blacklist → block the listed (expanded) domains; whitelist
+→ block `*` and allow the listed; block-all → block `*`. **Firefox is intentionally excluded**: it
+reads policies only at startup, so a focus-off delete wouldn't lift the block until the next
+restart (block-after-unlock) — Firefox relies on the network layers, which toggle instantly. This
+layer complements — does not replace — the network layers, which cover non-Chromium browsers,
+non-browser apps, and raw-IP traffic. (`clear()` still deletes a legacy Firefox `WebsiteFilter`
+key so policies written by an earlier build are torn down.)
 
-- **focus-on** → broad reset of *all* browser (and blocked-app) flows for a clean slate;
-- **policy change while focused** → **surgical**: only flows whose recorded SNI is now blocked are
-  reset, so a mid-session blocklist edit doesn't nuke your allowed tabs' connections.
+**Active resolver & antibody store (`enforce::resolve`, `enforce::observations`).** What pre-arms
+3b. The **observation store** is a persisted `host → [ip]` map (`%PROGRAMDATA%\FocusLock\
+observations.json`) written by the always-on SNI recorder on every captured ClientHello —
+**including while unfocused** — so it accumulates the IPs that blocked sites actually use over
+time ("antibodies") and survives restarts/reboots. The **resolver** is a hand-rolled UDP DNS
+client that resolves the policy's domains (the expanded blocklist in blacklist mode, the allowlist
+in whitelist mode) against pinned public upstreams (1.1.1.1/8.8.8.8/…) on focus-on and a 5-minute
+ticker, catching current CDN IPs and rotation — `focusd`'s approach. It binds a **fixed local
+source port** that `ENGINE_FILTER` excludes, so our own lookups bypass the DNS sinkhole (which
+would otherwise NXDOMAIN them). At focus-on both feed `EnforceShared`'s suspect/clean sets
+synchronously (store) + in the background (resolver), so blocking is in force within ~50ms.
 
-In both cases the worker first **seeds the taint set** (3b above) from live flows whose recorded
-SNI is blocked — so even if every RST probe misses a socket (challenge ACKs are rate-limited),
-its destination is dropped and the socket goes dead anyway.
+> **Connection reset — removed.** Earlier builds tore down already-open sockets with an RST burst
+> (deterministic `SetTcpEntry(DELETE_TCB)` for v4, an RFC-5961 challenge-ACK SYN-probe trick for
+> v6) on a signal from the core. The pre-armed stateless drop (3b) replaces that find-and-reset
+> race: an already-open socket to a suspect destination simply can't send application-data, so
+> there is nothing to "reset." The reset worker, its SYN probes, the `SetTcpEntry` kill, and the
+> per-4-tuple drop were all deleted.
 
 **App blocking — process termination (`enforce::apps`).** A ~1s poll of the process list
 `TerminateProcess`es any image-name match on the blocked-app list while focused. *Pre-execution*
@@ -821,10 +849,12 @@ focuslock/
 │  │  │  ├─ pairing.rs               # verify a present device matches a paired key
 │  │  │  ├─ schedule.rs              # timer driving the (shared-logic-equivalent) engine
 │  │  │  └─ enforce/
-│  │  │     ├─ mod.rs                # EnforceShared state; apply_network; reset signalling
-│  │  │     ├─ divert.rs             # WinDivert engines: DNS sinkhole + 443 SNI + reset worker
+│  │  │     ├─ mod.rs                # EnforceShared: pre-armed taint/clean sets; mode-aware seeding
+│  │  │     ├─ divert.rs             # WinDivert engines: DNS sinkhole + 443 SNI exoneration + pre-armed drop
 │  │  │     ├─ dns.rs                # pure DNS wire helpers (QNAME/QTYPE, NXDOMAIN/NODATA)
 │  │  │     ├─ sni.rs                # pure TLS ClientHello → SNI extraction
+│  │  │     ├─ resolve.rs            # active UDP DNS resolver (fixed src port; pinned upstreams)
+│  │  │     ├─ observations.rs       # persisted host→IP antibody store (observations.json)
 │  │  │     ├─ properties.rs         # multi-domain property groups + blocklist expansion
 │  │  │     ├─ wfp.rs                # persistent firewall backstop (DoT/DoH-IP/QUIC via netsh)
 │  │  │     └─ apps.rs               # process-list poll + TerminateProcess on match
@@ -968,8 +998,11 @@ focuslock/
 | `src/usb.rs` | `WM_DEVICECHANGE` listener + SetupAPI/CfgMgr32 enumeration; safety poll. |
 | `src/pairing.rs` | Decides whether a currently-connected device satisfies a paired key (serial + key-file secret). |
 | `src/schedule.rs` | Timer that evaluates the schedule and flips focus. |
-| `src/enforce/mod.rs` | `EnforceShared` (live policy/focus/flow-SNI/tainted-IP state shared with the engine threads); `apply_network` toggles the firewall backstop; reset signalling. |
-| `src/enforce/divert.rs` | WinDivert packet engines: always-on DNS/DoT engine (NXDOMAIN injection, DoT drop, ECH/HTTPS-RR suppression), always-on 443 SNI inspector (record-only unfocused; RST + taint on blocked SNI while focused), the tainted-destination DROP-flag handle (stateless 443 drop to IPs seen serving blocked SNIs), and the connection-reset worker (broad on focus-on, SNI-surgical on policy change, taint-seeding in both). |
+| `src/enforce/mod.rs` | `EnforceShared` (live policy/focus/flow-SNI state, the pre-armed tainted-IP suspect set + durable clean allow-set, the antibody store handle); mode-aware seeding (`prearm_from_store`, `seed_taints_from_flows`, `ingest_resolved`); `apply_network` toggles the firewall backstop. |
+| `src/enforce/divert.rs` | WinDivert packet engines: always-on DNS/DoT engine (NXDOMAIN injection, DoT drop, ECH/HTTPS-RR suppression, resolver-src-port exemption), always-on 443 SNI exoneration inspector (record-only unfocused; RST + taint on blocked SNI, `note_allowed`/`untaint` on allowed SNI while focused), and the pre-armed DROP-flag handle (`build_drop_filter`: mode-aware, drops only 443 application-data + QUIC, exempts handshakes for redemption). |
+| `src/enforce/resolve.rs` | Active UDP DNS resolver bound to a fixed local source port (sinkhole-exempt) against pinned upstreams; resolves the policy's domains on focus-on + a 5-min ticker and feeds the suspect/clean sets + antibody store. |
+| `src/enforce/observations.rs` | Persisted `host → [ip]` antibody store (`observations.json`): written by the always-on SNI recorder (incl. unfocused), read at focus-on to pre-arm the suspect/clean set; bounded + debounced flush + atomic write. |
+| `src/enforce/browser_policy.rs` | Enterprise browser-policy blocking: writes Chromium `URLBlocklist`/`URLAllowlist` HKLM keys (via `reg import`) so Chromium enforces the blocklist at the request layer; cleared by `teardown_network`. Firefox is excluded (startup-only policy reads → block-after-unlock); `clear()` still removes a legacy Firefox `WebsiteFilter` key. |
 | `src/enforce/dns.rs` | Pure DNS wire helpers (parse QNAME/QTYPE, build NXDOMAIN/NODATA replies) used by the engine. |
 | `src/enforce/sni.rs` | Pure TLS ClientHello → SNI extraction used by the 443 inspector. |
 | `src/enforce/properties.rs` | Curated multi-domain "property group" table + blocklist expansion (sibling/CDN domains). |
