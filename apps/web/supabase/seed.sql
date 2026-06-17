@@ -1,0 +1,1 @@
+-- No seed data. Subscriptions are populated by the Stripe webhook at runtime.

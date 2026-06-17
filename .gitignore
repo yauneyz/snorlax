@@ -7,17 +7,26 @@ node_modules/
 dist/
 out/
 build/
+.next/
+coverage/
+playwright-report/
+test-results/
 *.tsbuildinfo
 apps/desktop/out/
 apps/desktop/resources/bin/win/*.exe
 apps/desktop/resources/bin/win/*.pdb
+# Staged (built) browser extension + its locally-generated signing key.
+apps/desktop/resources/extension/
+apps/extension/keys/
 
 # Rust
 native/windows/target/
 
 # Env (machine-local secrets/overrides)
+.credentials
 .env.local
 .env.*.local
+.vercel/
 
 # Logs
 *.log

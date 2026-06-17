@@ -36,6 +36,9 @@ if (target !== 'win') {
 // 1. Native service.
 run('node', ['scripts/build-native-win.mjs']);
 
+// 1b. Browser extension (unpacked builds per engine, staged into resources).
+run('node', ['scripts/build-extension.mjs']);
+
 // 2. Electron bundles.
 run('pnpm', ['--filter', '@focuslock/desktop', 'build']);
 

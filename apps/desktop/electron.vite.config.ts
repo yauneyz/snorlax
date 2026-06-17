@@ -21,6 +21,7 @@ export default defineConfig(({ mode }) => {
   const alias = {
     '@shared': resolve(__dirname, '../../packages/shared/src'),
     '@core': resolve(__dirname, '../../packages/core/src'),
+    '@focuslock/product': resolve(__dirname, '../../packages/product/src/index.ts'),
     '@focuslock/shared': resolve(__dirname, '../../packages/shared/src/index.ts'),
     '@focuslock/core/browser': resolve(__dirname, '../../packages/core/src/browser.ts'),
     '@focuslock/core': resolve(__dirname, '../../packages/core/src/index.ts'),

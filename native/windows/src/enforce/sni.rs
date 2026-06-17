@@ -166,7 +166,10 @@ mod tests {
     #[test]
     fn extracts_sni_with_subdomain() {
         let rec = client_hello(Some("a.thumbs.redditmedia.com"));
-        assert_eq!(extract_sni(&rec).as_deref(), Some("a.thumbs.redditmedia.com"));
+        assert_eq!(
+            extract_sni(&rec).as_deref(),
+            Some("a.thumbs.redditmedia.com")
+        );
     }
 
     #[test]
@@ -178,7 +181,10 @@ mod tests {
     #[test]
     fn non_handshake_returns_none() {
         // 0x17 = application_data, the steady-state record our narrow filter excludes anyway.
-        assert_eq!(extract_sni(&[0x17, 0x03, 0x03, 0x00, 0x05, 1, 2, 3, 4, 5]), None);
+        assert_eq!(
+            extract_sni(&[0x17, 0x03, 0x03, 0x00, 0x05, 1, 2, 3, 4, 5]),
+            None
+        );
     }
 
     #[test]

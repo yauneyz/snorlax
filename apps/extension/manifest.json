@@ -1,0 +1,13 @@
+{
+  "manifest_version": 3,
+  "name": "FocusLock",
+  "version": "0.1.0",
+  "description": "Enforces FocusLock website blocking at the request layer (works under ECH, QUIC, and VPNs).",
+  "minimum_chrome_version": "101",
+  "permissions": ["declarativeNetRequest", "nativeMessaging", "storage"],
+  "background": {
+    "service_worker": "src/background.js",
+    "type": "module"
+  },
+  "icons": {}
+}

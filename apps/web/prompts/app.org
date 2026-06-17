@@ -1,0 +1,67 @@
+We are now ready to build the actual app part. So far we have a wrapper with a dummy web app. Now we are building the app. Try to leave the wrapper decoupled from the specific app we are building.
+
+The specific app idea:
+
+We are going to assemble a myriad of data sources regarding the SEO/content space for a website and its competitors. We will use this to identify the largest content opportunities, which are content gaps + demand + low competition. Then we will create a very detailed context and LLMs to generate specific ideas for new content that would be the most effective at increasing the target site's SEO footprint. But we aren't just returning a text list - each suggestion will be backed by specific reasons it would be a good fit.
+
+The app starts with a target domain (the user's site) and also a list of target queries that they want.
+
+Here are the sources that we will be using. For each data source we need an entire module. Make sure we have well designed api surfaces for these modules so that they can be treated as close to black boxes. We certainly want them to be decoupled. Hexagonal architecture here.
+
+Google Search Console
+- we use OAuth to let them log in with their Google Account to get Search Console data
+- queries, pages, clicks, impressions, CTR, average position
+- sitemaps
+- read the Search Console API docs
+
+The GSC is probably the single most valuable thing that we have.
+
+Bing Webmaster Tools API
+- we will also need to allow the user to connect their Bing Webmaster Tools
+- keyword research / related keyworks
+- Backlink/links details
+
+Google SERPs
+- we want to be able to query/store search results for various queries. If there is a free way to do this via and api at low volume, let's do that. Otherwise, let's just treat the goolge website itself as an API via scraping. If there is a package that does this, great, just build a wrapper around it to get a good API surface that works well for us. If not, build it from scratch.
+- we want to be able to pull out not just how well the target domain performed, but we want to identify all the competitors (and their rank in the list) we are going to do things with this list of competitor domains (we probably want the root domains)
+- In addition to scraping just the urls and ordering, we want title/h1/h2/entities; we are going to use all of this to perform a content-gap analysis
+- We also need to scrape People Also Ask / autosuggests / related searches per search
+- so for each query we need:
+  - autosuggest
+  - PAA
+  - related searches
+  - competitor url/domain and rank
+
+Competitor sites:
+- we want a package that can take a competitor URL and "map" it - we want to find *all* the urls on the domain, as well as get the:
+  - url slugs
+  - title tags
+  - h1/h2/h3
+  - anchor text
+  - lastmod so that we can give a timeline of their published content
+- using the sitemap.txt can give us lots of information as well - if they have it we can use it to guide our indexing
+- respect robots.txt as well
+- remember that we don't want to crawl the whole web, just a whole domain
+
+Google Keyword Planner
+- use the Google Ads API to call:
+  - GenerateKeywordIdeas
+  - GenerateKeywordHistoricalMetrics
+  - GenerateKeywordForecastMetrics
+We want Google Keyword planner to be able to evaluate the merits of possible keywords
+
+
+
+We probbaly want some sort of DataSource abstraction, while realizing that each data source is wildly different in implementation and what details it gives us. Also, not every account will use every data source (looking at GSC and Bing Webmaster especially)
+
+We are also going to want the ability to have a scheduled weekly "update" where we go to all our data sources and get fresh data, process it all, and then generate new recommendations.
+
+This means we need a scheduler and then the ability to load tasks into it. We want to decouple the scheduler from the tasks. Feel free to pull a pre-packaged scheduler.
+
+Also, we want the ability for the scheduler to run not on the server in the cloud, but on my local machine and then upload the results to the cloud (maybe S3) so the server can use them. This way we can offload the expensive of compute to my nice local machine.
+
+Your goal is to take all of this and create a detailed architecture/API/implementaiton plan.  It should include *all* the details necessary to pull this off. Thouroughly research all the APIs we are going to use (search the web), also look for packages that we can use to avoid re-inventing the wheel (although don't shoehorn something in, from scratch works if we need to.) List all the packages we are using and why in the implementation plan.
+
+Don't worry about the UI for now - for each data source we just need a simple widget that lets us input the base input for that source (i.e. a query or a domain, etc) and see the result in a well structured way. These widgets will just be used to verify that our data ingestion works. Then we will develop the algorithm for ranking and the true UI.
+
+Break the implementation up into phases. Ideally each phase is small and self-contained and can be tested/verified before moving on to the next phase. All working complex systems grow out of working simple systems.

@@ -7,11 +7,19 @@
 //! until observed live. Backed by persistent Windows-Firewall DoT/DoH-IP/QUIC rules
 //! (enforce::wfp) and managed browser policies (enforce::browser_policy); app blocking is process
 //! termination (enforce::apps). See the note in lib.rs for what's deferred.
+//!
+//! **VPN-transparent connect block (enforce::divert::run_socket_engine):** the WinDivert SOCKET
+//! layer adjudicates each `connect()` at setup — before the OS routes the packet into a VPN tunnel
+//! — so the real destination IP is visible and the same taint/clean sets gate connections even
+//! behind a full-tunnel VPN, where the NETWORK-layer engines see only encrypted traffic to the VPN
+//! server. (Browser-extension per-URL classification, for encrypted-SNI/ECH, is the deferred next
+//! layer beneath which this connect block is the universal backstop.)
 
 pub mod apps;
 pub mod browser_policy;
 pub mod divert;
 pub mod dns;
+pub mod extension_policy;
 pub mod observations;
 pub mod properties;
 pub mod resolve;
@@ -387,7 +395,11 @@ mod tests {
     use std::net::Ipv4Addr;
 
     fn shared() -> EnforceShared {
-        EnforceShared::new(Policy::default(), false, Arc::new(ObservationStore::empty_for_test()))
+        EnforceShared::new(
+            Policy::default(),
+            false,
+            Arc::new(ObservationStore::empty_for_test()),
+        )
     }
 
     fn ip(n: u8) -> IpAddr {
@@ -423,7 +435,10 @@ mod tests {
         let s = shared();
         s.note_allowed(ip(1));
         s.taint(ip(1));
-        assert!(s.tainted_ips().is_empty(), "recently-allowed IP must not be tainted");
+        assert!(
+            s.tainted_ips().is_empty(),
+            "recently-allowed IP must not be tainted"
+        );
         // Once the guard ages out, the same IP can be tainted.
         s.taint_at(ip(1), Instant::now() + ALLOWED_GUARD_TTL);
         assert_eq!(s.tainted_ips_at(Instant::now()), vec![ip(1)]);
@@ -453,10 +468,16 @@ mod tests {
         for n in 0..MAX_TAINTED_IPS {
             s.taint_at(ip((n % 250) as u8), now + Duration::from_secs(n as u64));
         }
-        s.taint_at(Ipv4Addr::new(10, 0, 1, 1).into(), now + Duration::from_secs(100));
+        s.taint_at(
+            Ipv4Addr::new(10, 0, 1, 1).into(),
+            now + Duration::from_secs(100),
+        );
         let ips = s.tainted_ips_at(now + Duration::from_secs(100));
         assert_eq!(ips.len(), MAX_TAINTED_IPS);
-        assert!(!ips.contains(&ip(0)), "stalest taint must be evicted past the cap");
+        assert!(
+            !ips.contains(&ip(0)),
+            "stalest taint must be evicted past the cap"
+        );
         assert!(ips.contains(&Ipv4Addr::new(10, 0, 1, 1).into()));
     }
 

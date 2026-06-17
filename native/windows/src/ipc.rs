@@ -12,8 +12,7 @@ use tokio::sync::{mpsc, watch, Mutex};
 use windows::core::{PCWSTR, PWSTR};
 use windows::Win32::Foundation::{CloseHandle, LocalFree, HANDLE, HLOCAL};
 use windows::Win32::Security::Authorization::{
-    ConvertSidToStringSidW, ConvertStringSecurityDescriptorToSecurityDescriptorW,
-    SDDL_REVISION_1,
+    ConvertSidToStringSidW, ConvertStringSecurityDescriptorToSecurityDescriptorW, SDDL_REVISION_1,
 };
 use windows::Win32::Security::{
     GetTokenInformation, TokenUser, PSECURITY_DESCRIPTOR, SECURITY_ATTRIBUTES, TOKEN_QUERY,
@@ -124,7 +123,10 @@ pub async fn run_server(core: SharedCore, pipe_path: String, mut shutdown: watch
         let server = match unsafe {
             ServerOptions::new()
                 .first_pipe_instance(first)
-                .create_with_security_attributes_raw(&pipe_path, &mut attrs as *mut _ as *mut c_void)
+                .create_with_security_attributes_raw(
+                    &pipe_path,
+                    &mut attrs as *mut _ as *mut c_void,
+                )
         } {
             Ok(s) => s,
             Err(e) => {

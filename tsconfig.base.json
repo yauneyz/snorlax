@@ -17,6 +17,11 @@
     "paths": {
       "@shared/*": ["packages/shared/src/*"],
       "@core/*": ["packages/core/src/*"],
+      "@focuslock/shared": ["packages/shared/src/index.ts"],
+      "@focuslock/core": ["packages/core/src/index.ts"],
+      "@focuslock/product": ["packages/product/src/index.ts"],
+      "@focuslock/auth-contracts": ["packages/auth-contracts/src/index.ts"],
+      "@focuslock/billing-server": ["packages/billing-server/src/index.ts"],
       "@config/*": ["config/*"]
     }
   }

@@ -19,6 +19,11 @@ extraResources:
     to: bin
     filter:
       - '**/*'
+  # Browser extension (unpacked, per-engine) produced by scripts/build-extension.mjs.
+  - from: apps/desktop/resources/extension
+    to: extension
+    filter:
+      - '**/*'
 
 win:
   signAndEditExecutable: false

@@ -9,5 +9,9 @@
     "noEmit": true
   },
   "include": ["src/**/*"],
-  "references": [{ "path": "../../packages/shared" }, { "path": "../../packages/core" }]
+  "references": [
+    { "path": "../../packages/shared" },
+    { "path": "../../packages/product" },
+    { "path": "../../packages/core" }
+  ]
 }

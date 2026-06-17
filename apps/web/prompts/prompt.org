@@ -1,0 +1,45 @@
+We are working on building a "SaaS starter"
+
+The idea is to allow rapid prototyping of SaaS apps by handling all the plumbing in a reusable way. You just set all the constants like credentials for new accounts, and suddenly you have a new blank canvas that is wired up to all the systems you would need.
+
+We should have a ".credentials" file or something like that that is kept out of source control that gives us the keys for each of the services we are using
+
+For tech, it will have this:
+- Next.js (App Router) + React + TypeScript
+- CSS will all be custom instead of tailwind; but the starter won't have any CSS, that is an implmentation detail. Just use good class names on all the html and we'll come up with the CSS later.
+- Supabase for auth, Postgres, storage, realtime, and edge functions
+- Zod for validation
+- TanStack Query for the client-side server-state/caching
+- Stripe for billing
+- Resend for transactional email
+- Sentry for error/perf
+- PostHog for product analytics
+
+In addition to the root app, our next.js will serve the following
+- A landing page
+- A pricing page
+- A blog; I should be able to have a folder where I put .md files with some metadata and those blog posts are displayed. The url slug is part of the metadata. I should also have a resources folder where I can put images/etc that go in those blog posts.
+- Privacy Policy & Terms. Both are just .md files that get served at the proper URLs
+
+All of those marketing facing things should have analytics and SEO stuff; metadata, sitemap, robots.txt, canoncial tags. We will use google analytics. Again, it would be great if the .credentials could let us put the GA4 tag in there somewhere so we can easily swap things out.
+
+If we have to do anything so the Google Search Console is integrated, we want to do that.
+
+The way the login flow works:
+- if they aren't logged in, they see the landing page at root
+- if they are logged in but no active subscription, they see the pricing page (redirect)
+- if they are logged in and subscribed, they see the app itself
+
+We will have Stripe payments. So we need a way to set up webhooks and a place to put both the test keys and the real production keys.
+
+We also need a sign/up + checkout workflow. Okay with using the Stripe Portal for billing, make it as lighweight as possible.
+
+We also need invoice/reciept emals, failed payment handling, edit/cancel subscription portal, and a refund flow. All Stripe
+
+We also need the standard email transactions:
+- password reset (unless supabase has that, but we still need a link I assume)
+
+
+This is all intended to be hosted on Vercel + Supabase
+
+Note that this app has a front-end and a back-end. We should architect the directories and app accordingly.

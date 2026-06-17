@@ -18,20 +18,44 @@ use std::collections::HashSet;
 pub const PROPERTY_GROUPS: &[(&str, &[&str])] = &[
     (
         "reddit.com",
-        &["redditstatic.com", "redditmedia.com", "redditspace.com", "redd.it"],
+        &[
+            "redditstatic.com",
+            "redditmedia.com",
+            "redditspace.com",
+            "redd.it",
+        ],
     ),
     (
         "youtube.com",
-        &["googlevideo.com", "ytimg.com", "youtube-nocookie.com", "youtu.be"],
+        &[
+            "googlevideo.com",
+            "ytimg.com",
+            "youtube-nocookie.com",
+            "youtu.be",
+        ],
     ),
     ("x.com", &["twimg.com", "twitter.com", "t.co"]),
     ("twitter.com", &["twimg.com", "x.com", "t.co"]),
     ("instagram.com", &["cdninstagram.com", "fbcdn.net"]),
     ("facebook.com", &["fbcdn.net", "facebook.net", "fb.com"]),
-    ("tiktok.com", &["tiktokcdn.com", "tiktokv.com", "ibytedtos.com", "byteoversea.com"]),
-    ("netflix.com", &["nflxvideo.net", "nflximg.net", "nflxext.com"]),
+    (
+        "tiktok.com",
+        &[
+            "tiktokcdn.com",
+            "tiktokv.com",
+            "ibytedtos.com",
+            "byteoversea.com",
+        ],
+    ),
+    (
+        "netflix.com",
+        &["nflxvideo.net", "nflximg.net", "nflxext.com"],
+    ),
     ("twitch.tv", &["ttvnw.net", "jtvnw.net"]),
-    ("discord.com", &["discordapp.com", "discordapp.net", "discord.gg"]),
+    (
+        "discord.com",
+        &["discordapp.com", "discordapp.net", "discord.gg"],
+    ),
     ("pinterest.com", &["pinimg.com"]),
     ("linkedin.com", &["licdn.com"]),
 ];
@@ -105,7 +129,12 @@ mod tests {
         ]);
         assert_eq!(got[0], "Reddit.com");
         // redditmedia.com appears once, not duplicated by the explicit entry.
-        assert_eq!(got.iter().filter(|d| d.eq_ignore_ascii_case("redditmedia.com")).count(), 1);
+        assert_eq!(
+            got.iter()
+                .filter(|d| d.eq_ignore_ascii_case("redditmedia.com"))
+                .count(),
+            1
+        );
         assert!(got.contains(&"example.com".to_string()));
     }
 

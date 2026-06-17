@@ -31,6 +31,12 @@ pub fn log_file() -> PathBuf {
     data_dir().join("service.log")
 }
 
+/// Directory holding the browser native-messaging host manifests (one per browser family, since
+/// Chromium and Firefox use different `allowed_*` keys). See enforce::extension_policy.
+pub fn nmh_dir() -> PathBuf {
+    data_dir().join("nmh")
+}
+
 /// Ensure the data directory exists. (ACL hardening is done by the installer.)
 pub fn ensure_data_dir() -> std::io::Result<()> {
     std::fs::create_dir_all(data_dir())

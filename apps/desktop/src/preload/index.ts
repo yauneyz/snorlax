@@ -7,14 +7,23 @@
  */
 
 import { contextBridge, ipcRenderer } from 'electron';
+import type { SubscriptionPlan } from '../shared/productLimits.js';
 
 const Channels = {
   serviceRequest: 'service:request',
   serviceEvent: 'service:event',
   devToggleKey: 'app:devToggleKey',
+  entitlement: 'app:entitlement',
+  devSetEntitlementPlan: 'app:devSetEntitlementPlan',
   openExternal: 'app:openExternal',
   appInfo: 'app:info',
 } as const;
+
+export interface EntitlementInfo {
+  active: boolean;
+  plan: SubscriptionPlan;
+  source: string;
+}
 
 export interface ServiceResponse {
   ok: boolean;
@@ -44,6 +53,15 @@ const api = {
   /** Dev-only: toggle the simulated USB key when running against the mock service. */
   devToggleKey: (): Promise<{ ok: boolean; present?: boolean; message?: string }> =>
     ipcRenderer.invoke(Channels.devToggleKey),
+
+  entitlement: (): Promise<EntitlementInfo> =>
+    ipcRenderer.invoke(Channels.entitlement),
+
+  /** Dev-only: override the simulated subscription plan. */
+  devSetEntitlementPlan: (
+    plan: SubscriptionPlan,
+  ): Promise<{ ok: boolean; entitlement?: EntitlementInfo; message?: string }> =>
+    ipcRenderer.invoke(Channels.devSetEntitlementPlan, plan),
 };
 
 export type FocusLockApi = typeof api;

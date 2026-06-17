@@ -50,7 +50,11 @@ pub fn resolve_and_ingest(shared: &EnforceShared) {
     if pairs.is_empty() {
         return;
     }
-    tracing::info!("resolver: {} host→ip pairs for {} domains", pairs.len(), targets.len());
+    tracing::info!(
+        "resolver: {} host→ip pairs for {} domains",
+        pairs.len(),
+        targets.len()
+    );
     for (host, ip) in pairs {
         shared.ingest_resolved(&host, ip);
     }
@@ -233,11 +237,11 @@ mod tests {
         assert_eq!(&q[0..2], &[0xab, 0xcd]); // txid
         assert_eq!(&q[2..4], &[0x01, 0x00]); // RD=1
         assert_eq!(&q[4..6], &[0x00, 0x01]); // QDCOUNT=1
-        // question: 6 r e d d i t 3 c o m 0  TYPE=1 CLASS=1
+                                             // question: 6 r e d d i t 3 c o m 0  TYPE=1 CLASS=1
         assert_eq!(q[12], 6);
         assert_eq!(&q[13..19], b"reddit");
         assert_eq!(*q.last().unwrap(), 0x01); // QCLASS low byte
-        // Trailing 5 bytes are: root label(1) + QTYPE(2) + QCLASS(2).
+                                              // Trailing 5 bytes are: root label(1) + QTYPE(2) + QCLASS(2).
         assert_eq!(q[q.len() - 5], 0); // root label terminates the QNAME
         assert_eq!(&q[q.len() - 4..], &[0x00, 0x01, 0x00, 0x01]); // QTYPE=A, QCLASS=IN
     }

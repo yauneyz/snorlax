@@ -55,7 +55,7 @@ async function bootstrap(): Promise<void> {
   await ensureServiceInstalled();
 
   const { service, mock } = await connectService();
-  registerIpcHandlers({ service, mock });
+  await registerIpcHandlers({ service, mock });
 
   createWindow();
   createTray(service, mock);

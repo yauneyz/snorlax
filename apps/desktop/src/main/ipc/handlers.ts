@@ -5,11 +5,23 @@
  */
 
 import { BrowserWindow, ipcMain, shell } from 'electron';
-import type { EventName, Method, Params } from '@focuslock/shared';
+import { ErrorCode, type EventName, type Method, type Params } from '@focuslock/shared';
 import { config } from '../config.js';
 import { logger } from '../logging.js';
 import { isServiceError, type ServiceConnection } from '../service/connection.js';
 import type { MockServiceConnection } from '../service/mockService.js';
+import {
+  getEntitlement,
+  setDevEntitlementPlan,
+} from '../auth/subscription.js';
+import {
+  constrainPolicyToLimits,
+  constrainScheduleToLimits,
+  limitsForPlan,
+  validatePolicyForLimits,
+  validateScheduleForLimits,
+  type SubscriptionPlan,
+} from '../../shared/productLimits.js';
 import { Channels } from './channels.js';
 
 const FORWARDED_EVENTS: EventName[] = [
@@ -25,8 +37,25 @@ export interface HandlerContext {
   mock?: MockServiceConnection;
 }
 
-export function registerIpcHandlers(ctx: HandlerContext): void {
+function limitError(message: string) {
+  return { ok: false, code: ErrorCode.BAD_REQUEST, message };
+}
+
+async function applyCurrentPlanLimits(service: ServiceConnection): Promise<void> {
+  const limits = limitsForPlan((await getEntitlement()).plan);
+  if (!limits) return;
+
+  const state = await service.request('getState', undefined);
+  const policy = constrainPolicyToLimits(state.policy, limits);
+  const schedule = constrainScheduleToLimits(state.schedule, limits);
+
+  await service.request('setPolicy', { policy });
+  await service.request('setSchedule', { schedule });
+}
+
+export async function registerIpcHandlers(ctx: HandlerContext): Promise<void> {
   const { service, mock } = ctx;
+  await applyCurrentPlanLimits(service);
 
   // Forward service events to all renderer windows.
   for (const event of FORWARDED_EVENTS) {
@@ -39,6 +68,20 @@ export function registerIpcHandlers(ctx: HandlerContext): void {
 
   ipcMain.handle(Channels.serviceRequest, async (_e, arg: { method: Method; params: unknown }) => {
     try {
+      const limits = limitsForPlan((await getEntitlement()).plan);
+
+      if (arg.method === 'setPolicy') {
+        const params = arg.params as Params<'setPolicy'>;
+        const violations = validatePolicyForLimits(params.policy, limits);
+        if (violations[0]) return limitError(violations[0].message);
+      }
+
+      if (arg.method === 'setSchedule') {
+        const params = arg.params as Params<'setSchedule'>;
+        const violations = validateScheduleForLimits(params.schedule, limits);
+        if (violations[0]) return limitError(violations[0].message);
+      }
+
       const result = await service.request(arg.method, arg.params as Params<Method>);
       return { ok: true, result };
     } catch (e) {
@@ -62,5 +105,21 @@ export function registerIpcHandlers(ctx: HandlerContext): void {
   ipcMain.handle(Channels.devToggleKey, () => {
     if (!mock) return { ok: false, message: 'Only available against the mock service.' };
     return { ok: true, present: mock.devToggleKey() };
+  });
+
+  ipcMain.handle(Channels.entitlement, () => getEntitlement());
+
+  ipcMain.handle(Channels.devSetEntitlementPlan, async (_e, plan: SubscriptionPlan) => {
+    if (config.appEnv === 'production') {
+      return { ok: false, message: 'Only available in development builds.' };
+    }
+
+    if (plan !== 'free' && plan !== 'pro') {
+      return { ok: false, message: 'Unknown subscription plan.' };
+    }
+
+    const entitlement = await setDevEntitlementPlan(plan);
+    await applyCurrentPlanLimits(service);
+    return { ok: true, entitlement };
   });
 }

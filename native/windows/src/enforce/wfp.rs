@@ -139,11 +139,7 @@ fn add_block_rule(name: &str, protocol: &str, port: u16, remote_ips: Option<&str
     if let Some(ip_arg) = &ip_arg {
         args.push(ip_arg.as_str());
     }
-    run_command(
-        "netsh",
-        &args,
-        &format!("add firewall block rule {name}"),
-    );
+    run_command("netsh", &args, &format!("add firewall block rule {name}"));
 }
 
 fn delete_rule(name: &str) {

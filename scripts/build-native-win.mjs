@@ -38,7 +38,12 @@ execFileSync('cargo', ['build', '--release'], {
 mkdirSync(outDir, { recursive: true });
 
 const targetDir = resolve(crate, 'target/release');
-for (const exe of ['focuslock-svc.exe', 'focuslock-svcctl.exe', 'focuslock-recover.exe']) {
+for (const exe of [
+  'focuslock-svc.exe',
+  'focuslock-svcctl.exe',
+  'focuslock-recover.exe',
+  'focuslock-natmsg.exe', // browser native-messaging host (bridges the extension ⇄ service)
+]) {
   const src = resolve(targetDir, exe);
   if (!existsSync(src)) {
     console.error(`Expected binary missing: ${src}`);

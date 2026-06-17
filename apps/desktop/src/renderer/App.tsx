@@ -7,9 +7,10 @@ import { SchedulePage } from './pages/Schedule.js';
 import { Keys } from './pages/Keys.js';
 import { Account } from './pages/Account.js';
 import { Settings } from './pages/Settings.js';
+import { Plans } from './pages/Plans.js';
 import { cx } from './lib/utils.js';
 
-type Route = 'dashboard' | 'blocklists' | 'schedule' | 'keys' | 'account' | 'settings';
+type Route = 'dashboard' | 'blocklists' | 'schedule' | 'keys' | 'account' | 'plans' | 'settings';
 
 const NAV: { route: Route; label: string }[] = [
   { route: 'dashboard', label: 'Dashboard' },
@@ -17,6 +18,7 @@ const NAV: { route: Route; label: string }[] = [
   { route: 'schedule', label: 'Schedule' },
   { route: 'keys', label: 'Keys' },
   { route: 'account', label: 'Account' },
+  { route: 'plans', label: 'Plans' },
   { route: 'settings', label: 'Settings' },
 ];
 
@@ -62,10 +64,11 @@ export default function App() {
         ) : (
           <>
             {route === 'dashboard' && <Dashboard />}
-            {route === 'blocklists' && <Blocklists />}
-            {route === 'schedule' && <SchedulePage />}
+            {route === 'blocklists' && <Blocklists onUpgrade={() => setRoute('plans')} />}
+            {route === 'schedule' && <SchedulePage onUpgrade={() => setRoute('plans')} />}
             {route === 'keys' && <Keys />}
             {route === 'account' && <Account />}
+            {route === 'plans' && <Plans />}
             {route === 'settings' && <Settings />}
           </>
         )}

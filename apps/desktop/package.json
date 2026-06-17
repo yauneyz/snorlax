@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@focuslock/core": "workspace:*",
+    "@focuslock/product": "workspace:*",
     "@focuslock/shared": "workspace:*",
     "electron-log": "^5.2.0",
     "electron-updater": "^6.3.4",

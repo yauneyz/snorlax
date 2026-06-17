@@ -10,6 +10,7 @@ import type {
   Params,
   Result,
 } from '@focuslock/shared';
+import type { SubscriptionPlan } from '../../shared/productLimits.js';
 
 export interface BridgeError extends Error {
   code: string;
@@ -38,3 +39,7 @@ export function onEvent<E extends EventName>(event: E, cb: (payload: EventMap[E]
 export const appInfo = () => window.api.appInfo();
 export const openExternal = (url: string) => window.api.openExternal(url);
 export const devToggleKey = () => window.api.devToggleKey();
+export const entitlement = () => window.api.entitlement();
+export const devSetEntitlementPlan = (plan: SubscriptionPlan) =>
+  window.api.devSetEntitlementPlan(plan);
+export type { SubscriptionPlan };

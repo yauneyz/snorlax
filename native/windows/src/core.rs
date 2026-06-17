@@ -111,27 +111,38 @@ impl Core {
     fn set_focus(&mut self, active: bool, source: FocusSource) {
         self.state.focus_active = active;
         self.state.focus_source = source;
-        self.shared.set_active(active);
-        enforce::apply_network(active);
         if active {
+            // Prepare the IP-first drop state before WinDivert/socket workers observe focus-on.
+            // This preserves the old guilty-until-innocent data-plane path: pooled/pre-existing
+            // sockets are already covered by the NETWORK-layer DROP handle when focus becomes live.
+            self.arm_ip_backstop();
+            enforce::apply_network(true);
             // Hand the blocklist to policy-honoring browsers (Chrome/Edge/Brave/Firefox), which
             // enforce it at the request layer — defeating pooled/coalesced sockets the packet
             // layer can't see. Uses the *expanded* domain set (siblings/CDNs) from the shared copy.
             enforce::browser_policy::apply(&self.shared.policy_snapshot());
-            // Pre-arm the suspect/clean drop set instantly, in-memory, so a pooled/coalesced/
-            // opaque socket to a blocked destination — which sends no new ClientHello — dies at
-            // focus-on instead of coasting. Three sources: the recorded in-session flows, and the
-            // persisted antibody store (both synchronous here), plus the active resolver kicked in
-            // the background to augment within a second or two.
-            self.shared.seed_taints_from_flows();
-            self.shared.prearm_from_store();
+            self.shared.set_active(true);
             kick_resolver(self.shared.clone());
+        } else {
+            self.shared.set_active(false);
+            self.shared.clear_taints();
+            enforce::apply_network(false);
         }
         self.persist();
         self.emit(
             "focusChanged",
             json!({ "active": active, "source": source }),
         );
+    }
+
+    fn arm_ip_backstop(&self) {
+        self.shared.clear_taints();
+        // Pre-arm the suspect/clean drop set instantly, in-memory, so a pooled/coalesced/opaque
+        // socket to a blocked destination — which sends no new ClientHello — dies at focus-on
+        // instead of coasting. Three sources: recorded in-session flows, the persisted antibody
+        // store (both synchronous here), plus the active resolver kicked after focus is live.
+        self.shared.seed_taints_from_flows();
+        self.shared.prearm_from_store();
     }
 
     fn enable_focus(&mut self, source: FocusSource) {
@@ -265,12 +276,12 @@ impl Core {
     /// Re-arm enforcement at boot for whatever focus state we loaded from disk.
     pub fn rearm_on_boot(&mut self) {
         if self.state.focus_active {
-            self.shared.set_active(true);
+            self.arm_ip_backstop();
             enforce::apply_network(true);
             enforce::browser_policy::apply(&self.shared.policy_snapshot());
-            // Pre-arm the suspect set from the persisted antibody store so blocking is in force
-            // before the first packet — no cold-start leak across a restart/reboot.
-            self.shared.prearm_from_store();
+            // Workers are spawned after boot re-arm, but keep the ordering identical to normal
+            // focus-on: data-plane state first, then focus becomes observable.
+            self.shared.set_active(true);
             kick_resolver(self.shared.clone());
             tracing::info!("re-armed enforcement on boot (focus was active)");
         }

@@ -11,6 +11,18 @@
 //! apps that hard-code a resolver IP — the gap the old adapter-repointing approach left open.
 //! No system DNS configuration is mutated.
 //!
+//! A SOCKET-layer handle (`run_socket_engine`) closes the **VPN bypass**. The NETWORK-layer engines
+//! above see packets *after* routing, so under a full-tunnel VPN they see only encrypted blobs to
+//! the VPN server — no SNI, no real destination IP, no plaintext DNS. The SOCKET layer instead
+//! intercepts `connect()` *at setup*, before the OS routes the packet into the tunnel, so the real
+//! destination IP + process are visible and the IP-first model holds regardless of any VPN. The
+//! SOCKET layer can't inject/re-inject (RECV_ONLY is mandatory) — a connect that matches the filter
+//! is blocked and one that doesn't proceeds, so the **filter string is the whole control surface**
+//! (built by `build_socket_filter`, same polarity as the taint-drop filter); the recv loop only
+//! drains the queued blocked events so the queue can't overflow into fail-open. This is additive:
+//! the NETWORK-layer taint-drop handle remains the data-plane backstop that starves pooled or
+//! pre-existing 443 sockets after focus turns on.
+//!
 //! A second, short-lived handle implements connection reset: on a toggle/policy-change signal
 //! we snapshot established TCP flows owned by browser (and blocked-app) processes and inject
 //! TCP RSTs to tear them down, so a newly-blocked site dies immediately instead of coasting on
@@ -69,14 +81,41 @@ unsafe impl Send for Diverter {}
 
 impl Diverter {
     fn open(filter: &str, priority: i16, flags: WinDivertFlags) -> std::io::Result<Self> {
+        Self::open_layer(filter, WinDivertLayer::Network, priority, flags)
+    }
+
+    /// Open a handle at an explicit layer. The NETWORK-layer engines use `open`; the connect-block
+    /// engine opens the SOCKET layer (which intercepts socket operations at setup, before any VPN
+    /// encapsulation — see the module header).
+    fn open_layer(
+        filter: &str,
+        layer: WinDivertLayer,
+        priority: i16,
+        flags: WinDivertFlags,
+    ) -> std::io::Result<Self> {
         let cfilter = CString::new(filter)
             .map_err(|_| std::io::Error::new(std::io::ErrorKind::InvalidInput, "filter has NUL"))?;
-        let handle =
-            unsafe { WinDivertOpen(cfilter.as_ptr(), WinDivertLayer::Network, priority, flags) };
+        let handle = unsafe { WinDivertOpen(cfilter.as_ptr(), layer, priority, flags) };
         if handle.0 == 0 || handle.0 == -1 {
             return Err(std::io::Error::last_os_error());
         }
         Ok(Self { handle })
+    }
+
+    /// Receive a layer event that carries no packet data (SOCKET layer). WinDivert wants a NULL
+    /// packet buffer for non-data layers; we only need the `WINDIVERT_ADDRESS` (to drain the queued,
+    /// already-blocked event — the SOCKET layer has no re-inject, so the filter is the control
+    /// surface and draining just keeps the queue from overflowing into fail-open).
+    fn recv_event(&self) -> std::io::Result<WINDIVERT_ADDRESS> {
+        let mut addr = WINDIVERT_ADDRESS::default();
+        let mut len = 0u32;
+        let ok =
+            unsafe { WinDivertRecv(self.handle, std::ptr::null_mut(), 0, &mut len, &mut addr) };
+        if ok.as_bool() {
+            Ok(addr)
+        } else {
+            Err(std::io::Error::last_os_error())
+        }
     }
 
     fn recv(&self, buf: &mut [u8]) -> std::io::Result<(usize, WINDIVERT_ADDRESS)> {
@@ -335,7 +374,11 @@ pub fn run_sni_engine(shared: Arc<EnforceShared>, shutdown: tokio::sync::watch::
         }
         // Open with the filter matching the current focus state; reopen on every transition.
         let was_active = shared.is_active();
-        let filter = if was_active { SNI_FILTER } else { SNI_RECORD_FILTER };
+        let filter = if was_active {
+            SNI_FILTER
+        } else {
+            SNI_RECORD_FILTER
+        };
         let diverter = match Diverter::open(filter, 0, WinDivertFlags::new()) {
             Ok(d) => d,
             Err(e) => {
@@ -346,7 +389,11 @@ pub fn run_sni_engine(shared: Arc<EnforceShared>, shutdown: tokio::sync::watch::
         };
         tracing::info!(
             "WinDivert SNI engine running ({})",
-            if was_active { "blocking" } else { "record-only" }
+            if was_active {
+                "blocking"
+            } else {
+                "record-only"
+            }
         );
 
         // Watcher: when focus flips (or we shut down) break the blocking recv so the handle
@@ -413,7 +460,11 @@ fn handle_sni_packet(
         // QUIC. Dropping (not RSTing — UDP has no RST) starves the session; the browser marks
         // the origin h3-broken and retries over TCP. (Only captured while focused — the
         // record-only filter has no UDP clause — but gate anyway for the transition window.)
-        return active && matches!(udp_ports_payload(data, pkt.l4_off), Some((_, PORT_HTTPS, _)));
+        return active
+            && matches!(
+                udp_ports_payload(data, pkt.l4_off),
+                Some((_, PORT_HTTPS, _))
+            );
     }
     if pkt.proto != PROTO_TCP {
         return false;
@@ -496,7 +547,8 @@ fn tcp_payload_offset(data: &[u8], l4: usize) -> Option<usize> {
 /// to everything **not** in the **clean** allow-exception set; block-all drops all 443. The
 /// desired filter is recomputed each tick and the handle is reopened only when it changes (new
 /// handle opened before the old is dropped, so there is no enforcement gap). On focus-off the
-/// handle is dropped and all session sets cleared.
+/// handle is dropped; `Core` owns clearing the session taint/clean sets so focus-on can pre-arm
+/// them before workers observe the new active state.
 pub fn run_taint_drop(shared: Arc<EnforceShared>, shutdown: tokio::sync::watch::Receiver<bool>) {
     let mut handle: Option<Diverter> = None;
     let mut installed: Option<String> = None;
@@ -506,7 +558,6 @@ pub fn run_taint_drop(shared: Arc<EnforceShared>, shutdown: tokio::sync::watch::
                 tracing::info!("taint drop disabled (focus off)");
             }
             installed = None;
-            shared.clear_taints();
             std::thread::sleep(FOCUS_POLL);
             continue;
         }
@@ -625,6 +676,176 @@ fn dst_not_in(clean: &[IpAddr]) -> String {
         format!("(ipv6 and {})", v6.join(" and "))
     };
     format!("({v4_excl} or {v6_excl})")
+}
+
+// ---------------------------------------------------------------------------
+// Socket-layer connect block (VPN-transparent — see module header)
+// ---------------------------------------------------------------------------
+
+/// Priority of the SOCKET-layer connect-block handle. The socket layer is independent of the
+/// network-layer handles (it intercepts socket operations, not packets), so the value is only for
+/// ordering against any other socket-layer handle; we keep it distinct for clarity.
+const SOCKET_PRIORITY: i16 = -50;
+
+/// Web ports the connect-block gates on. Non-web connects (DNS/UDP 53, NTP, system services, the
+/// VPN client's own tunnel, …) never match, so they are never blocked — fail-safe by construction,
+/// and it keeps name resolution working so allowed sites stay reachable.
+const SOCKET_WEB_SCOPE: &str =
+    "((tcp and (remotePort == 80 or remotePort == 443)) or (udp and remotePort == 443))";
+
+/// Loopback / private / link-local ranges exempted from whitelist & block-all connect blocking so
+/// localhost and LAN services never break. Inclusive `(low, high)` ranges because the WinDivert
+/// filter language has no CIDR notation but does support address comparisons (`<` / `>`). A single
+/// `remoteAddr` field covers both families (IPv4 arrives as an IPv4-mapped IPv6 address, which sorts
+/// far below the v6 ranges below), so one set of clauses is family-correct.
+const SOCKET_EXEMPT_RANGES: &[(&str, &str)] = &[
+    ("10.0.0.0", "10.255.255.255"),
+    ("172.16.0.0", "172.31.255.255"),
+    ("192.168.0.0", "192.168.255.255"),
+    ("127.0.0.0", "127.255.255.255"),
+    ("169.254.0.0", "169.254.255.255"),
+    ("::1", "::1"),
+    ("fe80::", "febf:ffff:ffff:ffff:ffff:ffff:ffff:ffff"),
+    ("fc00::", "fdff:ffff:ffff:ffff:ffff:ffff:ffff:ffff"),
+];
+
+/// `(remoteAddr < lo or remoteAddr > hi) and …` — destination is outside every exempt range. Each
+/// range is a positive parenthesized sub-expression (WinDivert can't negate a `(...)`, but it can
+/// `or` two single comparisons), joined by `and` so all must hold.
+fn socket_exempt_clause() -> String {
+    SOCKET_EXEMPT_RANGES
+        .iter()
+        .map(|(lo, hi)| format!("(remoteAddr < {lo} or remoteAddr > {hi})"))
+        .collect::<Vec<_>>()
+        .join(" and ")
+}
+
+/// `(remoteAddr == a or remoteAddr == b or …)` — connect destination is one of `ips`. Unlike the
+/// NETWORK layer, the SOCKET layer exposes one unified `remoteAddr` field for both v4 and v6, so no
+/// family split is needed.
+fn remote_in(ips: &[IpAddr]) -> String {
+    let parts: Vec<String> = ips.iter().map(|ip| format!("remoteAddr == {ip}")).collect();
+    format!("({})", parts.join(" or "))
+}
+
+/// Build the SOCKET-layer connect-block filter for the current mode, or `None` when there is
+/// nothing to block (blacklist with an empty taint set). A connect that **matches** is blocked by
+/// the driver at setup; one that doesn't match proceeds. Because the SOCKET layer adjudicates at
+/// `connect()` — before the OS routes the packet into a VPN tunnel — the destination IP is the real
+/// one, so this enforcement is VPN-transparent. Polarity mirrors `build_drop_filter`:
+///   * **Blacklist** — block web connects to the tainted destinations.
+///   * **Whitelist** — block web connects to everything *not* in the clean allow-exception set
+///     (and not an exempt local/private range). Empty clean set ⇒ block all non-exempt web connects.
+///   * **BlockAll** — block all non-exempt web connects.
+fn build_socket_filter(mode: Mode, tainted: &[IpAddr], clean: &[IpAddr]) -> Option<String> {
+    let mut clauses = vec!["event == CONNECT".to_string(), SOCKET_WEB_SCOPE.to_string()];
+    match mode {
+        Mode::Blacklist => {
+            if tainted.is_empty() {
+                return None; // nothing proven blocked yet → no handle
+            }
+            clauses.push(remote_in(tainted));
+        }
+        Mode::Whitelist => {
+            clauses.push(socket_exempt_clause());
+            for ip in clean {
+                clauses.push(format!("remoteAddr != {ip}"));
+            }
+        }
+        Mode::BlockAll => {
+            clauses.push(socket_exempt_clause());
+        }
+    }
+    Some(clauses.join(" and "))
+}
+
+/// VPN-transparent connect-block engine (SOCKET layer). While focused, keeps a SOCKET-layer handle
+/// open whose filter blocks `connect()` to in-scope destinations *at connection setup* — before the
+/// OS hands the packet to a VPN tunnel — so new connects are still gated even behind a full-tunnel
+/// VPN, the gap the NETWORK-layer engines can't close (they see only encrypted blobs to the VPN
+/// server). This does not replace `run_taint_drop`: SOCKET sees setup only; NETWORK DROP remains
+/// responsible for already-open sockets on the regular path.
+///
+/// The SOCKET layer has no packet injection: a connect that matches the filter is blocked, one that
+/// doesn't proceeds — the **filter is the entire control surface** (like `run_taint_drop`). It also
+/// can't use the DROP flag (RECV_ONLY is mandatory), so we run a `recv` loop purely to **drain** the
+/// queued (already-blocked) connect events; if we let the queue overflow, blocking would fail open.
+///
+/// The desired filter is recomputed from the live taint/clean sets; when it changes (or focus ends)
+/// a watcher shuts down the blocking `recv` and the outer loop reopens with the fresh filter. On
+/// focus-off the handle is dropped. Fail-safe: any open/recv error just retries — a missing handle
+/// means connects pass (the persistent firewall backstop and SCM restart cover a dead service).
+pub fn run_socket_engine(shared: Arc<EnforceShared>, shutdown: tokio::sync::watch::Receiver<bool>) {
+    while !*shutdown.borrow() {
+        if !shared.is_active() {
+            std::thread::sleep(FOCUS_POLL);
+            continue;
+        }
+        let Some(filter) =
+            build_socket_filter(shared.mode(), &shared.tainted_ips(), &shared.clean_ips())
+        else {
+            // Nothing to block yet (blacklist, empty taint set). Re-check on the taint cadence.
+            std::thread::sleep(TAINT_POLL);
+            continue;
+        };
+        let diverter = match Diverter::open_layer(
+            &filter,
+            WinDivertLayer::Socket,
+            SOCKET_PRIORITY,
+            WinDivertFlags::new().set_recv_only(),
+        ) {
+            Ok(d) => d,
+            Err(e) => {
+                tracing::error!("WinDivert socket engine open failed: {e}");
+                std::thread::sleep(FOCUS_POLL);
+                continue;
+            }
+        };
+        tracing::info!("WinDivert socket connect-block active");
+
+        // Watcher: shut down the blocking recv when focus ends, we shut down, or the desired filter
+        // changes (a taint/clean membership change) — so the outer loop reopens with the new filter.
+        // We compare filter *strings* (cheap to rebuild) rather than a generation counter because
+        // tainted_ips/clean_ips TTL-evict as a side effect and would race a counter. `done` retires
+        // the watcher without it shutting down a handle we're already closing.
+        let done = Arc::new(AtomicBool::new(false));
+        let watcher = {
+            let raw = diverter.raw();
+            let shared = shared.clone();
+            let shutdown = shutdown.clone();
+            let done = done.clone();
+            let installed = filter.clone();
+            std::thread::spawn(move || {
+                loop {
+                    if *shutdown.borrow() || !shared.is_active() || done.load(Ordering::Relaxed) {
+                        break;
+                    }
+                    let want = build_socket_filter(
+                        shared.mode(),
+                        &shared.tainted_ips(),
+                        &shared.clean_ips(),
+                    );
+                    if want.as_deref() != Some(installed.as_str()) {
+                        break;
+                    }
+                    std::thread::sleep(TAINT_POLL);
+                }
+                if !done.load(Ordering::Relaxed) {
+                    unsafe {
+                        let _ = WinDivertShutdown(HANDLE(raw), WinDivertShutdownMode::Recv);
+                    }
+                }
+            })
+        };
+
+        // Drain loop: each event is a connect the filter already blocked; we discard it. Blocks on
+        // recv (no busy-wait) until the watcher shuts it down on a refresh (recv then errors).
+        while diverter.recv_event().is_ok() {}
+        done.store(true, Ordering::Relaxed);
+        let _ = watcher.join();
+        tracing::info!("WinDivert socket engine handle closed (refresh)");
+    }
+    tracing::info!("WinDivert socket engine exited");
 }
 
 // ---------------------------------------------------------------------------
@@ -849,7 +1070,10 @@ mod tests {
         assert_eq!(out[6], PROTO_TCP); // next header
         let tcp = &out[40..];
         assert_eq!(u16::from_be_bytes([tcp[0], tcp[1]]), 443);
-        assert_eq!(u32::from_be_bytes([tcp[4], tcp[5], tcp[6], tcp[7]]), 0x11223344);
+        assert_eq!(
+            u32::from_be_bytes([tcp[4], tcp[5], tcp[6], tcp[7]]),
+            0x11223344
+        );
         assert_eq!(tcp[13], 0x04); // RST flag
     }
 
@@ -914,6 +1138,38 @@ mod tests {
         assert!(f.contains("udp.DstPort == 443"));
     }
 
+    #[test]
+    fn network_drop_remains_data_plane_backstop() {
+        let clean = [Ipv4Addr::new(142, 250, 0, 1).into()];
+        let f = build_drop_filter(Mode::Whitelist, &[], &clean).unwrap();
+
+        // This is the pre-existing/pooled-socket killer: a NETWORK-layer DROP filter on outbound
+        // app-data/QUIC packets. The SOCKET layer must stay additive, not replace this path.
+        assert!(f.starts_with("outbound and"));
+        assert!(f.contains("tcp.Payload[0] == 0x17"));
+        assert!(f.contains("udp.DstPort == 443"));
+        assert!(f.contains("ip.DstAddr != 142.250.0.1"));
+        assert!(!f.contains("event == CONNECT"));
+        assert!(!f.contains("remoteAddr"));
+    }
+
+    #[test]
+    fn socket_connect_filter_does_not_weaken_network_drop_scope() {
+        let network = build_drop_filter(Mode::Whitelist, &[], &[]).unwrap();
+        let socket = build_socket_filter(Mode::Whitelist, &[], &[]).unwrap();
+
+        // The old IP-first path remains strict: empty whitelist clean set means drop all 443
+        // app-data/QUIC at NETWORK. Local/private exemptions are only for new CONNECT blocking.
+        assert!(network.contains("(ip or ipv6)"));
+        assert!(!network.contains("10.0.0.0"));
+        assert!(!network.contains("remoteAddr"));
+
+        assert!(socket.contains("event == CONNECT"));
+        assert!(socket.contains("(remoteAddr < 10.0.0.0 or remoteAddr > 10.255.255.255)"));
+        assert!(!socket.contains("ip.DstAddr"));
+        assert!(!socket.contains("tcp.Payload[0]"));
+    }
+
     /// Validate every drop-filter variant against WinDivert's own compiler (no driver/admin
     /// needed) — this is what `WinDivertOpen` checks and was rejecting with os error 87.
     fn assert_windivert_compiles(filter: &str) {
@@ -935,7 +1191,9 @@ mod tests {
             let msg = if err_str.is_null() {
                 "<null>".to_string()
             } else {
-                unsafe { CStr::from_ptr(err_str) }.to_string_lossy().into_owned()
+                unsafe { CStr::from_ptr(err_str) }
+                    .to_string_lossy()
+                    .into_owned()
             };
             panic!("WinDivert rejected filter at pos {err_pos}: {msg}\n  filter: {filter}");
         }
@@ -955,5 +1213,111 @@ mod tests {
         // The always-on engine filters too, so a syntax regression is caught here.
         assert_windivert_compiles(SNI_FILTER);
         assert_windivert_compiles(SNI_RECORD_FILTER);
+    }
+
+    /// Compile a filter against WinDivert's own compiler at a specific layer (the socket-layer
+    /// fields `event`/`remoteAddr`/`remotePort` are only valid at the SOCKET layer).
+    fn assert_compiles_at(filter: &str, layer: WinDivertLayer) {
+        use std::ffi::{CStr, CString};
+        let c = CString::new(filter).unwrap();
+        let mut err_str: *const std::os::raw::c_char = std::ptr::null();
+        let mut err_pos: u32 = 0;
+        let ok = unsafe {
+            windivert_sys::WinDivertHelperCompileFilter(
+                c.as_ptr(),
+                layer,
+                std::ptr::null_mut(),
+                0,
+                &mut err_str,
+                &mut err_pos,
+            )
+        };
+        if !ok.as_bool() {
+            let msg = if err_str.is_null() {
+                "<null>".to_string()
+            } else {
+                unsafe { CStr::from_ptr(err_str) }
+                    .to_string_lossy()
+                    .into_owned()
+            };
+            panic!("WinDivert rejected socket filter at pos {err_pos}: {msg}\n  filter: {filter}");
+        }
+    }
+
+    #[test]
+    fn blacklist_socket_filter_blocks_connect_to_tainted() {
+        let ips = [
+            Ipv4Addr::new(151, 101, 1, 140).into(),
+            Ipv6Addr::LOCALHOST.into(),
+        ];
+        let f = build_socket_filter(Mode::Blacklist, &ips, &[]).unwrap();
+        assert!(f.starts_with("event == CONNECT and"));
+        assert!(f.contains("remoteAddr == 151.101.1.140"));
+        assert!(f.contains("remoteAddr == ::1"));
+        assert!(f.contains("remotePort == 443"));
+        // Blacklist scopes to the taint set — no private-range exemption clause.
+        assert!(!f.contains("remoteAddr <"));
+    }
+
+    #[test]
+    fn blacklist_socket_empty_taint_means_no_handle() {
+        assert!(build_socket_filter(Mode::Blacklist, &[], &[]).is_none());
+    }
+
+    #[test]
+    fn whitelist_socket_filter_excludes_clean_and_exempts_private() {
+        let clean = [
+            Ipv4Addr::new(142, 250, 0, 1).into(),
+            Ipv6Addr::new(0x2607, 0xf8b0, 0, 0, 0, 0, 0, 1).into(),
+        ];
+        let f = build_socket_filter(Mode::Whitelist, &[], &clean).unwrap();
+        assert!(f.contains("remoteAddr != 142.250.0.1"));
+        assert!(f.contains("remoteAddr != 2607:f8b0::1"));
+        // Local/private ranges are exempted so LAN/localhost never break.
+        assert!(f.contains("(remoteAddr < 10.0.0.0 or remoteAddr > 10.255.255.255)"));
+        assert!(f.contains("(remoteAddr < 127.0.0.0 or remoteAddr > 127.255.255.255)"));
+        // WinDivert can't negate a parenthesized set; we only use single-term `!=`/`<`/`>`.
+        assert!(!f.contains("not "));
+    }
+
+    #[test]
+    fn whitelist_socket_empty_clean_blocks_all_nonexempt() {
+        let f = build_socket_filter(Mode::Whitelist, &[], &[]).unwrap();
+        assert!(!f.contains("remoteAddr !="));
+        assert!(!f.contains("remoteAddr =="));
+        assert!(f.contains("(remoteAddr < 10.0.0.0 or remoteAddr > 10.255.255.255)"));
+    }
+
+    #[test]
+    fn block_all_socket_filter_blocks_all_nonexempt_web() {
+        let f = build_socket_filter(Mode::BlockAll, &[], &[]).unwrap();
+        assert!(!f.contains("remoteAddr =="));
+        assert!(!f.contains("remoteAddr !="));
+        assert!(f.contains("event == CONNECT"));
+        assert!(f.contains("remotePort == 443"));
+        assert!(f.contains("(remoteAddr < ::1 or remoteAddr > ::1)"));
+    }
+
+    #[test]
+    fn all_socket_filters_compile_in_windivert() {
+        let v4: IpAddr = Ipv4Addr::new(1, 2, 3, 4).into();
+        let v6: IpAddr = Ipv6Addr::new(0x2606, 0x4700, 0, 0, 0, 0, 0, 1).into();
+        let mixed = [v4, v6];
+        assert_compiles_at(
+            &build_socket_filter(Mode::Blacklist, &mixed, &[]).unwrap(),
+            WinDivertLayer::Socket,
+        );
+        assert_compiles_at(
+            &build_socket_filter(Mode::Whitelist, &[], &mixed).unwrap(),
+            WinDivertLayer::Socket,
+        );
+        assert_compiles_at(
+            &build_socket_filter(Mode::Whitelist, &[], &[]).unwrap(),
+            WinDivertLayer::Socket,
+        );
+        assert_compiles_at(
+            &build_socket_filter(Mode::BlockAll, &[], &[]).unwrap(),
+            WinDivertLayer::Socket,
+        );
     }
 }
