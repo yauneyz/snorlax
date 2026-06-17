@@ -94,7 +94,7 @@ impl ObservationStore {
     }
 
     /// IPs of every host whose name is blocked under `policy` (incl. DoH-bypass hosts). Used to
-    /// pre-arm the suspect set at focus-on (blacklist + block-all).
+    /// pre-arm the guilty set at focus-on.
     pub fn blocked_ips(&self, policy: &Policy) -> Vec<IpAddr> {
         let inner = self.inner.lock().unwrap();
         let mut out = BTreeSet::new();
@@ -107,7 +107,7 @@ impl ObservationStore {
     }
 
     /// IPs of every host that is *allowed* under `policy` (i.e. not blocked). Used to pre-seed the
-    /// clean/allow exception set at focus-on in whitelist mode so allowed sites aren't dropped.
+    /// clean/allow exception set at focus-on so known-good shared IPs aren't dropped.
     pub fn allowed_ips(&self, policy: &Policy) -> Vec<IpAddr> {
         let inner = self.inner.lock().unwrap();
         let mut out = BTreeSet::new();

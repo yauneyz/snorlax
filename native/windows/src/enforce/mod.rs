@@ -4,16 +4,10 @@
 //! The suspect-IP set is **pre-armed** at focus-on from three sources — the persisted
 //! `observations` antibody store, the active `resolve`r, and the in-memory recorded flows — so a
 //! pooled/coalesced/opaque socket to a blocked destination dies instantly instead of coasting
-//! until observed live. Backed by persistent Windows-Firewall DoT/DoH-IP/QUIC rules
-//! (enforce::wfp) and managed browser policies (enforce::browser_policy); app blocking is process
-//! termination (enforce::apps). See the note in lib.rs for what's deferred.
-//!
-//! **VPN-transparent connect block (enforce::divert::run_socket_engine):** the WinDivert SOCKET
-//! layer adjudicates each `connect()` at setup — before the OS routes the packet into a VPN tunnel
-//! — so the real destination IP is visible and the same taint/clean sets gate connections even
-//! behind a full-tunnel VPN, where the NETWORK-layer engines see only encrypted traffic to the VPN
-//! server. (Browser-extension per-URL classification, for encrypted-SNI/ECH, is the deferred next
-//! layer beneath which this connect block is the universal backstop.)
+//! until observed live. The browser extension is the request-layer authority for cases the IP layer
+//! cannot classify precisely (VPNs, ECH, pooled browser connections). Backed by persistent
+//! Windows-Firewall DoT/DoH-IP/QUIC rules (enforce::wfp) and managed browser policies
+//! (enforce::browser_policy); app blocking is process termination (enforce::apps).
 
 pub mod apps;
 pub mod browser_policy;
@@ -274,20 +268,28 @@ impl EnforceShared {
         ips
     }
 
-    /// Seed the taint set from every recorded flow whose SNI is blocked under the current policy.
-    /// Pooled/coalesced sockets send no new ClientHello, so the SNI engine never re-fires on them
-    /// — but the always-on recorder already captured their hostname. Calling this synchronously at
-    /// focus-on taints those destinations immediately, in-memory.
+    /// Seed the live IP sets from recorded flows. Pooled/coalesced sockets send no new ClientHello,
+    /// so the SNI engine never re-fires on them — but the always-on recorder already captured their
+    /// hostname. Calling this synchronously at focus-on arms guilty IPs and clean allow exceptions
+    /// immediately, in-memory.
     pub fn seed_taints_from_flows(&self) {
         let policy = self.policy.lock().unwrap().clone();
-        let blocked: Vec<IpAddr> = {
+        let (blocked, allowed): (Vec<IpAddr>, Vec<IpAddr>) = {
             let flows = self.flow_sni.lock().unwrap();
-            flows
-                .iter()
-                .filter(|(_, sni)| is_host_blocked(&policy, sni) || is_doh_bypass_host(sni))
-                .map(|((_, _, remote, _), _)| *remote)
-                .collect()
+            let mut blocked = Vec::new();
+            let mut allowed = Vec::new();
+            for ((_, _, remote, _), sni) in flows.iter() {
+                if is_host_blocked(&policy, sni) || is_doh_bypass_host(sni) {
+                    blocked.push(*remote);
+                } else if policy.mode != Mode::BlockAll {
+                    allowed.push(*remote);
+                }
+            }
+            (blocked, allowed)
         };
+        for ip in allowed {
+            self.mark_clean(ip);
+        }
         for ip in blocked {
             self.taint(ip);
         }
@@ -299,11 +301,15 @@ impl EnforceShared {
     pub fn prearm_from_store(&self) {
         let policy = self.policy_snapshot();
         match policy.mode {
-            Mode::Blacklist | Mode::BlockAll => {
+            Mode::Blacklist => {
+                for ip in self.observations.allowed_ips(&policy) {
+                    self.mark_clean(ip);
+                }
                 for ip in self.observations.blocked_ips(&policy) {
                     self.taint(ip);
                 }
             }
+            Mode::BlockAll => {}
             Mode::Whitelist => {
                 for ip in self.observations.allowed_ips(&policy) {
                     self.mark_clean(ip);
@@ -332,6 +338,8 @@ impl EnforceShared {
             Mode::Blacklist => {
                 if blocked {
                     self.taint(ip);
+                } else {
+                    self.mark_clean(ip);
                 }
             }
             Mode::BlockAll => {}
@@ -526,6 +534,7 @@ mod tests {
         let ips = s.tainted_ips();
         assert!(ips.contains(&ip(7)));
         assert!(!ips.contains(&ip(8)));
+        assert!(s.clean_ips().contains(&ip(8)));
     }
 
     #[test]

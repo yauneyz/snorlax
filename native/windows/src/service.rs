@@ -63,15 +63,6 @@ pub async fn serve(pipe_path: String, shutdown: watch::Receiver<bool>) {
         let shutdown = shutdown.clone();
         std::thread::spawn(move || divert::run_taint_drop(shared, shutdown));
     }
-    // VPN-transparent connect-block engine — SOCKET-layer handle that blocks connect() to in-scope
-    // destinations at connection setup, before the OS routes the packet into a VPN tunnel, so the
-    // IP-first model holds even behind a full-tunnel VPN (the gap the NETWORK-layer engines, which
-    // see only encrypted blobs to the VPN server, can't close).
-    {
-        let shared = shared.clone();
-        let shutdown = shutdown.clone();
-        std::thread::spawn(move || divert::run_socket_engine(shared, shutdown));
-    }
     // Active blocked-domain resolver ticker — re-resolves the policy's domains on a cadence to
     // pre-arm the suspect/clean set against current CDN IPs and grow the antibody store.
     {

@@ -14,7 +14,8 @@ the wire. That model goes blind when:
 - **DoH** hides the DNS query → our UDP-53 sinkhole never sees it.
 - **Connection reuse** (HTTP/2 keep-alive, HTTP/3) means no new ClientHello after focus turns on →
   nothing re-adjudicates the flow.
-- **VPNs** tunnel everything; the connect-layer block helps for *new* connects but not reused ones.
+- **VPNs** tunnel the wire path; the extension still sees browser URLs and blocks before the request
+  leaves the browser.
 
 Chromium already gets a request-layer backstop from the managed `URLBlocklist` policy
 (`enforce::browser_policy`), but **Firefox is deliberately excluded there** (it reads policy only at
