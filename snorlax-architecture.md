@@ -257,11 +257,10 @@ hostname actually on the wire":
    wrongly-scoped shared IP self-heals via the let-through handshake. All session sets clear on
    focus-off; the durable antibody store on disk is retained.
 
-4. **QUIC / HTTP-3.** QUIC (UDP 443) encrypts its ClientHello, so layer 3 can't read the SNI off
-   the wire. For now we **block outbound UDP 443** (firewall rule, below), forcing browsers to
-   fall back to TCP where SNI inspection works. The principled upgrade — decrypting the QUIC
-   Initial packet (keys derivable from the connection ID) to read its SNI and block per-flow — is
-   designed in [`quic-upgrade.md`](./quic-upgrade.md) and deferred.
+4. **QUIC / HTTP-3.** QUIC (UDP 443) hides request details from packet inspection and can keep
+   pooled sessions alive across a focus transition. For now we **block outbound UDP 443** while
+   focused, forcing browsers to fall back to TCP where the DNS sinkhole, destination-IP drop, and
+   extension request rules are the intended enforcement path.
 
 **Persistent firewall backstop (`enforce::wfp`).** The WinDivert layers above die with the
 process. As a kill-survival backstop we install **Windows Firewall** rules (via `netsh
@@ -276,32 +275,19 @@ off:
 These are ordinary firewall rules, so they **persist if the service is killed** until focus is
 cleared, while the SCM restarts the service (~1s) to re-arm the WinDivert layers.
 
-**Browser-policy blocking (`enforce::browser_policy`).** A request-layer layer for Chromium
-(Chrome/Edge/Brave/Chromium), which honor the managed `URLBlocklist`/`URLAllowlist` policies set
-via HKLM registry keys our `LocalSystem` service writes on focus-on (and re-writes on a policy
-change), removed by `teardown_network`. The browser enforces these **above the socket** — so they
-defeat the pooled/coalesced-socket reuse the packet layer can't see (every request on a reused
-HTTP/2 socket is still checked) — and a machine policy can't be overridden by the user. Chromium
-watches the policy keys and reloads within seconds of a write *or* delete, so focus-on/off both
-reflect near-live. Modes map directly: blacklist → block the listed (expanded) domains; whitelist
-→ block `*` and allow the listed; block-all → block `*`. **Firefox is intentionally excluded**: it
-reads policies only at startup, so a focus-off delete wouldn't lift the block until the next
-restart (block-after-unlock) — Firefox relies on the network layers, which toggle instantly. This
-layer complements — does not replace — the network layers, which cover non-Chromium browsers,
-non-browser apps, and raw-IP traffic. (`clear()` still deletes a legacy Firefox `WebsiteFilter`
-key so policies written by an earlier build are torn down.)
+**Browser extension blocking (`enforce::extension_policy`, `focuslock-natmsg.exe`).** Browser
+request-layer blocking lives in the force-installed extension for Chromium variants and Firefox.
+The service sends live `{active, mode, domains}` state over native messaging; the extension applies
+declarativeNetRequest rules above TLS and clears them when focus turns off. We no longer write
+Chromium enterprise `URLBlocklist` / `URLAllowlist` policies; extension install only removes
+legacy policy keys from older builds.
 
-**Active resolver & antibody store (`enforce::resolve`, `enforce::observations`).** What pre-arms
-3b. The **observation store** is a persisted `host → [ip]` map (`%PROGRAMDATA%\FocusLock\
-observations.json`) written by the always-on SNI recorder on every captured ClientHello —
-**including while unfocused** — so it accumulates the IPs that blocked sites actually use over
-time ("antibodies") and survives restarts/reboots. The **resolver** is a hand-rolled UDP DNS
-client that resolves the policy's domains (the expanded blocklist in blacklist mode, the allowlist
-in whitelist mode) against pinned public upstreams (1.1.1.1/8.8.8.8/…) on focus-on and a 5-minute
-ticker, catching current CDN IPs and rotation — `focusd`'s approach. It binds a **fixed local
-source port** that `ENGINE_FILTER` excludes, so our own lookups bypass the DNS sinkhole (which
-would otherwise NXDOMAIN them). At focus-on both feed `EnforceShared`'s suspect/clean sets
-synchronously (store) + in the background (resolver), so blocking is in force within ~50ms.
+**Warm resolver (`enforce::resolve`).** The resolver is a hand-rolled UDP DNS client that resolves
+the policy's expanded domains (blocklist in blacklist mode, allowlist in whitelist mode) through
+the OS-configured resolvers first, then public fallbacks. It runs on startup, on policy/focus kicks,
+and a 5-minute ticker **whether focus is on or off**, replacing the blocked/allowed IP bank
+wholesale like `focusd`'s atomic nftables set swap. It binds a **fixed local source port** that
+`ENGINE_FILTER` excludes, so our own lookups bypass the DNS sinkhole.
 
 > **Connection reset — removed.** Earlier builds tore down already-open sockets with an RST burst
 > (deterministic `SetTcpEntry(DELETE_TCB)` for v4, an RFC-5961 challenge-ACK SYN-probe trick for
@@ -998,13 +984,11 @@ focuslock/
 | `src/usb.rs` | `WM_DEVICECHANGE` listener + SetupAPI/CfgMgr32 enumeration; safety poll. |
 | `src/pairing.rs` | Decides whether a currently-connected device satisfies a paired key (serial + key-file secret). |
 | `src/schedule.rs` | Timer that evaluates the schedule and flips focus. |
-| `src/enforce/mod.rs` | `EnforceShared` (live policy/focus/flow-SNI state, the pre-armed tainted-IP suspect set + durable clean allow-set, the antibody store handle); mode-aware seeding (`prearm_from_store`, `seed_taints_from_flows`, `ingest_resolved`); `apply_network` toggles the firewall backstop. |
-| `src/enforce/divert.rs` | WinDivert packet engines: always-on DNS/DoT engine (NXDOMAIN injection, DoT drop, ECH/HTTPS-RR suppression, resolver-src-port exemption), always-on 443 SNI exoneration inspector (record-only unfocused; RST + taint on blocked SNI, `note_allowed`/`untaint` on allowed SNI while focused), and the pre-armed DROP-flag handle (`build_drop_filter`: mode-aware, drops only 443 application-data + QUIC, exempts handshakes for redemption). |
-| `src/enforce/resolve.rs` | Active UDP DNS resolver bound to a fixed local source port (sinkhole-exempt) against pinned upstreams; resolves the policy's domains on focus-on + a 5-min ticker and feeds the suspect/clean sets + antibody store. |
-| `src/enforce/observations.rs` | Persisted `host → [ip]` antibody store (`observations.json`): written by the always-on SNI recorder (incl. unfocused), read at focus-on to pre-arm the suspect/clean set; bounded + debounced flush + atomic write. |
-| `src/enforce/browser_policy.rs` | Enterprise browser-policy blocking: writes Chromium `URLBlocklist`/`URLAllowlist` HKLM keys (via `reg import`) so Chromium enforces the blocklist at the request layer; cleared by `teardown_network`. Firefox is excluded (startup-only policy reads → block-after-unlock); `clear()` still removes a legacy Firefox `WebsiteFilter` key. |
+| `src/enforce/mod.rs` | `EnforceShared` (live policy/focus state plus resolver-fed blocked/allowed IP banks); property expansion; `apply_network` toggles the firewall backstop. |
+| `src/enforce/divert.rs` | WinDivert packet engines: always-on DNS/DoT engine (NXDOMAIN injection, DoT drop, ECH/HTTPS-RR suppression, resolver-src-port exemption) plus the focus-gated DROP-flag destination-IP handle (`build_drop_filter`). |
+| `src/enforce/resolve.rs` | Warm UDP DNS resolver bound to a fixed local source port (sinkhole-exempt); resolves the expanded policy domains at startup, on policy/focus kicks, and every 5 minutes whether focus is on or off. |
+| `src/enforce/extension_policy.rs` | Force-installs the browser extension and registers the native-messaging host; clears legacy Chromium URL policy keys from older builds. |
 | `src/enforce/dns.rs` | Pure DNS wire helpers (parse QNAME/QTYPE, build NXDOMAIN/NODATA replies) used by the engine. |
-| `src/enforce/sni.rs` | Pure TLS ClientHello → SNI extraction used by the 443 inspector. |
 | `src/enforce/properties.rs` | Curated multi-domain "property group" table + blocklist expansion (sibling/CDN domains). |
 | `src/enforce/wfp.rs` | Installs/removes the persistent Windows-Firewall backstop (DoT 853, DoH resolver IPs, QUIC UDP 443) via `netsh`. |
 | `src/enforce/apps.rs` | Process-list poll + `TerminateProcess` on a blocked-app match. |

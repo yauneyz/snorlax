@@ -20,13 +20,6 @@ pub fn recovery_code_file() -> PathBuf {
     data_dir().join("recovery-code.txt")
 }
 
-/// The persisted "antibodies" store: learned `host -> [ip]` observations accumulated by the
-/// always-on SNI recorder (even while unfocused). Read at focus-on to pre-arm the suspect/clean
-/// IP sets so blocking is instant. See enforce::observations.
-pub fn observations_file() -> PathBuf {
-    data_dir().join("observations.json")
-}
-
 pub fn log_file() -> PathBuf {
     data_dir().join("service.log")
 }

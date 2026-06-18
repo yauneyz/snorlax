@@ -8,7 +8,6 @@ use std::time::Duration;
 use tokio::sync::{watch, Mutex};
 
 use crate::core::Core;
-use crate::enforce::observations::ObservationStore;
 use crate::enforce::{self, EnforceShared};
 use crate::ipc;
 use crate::secure_store::SecureStore;
@@ -24,14 +23,7 @@ pub async fn serve(pipe_path: String, shutdown: watch::Receiver<bool>) {
 
     let state = PersistentState::load();
     let store = SecureStore::load();
-    // Persisted antibody store: learned host→IP observations that pre-arm the suspect/clean set
-    // at focus-on (survives restarts). Shared with the SNI recorder + resolver via EnforceShared.
-    let observations = Arc::new(ObservationStore::load());
-    let shared = Arc::new(EnforceShared::new(
-        state.policy.clone(),
-        state.focus_active,
-        observations,
-    ));
+    let shared = Arc::new(EnforceShared::new(state.policy.clone(), state.focus_active));
 
     let core = Arc::new(Mutex::new(Core::new(state, store, shared.clone())));
     core.lock().await.rearm_on_boot();
@@ -41,30 +33,24 @@ pub async fn serve(pipe_path: String, shutdown: watch::Receiver<bool>) {
     // pushes (no rules while focus is off), so it's safe to leave installed. Idempotent.
     enforce::extension_policy::install();
 
-    // The WinDivert packet engines and reset worker run on dedicated OS threads (WinDivert recv
-    // is blocking). They self-gate on focus_active and are cleaned up on process exit.
+    // The WinDivert packet engines run on dedicated OS threads (WinDivert recv is blocking). They
+    // self-gate on focus_active and are cleaned up on process exit.
     {
         let shared = shared.clone();
         let shutdown = shutdown.clone();
         std::thread::spawn(move || divert::run_engine(shared, shutdown));
     }
-    // 443 SNI inspection engine — always-on (record-only while unfocused, blocking while
-    // focused; the handle's filter tracks focus transitions).
+    // focusd-style IP-drop manager — focus-gated DROP-flag handle that silently discards outbound
+    // packets to the resolver's blocked-IP set (blacklist), or to anything not in the allow set
+    // (whitelist/block-all). This is the website blocker.
     {
         let shared = shared.clone();
         let shutdown = shutdown.clone();
-        std::thread::spawn(move || divert::run_sni_engine(shared, shutdown));
+        std::thread::spawn(move || divert::run_ip_drop(shared, shutdown));
     }
-    // Pre-armed suspect-IP drop manager — focus-gated DROP-flag handle that silently discards
-    // 443 application-data to in-scope destinations (blacklist: tainted set; whitelist: not the
-    // clean set; block-all: all). This is the IP-first enforcement point (see blocking-upgrade.md).
-    {
-        let shared = shared.clone();
-        let shutdown = shutdown.clone();
-        std::thread::spawn(move || divert::run_taint_drop(shared, shutdown));
-    }
-    // Active blocked-domain resolver ticker — re-resolves the policy's domains on a cadence to
-    // pre-arm the suspect/clean set against current CDN IPs and grow the antibody store.
+    // Warm policy-domain resolver ticker — re-resolves the policy's expanded domains on a cadence
+    // and swaps the blocked/allowed IP set wholesale against current CDN IPs (focusd's refresh).
+    // It runs while focus is off too so the next focus-on starts with an IP bank already populated.
     {
         let shared = shared.clone();
         let shutdown = shutdown.clone();
@@ -108,9 +94,6 @@ pub async fn serve(pipe_path: String, shutdown: watch::Receiver<bool>) {
 
     tracing::info!("FocusLock service running; IPC at {pipe_path}");
     ipc::run_server(core, pipe_path, shutdown).await;
-
-    // Persist any pending learned observations before we exit.
-    shared.observations().flush();
 
     // NOTE: we intentionally do NOT tear down enforcement on a clean stop — if focus is active,
     // blocking should persist (the SCM restarts us on kill). The killswitch / focus-off path is

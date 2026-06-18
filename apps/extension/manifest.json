@@ -5,6 +5,7 @@
   "description": "Enforces FocusLock website blocking at the request layer (works under ECH, QUIC, and VPNs).",
   "minimum_chrome_version": "101",
   "permissions": ["declarativeNetRequest", "nativeMessaging", "storage"],
+  "host_permissions": ["<all_urls>"],
   "background": {
     "service_worker": "src/background.js",
     "type": "module"

@@ -1,9 +1,11 @@
-//! Active blocked-domain resolver (architecture §4.1, IP-first blocking).
+//! Warm policy-domain resolver (architecture §4.1, IP-first blocking).
 //!
-//! Ports the idea from the Linux sibling `focusd` (`internal/resolver/resolver.go`): resolve the
-//! domains we care about to their A/AAAA IPs ourselves, up front, so focus-on can pre-arm the
-//! suspect-IP drop set without waiting to *observe* a blocked host on the wire. This is the
-//! "active" half of the suspect set; the persisted `observations` store is the "passive" half.
+//! This is the **sole source** of the drop-set IPs, exactly as in the Linux sibling `focusd`
+//! (`internal/resolver/resolver.go` + `internal/daemon/daemon.go`): resolve the policy's domains to
+//! their A/AAAA IPs ourselves and hand the full set to the IP-drop layer, replacing it wholesale
+//! each pass (focusd's atomic nftables set swap). No SNI inspection, no learned allow store — an
+//! IP is blocked iff a blocked domain currently resolves to it. The resolver runs while focus is
+//! off too, so focus-on can arm against an already-populated IP bank instead of waiting for DNS.
 //!
 //! Two integration constraints drive the hand-rolled UDP client (rather than a resolver crate):
 //!
@@ -15,48 +17,75 @@
 //!   2. **It must not use the OS resolver** (which our sinkhole would also poison). We query
 //!      pinned public upstreams directly over UDP/53, exactly as `focusd` does.
 
+use std::collections::HashSet;
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr, UdpSocket};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
-use crate::enforce::EnforceShared;
+use crate::enforce::{EnforceShared, ResolvedClass};
+use crate::model::Mode;
 
 /// Fixed local UDP source port our resolver binds to. `enforce::divert::ENGINE_FILTER` excludes
 /// this port so the sinkhole never captures our own queries while focus is active.
 pub const RESOLVER_SRC_PORT: u16 = 5354;
 
-/// Pinned upstream resolvers (UDP/53). Independent of the OS resolver and of the machine's
-/// configured DNS, mirroring `focusd`'s upstream set. Tried in order with failover.
-const UPSTREAMS: &[&str] = &["1.1.1.1:53", "8.8.8.8:53", "1.0.0.1:53", "9.9.9.9:53"];
+/// Public fallback resolvers (UDP/53), tried only if the OS-configured DNS servers are unreachable
+/// or return nothing. We prefer the **system** resolvers (see `effective_upstreams`) because a CDN
+/// answers based on the *resolver's* network location: the browser uses the OS resolver, so to
+/// block the same anycast POP IPs the browser actually connects to, we must resolve through the
+/// same servers. Hardcoding 1.1.1.1 made us resolve a *different* Fastly POP than the browser, so
+/// the IP we blocked never matched the IP the browser used.
+const FALLBACK_UPSTREAMS: &[&str] = &["1.1.1.1:53", "8.8.8.8:53", "1.0.0.1:53", "9.9.9.9:53"];
 
 const QTYPE_A: u16 = 1;
 const QTYPE_AAAA: u16 = 28;
 const QUERY_TIMEOUT: Duration = Duration::from_millis(1500);
 
 /// How often the background resolver re-resolves the policy's domains. CDN IPs rotate, so this
-/// refreshes the suspect/clean sets (and grows the antibody store) on a cadence — focusd uses the
-/// same interval-based approach.
+/// refreshes the blocked/allowed sets on a cadence — focusd uses the same interval-based approach.
 const RESOLVE_INTERVAL: Duration = Duration::from_secs(300);
 
-/// Resolve the policy's relevant domains and feed every `host → ip` into `shared`: the antibody
-/// store always grows, and while focused the live suspect/clean set is armed per mode. Blocking;
-/// call from a dedicated thread (or a one-shot focus-on kick).
+/// Resolve the policy's relevant domains and replace the drop-set IPs wholesale (focusd's atomic
+/// swap): in blacklist mode the blocked set, in whitelist mode the allowed set. Runs regardless of
+/// focus so the IP bank stays warm. Blocking; call from a dedicated thread or one-shot kick.
 pub fn resolve_and_ingest(shared: &EnforceShared) {
     let targets = shared.resolver_targets();
     if targets.is_empty() {
+        match shared.mode() {
+            Mode::Blacklist => shared.set_blocked_ips(HashSet::new()),
+            Mode::Whitelist => shared.set_allowed_ips(HashSet::new()),
+            Mode::BlockAll => {}
+        }
         return;
     }
     let pairs = resolve_hosts(&targets);
-    if pairs.is_empty() {
-        return;
-    }
     tracing::info!(
         "resolver: {} host→ip pairs for {} domains",
         pairs.len(),
         targets.len()
     );
+    // Build the full set this pass, then swap it in (focusd UpdateRulesAtomic). An empty result
+    // (all upstreams timed out) leaves the previous set untouched rather than unblocking.
+    if pairs.is_empty() {
+        return;
+    }
+    let mut blocked = HashSet::new();
+    let mut allowed = HashSet::new();
     for (host, ip) in pairs {
-        shared.ingest_resolved(&host, ip);
+        match shared.classify_resolved(&host) {
+            ResolvedClass::Blocked => {
+                blocked.insert(ip);
+            }
+            ResolvedClass::Allowed => {
+                allowed.insert(ip);
+            }
+            ResolvedClass::Ignore => {}
+        }
+    }
+    match shared.mode() {
+        Mode::Blacklist => shared.set_blocked_ips(blocked),
+        Mode::Whitelist => shared.set_allowed_ips(allowed),
+        Mode::BlockAll => {}
     }
 }
 
@@ -75,8 +104,15 @@ pub fn run_resolver(shared: Arc<EnforceShared>, shutdown: tokio::sync::watch::Re
 }
 
 /// Resolve each host's A + AAAA records, returning `(host, ip)` pairs (deduped per host by the
-/// caller's set). Best-effort: a bind failure or all-upstreams-timeout yields an empty result
-/// (the passive observation store still covers us). Blocking; call from a dedicated thread.
+/// caller's set). Best-effort: a bind failure or all-upstreams-timeout yields an empty result, in
+/// which case the caller leaves the previous drop set in place. Blocking; call from a dedicated
+/// thread.
+///
+/// Each target is expanded to the bare name **and its `www.` variant** (focusd's `GetDomainVariants`
+/// / `Resolve`). A CDN routinely serves `www.<host>` from a *different* anycast IP than the apex,
+/// and the browser connects to `www.` — so without this the apex IP we'd block never matches the IP
+/// the browser actually uses. Resolving the `www.` variant captures it (and, since a CDN co-locates
+/// many of a customer's hostnames on those same IPs, covers the other subdomains too).
 pub fn resolve_hosts(hosts: &[String]) -> Vec<(String, IpAddr)> {
     if hosts.is_empty() {
         return Vec::new();
@@ -86,21 +122,65 @@ pub fn resolve_hosts(hosts: &[String]) -> Vec<(String, IpAddr)> {
         None => return Vec::new(),
     };
     let _ = sock.set_read_timeout(Some(QUERY_TIMEOUT));
+    let upstreams = effective_upstreams();
     let mut txid: u16 = rand::random();
     let mut out = Vec::new();
-    for host in hosts {
-        let name = host.trim().trim_start_matches("*.").trim_end_matches('.');
-        if name.is_empty() {
-            continue;
-        }
+    for name in expand_www_variants(hosts) {
         for qtype in [QTYPE_A, QTYPE_AAAA] {
             txid = txid.wrapping_add(1);
-            for ip in query_one(&sock, name, qtype, txid) {
-                out.push((name.to_ascii_lowercase(), ip));
+            for ip in query_one(&sock, &name, qtype, txid, &upstreams) {
+                out.push((name.clone(), ip));
             }
         }
     }
     out
+}
+
+/// The resolver upstreams to try, in order: the **OS-configured DNS servers** first (so a CDN gives
+/// us the same anycast POP the browser gets), then the public fallbacks. Deduped, order-stable.
+fn effective_upstreams() -> Vec<SocketAddr> {
+    let mut out: Vec<SocketAddr> = Vec::new();
+    let mut seen = HashSet::new();
+    for addr in system_dns_servers() {
+        if seen.insert(addr) {
+            out.push(addr);
+        }
+    }
+    for s in FALLBACK_UPSTREAMS {
+        if let Ok(addr) = s.parse::<SocketAddr>() {
+            if seen.insert(addr) {
+                out.push(addr);
+            }
+        }
+    }
+    out
+}
+
+/// Normalize each host (strip `*.`/trailing dot, lowercase) and pair it with its `www.` variant,
+/// deduped and order-stable. Mirrors focusd's `resolver.GetDomainVariants`.
+fn expand_www_variants(hosts: &[String]) -> Vec<String> {
+    let mut names = Vec::new();
+    let mut seen = HashSet::new();
+    for host in hosts {
+        let name = host
+            .trim()
+            .trim_start_matches("*.")
+            .trim_end_matches('.')
+            .to_ascii_lowercase();
+        if name.is_empty() {
+            continue;
+        }
+        if seen.insert(name.clone()) {
+            names.push(name.clone());
+        }
+        if !name.starts_with("www.") {
+            let www = format!("www.{name}");
+            if seen.insert(www.clone()) {
+                names.push(www);
+            }
+        }
+    }
+    names
 }
 
 /// Bind the resolver socket to the fixed source port (any address). Returns None if the port is
@@ -109,14 +189,115 @@ fn bind_socket() -> Option<UdpSocket> {
     UdpSocket::bind((Ipv4Addr::UNSPECIFIED, RESOLVER_SRC_PORT)).ok()
 }
 
+/// Enumerate the OS-configured DNS servers (per active adapter) as `SocketAddr` on :53. Best
+/// effort — returns empty on any API failure, in which case the public fallbacks cover us. We query
+/// through these (not hardcoded public resolvers) so a CDN hands us the same anycast POP IPs the
+/// browser gets, since the browser also resolves via the OS servers.
+fn system_dns_servers() -> Vec<SocketAddr> {
+    use windows::Win32::Foundation::ERROR_BUFFER_OVERFLOW;
+    use windows::Win32::NetworkManagement::IpHelper::{
+        GetAdaptersAddresses, GAA_FLAG_SKIP_ANYCAST, GAA_FLAG_SKIP_FRIENDLY_NAME,
+        GAA_FLAG_SKIP_MULTICAST, IP_ADAPTER_ADDRESSES_LH,
+    };
+    use windows::Win32::Networking::WinSock::{
+        AF_INET, AF_INET6, AF_UNSPEC, SOCKADDR_IN, SOCKADDR_IN6,
+    };
+
+    let flags = GAA_FLAG_SKIP_ANYCAST | GAA_FLAG_SKIP_MULTICAST | GAA_FLAG_SKIP_FRIENDLY_NAME;
+    let mut size: u32 = 15 * 1024;
+    let mut buf: Vec<u8> = Vec::new();
+    let mut filled = false;
+    for _ in 0..3 {
+        buf = vec![0u8; size as usize];
+        let ret = unsafe {
+            GetAdaptersAddresses(
+                AF_UNSPEC.0 as u32,
+                flags,
+                None,
+                Some(buf.as_mut_ptr() as *mut IP_ADAPTER_ADDRESSES_LH),
+                &mut size,
+            )
+        };
+        if ret == 0 {
+            filled = true;
+            break;
+        }
+        if ret == ERROR_BUFFER_OVERFLOW.0 {
+            continue; // `size` now holds the needed length; retry with a bigger buffer
+        }
+        return Vec::new();
+    }
+    if !filled {
+        return Vec::new();
+    }
+
+    let mut out = Vec::new();
+    let mut cur = buf.as_ptr() as *const IP_ADAPTER_ADDRESSES_LH;
+    unsafe {
+        while !cur.is_null() {
+            let ad = &*cur;
+            // OperStatus == IfOperStatusUp (1): skip down/disconnected adapters (they carry the
+            // bogus fec0:: placeholder servers).
+            if ad.OperStatus.0 == 1 {
+                let mut dns = ad.FirstDnsServerAddress;
+                while !dns.is_null() {
+                    let d = &*dns;
+                    let sa = d.Address.lpSockaddr;
+                    if !sa.is_null() {
+                        let fam = (*sa).sa_family;
+                        let ip = if fam == AF_INET {
+                            let s = &*(sa as *const SOCKADDR_IN);
+                            let b = s.sin_addr.S_un.S_un_b;
+                            Some(IpAddr::from(Ipv4Addr::new(b.s_b1, b.s_b2, b.s_b3, b.s_b4)))
+                        } else if fam == AF_INET6 {
+                            let s = &*(sa as *const SOCKADDR_IN6);
+                            Some(IpAddr::from(Ipv6Addr::from(s.sin6_addr.u.Byte)))
+                        } else {
+                            None
+                        };
+                        if let Some(ip) = ip {
+                            if is_real_resolver(ip) {
+                                out.push(SocketAddr::new(ip, 53));
+                            }
+                        }
+                    }
+                    dns = d.Next;
+                }
+            }
+            cur = ad.Next;
+        }
+    }
+    out
+}
+
+/// Reject non-routable / placeholder DNS addresses Windows lists on adapters with no real DNS:
+/// loopback, unspecified, IPv4 link-local (169.254/16), and the IPv6 link-local fe80::/10 +
+/// site-local fec0::/10 well-known placeholders.
+fn is_real_resolver(ip: IpAddr) -> bool {
+    match ip {
+        IpAddr::V4(a) => !a.is_loopback() && !a.is_unspecified() && !a.is_link_local(),
+        IpAddr::V6(a) => {
+            if a.is_loopback() || a.is_unspecified() {
+                return false;
+            }
+            let o = a.octets();
+            !(o[0] == 0xfe && (o[1] & 0xc0) != 0) // fe80::/10 + fec0::/10
+        }
+    }
+}
+
 /// Send one query for `name`/`qtype`, trying each upstream until one answers; parse the IPs out.
-fn query_one(sock: &UdpSocket, name: &str, qtype: u16, txid: u16) -> Vec<IpAddr> {
+fn query_one(
+    sock: &UdpSocket,
+    name: &str,
+    qtype: u16,
+    txid: u16,
+    upstreams: &[SocketAddr],
+) -> Vec<IpAddr> {
     let query = build_query(txid, name, qtype);
     let mut buf = [0u8; 1500];
-    for up in UPSTREAMS {
-        let Ok(addr) = up.parse::<SocketAddr>() else {
-            continue;
-        };
+    for addr in upstreams {
+        let addr = *addr;
         if sock.send_to(&query, addr).is_err() {
             continue;
         }
@@ -230,6 +411,26 @@ fn skip_name(buf: &[u8], mut pos: usize) -> Option<usize> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn expands_www_variants_deduped_and_stable() {
+        let got = expand_www_variants(&[
+            "reddit.com".into(),
+            "*.redditstatic.com".into(),
+            "www.example.com".into(),
+            "reddit.com".into(), // duplicate
+        ]);
+        assert_eq!(
+            got,
+            vec![
+                "reddit.com",
+                "www.reddit.com",
+                "redditstatic.com",
+                "www.redditstatic.com",
+                "www.example.com", // already www. -> no www.www. variant
+            ]
+        );
+    }
 
     #[test]
     fn build_query_shape() {

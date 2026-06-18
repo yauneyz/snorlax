@@ -4,11 +4,9 @@
 // (see tests/electron/unit/extension-rules.test.ts). The background service worker calls
 // `buildRules(state)` and hands the result to `chrome.declarativeNetRequest.updateDynamicRules`.
 //
-// Why an extension at all: in Firefox (and any browser with ECH + DoH) the network layer can't read
-// the SNI or the DNS query, and pooled/keep-alive + QUIC connections never re-handshake — so the
-// host-based "guilty until proven innocent" IP model goes blind. The browser, by contrast, always
-// knows the plaintext URL it's fetching. DNR block rules let us enforce by hostname above TLS,
-// immune to ECH/QUIC/VPN/connection-reuse. Force-installed, the extension can't be toggled off.
+// Why an extension at all: the network layer blocks by resolved destination IP, but browser
+// requests still have plaintext hostnames above TLS. DNR block rules let us enforce by hostname
+// above ECH/QUIC/VPN/connection-reuse. Force-installed, the extension cannot be toggled off.
 
 /**
  * @typedef {{ active: boolean, mode: 'blacklist'|'whitelist'|'block-all', domains: string[] }} State

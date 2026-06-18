@@ -1,20 +1,19 @@
 //! FocusLock shared library: the modules used by all three binaries (service, svcctl,
 //! recover). See snorlax-architecture.md §4–§9 for the design.
 //!
-//! Enforcement note (IP-first, guilty-until-proven-innocent): website blocking is done by a set
-//! of WinDivert packet engines (enforce::divert). A destination IP associated with a blocked
-//! domain is dropped by default — the suspect set is **pre-armed at focus-on** from the persisted
-//! antibody store (enforce::observations), the active resolver (enforce::resolve), and the
-//! recorded flows — so a pooled/coalesced/opaque socket dies instantly. The SNI engine
-//! *exonerates* a new connection that proves an allowed hostname on the wire (it only drops 443
-//! application-data, letting handshakes through to be judged). The DNS engine still answers
-//! NXDOMAIN for blocked names + DoH endpoints + the Firefox canary (policy_match) and drops
-//! DNS-over-TLS/QUIC. Persistent Windows-Firewall rules blocking DoT/DoQ and 443 to known DoH
-//! resolver IPs (enforce::wfp) are the backstop that survives a service kill; managed browser
-//! policies (enforce::browser_policy) cover the request layer. App blocking is process-termination
-//! (enforce::apps). A kernel-WFP connect-redirect callout (true persistence + closing the
-//! hardcoded-resolver-IP gap) and raw FWPM whitelist/block-all filters are the documented
-//! hardening upgrades and are intentionally not in v1.
+//! Enforcement note (focusd-style IP blocking): website blocking is a stateless destination-IP
+//! drop, following the Linux sibling `focusd`. The resolver (enforce::resolve) continuously
+//! resolves the policy's expanded domains to their current IPs, even while focus is off; a
+//! WinDivert DROP handle (enforce::divert) then discards every outbound packet to that set while
+//! focused, on every socket, with no per-connection inspection or SNI. The resolver refreshes the
+//! set on a ticker (CDN rotation), replacing it wholesale. The DNS engine still answers NXDOMAIN
+//! for blocked names + DoH endpoints + the Firefox canary (policy_match) and drops
+//! DNS-over-TLS/QUIC. The IP-coarse model can over-block CDN IPs shared with an allowed tenant; the
+//! browser extension (enforce::extension_policy) is the request-layer blocker for browser traffic,
+//! but it does not create network-layer IP exemptions. Persistent Windows-Firewall rules blocking
+//! DoT/DoQ, QUIC, and 443 to known DoH resolver IPs (enforce::wfp) are the backstop that survives a
+//! service kill. App blocking is process-termination (enforce::apps). A kernel-WFP
+//! connect-redirect callout is the documented hardening upgrade and is intentionally not in v1.
 
 pub mod constants;
 pub mod core;

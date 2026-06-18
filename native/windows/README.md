@@ -11,12 +11,13 @@ One crate, three binaries (see `Cargo.toml`):
 
 ## Enforcement (v1 pragmatic subset)
 
-- **Websites/IPs:** a loopback DNS sinkhole (`enforce/dns.rs`) on `127.0.0.1:53` answers NXDOMAIN
-  for blocked names and forwards allowed names upstream; every adapter's DNS is pointed at the
-  sinkhole and re-asserted periodically. A WinDivert NETWORK-layer backstop (`enforce/divert.rs`)
-  learns host-to-IP from SNI and drops outbound packets to guilty destination IPs unless the IP is in
-  the clean allow-exception set, so pre-existing sockets cannot coast once an IP is known blocked.
-  Windows-Firewall rules (`enforce/wfp.rs`) block DNS-over-TLS, DoH resolver IPs, and QUIC.
+- **Websites/IPs:** a WinDivert DNS engine (`enforce/divert.rs` + `enforce/dns.rs`) answers
+  NXDOMAIN for blocked DNS names while focused, without changing adapter DNS settings. A warm
+  resolver ticker (`enforce/resolve.rs`) continuously resolves the expanded policy domains, even
+  while focus is off, and swaps the blocked/allowed IP bank wholesale. The WinDivert NETWORK-layer
+  drop handle then blocks outbound packets to the blocked destination IPs while focused, so
+  pre-existing sockets cannot coast once their destination is in the bank. Windows-Firewall rules
+  (`enforce/wfp.rs`) block DNS-over-TLS, DoH resolver IPs, and QUIC.
 - **Apps:** a ~1s process poll (`enforce/apps.rs`) terminates blocked executables.
 - **Disable gate:** `core.rs` re-checks USB presence on every `disableFocus` and refuses
   without a present paired key (or during a `locked` schedule window).
@@ -31,8 +32,8 @@ window. None are required for the v1 product goal (raise the activation energy o
 A **force-installed browser extension** (`apps/extension`, wired by `enforce::extension_policy` via
 Chromium `ExtensionInstallForcelist` + Firefox `Extensions\Install`/`Locked`, fed live state by
 `focuslock-natmsg.exe`) does per-URL request-layer blocking where the wire/IP layer is too coarse or
-blind: encrypted SNI (ECH), VPNs, QUIC, and pooled browser connections. The native IP taint-drop
-remains the backstop for network-visible traffic and non-browser apps. Packaging the extension
+blind: encrypted SNI (ECH), VPNs, QUIC, and pooled browser connections. The native IP drop remains
+the backstop for network-visible traffic and non-browser apps. Packaging the extension
 (stable ids/CRX/XPI) is documented in `apps/extension/README.md`.
 
 ## Build

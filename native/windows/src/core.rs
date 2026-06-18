@@ -112,20 +112,13 @@ impl Core {
         self.state.focus_active = active;
         self.state.focus_source = source;
         if active {
-            // Prepare the IP-first drop state before WinDivert/socket workers observe focus-on.
-            // This preserves the old guilty-until-innocent data-plane path: pooled/pre-existing
-            // sockets are already covered by the NETWORK-layer DROP handle when focus becomes live.
-            self.arm_ip_backstop();
-            enforce::apply_network(true);
-            // Hand the blocklist to policy-honoring browsers (Chrome/Edge/Brave/Firefox), which
-            // enforce it at the request layer — defeating pooled/coalesced sockets the packet
-            // layer can't see. Uses the *expanded* domain set (siblings/CDNs) from the shared copy.
-            enforce::browser_policy::apply(&self.shared.policy_snapshot());
+            // Keep the resolver-fed IP bank intact across sessions. Focus-on just opens the
+            // network gates over the already-warm set, then kicks a refresh for freshness.
             self.shared.set_active(true);
+            enforce::apply_network(true);
             kick_resolver(self.shared.clone());
         } else {
             self.shared.set_active(false);
-            self.shared.clear_taints();
             enforce::apply_network(false);
         }
         self.persist();
@@ -133,16 +126,6 @@ impl Core {
             "focusChanged",
             json!({ "active": active, "source": source }),
         );
-    }
-
-    fn arm_ip_backstop(&self) {
-        self.shared.clear_taints();
-        // Pre-arm the suspect/clean drop set instantly, in-memory, so a pooled/coalesced/opaque
-        // socket to a blocked destination — which sends no new ClientHello — dies at focus-on
-        // instead of coasting. Three sources: recorded in-session flows, the persisted antibody
-        // store (both synchronous here), plus the active resolver kicked after focus is live.
-        self.shared.seed_taints_from_flows();
-        self.shared.prearm_from_store();
     }
 
     fn enable_focus(&mut self, source: FocusSource) {
@@ -178,20 +161,9 @@ impl Core {
     fn set_policy(&mut self, policy: Policy) {
         self.state.policy = policy.clone();
         self.shared.set_policy(policy.clone());
-        // A policy change while focused may newly block a site the user has open — reset live
-        // flows so it takes effect now. Only the newly-blocked flows are reset (by recorded SNI),
-        // so allowed sites' connections are left alone. Taint their destinations first (fast,
-        // in-memory) so a newly-blocked site's pooled socket dies immediately.
-        if self.state.focus_active {
-            // Re-push the (expanded) blocklist to browsers so a mid-session edit takes effect.
-            enforce::browser_policy::apply(&self.shared.policy_snapshot());
-            // Re-arm the drop set for the new policy (a newly-blocked site's pooled socket dies
-            // immediately; a newly-allowed site recovers as the SNI engine untaints it). The
-            // resolver re-resolves the new domain set in the background.
-            self.shared.seed_taints_from_flows();
-            self.shared.prearm_from_store();
-            kick_resolver(self.shared.clone());
-        }
+        // Policy edits change the resolver target list even while focus is off. Kick a one-shot
+        // refresh now so the IP bank is warm before the next session.
+        kick_resolver(self.shared.clone());
         self.persist();
         self.emit("policyChanged", json!({ "policy": policy }));
     }
@@ -276,12 +248,8 @@ impl Core {
     /// Re-arm enforcement at boot for whatever focus state we loaded from disk.
     pub fn rearm_on_boot(&mut self) {
         if self.state.focus_active {
-            self.arm_ip_backstop();
-            enforce::apply_network(true);
-            enforce::browser_policy::apply(&self.shared.policy_snapshot());
-            // Workers are spawned after boot re-arm, but keep the ordering identical to normal
-            // focus-on: data-plane state first, then focus becomes observable.
             self.shared.set_active(true);
+            enforce::apply_network(true);
             kick_resolver(self.shared.clone());
             tracing::info!("re-armed enforcement on boot (focus was active)");
         }
@@ -374,8 +342,8 @@ impl Core {
 }
 
 /// Fire a one-shot background resolve of the current policy's domains (focus-on / policy-change /
-/// boot). Runs on a detached thread because `resolve_and_ingest` blocks on UDP; it self-no-ops if
-/// focus isn't active or there are no targets, so a stale kick is harmless.
+/// boot). Runs on a detached thread because `resolve_and_ingest` blocks on UDP. The resolver runs
+/// regardless of focus so the next session starts with a warm IP bank.
 fn kick_resolver(shared: Arc<EnforceShared>) {
     std::thread::spawn(move || crate::enforce::resolve::resolve_and_ingest(&shared));
 }

@@ -95,15 +95,15 @@ pub fn block_doh_resolvers() {
     add_block_rule(DOH_UDP_RULE, "UDP", 443, Some(&ips));
 }
 
-/// Block all outbound UDP 443 (HTTP/3 / QUIC). This forces browsers to fall back to TCP, where
-/// the SNI inspector (enforce::divert) can read the cleartext ClientHello — QUIC carries an
-/// encrypted SNI we can't yet parse (see quic-upgrade.md). Trade-off: a possible one-time
-/// TCP-fallback delay on h3 sites while focused; bulk throughput is unaffected.
+/// Block all outbound UDP 443 (HTTP/3 / QUIC). This forces browsers to fall back to TCP, where the
+/// DNS sinkhole, IP-drop layer, and extension request rules are the intended enforcement path.
+/// Trade-off: a possible one-time TCP-fallback delay on h3 sites while focused; bulk throughput is
+/// unaffected.
 ///
 /// This rule is the kill-resistant *backstop*: the primary QUIC kill is the data-plane drop in
-/// the 443 inspection engine (enforce::divert), which also starves QUIC sessions that were
-/// already established when focus turned on — a firewall rule added mid-flow may not cut those
-/// (WFP flow reauthorization is not reliable for them).
+/// the WinDivert layer (enforce::divert), which also starves QUIC sessions that were already
+/// established when focus turned on — a firewall rule added mid-flow may not cut those (WFP flow
+/// reauthorization is not reliable for them).
 pub fn block_quic() {
     add_block_rule(QUIC_UDP_RULE, "UDP", 443, None);
 }

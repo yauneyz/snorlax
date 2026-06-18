@@ -48,7 +48,7 @@ pub(crate) fn nxdomain_reply(query: &[u8], question_end: usize) -> Vec<u8> {
 
 /// Build a NODATA reply (NOERROR, no answers) — "the name exists but has no record of this
 /// type". Used to suppress `HTTPS`/`SVCB` (type 65/64) records while focus is active so a browser
-/// can't fetch an Encrypted-ClientHello config and hide its SNI from the 443 inspector.
+/// does not skip the plain A/AAAA lookup path with address hints or ECH metadata.
 pub(crate) fn nodata_reply(query: &[u8], question_end: usize) -> Vec<u8> {
     let mut reply = query[..question_end].to_vec();
     reply[2] = 0x81; // QR=1, RD=1

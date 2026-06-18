@@ -1,19 +1,16 @@
 //! Force-install + native-messaging registration for the FocusLock browser extension.
 //!
-//! Why an extension on top of the existing layers: the managed `URLBlocklist` browser policy
-//! (enforce::browser_policy) gives Chromium request-layer blocking, but **Firefox is excluded**
-//! there (it reads policy only at startup → block-after-unlock). And in any browser, ECH (encrypted
-//! SNI) + DoH + pooled/QUIC connection reuse make the host's wire-based IP model go blind. The
-//! extension enforces by plaintext URL above TLS via declarativeNetRequest — immune to
-//! ECH/QUIC/VPN/connection-reuse — and force-installed it can't be toggled off.
+//! The extension is the browser request-layer blocker: it receives live `{active, mode, domains}`
+//! state over native messaging (host: focuslock-natmsg.exe) and applies declarativeNetRequest rules
+//! above TLS, so ECH/QUIC/VPN/connection reuse do not hide requests from it.
 //!
-//! Lifecycle differs from browser_policy: this is **persistent**, not focus-toggled. The extension
-//! self-gates — it receives the live `{active, mode, domains}` from the service over native
-//! messaging (enforce host: focuslock-natmsg.exe) and applies *no* rules while focus is off. So we
-//! install once (service startup) and only tear down on a full recover/uninstall — never on a
-//! normal focus-off (the extension clears itself when the service pushes `active:false`).
+//! Lifecycle is persistent, not focus-toggled. We install once at service startup and only tear down
+//! on a full recover/uninstall; during normal focus-off the extension remains installed and clears
+//! its own dynamic rules when the service pushes `active:false`.
 //!
-//! All registry writes are HKLM (LocalSystem can write; users can't), mirroring browser_policy.
+//! All registry writes are HKLM (LocalSystem can write; users cannot). We also clear legacy
+//! URLBlocklist/URLAllowlist policy keys from older builds; current request-layer blocking lives
+//! entirely in the extension.
 
 use std::path::{Path, PathBuf};
 
@@ -146,6 +143,7 @@ pub fn install() {
         "1",
         FIREFOX_EXT_ID,
     );
+    clear_legacy_request_policies();
     tracing::info!("extension_policy: force-install + native host registered");
 }
 
@@ -172,7 +170,18 @@ pub fn uninstall() {
         r"HKLM\SOFTWARE\Policies\Mozilla\Firefox\Extensions\Locked",
         "1",
     );
+    clear_legacy_request_policies();
     tracing::info!("extension_policy: force-install + native host removed");
+}
+
+fn clear_legacy_request_policies() {
+    for (policy_root, _) in CHROMIUM_BROWSERS {
+        reg_delete(&format!(r"HKLM\{policy_root}\URLBlocklist"));
+        reg_delete(&format!(r"HKLM\{policy_root}\URLAllowlist"));
+        reg_delete_value(&format!(r"HKLM\{policy_root}"), "DnsOverHttpsMode");
+        reg_delete_value(&format!(r"HKLM\{policy_root}"), "BuiltInDnsClientEnabled");
+    }
+    reg_delete(r"HKLM\SOFTWARE\Policies\Mozilla\Firefox\WebsiteFilter");
 }
 
 fn reg_set_default(key: &str, data: &str) {

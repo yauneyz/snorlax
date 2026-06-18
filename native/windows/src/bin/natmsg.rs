@@ -75,7 +75,7 @@ async fn main() {
 
     let last: Arc<Mutex<Option<Blocking>>> = Arc::new(Mutex::new(None));
 
-    // stdin reader: detects the extension's `hello` (resend current state) and EOF (exit).
+    // stdin reader: any inbound frame (the extension's `hello`) requests a state resend.
     {
         let out_tx = out_tx.clone();
         let last = last.clone();
@@ -83,10 +83,10 @@ async fn main() {
             let mut stdin = tokio::io::stdin();
             loop {
                 match read_frame(&mut stdin).await {
-                    Ok(Some(_msg)) => {
-                        // Any message (the extension only sends `hello`) → resend latest state.
+                    Ok(Some(msg)) => {
+                        let _ = msg;
                         if let Some(b) = last.lock().await.clone() {
-                            let _ = out_tx.send(b.to_msg());
+                            let _ = out_tx.send(b.to_msg()); // `hello` → resend latest state
                         }
                     }
                     // EOF or error: the port is gone. Native-messaging hosts exit with their port.
@@ -96,7 +96,7 @@ async fn main() {
         });
     }
 
-    // Pipe loop: keep the service connection up, translate state/events into pushes.
+    // Pipe loop: keep the service connection up and translate state/events into extension pushes.
     loop {
         if let Err(_e) = pump_pipe(&out_tx, &last).await {
             // Connection failed or dropped; back off and retry. The extension keeps its last rules.
@@ -123,7 +123,11 @@ async fn pump_pipe(
 
     let mut b = Blocking::default();
     let mut lines = BufReader::new(reader).lines();
-    while let Some(line) = lines.next_line().await? {
+    loop {
+        let line = match lines.next_line().await? {
+            Some(l) => l,
+            None => break, // pipe closed
+        };
         let Ok(v) = serde_json::from_str::<Value>(&line) else {
             continue;
         };
