@@ -26,17 +26,15 @@ pub const HOST_NAME: &str = "com.focuslock.host";
 // id is `browser_specific_settings.gecko.id`. Keep them in sync with the update/install URLs.
 // The Chromium id is derived from the local dev key (apps/extension/keys/chromium.pem) by
 // scripts/build-extension.mjs and printed on each build; this value matches that key. Regenerate
-// both together if the key changes. TODO(packaging): swap to the published store id + URLs.
+// both together if the key changes.
 pub const CHROMIUM_EXT_ID: &str = "cpemmokfjbiicoaocpmpdeiobnilpokc";
 pub const FIREFOX_EXT_ID: &str = "focuslock@focuslock.app";
 
-/// Chromium force-install update manifest. The Web-Store default; for a self-hosted forcelist,
-/// point this at our own `update.xml` instead (see the extension README).
-pub const CHROMIUM_UPDATE_URL: &str = "https://clients2.google.com/service/update2/crx";
+/// Chromium force-install update manifest, served by the web app and backed by S3 artifacts.
+pub const CHROMIUM_UPDATE_URL: &str = "https://focuslock.app/ext/chromium/updates.xml";
 
-/// Firefox force-install XPI location (a `file://` path to the shipped, signed `.xpi`, or an https
-/// URL). TODO(packaging): set to the real signed XPI location.
-pub const FIREFOX_XPI_URL: &str = "https://focuslock.app/ext/focuslock.xpi";
+/// Firefox force-install XPI location, served by the web app and backed by S3 artifacts.
+pub const FIREFOX_XPI_URL: &str = "https://focuslock.app/ext/firefox/focuslock-0.1.0.xpi";
 
 /// (policy root, app root) per Chromium browser. The policy root carries
 /// `ExtensionInstallForcelist`; the app root carries `NativeMessagingHosts`.

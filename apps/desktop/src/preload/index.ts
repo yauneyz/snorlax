@@ -8,6 +8,7 @@
 
 import { contextBridge, ipcRenderer } from 'electron';
 import type { SubscriptionPlan } from '../shared/productLimits.js';
+import type { AppPickerItem } from '../shared/appPicker.js';
 
 const Channels = {
   serviceRequest: 'service:request',
@@ -17,6 +18,7 @@ const Channels = {
   devSetEntitlementPlan: 'app:devSetEntitlementPlan',
   openExternal: 'app:openExternal',
   appInfo: 'app:info',
+  listInstalledApps: 'app:listInstalledApps',
 } as const;
 
 export interface EntitlementInfo {
@@ -46,6 +48,9 @@ const api = {
 
   appInfo: (): Promise<{ appEnv: string; usingMock: boolean; serviceConnected: boolean }> =>
     ipcRenderer.invoke(Channels.appInfo),
+
+  listInstalledApps: (): Promise<AppPickerItem[]> =>
+    ipcRenderer.invoke(Channels.listInstalledApps),
 
   openExternal: (url: string): Promise<{ ok: boolean }> =>
     ipcRenderer.invoke(Channels.openExternal, url),

@@ -145,5 +145,8 @@ pub fn apply_network(active: bool) {
 }
 
 pub fn teardown_network() {
+    if let Err(e) = dns::remove_config() {
+        tracing::warn!("failed to remove dnsmasq sinkhole config: {e}");
+    }
     nft::remove_rules();
 }

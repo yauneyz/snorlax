@@ -2,8 +2,9 @@
 //! old loopback DNS sinkhole + PowerShell adapter-DNS repointing + reassert task. One
 //! always-running OS thread owns a WinDivert NETWORK-layer handle and, while focus is active:
 //!
-//!   * intercepts outbound DNS (UDP/53) and answers NXDOMAIN for blocked names (and DoH
-//!     bootstrap hostnames) by injecting a spoofed reply, dropping the original query;
+//!   * intercepts outbound DNS (UDP/53), answers blocked names with dnsmasq-style sinkhole
+//!     addresses, and answers DoH bootstrap hostnames with NXDOMAIN by injecting a spoofed reply
+//!     and dropping the original query;
 //!   * drops outbound DNS-over-TLS/QUIC (port 853);
 //!   * passes everything else through unchanged.
 //!
@@ -34,7 +35,8 @@ use windivert_sys::{
 use windivert_win::Win32::Foundation::HANDLE;
 
 use crate::enforce::dns::{
-    nodata_reply, nxdomain_reply, qtype, read_qname, QTYPE_HTTPS, QTYPE_SVCB,
+    nodata_reply, nxdomain_reply, qtype, read_qname, sinkhole_address_reply, QTYPE_HTTPS,
+    QTYPE_SVCB,
 };
 use crate::enforce::resolve::RESOLVER_SRC_PORT;
 use crate::enforce::EnforceShared;
@@ -220,10 +222,15 @@ fn handle_packet(
             if dport == PORT_DNS {
                 let payload = &data[payload_off..];
                 if let Some((name, qend)) = read_qname(payload) {
-                    if is_doh_bypass_host(&name) || is_host_blocked(policy, &name) {
+                    if is_doh_bypass_host(&name) {
                         tracing::debug!("sinkholed {name}");
-                        // Spoof a reply server->app: swap addrs + ports, inject inbound.
                         let reply = nxdomain_reply(payload, qend);
+                        return inject_dns_reply(diverter, &pkt, sport, dport, &reply, addr);
+                    }
+                    if is_host_blocked(policy, &name) {
+                        tracing::debug!("sinkholed {name}");
+                        let reply = sinkhole_address_reply(payload, qend)
+                            .unwrap_or_else(|| nodata_reply(payload, qend));
                         return inject_dns_reply(diverter, &pkt, sport, dport, &reply, addr);
                     }
                     // Refuse HTTPS/SVCB records so a browser falls back to plain A/AAAA resolution,

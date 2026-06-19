@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "description": "FocusLock — a USB-key-gated distraction blocker (Electron UI + privileged native service).",
-  "packageManager": "pnpm@10.33.0",
+  "packageManager": "pnpm@11.5.2",
   "engines": {
     "node": ">=20"
   },
@@ -19,7 +19,9 @@
     "build:win": "cross-env APP_ENV=production node scripts/build.mjs --target win",
     "build:linux": "cross-env APP_ENV=production node scripts/build.mjs --target linux",
     "build:mac": "cross-env APP_ENV=production node scripts/build.mjs --target mac",
-    "build:dev": "cross-env APP_ENV=development node scripts/build.mjs --target win",
+    "build:dev": "cross-env APP_ENV=development node scripts/build.mjs --target linux",
+    "release:local": "node scripts/release-local.mjs",
+    "release:extension": "node scripts/release-extension.mjs",
     "build:native:win": "node scripts/build-native-win.mjs",
     "build:native:linux": "node scripts/build-native-linux.mjs",
     "build:native:mac": "node scripts/build-native.mjs --target mac",
@@ -37,10 +39,5 @@
     "typescript": "^5.5.4",
     "vitest": "^2.0.5",
     "zod": "^3.23.8"
-  },
-  "pnpm": {
-    "overrides": {
-      "google-auth-library": "10.7.0"
-    }
   }
 }

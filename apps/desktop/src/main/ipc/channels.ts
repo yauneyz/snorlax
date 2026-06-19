@@ -15,4 +15,6 @@ export const Channels = {
   openExternal: 'app:openExternal',
   /** invoke: returns { appEnv, usingMock, serviceConnected }. */
   appInfo: 'app:info',
+  /** invoke: returns installed apps discovered on the local OS. */
+  listInstalledApps: 'app:listInstalledApps',
 } as const;

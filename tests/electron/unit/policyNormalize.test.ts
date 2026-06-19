@@ -31,13 +31,15 @@ describe('normalizePolicy', () => {
       apps: [
         { windowsImageName: 'Chrome.exe', label: 'Chrome' },
         { windowsImageName: 'chrome.exe', label: 'dup' },
+        { linuxProcessName: 'Spotify', label: 'Spotify' },
         { label: 'no-identity' },
       ],
     };
     const n = normalizePolicy(policy);
     expect(n.domains).toEqual(['youtube.com', '*.reddit.com']);
-    expect(n.apps).toHaveLength(1);
+    expect(n.apps).toHaveLength(2);
     expect(n.apps[0]!.windowsImageName).toBe('chrome.exe');
+    expect(n.apps[1]!.linuxProcessName).toBe('spotify');
     expect(n.rejected.map((r) => r.value)).toContain('not a domain');
     expect(n.rejected.map((r) => r.value)).toContain('no-identity');
   });

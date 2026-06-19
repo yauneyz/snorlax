@@ -8,6 +8,7 @@ import { BrowserWindow, ipcMain, shell } from 'electron';
 import { ErrorCode, type EventName, type Method, type Params } from '@focuslock/shared';
 import { config } from '../config.js';
 import { logger } from '../logging.js';
+import { listInstalledApps } from '../appDiscovery.js';
 import { isServiceError, type ServiceConnection } from '../service/connection.js';
 import type { MockServiceConnection } from '../service/mockService.js';
 import {
@@ -96,6 +97,8 @@ export async function registerIpcHandlers(ctx: HandlerContext): Promise<void> {
     usingMock: Boolean(mock),
     serviceConnected: service.connected,
   }));
+
+  ipcMain.handle(Channels.listInstalledApps, () => listInstalledApps());
 
   ipcMain.handle(Channels.openExternal, async (_e, url: string) => {
     await shell.openExternal(url);

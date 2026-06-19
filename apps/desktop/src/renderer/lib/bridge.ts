@@ -11,6 +11,7 @@ import type {
   Result,
 } from '@focuslock/shared';
 import type { SubscriptionPlan } from '../../shared/productLimits.js';
+import type { AppPickerItem } from '../../shared/appPicker.js';
 
 export interface BridgeError extends Error {
   code: string;
@@ -37,6 +38,7 @@ export function onEvent<E extends EventName>(event: E, cb: (payload: EventMap[E]
 }
 
 export const appInfo = () => window.api.appInfo();
+export const listInstalledApps = (): Promise<AppPickerItem[]> => window.api.listInstalledApps();
 export const openExternal = (url: string) => window.api.openExternal(url);
 export const devToggleKey = () => window.api.devToggleKey();
 export const entitlement = () => window.api.entitlement();

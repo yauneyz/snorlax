@@ -32,6 +32,11 @@ pub async fn serve(socket_path: String, shutdown: watch::Receiver<bool>) {
     {
         let shared = shared.clone();
         let shutdown = shutdown.clone();
+        std::thread::spawn(move || enforce::dns::run_manager(shared, shutdown));
+    }
+    {
+        let shared = shared.clone();
+        let shutdown = shutdown.clone();
         std::thread::spawn(move || enforce::resolve::run_resolver(shared, shutdown));
     }
 

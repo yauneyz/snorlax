@@ -45,7 +45,15 @@ nsis:
 linux:
   target:
     - deb
+    - AppImage
   category: Utility
+  maintainer: FocusLock <support@focuslock.app>
+  artifactName: ${productName}-${version}-${arch}.${ext}
+
+# The AppImage is a self-contained bundle for NixOS (wrapped via appimageTools in
+# the nixos-config repo). It must not rely on the deb installer hooks — on NixOS the
+# privileged daemon is built from source and started by a declarative systemd unit.
+appImage:
   artifactName: ${productName}-${version}-${arch}.${ext}
 
 deb:

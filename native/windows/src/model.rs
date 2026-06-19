@@ -23,6 +23,8 @@ pub struct AppRef {
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub windows_image_name: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub linux_process_name: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
     pub mac_bundle_id: Option<String>,
     pub label: String,
 }

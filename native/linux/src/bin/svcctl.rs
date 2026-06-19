@@ -8,6 +8,7 @@ use std::process::Command;
 use anyhow::{bail, Context, Result};
 
 use focuslock::constants::{socket_path, PIPE_BASE_PROD, SERVICE_DISPLAY_NAME, SERVICE_NAME};
+use focuslock::enforce::dns;
 use focuslock::pairing;
 use focuslock::paths;
 use focuslock::secure_store::SecureStore;
@@ -62,6 +63,7 @@ fn run(program: &str, args: &[&str]) -> Result<()> {
 
 fn install() -> Result<()> {
     paths::ensure_data_dir().context("create FocusLock data dir")?;
+    dns::install_include().context("write dnsmasq include")?;
     std::fs::write(UNIT_PATH, unit_text()?).context("write systemd unit")?;
     run("systemctl", &["daemon-reload"])?;
     run("systemctl", &["enable", "--now", SERVICE_NAME])?;
@@ -76,6 +78,7 @@ fn uninstall() -> Result<()> {
     let _ = std::fs::remove_file(UNIT_PATH);
     let _ = run("systemctl", &["daemon-reload"]);
     focuslock::enforce::teardown_network();
+    dns::remove_include();
     println!("Service '{SERVICE_NAME}' removed.");
     Ok(())
 }

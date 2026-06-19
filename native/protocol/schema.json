@@ -10,6 +10,19 @@
     "responseErr": { "kind": "response", "id": "number", "ok": false, "code": "string", "message": "string" },
     "event": { "kind": "event", "event": "string", "payload": "object" }
   },
+  "types": {
+    "AppRef": {
+      "windowsImageName": "string?",
+      "linuxProcessName": "string?",
+      "macBundleId": "string?",
+      "label": "string"
+    },
+    "Policy": {
+      "mode": "blacklist|whitelist|block-all",
+      "domains": "string[]",
+      "apps": "AppRef[]"
+    }
+  },
   "methods": {
     "getState": { "params": null, "result": "ServiceState" },
     "ping": { "params": null, "result": { "version": "string", "protocolVersion": "number" } },

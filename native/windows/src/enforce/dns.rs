@@ -1,9 +1,8 @@
 //! Pure DNS wire-format helpers shared by the WinDivert engine (enforce::divert).
 //!
 //! Website blocking no longer uses a loopback sinkhole or adapter-DNS repointing: the engine
-//! intercepts outbound DNS at the packet layer and answers blocked names itself. All that
-//! remains here is parsing a query name and turning a query into an NXDOMAIN reply — both pure
-//! and unit-testable.
+//! intercepts outbound DNS at the packet layer and answers blocked names itself. These helpers
+//! parse a query name and build dnsmasq-style sinkhole replies for blocked A/AAAA lookups.
 
 /// Parse the QNAME from a DNS query. Returns (name, offset_just_past_question).
 pub(crate) fn read_qname(buf: &[u8]) -> Option<(String, usize)> {
@@ -59,6 +58,31 @@ pub(crate) fn nodata_reply(query: &[u8], question_end: usize) -> Vec<u8> {
     reply
 }
 
+/// Build a dnsmasq-style address reply for blocked A/AAAA lookups: the queried name exists, but
+/// resolves to an unroutable local sinkhole address. Returns `None` for non-address QTYPEs.
+pub(crate) fn sinkhole_address_reply(query: &[u8], question_end: usize) -> Option<Vec<u8>> {
+    let (rr_type, rr_data): (u16, &[u8]) = match qtype(query, question_end)? {
+        QTYPE_A => (QTYPE_A, &[0, 0, 0, 0]),
+        QTYPE_AAAA => (QTYPE_AAAA, &[0; 16]),
+        _ => return None,
+    };
+
+    let mut reply = query[..question_end].to_vec();
+    reply[2] = 0x81; // QR=1, RD=1
+    reply[3] = 0x80; // RA=1, RCODE=0 (NOERROR)
+    reply[6..8].copy_from_slice(&1u16.to_be_bytes()); // ANCOUNT = 1
+    reply[8..10].copy_from_slice(&0u16.to_be_bytes()); // NSCOUNT = 0
+    reply[10..12].copy_from_slice(&0u16.to_be_bytes()); // ARCOUNT = 0
+
+    reply.extend_from_slice(&[0xc0, 0x0c]); // answer NAME = pointer to question QNAME
+    reply.extend_from_slice(&rr_type.to_be_bytes());
+    reply.extend_from_slice(&1u16.to_be_bytes()); // CLASS = IN
+    reply.extend_from_slice(&0u32.to_be_bytes()); // TTL = 0
+    reply.extend_from_slice(&(rr_data.len() as u16).to_be_bytes());
+    reply.extend_from_slice(rr_data);
+    Some(reply)
+}
+
 /// The QTYPE of a parsed query (the 2 bytes just before `question_end`, which `read_qname`
 /// returns as the offset past QTYPE+QCLASS).
 pub(crate) fn qtype(query: &[u8], question_end: usize) -> Option<u16> {
@@ -71,6 +95,10 @@ pub(crate) fn qtype(query: &[u8], question_end: usize) -> Option<u16> {
 pub(crate) const QTYPE_HTTPS: u16 = 65;
 /// DNS QTYPE for the generic `SVCB` resource record (RFC 9460).
 pub(crate) const QTYPE_SVCB: u16 = 64;
+/// DNS QTYPE for IPv4 address records.
+pub(crate) const QTYPE_A: u16 = 1;
+/// DNS QTYPE for IPv6 address records.
+pub(crate) const QTYPE_AAAA: u16 = 28;
 
 #[cfg(test)]
 mod tests {
@@ -119,5 +147,28 @@ mod tests {
         q.extend_from_slice(&[1, b'a', 0, 0, 65, 0, 1]);
         let (_name, end) = read_qname(&q).unwrap();
         assert_eq!(qtype(&q, end), Some(QTYPE_HTTPS));
+    }
+
+    #[test]
+    fn sinkhole_a_reply_returns_zero_address() {
+        let mut q = vec![0x12, 0x34, 0x01, 0x00, 0, 1, 0, 0, 0, 0, 0, 1];
+        q.extend_from_slice(&[7, b'e', b'x', b'a', b'm', b'p', b'l', b'e']);
+        q.extend_from_slice(&[3, b'c', b'o', b'm', 0, 0, 1, 0, 1]);
+        let end = read_qname(&q).unwrap().1;
+        let reply = sinkhole_address_reply(&q, end).unwrap();
+        assert_eq!(reply[2], 0x81);
+        assert_eq!(reply[3], 0x80);
+        assert_eq!(&reply[6..8], &[0, 1]); // one answer
+        assert_eq!(&reply[end..end + 2], &[0xc0, 0x0c]); // compressed name pointer
+        assert_eq!(&reply[reply.len() - 4..], &[0, 0, 0, 0]);
+    }
+
+    #[test]
+    fn sinkhole_aaaa_reply_returns_unspecified_address() {
+        let mut q = vec![0x12, 0x34, 0x01, 0x00, 0, 1, 0, 0, 0, 0, 0, 0];
+        q.extend_from_slice(&[1, b'a', 0, 0, 28, 0, 1]);
+        let end = read_qname(&q).unwrap().1;
+        let reply = sinkhole_address_reply(&q, end).unwrap();
+        assert_eq!(reply[reply.len() - 16..], [0u8; 16]);
     }
 }

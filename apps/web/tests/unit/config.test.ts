@@ -6,6 +6,17 @@ const securityEnv = {
   OAUTH_STATE_SECRET: "test-oauth-state-secret-at-least-32-chars",
 };
 
+const extensionHostingEnv = {
+  EXTENSION_ARTIFACTS_BUCKET: "focuslock-extension-artifacts-prod",
+  EXTENSION_ARTIFACTS_REGION: "us-east-1",
+  EXTENSION_PUBLIC_S3_BASE_URL:
+    "https://focuslock-extension-artifacts-prod.s3.us-east-1.amazonaws.com",
+  EXTENSION_PUBLIC_APP_BASE_URL: "https://focuslock.app/ext",
+  EXTENSION_CHROMIUM_UPDATE_URL: "https://focuslock.app/ext/chromium/updates.xml",
+  EXTENSION_FIREFOX_UPDATE_URL: "https://focuslock.app/ext/firefox/updates.json",
+  EXTENSION_FIREFOX_XPI_URL: "https://focuslock.app/ext/firefox/focuslock-0.1.0.xpi",
+};
+
 describe("config schemas", () => {
   it("publicSchema rejects missing NEXT_PUBLIC_APP_URL", () => {
     const r = publicSchema.safeParse({});
@@ -25,6 +36,7 @@ describe("config schemas", () => {
       STRIPE_WEBHOOK_SECRET: "whsec",
       RESEND_API_KEY: "re",
       RESEND_FROM: "a@b.com",
+      ...extensionHostingEnv,
       ...securityEnv,
     });
     expect(r.success).toBe(false);
@@ -45,6 +57,7 @@ describe("config schemas", () => {
       RESEND_API_KEY: "re",
       RESEND_FROM: "a@b.com",
       OPENAI_API_KEY: "sk_test_xxx",
+      ...extensionHostingEnv,
       ...securityEnv,
     });
     expect(r.success).toBe(true);
@@ -94,6 +107,7 @@ describe("config schemas", () => {
       RESEND_API_KEY: "re",
       RESEND_FROM: "a@b.com",
       LLM_PROVIDER: "local",
+      ...extensionHostingEnv,
       ...securityEnv,
     });
     expect(r.success).toBe(true);

@@ -21,6 +21,7 @@ apps/desktop/resources/bin/win/*.pdb
 # Staged (built) browser extension + its locally-generated signing key.
 apps/desktop/resources/extension/
 apps/extension/keys/
+apps/extension/release/
 
 # Rust
 native/windows/target/

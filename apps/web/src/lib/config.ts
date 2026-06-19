@@ -59,6 +59,13 @@ const serverSchemaBase = publicSchema.extend({
   GOOGLE_SITE_VERIFICATION: z.string().optional().default(""),
   GOOGLE_OAUTH_CLIENT_ID: z.string().optional().default(""),
   GOOGLE_OAUTH_CLIENT_SECRET: z.string().optional().default(""),
+  EXTENSION_ARTIFACTS_BUCKET: z.string().min(1),
+  EXTENSION_ARTIFACTS_REGION: z.string().min(1).default("us-east-1"),
+  EXTENSION_PUBLIC_S3_BASE_URL: z.string().url(),
+  EXTENSION_PUBLIC_APP_BASE_URL: z.string().url(),
+  EXTENSION_CHROMIUM_UPDATE_URL: z.string().url(),
+  EXTENSION_FIREFOX_UPDATE_URL: z.string().url(),
+  EXTENSION_FIREFOX_XPI_URL: z.string().url(),
   LLM_PROVIDER: z.enum(["openai", "local"]).default("openai"),
   OPENAI_API_KEY: z.string().optional().default(""),
   OPENAI_DEFAULT_MODEL: z.string().min(1).default("gpt-5.1"),
@@ -195,6 +202,25 @@ export const config = {
     oauthClientId: isServer ? (parsed as z.infer<typeof serverSchema>).GOOGLE_OAUTH_CLIENT_ID : "",
     oauthClientSecret: isServer
       ? (parsed as z.infer<typeof serverSchema>).GOOGLE_OAUTH_CLIENT_SECRET
+      : "",
+  },
+  extensionHosting: {
+    bucket: isServer ? (parsed as z.infer<typeof serverSchema>).EXTENSION_ARTIFACTS_BUCKET : "",
+    region: isServer ? (parsed as z.infer<typeof serverSchema>).EXTENSION_ARTIFACTS_REGION : "",
+    publicS3BaseUrl: isServer
+      ? (parsed as z.infer<typeof serverSchema>).EXTENSION_PUBLIC_S3_BASE_URL
+      : "",
+    publicAppBaseUrl: isServer
+      ? (parsed as z.infer<typeof serverSchema>).EXTENSION_PUBLIC_APP_BASE_URL
+      : "",
+    chromiumUpdateUrl: isServer
+      ? (parsed as z.infer<typeof serverSchema>).EXTENSION_CHROMIUM_UPDATE_URL
+      : "",
+    firefoxUpdateUrl: isServer
+      ? (parsed as z.infer<typeof serverSchema>).EXTENSION_FIREFOX_UPDATE_URL
+      : "",
+    firefoxXpiUrl: isServer
+      ? (parsed as z.infer<typeof serverSchema>).EXTENSION_FIREFOX_XPI_URL
       : "",
   },
   openai: {

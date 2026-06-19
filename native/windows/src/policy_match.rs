@@ -155,6 +155,7 @@ mod tests {
         let mut p = Policy::default();
         p.apps = vec![AppRef {
             windows_image_name: Some("chrome.exe".into()),
+            linux_process_name: None,
             mac_bundle_id: None,
             label: "Chrome".into(),
         }];
