@@ -13,6 +13,9 @@ playwright-report/
 test-results/
 *.tsbuildinfo
 apps/desktop/out/
+apps/desktop/resources/bin/current/
+apps/desktop/resources/bin/linux/
+apps/desktop/resources/bin/mac/
 apps/desktop/resources/bin/win/*.exe
 apps/desktop/resources/bin/win/*.pdb
 # Staged (built) browser extension + its locally-generated signing key.
@@ -21,6 +24,7 @@ apps/extension/keys/
 
 # Rust
 native/windows/target/
+native/linux/target/
 
 # Env (machine-local secrets/overrides)
 .credentials

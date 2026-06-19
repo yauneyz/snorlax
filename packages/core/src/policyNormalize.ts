@@ -61,11 +61,13 @@ export function normalizeDomain(input: string): { domain: string } | { error: st
 function normalizeApp(app: AppRef): AppRef | null {
   const label = app.label?.trim();
   const win = app.windowsImageName?.trim().toLowerCase();
+  const linux = app.linuxProcessName?.trim().toLowerCase();
   const mac = app.macBundleId?.trim();
-  if (!win && !mac) return null; // nothing to match on
+  if (!win && !linux && !mac) return null; // nothing to match on
   return {
-    label: label || win || mac || 'app',
+    label: label || win || linux || mac || 'app',
     ...(win ? { windowsImageName: win } : {}),
+    ...(linux ? { linuxProcessName: linux } : {}),
     ...(mac ? { macBundleId: mac } : {}),
   };
 }
@@ -93,10 +95,13 @@ export function normalizePolicy(policy: Policy): NormalizedPolicy {
   for (const a of policy.apps ?? []) {
     const n = normalizeApp(a);
     if (!n) {
-      rejected.push({ value: a.label ?? '(app)', reason: 'no windowsImageName or macBundleId' });
+      rejected.push({
+        value: a.label ?? '(app)',
+        reason: 'no windowsImageName, linuxProcessName, or macBundleId',
+      });
       continue;
     }
-    const key = `${n.windowsImageName ?? ''}|${n.macBundleId ?? ''}`;
+    const key = `${n.windowsImageName ?? ''}|${n.linuxProcessName ?? ''}|${n.macBundleId ?? ''}`;
     if (!appSeen.has(key)) {
       appSeen.add(key);
       apps.push(n);

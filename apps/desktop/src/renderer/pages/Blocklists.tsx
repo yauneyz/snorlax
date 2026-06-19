@@ -54,7 +54,10 @@ export function Blocklists({ onUpgrade }: { onUpgrade: () => void }) {
       return setError('Free does not include app blocking.');
     }
     const name = appName.trim();
-    save({ ...policy, apps: [...policy.apps, { windowsImageName: name, label: name }] });
+    save({
+      ...policy,
+      apps: [...policy.apps, { windowsImageName: name, linuxProcessName: name, label: name }],
+    });
     setAppName('');
   };
   const removeApp = (label: string) =>
@@ -167,6 +170,7 @@ export function Blocklists({ onUpgrade }: { onUpgrade: () => void }) {
                 <li key={a.label} className="flex items-center justify-between rounded-lg bg-panel2 px-3 py-2">
                   <span className="text-sm text-slate-200">
                     {a.label} {a.windowsImageName && <Badge tone="neutral">{a.windowsImageName}</Badge>}
+                    {a.linuxProcessName && <Badge tone="neutral">{a.linuxProcessName}</Badge>}
                   </span>
                   <button onClick={() => removeApp(a.label)} className="text-xs text-red-400 hover:underline">
                     remove

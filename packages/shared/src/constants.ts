@@ -1,6 +1,6 @@
 /**
- * Constants shared by the Electron main process and the native service. The pipe name in
- * particular is mirrored on the Rust side (native/windows/src/ipc.rs) — keep them in sync.
+ * Constants shared by the Electron main process and the native service. The service endpoint
+ * names are mirrored on the Rust side — keep them in sync.
  */
 
 /** Protocol version negotiated on connect; bump on breaking RPC changes. */
@@ -15,6 +15,16 @@ export const DEEP_LINK_SCHEME = 'focuslock';
  */
 export function windowsPipePath(baseName: string): string {
   return `\\\\.\\pipe\\${baseName}`;
+}
+
+/**
+ * Resolve the Unix-domain socket path from the base name in config.
+ * Production lives under systemd's RuntimeDirectory; dev uses /tmp so an installed service and a
+ * console service do not collide. Passing an absolute path is allowed for tests/support.
+ */
+export function unixSocketPath(baseName: string): string {
+  if (baseName.startsWith('/')) return baseName;
+  return baseName === PIPE_BASE_PROD ? '/run/focuslock/focuslock.sock' : `/tmp/${baseName}.sock`;
 }
 
 /** Default base names (overridable via FOCUSLOCK_PIPE in env). */

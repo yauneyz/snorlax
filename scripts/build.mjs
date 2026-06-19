@@ -3,9 +3,9 @@
  * Full build orchestration (architecture §13):
  *   1. build native service (Rust) → stage binaries
  *   2. electron-vite build (main + preload + renderer)
- *   3. electron-builder (NSIS installer that registers/starts the service)
+ *   3. electron-builder (platform installer that registers/starts the service)
  *
- * Usage: node scripts/build.mjs --target win
+ * Usage: node scripts/build.mjs --target win|linux|mac
  */
 
 import { execFileSync } from 'node:child_process';
@@ -18,6 +18,12 @@ const args = process.argv.slice(2);
 const targetIdx = args.indexOf('--target');
 const target = targetIdx !== -1 ? args[targetIdx + 1] : 'win';
 
+const TARGETS = {
+  win: { hostPlatform: 'win32', builderFlag: '--win', nativeTarget: 'win' },
+  linux: { hostPlatform: 'linux', builderFlag: '--linux', nativeTarget: 'linux' },
+  mac: { hostPlatform: 'darwin', builderFlag: '--mac', nativeTarget: 'mac' },
+};
+
 function run(cmd, cmdArgs, cwd = root) {
   console.log(`\n› ${cmd} ${cmdArgs.join(' ')}`);
   execFileSync(cmd, cmdArgs, { cwd, stdio: 'inherit', shell: process.platform === 'win32' });
@@ -28,13 +34,21 @@ function desktopElectronVersion() {
   return JSON.parse(readFileSync(pkg, 'utf8')).version;
 }
 
-if (target !== 'win') {
-  console.error(`Only --target win is supported in this build (got "${target}"). macOS is a later phase.`);
+const cfg = TARGETS[target];
+if (!cfg) {
+  console.error(`Unsupported build target "${target}". Expected one of: ${Object.keys(TARGETS).join(', ')}`);
+  process.exit(1);
+}
+
+if (process.platform !== cfg.hostPlatform) {
+  console.error(
+    `build --target ${target} must run on ${cfg.hostPlatform} (current host is ${process.platform}).`,
+  );
   process.exit(1);
 }
 
 // 1. Native service.
-run('node', ['scripts/build-native-win.mjs']);
+run('node', ['scripts/build-native.mjs', '--target', cfg.nativeTarget]);
 
 // 1b. Browser extension (unpacked builds per engine, staged into resources).
 run('node', ['scripts/build-extension.mjs']);
@@ -46,10 +60,10 @@ run('pnpm', ['--filter', '@focuslock/desktop', 'build']);
 run('pnpm', [
   'exec',
   'electron-builder',
-  '--win',
+  cfg.builderFlag,
   '--config',
   'electron-builder.yml',
   `--config.electronVersion=${desktopElectronVersion()}`,
 ]);
 
-console.log('\n✓ Build complete. Installer is in dist/.');
+console.log('\nOK Build complete. Installer is in dist/.');

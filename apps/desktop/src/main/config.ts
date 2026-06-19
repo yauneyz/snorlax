@@ -4,13 +4,13 @@
  * `process.env` directly — everything imports from here (architecture §11).
  */
 
-import { PIPE_BASE_DEV, PIPE_BASE_PROD, windowsPipePath } from '@focuslock/shared';
+import { PIPE_BASE_DEV, PIPE_BASE_PROD, unixSocketPath, windowsPipePath } from '@focuslock/shared';
 
 export interface MainConfig {
   appEnv: 'development' | 'production';
   isDev: boolean;
   pipeBaseName: string;
-  /** Full platform pipe path used by the service client. */
+  /** Full platform IPC endpoint used by the service client. */
   pipePath: string;
 }
 
@@ -27,12 +27,14 @@ function build(): MainConfig {
   const appEnv = injected.APP_ENV;
   const isDev = appEnv !== 'production';
   const pipeBaseName = injected.FOCUSLOCK_PIPE || (isDev ? PIPE_BASE_DEV : PIPE_BASE_PROD);
+  const pipePath =
+    process.platform === 'win32' ? windowsPipePath(pipeBaseName) : unixSocketPath(pipeBaseName);
 
   return {
     appEnv,
     isDev,
     pipeBaseName,
-    pipePath: windowsPipePath(pipeBaseName),
+    pipePath,
   };
 }
 

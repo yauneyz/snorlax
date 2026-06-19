@@ -13,9 +13,9 @@ files:
   - apps/desktop/out/**/*
   - package.json
 
-# Embed the native Windows service binaries produced by scripts/build-native-win.mjs.
+# Embed the native service binaries staged by scripts/build-native.mjs for the selected target.
 extraResources:
-  - from: apps/desktop/resources/bin/win
+  - from: apps/desktop/resources/bin/current
     to: bin
     filter:
       - '**/*'
@@ -41,6 +41,20 @@ nsis:
   allowToChangeInstallationDirectory: true
   include: native/windows/installer/nsis-include.nsh
   artifactName: ${productName}-Setup-${version}.${ext}
+
+linux:
+  target:
+    - deb
+  category: Utility
+  artifactName: ${productName}-${version}-${arch}.${ext}
+
+deb:
+  afterInstall: native/linux/installer/after-install.sh
+  afterRemove: native/linux/installer/after-remove.sh
+  fpm:
+    - --depends=nftables
+    - --depends=systemd
+    - --before-remove=native/linux/installer/before-remove.sh
 
 publish:
   provider: generic

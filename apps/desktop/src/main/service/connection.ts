@@ -1,6 +1,6 @@
 /**
  * The interface the main process uses to talk to the privileged service. Two implementations:
- *  - PipeServiceConnection (client.ts): real NDJSON-RPC over the Windows named pipe.
+ *  - PipeServiceConnection (client.ts): real NDJSON-RPC over the native service endpoint.
  *  - MockServiceConnection (mockService.ts): in-process fake for dev/WSL/tests.
  *
  * `index.ts` picks one at startup so the rest of main is agnostic.

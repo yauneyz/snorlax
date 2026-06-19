@@ -1,9 +1,9 @@
 /**
- * Real NDJSON-RPC client over the Windows named pipe to the privileged service
+ * Real NDJSON-RPC client over the platform IPC endpoint to the privileged service
  * (architecture §6). One line = one message. Auto-reconnects if the service restarts, and
  * re-emits the latest state to subscribers on reconnect.
  *
- * A named pipe on Windows is reachable via `net.connect({ path: '\\\\.\\pipe\\focuslock' })`.
+ * Node's `net.connect({ path })` works for Windows named pipes and Unix-domain sockets.
  */
 
 import net from 'node:net';
