@@ -4,6 +4,7 @@ compile_error!("native/linux must be built on Linux.");
 pub mod constants;
 pub mod core;
 pub mod enforce;
+pub mod focus_cli;
 pub mod ipc;
 pub mod model;
 pub mod pairing;

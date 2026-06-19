@@ -25,6 +25,14 @@ path = "src/bin/recover.rs"
 name = "focuslock-natmsg"
 path = "src/bin/natmsg.rs"
 
+[[bin]]
+name = "focus-enable"
+path = "src/bin/focus-enable.rs"
+
+[[bin]]
+name = "focus-disable"
+path = "src/bin/focus-disable.rs"
+
 [dependencies]
 anyhow = "1"
 chrono = { version = "0.4", default-features = false, features = ["clock"] }
