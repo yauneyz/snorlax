@@ -276,7 +276,9 @@ These are ordinary firewall rules, so they **persist if the service is killed** 
 cleared, while the SCM restarts the service (~1s) to re-arm the WinDivert layers.
 
 **Browser extension blocking (`enforce::extension_policy`, `focuslock-natmsg.exe`).** Browser
-request-layer blocking lives in the force-installed extension for Chromium variants and Firefox.
+request-layer blocking lives in the user-installed store extension for Chromium variants and
+Firefox. The native service registers the local messaging host but does not force-install or lock
+the extension through enterprise browser policy.
 The service sends live `{active, mode, domains}` state over native messaging; the extension applies
 declarativeNetRequest rules above TLS and clears them when focus turns off. We no longer write
 Chromium enterprise `URLBlocklist` / `URLAllowlist` policies; extension install only removes

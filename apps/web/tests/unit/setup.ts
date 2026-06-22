@@ -12,14 +12,6 @@ process.env.STRIPE_PRICE_YEARLY ??= "price_yearly";
 process.env.RESEND_API_KEY ??= "re_test_xxx";
 process.env.RESEND_FROM ??= "Test <test@example.com>";
 process.env.APP_ENVIRONMENT ??= "development";
-process.env.EXTENSION_ARTIFACTS_BUCKET ??= "focuslock-extension-artifacts-prod";
-process.env.EXTENSION_ARTIFACTS_REGION ??= "us-east-1";
-process.env.EXTENSION_PUBLIC_S3_BASE_URL ??=
-  "https://focuslock-extension-artifacts-prod.s3.us-east-1.amazonaws.com";
-process.env.EXTENSION_PUBLIC_APP_BASE_URL ??= "https://focuslock.app/ext";
-process.env.EXTENSION_CHROMIUM_UPDATE_URL ??= "https://focuslock.app/ext/chromium/updates.xml";
-process.env.EXTENSION_FIREFOX_UPDATE_URL ??= "https://focuslock.app/ext/firefox/updates.json";
-process.env.EXTENSION_FIREFOX_XPI_URL ??= "https://focuslock.app/ext/firefox/focuslock-0.1.0.xpi";
 process.env.OPENAI_API_KEY ??= "sk_test_xxx";
 process.env.TOKEN_ENCRYPTION_KEY ??= "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
 process.env.OAUTH_STATE_SECRET ??= "test-oauth-state-secret-at-least-32-chars";

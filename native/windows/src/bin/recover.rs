@@ -87,7 +87,7 @@ fn offline_recover(code: &str) -> Result<()> {
     eprintln!("Service unreachable — performing offline recovery.");
     enforce::teardown_network(); // restore adapter DNS + remove firewall rules
                                  // The service is wedged, so the extension can't be told focus is off over native messaging —
-                                 // remove its force-install so the browser drops it (it keeps its last ruleset until then).
+                                 // remove the native-host registration; the user controls the store extension.
     enforce::extension_policy::uninstall();
 
     // Best-effort: stop the service so it doesn't immediately re-arm.

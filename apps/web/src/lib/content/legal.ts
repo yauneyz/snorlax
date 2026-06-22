@@ -7,7 +7,13 @@ import remarkHtml from "remark-html";
 
 const LEGAL_DIR = path.join(process.cwd(), "content", "legal");
 
-export async function getLegalDoc(name: "privacy" | "terms"): Promise<{ title: string; html: string } | null> {
+export type LegalDocName =
+  | "privacy"
+  | "terms"
+  | "browser-extension-privacy"
+  | "edge-extension-privacy";
+
+export async function getLegalDoc(name: LegalDocName): Promise<{ title: string; html: string } | null> {
   const abs = path.join(LEGAL_DIR, `${name}.md`);
   let raw: string;
   try {
@@ -18,7 +24,7 @@ export async function getLegalDoc(name: "privacy" | "terms"): Promise<{ title: s
   const { data, content } = matter(raw);
   const processed = await remark().use(remarkHtml, { sanitize: false }).process(content);
   return {
-    title: typeof data.title === "string" ? data.title : name === "privacy" ? "Privacy Policy" : "Terms of Service",
+    title: typeof data.title === "string" ? data.title : "Legal",
     html: String(processed),
   };
 }

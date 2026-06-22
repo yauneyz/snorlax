@@ -6,7 +6,7 @@
 //
 // Why an extension at all: the network layer blocks by resolved destination IP, but browser
 // requests still have plaintext hostnames above TLS. DNR block rules let us enforce by hostname
-// above ECH/QUIC/VPN/connection-reuse. Force-installed, the extension cannot be toggled off.
+// above ECH/QUIC/VPN/connection-reuse.
 
 /**
  * @typedef {{ active: boolean, mode: 'blacklist'|'whitelist'|'block-all', domains: string[] }} State

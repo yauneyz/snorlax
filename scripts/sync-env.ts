@@ -48,15 +48,6 @@ const optionalPosthogKey = z
     return trimmed.includes("...") ? "" : trimmed;
   });
 
-const extensionHostingBlock = z.object({
-  bucket: z.string().min(1),
-  public_s3_base_url: z.string().url(),
-  public_app_base_url: z.string().url(),
-  chromium_update_url: z.string().url(),
-  firefox_update_url: z.string().url(),
-  firefox_xpi_url: z.string().url(),
-});
-
 const supabaseBlock = z.object({
   url: supabaseProjectUrl,
   publishable_key: z.string().min(1),
@@ -105,23 +96,6 @@ const credentialsSchema = z.object({
     search_console_verification: z.string().optional().default(""),
     oauth_client_id: z.string().optional().default(""),
     oauth_client_secret: z.string().optional().default(""),
-  }),
-  aws: z.object({
-    region: z.string().min(1),
-    access_key_id: z.string().min(1),
-    secret_access_key: z.string().min(1),
-  }),
-  extension_hosting: extensionHostingBlock,
-  extension_signing: z.object({
-    chromium: z.object({
-      private_key_path: z.string().min(1),
-      expected_extension_id: z.string().regex(/^[a-p]{32}$/),
-    }),
-    firefox: z.object({
-      gecko_id: z.string().min(1),
-      amo_jwt_issuer: z.string().min(1),
-      amo_jwt_secret: z.string().min(1),
-    }),
   }),
   openai: z.object({
     api_key: z.string().optional().default(""),
@@ -262,14 +236,6 @@ function toWebEnvPairs(c: Credentials, mode: Mode): Array<[string, string]> {
     ["GOOGLE_SITE_VERIFICATION", c.google.search_console_verification],
     ["GOOGLE_OAUTH_CLIENT_ID", c.google.oauth_client_id],
     ["GOOGLE_OAUTH_CLIENT_SECRET", c.google.oauth_client_secret],
-
-    ["EXTENSION_ARTIFACTS_BUCKET", c.extension_hosting.bucket],
-    ["EXTENSION_ARTIFACTS_REGION", c.aws.region],
-    ["EXTENSION_PUBLIC_S3_BASE_URL", c.extension_hosting.public_s3_base_url],
-    ["EXTENSION_PUBLIC_APP_BASE_URL", c.extension_hosting.public_app_base_url],
-    ["EXTENSION_CHROMIUM_UPDATE_URL", c.extension_hosting.chromium_update_url],
-    ["EXTENSION_FIREFOX_UPDATE_URL", c.extension_hosting.firefox_update_url],
-    ["EXTENSION_FIREFOX_XPI_URL", c.extension_hosting.firefox_xpi_url],
 
     ["LLM_PROVIDER", llmProvider],
 

@@ -50,8 +50,9 @@ if (process.platform !== cfg.hostPlatform) {
 // 1. Native service.
 run('node', ['scripts/build-native.mjs', '--target', cfg.nativeTarget]);
 
-// 1b. Browser extension (unpacked builds per engine, staged into resources).
+// 1b. Browser extensions (unpacked builds + uploadable ZIPs for all three stores).
 run('node', ['scripts/build-extension.mjs']);
+run('node', ['scripts/audit-extension.mjs']);
 
 // 2. Electron bundles.
 run('pnpm', ['--filter', '@focuslock/desktop', 'build']);

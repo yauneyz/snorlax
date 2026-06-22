@@ -1,18 +1,19 @@
-//! Force-install + native-messaging registration for the FocusLock browser extension.
+//! Native-messaging registration for the user-installed FocusLock browser extension.
 //!
 //! The extension is the browser request-layer blocker: it receives live `{active, mode, domains}`
 //! state over native messaging (host: focuslock-natmsg.exe) and applies declarativeNetRequest rules
 //! above TLS, so ECH/QUIC/VPN/connection reuse do not hide requests from it.
 //!
-//! Lifecycle is persistent, not focus-toggled. We install once at service startup and only tear down
-//! on a full recover/uninstall; during normal focus-off the extension remains installed and clears
-//! its own dynamic rules when the service pushes `active:false`.
+//! Lifecycle is persistent, not focus-toggled. We register the local native host at service startup
+//! and remove that registration on a full recover/uninstall. Browser installation remains under the
+//! user's control through each browser's official extension store.
 //!
 //! All registry writes are HKLM (LocalSystem can write; users cannot). We also clear legacy
 //! URLBlocklist/URLAllowlist policy keys from older builds; current request-layer blocking lives
 //! entirely in the extension.
 
 use std::path::{Path, PathBuf};
+use std::process::Command;
 
 use crate::paths::nmh_dir;
 use crate::run::run_command;
@@ -21,37 +22,48 @@ use crate::run::run_command;
 pub const HOST_NAME: &str = "com.focuslock.host";
 
 // --- Packaging-time identities -------------------------------------------------------------------
-// These are fixed when the extension is packaged/published. The Chromium ID is the 32-char id
-// derived from the packed CRX's public key (stable while the manifest `key` is fixed); the Firefox
-// id is `browser_specific_settings.gecko.id`. Keep them in sync with the update/install URLs.
-// The Chromium id is derived from the local dev key (apps/extension/keys/chromium.pem) by
-// scripts/build-extension.mjs and printed on each build; this value matches that key. Regenerate
-// both together if the key changes.
-pub const CHROMIUM_EXT_ID: &str = "cpemmokfjbiicoaocpmpdeiobnilpokc";
+// Chrome and Edge assign separate IDs when their store items are first created. Leave these empty
+// until the first submissions exist, then copy the store IDs here. They are used only to restrict
+// which store extensions may launch the native host; they are not used to install extensions.
+pub const CHROME_EXT_ID: &str = "";
+pub const EDGE_EXT_ID: &str = "";
+
+// Firefox uses the authored Gecko ID in manifest.json, including for AMO-listed builds.
 pub const FIREFOX_EXT_ID: &str = "focuslock@focuslock.app";
 
-/// Chromium force-install update manifest, served by the web app and backed by S3 artifacts.
-pub const CHROMIUM_UPDATE_URL: &str = "https://focuslock.app/ext/chromium/updates.xml";
+const LEGACY_CHROMIUM_FORCELIST_VALUE: &str =
+    "cpemmokfjbiicoaocpmpdeiobnilpokc;https://focuslock.app/ext/chromium/updates.xml";
+const LEGACY_FIREFOX_XPI_URL: &str = "https://focuslock.app/ext/firefox/focuslock-0.1.0.xpi";
+const LEGACY_FIREFOX_AMO_URL: &str =
+    "https://addons.mozilla.org/firefox/downloads/latest/focuslock@focuslock.app/latest.xpi";
 
-/// Firefox force-install XPI location, served by the web app and backed by S3 artifacts.
-pub const FIREFOX_XPI_URL: &str = "https://focuslock.app/ext/firefox/focuslock-0.1.0.xpi";
-
-/// (policy root, app root) per Chromium browser. The policy root carries
-/// `ExtensionInstallForcelist`; the app root carries `NativeMessagingHosts`.
-const CHROMIUM_BROWSERS: &[(&str, &str)] = &[
+/// (browser, policy root, app root, store extension ID) per Chromium browser. The policy root is
+/// retained only to remove FocusLock values written by older releases.
+const CHROMIUM_BROWSERS: &[(&str, &str, &str, &str)] = &[
     (
+        "Chrome",
         r"SOFTWARE\Policies\Google\Chrome",
         r"SOFTWARE\Google\Chrome",
+        CHROME_EXT_ID,
     ),
     (
+        "Edge",
         r"SOFTWARE\Policies\Microsoft\Edge",
         r"SOFTWARE\Microsoft\Edge",
+        EDGE_EXT_ID,
     ),
     (
+        "Brave",
         r"SOFTWARE\Policies\BraveSoftware\Brave",
         r"SOFTWARE\BraveSoftware\Brave-Browser",
+        CHROME_EXT_ID,
     ),
-    (r"SOFTWARE\Policies\Chromium", r"SOFTWARE\Chromium"),
+    (
+        "Chromium",
+        r"SOFTWARE\Policies\Chromium",
+        r"SOFTWARE\Chromium",
+        CHROME_EXT_ID,
+    ),
 ];
 
 /// Locate the shipped native-messaging host exe (sibling of the running service binary).
@@ -62,12 +74,17 @@ fn natmsg_exe() -> Option<PathBuf> {
 
 /// The native-messaging host manifest for Chromium (uses `allowed_origins`).
 fn chromium_manifest(exe: &Path) -> String {
+    let allowed_origins: Vec<String> = [CHROME_EXT_ID, EDGE_EXT_ID]
+        .into_iter()
+        .filter(|id| !id.is_empty())
+        .map(|id| format!("chrome-extension://{id}/"))
+        .collect();
     serde_json::json!({
         "name": HOST_NAME,
         "description": "FocusLock native messaging host",
         "path": exe.to_string_lossy(),
         "type": "stdio",
-        "allowed_origins": [format!("chrome-extension://{CHROMIUM_EXT_ID}/")],
+        "allowed_origins": allowed_origins,
     })
     .to_string()
 }
@@ -84,13 +101,9 @@ fn firefox_manifest(exe: &Path) -> String {
     .to_string()
 }
 
-/// The Chromium `ExtensionInstallForcelist` value: `"<id>;<update_url>"`.
-fn forcelist_value() -> String {
-    format!("{CHROMIUM_EXT_ID};{CHROMIUM_UPDATE_URL}")
-}
-
-/// Install the extension everywhere we can: write the host manifests, register the native host per
-/// browser, and force-install (locked) the extension. Idempotent — safe to call on every startup.
+/// Write and register the native host for each browser. Idempotent — safe to call on every startup.
+/// Extension installation is deliberately not performed here: consumer browser-store installs must
+/// remain user initiated and removable through the browser's normal controls.
 pub fn install() {
     let Some(exe) = natmsg_exe() else {
         tracing::warn!("extension_policy: cannot locate focuslock-natmsg.exe; skipping");
@@ -110,70 +123,71 @@ pub fn install() {
     }
 
     let chromium_manifest_path = chromium_path.to_string_lossy().to_string();
-    let forcelist = forcelist_value();
-    for (policy_root, app_root) in CHROMIUM_BROWSERS {
+    for (browser, _, app_root, extension_id) in CHROMIUM_BROWSERS {
         // Register the native messaging host (default value = manifest path).
         reg_set_default(
             &format!(r"HKLM\{app_root}\NativeMessagingHosts\{HOST_NAME}"),
             &chromium_manifest_path,
         );
-        // Force-install + lock the extension (the user can't disable a forcelisted extension).
-        reg_set_value(
-            &format!(r"HKLM\{policy_root}\ExtensionInstallForcelist"),
-            "1",
-            &forcelist,
-        );
+        if extension_id.is_empty() {
+            tracing::warn!(
+                "extension_policy: {browser} store id is not configured; native messaging is unavailable"
+            );
+        }
     }
 
-    // Firefox: native host under the Mozilla root, force-install via the Extensions Install/Locked
-    // policy lists.
+    // Firefox uses the same user-installed companion model. The authored Gecko ID restricts the
+    // native host to the official AMO build.
     reg_set_default(
         &format!(r"HKLM\SOFTWARE\Mozilla\NativeMessagingHosts\{HOST_NAME}"),
         &firefox_path.to_string_lossy(),
     );
-    reg_set_value(
-        r"HKLM\SOFTWARE\Policies\Mozilla\Firefox\Extensions\Install",
-        "1",
-        FIREFOX_XPI_URL,
-    );
-    reg_set_value(
-        r"HKLM\SOFTWARE\Policies\Mozilla\Firefox\Extensions\Locked",
-        "1",
-        FIREFOX_EXT_ID,
-    );
+    remove_focuslock_managed_install_policies();
     clear_legacy_request_policies();
-    tracing::info!("extension_policy: force-install + native host registered");
+    tracing::info!("extension_policy: native host registered");
 }
 
-/// Remove the force-install and native-host registration (full recover / uninstall only — never on
-/// a normal focus-off, which leaves the extension installed and self-gated).
+/// Remove native-host registration on full recover / uninstall. The store extension remains under
+/// the user's control and can be removed using the browser UI.
 pub fn uninstall() {
-    for (policy_root, app_root) in CHROMIUM_BROWSERS {
+    for (_, _, app_root, _) in CHROMIUM_BROWSERS {
         reg_delete(&format!(
             r"HKLM\{app_root}\NativeMessagingHosts\{HOST_NAME}"
         ));
-        reg_delete_value(
-            &format!(r"HKLM\{policy_root}\ExtensionInstallForcelist"),
-            "1",
-        );
     }
     reg_delete(&format!(
         r"HKLM\SOFTWARE\Mozilla\NativeMessagingHosts\{HOST_NAME}"
     ));
-    reg_delete_value(
+    remove_focuslock_managed_install_policies();
+    clear_legacy_request_policies();
+    tracing::info!("extension_policy: native host removed");
+}
+
+/// Remove only policy values known to have been written by FocusLock. List-policy value names are
+/// shared with administrators, so deleting value `1` unconditionally could remove unrelated policy.
+fn remove_focuslock_managed_install_policies() {
+    let chromium_values = [LEGACY_CHROMIUM_FORCELIST_VALUE, CHROME_EXT_ID, EDGE_EXT_ID];
+    for (_, policy_root, _, _) in CHROMIUM_BROWSERS {
+        reg_delete_value_if_matches(
+            &format!(r"HKLM\{policy_root}\ExtensionInstallForcelist"),
+            "1",
+            &chromium_values,
+        );
+    }
+    reg_delete_value_if_matches(
         r"HKLM\SOFTWARE\Policies\Mozilla\Firefox\Extensions\Install",
         "1",
+        &[LEGACY_FIREFOX_XPI_URL, LEGACY_FIREFOX_AMO_URL],
     );
-    reg_delete_value(
+    reg_delete_value_if_matches(
         r"HKLM\SOFTWARE\Policies\Mozilla\Firefox\Extensions\Locked",
         "1",
+        &[FIREFOX_EXT_ID],
     );
-    clear_legacy_request_policies();
-    tracing::info!("extension_policy: force-install + native host removed");
 }
 
 fn clear_legacy_request_policies() {
-    for (policy_root, _) in CHROMIUM_BROWSERS {
+    for (_, policy_root, _, _) in CHROMIUM_BROWSERS {
         reg_delete(&format!(r"HKLM\{policy_root}\URLBlocklist"));
         reg_delete(&format!(r"HKLM\{policy_root}\URLAllowlist"));
         reg_delete_value(&format!(r"HKLM\{policy_root}"), "DnsOverHttpsMode");
@@ -190,16 +204,38 @@ fn reg_set_default(key: &str, data: &str) {
     );
 }
 
-fn reg_set_value(key: &str, name: &str, data: &str) {
-    run_command(
-        "reg",
-        &["add", key, "/v", name, "/t", "REG_SZ", "/d", data, "/f"],
-        &format!("set {key}\\{name}"),
-    );
-}
-
 fn reg_delete(key: &str) {
     run_command("reg", &["delete", key, "/f"], &format!("delete {key}"));
+}
+
+fn parse_reg_sz(stdout: &str) -> Option<&str> {
+    stdout.lines().find_map(|line| {
+        let (_, data) = line.split_once("REG_SZ")?;
+        let data = data.trim();
+        (!data.is_empty()).then_some(data)
+    })
+}
+
+fn reg_delete_value_if_matches(key: &str, name: &str, expected: &[&str]) {
+    let Ok(output) = Command::new("reg")
+        .args(["query", key, "/v", name])
+        .output()
+    else {
+        return;
+    };
+    if !output.status.success() {
+        return;
+    }
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let Some(value) = parse_reg_sz(&stdout) else {
+        return;
+    };
+    if expected
+        .iter()
+        .any(|candidate| !candidate.is_empty() && *candidate == value)
+    {
+        reg_delete_value(key, name);
+    }
 }
 
 fn reg_delete_value(key: &str, name: &str) {
@@ -216,17 +252,24 @@ mod tests {
     use std::path::Path;
 
     #[test]
-    fn chromium_manifest_has_stdio_and_extension_origin() {
+    fn chromium_manifest_has_stdio_and_configured_store_origins() {
         let m = chromium_manifest(Path::new(
             r"C:\Program Files\FocusLock\focuslock-natmsg.exe",
         ));
         let v: serde_json::Value = serde_json::from_str(&m).unwrap();
         assert_eq!(v["name"], HOST_NAME);
         assert_eq!(v["type"], "stdio");
-        assert_eq!(
-            v["allowed_origins"][0],
-            format!("chrome-extension://{CHROMIUM_EXT_ID}/")
-        );
+        let origins = v["allowed_origins"].as_array().unwrap();
+        let configured_ids: Vec<&str> = [CHROME_EXT_ID, EDGE_EXT_ID]
+            .into_iter()
+            .filter(|id| !id.is_empty())
+            .collect();
+        assert_eq!(origins.len(), configured_ids.len());
+        for id in configured_ids {
+            assert!(origins
+                .iter()
+                .any(|origin| origin == &format!("chrome-extension://{id}/")));
+        }
         // Backslashes in the path must be valid JSON (serde escapes them).
         assert!(v["path"].as_str().unwrap().contains("focuslock-natmsg.exe"));
     }
@@ -240,10 +283,11 @@ mod tests {
     }
 
     #[test]
-    fn forcelist_value_is_id_semicolon_url() {
-        let val = forcelist_value();
-        assert!(val.starts_with(CHROMIUM_EXT_ID));
-        assert!(val.contains(';'));
-        assert!(val.ends_with(CHROMIUM_UPDATE_URL));
+    fn parses_registry_string_values() {
+        let output = r#"
+HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Google\Chrome\ExtensionInstallForcelist
+    1    REG_SZ    abcdefghijklmnop
+"#;
+        assert_eq!(parse_reg_sz(output), Some("abcdefghijklmnop"));
     }
 }

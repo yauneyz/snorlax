@@ -5,9 +5,9 @@
 // into declarativeNetRequest dynamic rules. DNR dynamic rules persist across service-worker
 // restarts, so enforcement survives the worker sleeping; we only touch them when state changes.
 //
-// Fail-safe stance: if the host disconnects we KEEP the last-applied rules (so killing the bridge
-// can't unblock a locked session) and reconnect with backoff. On reconnect the service re-pushes
-// authoritative state. The extension is force-installed, so the user can't disable it.
+// Fail-safe stance: if the host disconnects we KEEP the last-applied rules and reconnect with
+// backoff. On reconnect the service re-pushes authoritative state. The user remains in control of
+// the extension through the browser's standard disable/remove controls.
 
 import { buildRules } from './rules.js';
 
@@ -33,7 +33,8 @@ async function applyState(state) {
       removeRuleIds: existing.map((r) => r.id),
       addRules: next,
     });
-    console.info('[focuslock] applied', next.length, 'rule(s)', state);
+    // Do not log the configured domain list. It is local user data and is not needed for support.
+    console.info('[focuslock] applied', next.length, 'rule(s)');
   } catch (e) {
     console.error('[focuslock] updateDynamicRules failed', e);
   }

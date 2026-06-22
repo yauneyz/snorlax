@@ -28,7 +28,7 @@ pub async fn serve(pipe_path: String, shutdown: watch::Receiver<bool>) {
     let core = Arc::new(Mutex::new(Core::new(state, store, shared.clone())));
     core.lock().await.rearm_on_boot();
 
-    // Persistently force-install the browser extension + register its native-messaging host. This
+    // Persistently register the user-installed browser extension's native-messaging host. This
     // is install-time, not focus-toggled: the extension self-gates on the live state the host
     // pushes (no rules while focus is off), so it's safe to leave installed. Idempotent.
     enforce::extension_policy::install();
