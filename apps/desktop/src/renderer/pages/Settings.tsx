@@ -8,6 +8,7 @@ export function Settings() {
   const appEnv = useFocusStore((s) => s.appEnv);
   const usingMock = useFocusStore((s) => s.usingMock);
   const serviceVersion = useFocusStore((s) => s.serviceVersion);
+  const entitlementLoaded = useFocusStore((s) => s.entitlementLoaded);
   const subscriptionPlan = useFocusStore((s) => s.subscriptionPlan);
   const entitlementActive = useFocusStore((s) => s.entitlementActive);
   const entitlementSource = useFocusStore((s) => s.entitlementSource);
@@ -43,9 +44,13 @@ export function Settings() {
           <div>Service version: {serviceVersion}</div>
           <div>
             Plan:{' '}
-            <Badge tone={entitlementActive ? 'ok' : 'neutral'}>
-              {subscriptionPlan === 'pro' ? 'Pro' : 'Free'}
-            </Badge>
+            {entitlementLoaded ? (
+              <Badge tone={entitlementActive ? 'ok' : 'neutral'}>
+                {subscriptionPlan === 'pro' ? 'Pro' : 'Free'}
+              </Badge>
+            ) : (
+              <Badge tone="neutral">Checking…</Badge>
+            )}
           </div>
         </div>
       </Card>

@@ -25,6 +25,8 @@ interface FocusStore {
   appEnv: string;
   signedIn: boolean;
   email?: string;
+  /** False until the first entitlement fetch resolves — UI shows a neutral state meanwhile. */
+  entitlementLoaded: boolean;
   subscriptionPlan: SubscriptionPlan;
   entitlementActive: boolean;
   entitlementSource: string;
@@ -56,7 +58,9 @@ export const useFocusStore = create<FocusStore>((set, get) => ({
   appEnv: 'development',
   signedIn: false,
   email: undefined,
-  // Fail closed: assume Free / inactive until the first real entitlement fetch resolves.
+  // Unknown until the first fetch resolves; pages render a neutral "Checking…" state. Values
+  // below are placeholders (fail-closed) and are not shown while entitlementLoaded is false.
+  entitlementLoaded: false,
   subscriptionPlan: 'free',
   entitlementActive: false,
   entitlementSource: 'server',
@@ -91,6 +95,7 @@ export const useFocusStore = create<FocusStore>((set, get) => ({
   refreshEntitlement: async () => {
     const current = await entitlement();
     set({
+      entitlementLoaded: true,
       subscriptionPlan: current.plan,
       entitlementActive: current.active,
       entitlementSource: current.source,

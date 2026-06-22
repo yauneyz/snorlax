@@ -6,6 +6,7 @@ import { openBillingPortal, signInGoogle, signInPassword, signOut } from '../lib
 export function Account() {
   const signedIn = useFocusStore((s) => s.signedIn);
   const email = useFocusStore((s) => s.email);
+  const entitlementLoaded = useFocusStore((s) => s.entitlementLoaded);
   const subscriptionPlan = useFocusStore((s) => s.subscriptionPlan);
   const entitlementActive = useFocusStore((s) => s.entitlementActive);
 
@@ -45,9 +46,13 @@ export function Account() {
           </div>
           <div className="flex items-center gap-2">
             Plan:{' '}
-            <Badge tone={entitlementActive ? 'ok' : 'neutral'}>
-              {subscriptionPlan === 'pro' ? 'Pro' : 'Free'}
-            </Badge>
+            {entitlementLoaded ? (
+              <Badge tone={entitlementActive ? 'ok' : 'neutral'}>
+                {subscriptionPlan === 'pro' ? 'Pro' : 'Free'}
+              </Badge>
+            ) : (
+              <Badge tone="neutral">Checking…</Badge>
+            )}
           </div>
         </div>
 
