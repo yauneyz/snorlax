@@ -7,7 +7,6 @@ export const entitlementSourceSchema = z.enum([
     'stub',
     'dev-override',
     'server',
-    'edge-function',
     'cache',
     'offline',
 ]);

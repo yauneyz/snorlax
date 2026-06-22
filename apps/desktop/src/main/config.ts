@@ -12,6 +12,11 @@ export interface MainConfig {
   pipeBaseName: string;
   /** Full platform IPC endpoint used by the service client. */
   pipePath: string;
+  /** Origin of the Next.js web backend the main process calls (`/api/desktop/*`). */
+  apiBaseUrl: string;
+  /** Supabase project URL + publishable anon key for the main-process auth client. */
+  supabaseUrl: string;
+  supabaseAnonKey: string;
 }
 
 function build(): MainConfig {
@@ -22,6 +27,9 @@ function build(): MainConfig {
       : {
           APP_ENV: (process.env.APP_ENV as 'development' | 'production') ?? 'development',
           FOCUSLOCK_PIPE: process.env.FOCUSLOCK_PIPE ?? PIPE_BASE_DEV,
+          API_BASE_URL: process.env.API_BASE_URL ?? '',
+          VITE_SUPABASE_URL: process.env.VITE_SUPABASE_URL ?? '',
+          VITE_SUPABASE_ANON_KEY: process.env.VITE_SUPABASE_ANON_KEY ?? '',
         };
 
   const appEnv = injected.APP_ENV;
@@ -35,6 +43,9 @@ function build(): MainConfig {
     isDev,
     pipeBaseName,
     pipePath,
+    apiBaseUrl: injected.API_BASE_URL.replace(/\/$/, ''),
+    supabaseUrl: injected.VITE_SUPABASE_URL,
+    supabaseAnonKey: injected.VITE_SUPABASE_ANON_KEY,
   };
 }
 

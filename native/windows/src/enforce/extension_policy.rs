@@ -8,9 +8,8 @@
 //! and remove that registration on a full recover/uninstall. Browser installation remains under the
 //! user's control through each browser's official extension store.
 //!
-//! All registry writes are HKLM (LocalSystem can write; users cannot). We also clear legacy
-//! URLBlocklist/URLAllowlist policy keys from older builds; current request-layer blocking lives
-//! entirely in the extension.
+//! All registry writes are HKLM (LocalSystem can write; users cannot). Request-layer blocking lives
+//! entirely in the extension; the service does not alter browser URL or DNS policies.
 
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -143,7 +142,6 @@ pub fn install() {
         &firefox_path.to_string_lossy(),
     );
     remove_focuslock_managed_install_policies();
-    clear_legacy_request_policies();
     tracing::info!("extension_policy: native host registered");
 }
 
@@ -159,7 +157,6 @@ pub fn uninstall() {
         r"HKLM\SOFTWARE\Mozilla\NativeMessagingHosts\{HOST_NAME}"
     ));
     remove_focuslock_managed_install_policies();
-    clear_legacy_request_policies();
     tracing::info!("extension_policy: native host removed");
 }
 
@@ -184,16 +181,6 @@ fn remove_focuslock_managed_install_policies() {
         "1",
         &[FIREFOX_EXT_ID],
     );
-}
-
-fn clear_legacy_request_policies() {
-    for (_, policy_root, _, _) in CHROMIUM_BROWSERS {
-        reg_delete(&format!(r"HKLM\{policy_root}\URLBlocklist"));
-        reg_delete(&format!(r"HKLM\{policy_root}\URLAllowlist"));
-        reg_delete_value(&format!(r"HKLM\{policy_root}"), "DnsOverHttpsMode");
-        reg_delete_value(&format!(r"HKLM\{policy_root}"), "BuiltInDnsClientEnabled");
-    }
-    reg_delete(r"HKLM\SOFTWARE\Policies\Mozilla\Firefox\WebsiteFilter");
 }
 
 fn reg_set_default(key: &str, data: &str) {

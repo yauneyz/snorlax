@@ -9,8 +9,10 @@ import type { Policy, Schedule, ServiceState } from '@focuslock/shared';
 import { EMPTY_POLICY, EMPTY_SCHEDULE } from '@focuslock/shared';
 import {
   appInfo,
+  authStatus,
   devSetEntitlementPlan,
   entitlement,
+  onAppEvent,
   onEvent,
   request,
   type SubscriptionPlan,
@@ -21,6 +23,8 @@ interface FocusStore {
   ready: boolean;
   usingMock: boolean;
   appEnv: string;
+  signedIn: boolean;
+  email?: string;
   subscriptionPlan: SubscriptionPlan;
   entitlementActive: boolean;
   entitlementSource: string;
@@ -39,6 +43,7 @@ interface FocusStore {
 
   init: () => Promise<void>;
   refresh: () => Promise<void>;
+  refreshAuth: () => Promise<void>;
   refreshEntitlement: () => Promise<void>;
   setDevSubscriptionPlan: (plan: SubscriptionPlan) => Promise<void>;
   setError: (e?: { code: string; message: string }) => void;
@@ -49,10 +54,13 @@ export const useFocusStore = create<FocusStore>((set, get) => ({
   ready: false,
   usingMock: false,
   appEnv: 'development',
-  subscriptionPlan: 'pro',
-  entitlementActive: true,
-  entitlementSource: 'stub',
-  productLimits: null,
+  signedIn: false,
+  email: undefined,
+  // Fail closed: assume Free / inactive until the first real entitlement fetch resolves.
+  subscriptionPlan: 'free',
+  entitlementActive: false,
+  entitlementSource: 'server',
+  productLimits: limitsForPlan('free'),
 
   focusActive: false,
   keyPresent: false,
@@ -74,6 +82,11 @@ export const useFocusStore = create<FocusStore>((set, get) => ({
     }),
 
   setError: (lastError) => set({ lastError }),
+
+  refreshAuth: async () => {
+    const status = await authStatus();
+    set({ signedIn: status.signedIn, email: status.email });
+  },
 
   refreshEntitlement: async () => {
     const current = await entitlement();
@@ -108,6 +121,7 @@ export const useFocusStore = create<FocusStore>((set, get) => ({
   init: async () => {
     const info = await appInfo();
     set({ usingMock: info.usingMock, appEnv: info.appEnv });
+    await get().refreshAuth();
     await get().refreshEntitlement();
 
     await get().refresh();
@@ -118,6 +132,12 @@ export const useFocusStore = create<FocusStore>((set, get) => ({
     onEvent('scheduleFired', () => {
       // Schedule boundaries can change focus + lock state; re-pull the snapshot.
       get().refresh();
+    });
+
+    // Main pushes these after sign-in/out and billing deep-link returns.
+    onAppEvent(() => {
+      void get().refreshAuth();
+      void get().refreshEntitlement();
     });
 
     set({ ready: true });

@@ -21,16 +21,17 @@ production-ready.
 - **Both web and desktop authenticate with Supabase.** The web uses Supabase SSR cookies;
   the desktop holds a Supabase session and sends the access token as a bearer token.
 
-**Where we actually are:**
+**Where we are now:**
 
-- ✅ The **backend is already built to this design.** Stripe webhook, checkout, portal,
+- ✅ The **backend is built to this design.** Stripe webhook, checkout, portal,
   entitlement endpoint, subscription tables, and bearer-token auth all exist and work.
-- ⚠️ The **desktop side is stubbed.** It never signs in, never stores a session, and
-  **never calls the backend**. Entitlement is faked locally (a dev-only JSON override, or a
-  hard-coded `pro` stub in production builds).
+- ✅ The **desktop is wired to it.** The main process runs a Supabase client (Google
+  browser-OAuth + in-app email/password), persists the session with `safeStorage`, and calls
+  `/api/desktop/{entitlement,checkout,portal}` with a bearer token. A dev-only override
+  remains for exercising gated UI without a real subscription.
 
-So production work is mostly **connecting the desktop to the backend that already exists** —
-not building new billing infrastructure.
+The remaining work is **go-live hardening** (Stripe live mode, Supabase redirect allow-list,
+abuse protection) — covered in §7.
 
 ```
                  ┌───────────────────────────────────────────────┐
@@ -83,23 +84,26 @@ backend.
     `Authorization: Bearer <token>` and validates it with
     `supabaseAdmin().auth.getUser(token)`.
 
-### 2.2 Desktop → web (the contract exists, the desktop side does not)
+### 2.2 Desktop → web (wired)
 
-- The desktop is expected to send the Supabase **access token** as
-  `Authorization: Bearer <jwt>` on every `/api/desktop/*` call.
+- The desktop sends the Supabase **access token** as `Authorization: Bearer <jwt>` on every
+  `/api/desktop/*` call (`getAccessToken()` in `apps/desktop/src/main/auth/supabase.ts`).
 - Bearer parsing/validation is shared in `packages/auth-contracts/src/index.ts`
   (`extractBearerToken`, `bearerTokenSchema`) and consumed by `require-bearer-user.ts`.
 
-### 2.3 Desktop local session (STUBBED)
+### 2.3 Desktop local session (implemented)
 
-The intended design (architecture §10): run `supabase-js` in the **main process** so tokens
-never reach the renderer DOM, and persist the refresh token with Electron `safeStorage`
-(DPAPI on Windows, Keychain on macOS). Today these are no-ops:
+`supabase-js` runs in the **main process** so tokens never reach the renderer DOM; the
+session is persisted with Electron `safeStorage` (DPAPI on Windows, Keychain on macOS).
 
-| File | Current behavior |
+| File | Behavior |
 | --- | --- |
-| `apps/desktop/src/main/auth/supabase.ts` | `getAuthStatus()` always returns `{ signedIn: false }`. No Supabase client is created. |
-| `apps/desktop/src/main/auth/session.ts` | `loadSession()` returns `null`; `saveSession()` / `clearSession()` do nothing. |
+| `apps/desktop/src/main/auth/supabase.ts` | PKCE client; `getAuthStatus` / `getAccessToken`, `signInWithGoogle` (browser OAuth), `signInWithPassword`, `completeOAuth`, `signOut`; `onAuthStateChange` broadcasts to renderers. |
+| `apps/desktop/src/main/auth/session.ts` | `safeStorage`-encrypted storage adapter handed to supabase-js (persists session + PKCE verifier); falls back to an unencrypted file with a warning if OS encryption is unavailable. |
+
+The renderer only ever receives `{ signedIn, email }` — never the raw token. Sign-in UX
+(Account page) offers both **Sign in with Google** (system browser) and an in-app
+**email/password** form.
 
 ### 2.4 Deep links
 
@@ -194,163 +198,137 @@ authoritative sync.**
 | `STRIPE_WEBHOOK_SECRET` | server-only | webhook signature |
 | `STRIPE_PRICE_MONTHLY` / `STRIPE_PRICE_YEARLY` | server-only | checkout line items |
 | `STRIPE_MODE` (`test`/`live`), `STRIPE_PORTAL_CONFIG_ID` | server-only | mode/portal config |
-| `API_BASE_URL` | client (desktop) | base URL the desktop will call (see §6) |
+| `API_BASE_URL` | client (desktop) | Next.js web origin the desktop calls (e.g. `http://localhost:3000`) |
 
 Config is validated at startup in `apps/web/src/lib/config.ts` (Zod, fail-fast,
 public/server split). Local secrets come from `.credentials` → `pnpm sync:env`.
 
 ---
 
-## 4. Entitlement on the desktop today (STUBBED)
+## 4. Entitlement on the desktop (implemented)
 
-The renderer shows plan-gated UI based on an `Entitlement`, but that entitlement **never
-comes from the server**.
+The renderer shows plan-gated UI based on an `Entitlement` that now comes from the server.
 
 - **`apps/desktop/src/main/auth/subscription.ts`** — `getEntitlement()`:
-  - In **development**: reads/writes `dev-entitlement.json` in `userData`; default plan
-    `pro`; can be flipped from the Settings page.
-  - In **production**: returns a **hard-coded `pro` stub**. No network call.
-  - It also **redefines its own `Entitlement` type** with a narrower `source` union
-    (`'stub' | 'dev-override' | 'edge-function' | 'cache'`) instead of importing the
-    canonical schema from `@focuslock/product`, and pulls a desktop-local
-    `shared/productLimits.js` copy of the plan limits.
-- **IPC surface** (`apps/desktop/src/main/ipc/handlers.ts`):
-  - `app:entitlement` — returns the current entitlement snapshot.
-  - `app:devSetEntitlementPlan` — dev-only plan override.
+  - In **production**: `GET {API_BASE_URL}/api/desktop/entitlement` with the bearer access
+    token; the result is validated with `entitlementSchema` and cached to
+    `entitlement-cache.json` in `userData`. No token → `free`/inactive.
+  - **Offline:** while signed in, the last-known cached entitlement is served **indefinitely**
+    (`source: 'offline'`); re-evaluation happens on the next successful online call. (Focus
+    enforcement is independent — native service + USB-key gate — so entitlement is feature
+    gating only and must not strip a paying user's features over a network blip.)
+  - In **development**: still reads/writes `dev-entitlement.json` (default `pro`) so gated UI
+    can be exercised without a subscription (Settings/Plans dev switch).
+  - The desktop now imports the canonical `Entitlement` / `entitlementSchema` /
+    `entitlementForPlan` from `@focuslock/product` — no local type copy.
+- **`apps/desktop/src/main/auth/billing.ts`** — `startCheckout(price)` →
+  `POST /api/desktop/checkout`; `openBillingPortal()` → `POST /api/desktop/portal`; both open
+  the returned Stripe URL with `shell.openExternal`.
+- **IPC surface** (`apps/desktop/src/main/ipc/{channels,handlers}.ts`):
+  - `app:entitlement`, `app:authStatus`; `app:signInGoogle` / `app:signInPassword` /
+    `app:signOut`; `app:startCheckout` / `app:openBillingPortal`; `app:devSetEntitlementPlan`
+    (dev-only); and an `app:event` push (`authChanged` / `entitlementChanged`) so renderers
+    re-pull after sign-in/out and billing deep-link returns.
   - Free-tier limits are enforced at the IPC boundary on `setPolicy` / `setSchedule`
     (blacklist/block-all only, ≤ 5 domains, no apps, no scheduling).
 - **Canonical contract** (`packages/product/src/index.ts`): `entitlementSchema`
   (`active`, `plan`, `source`, optional `status`/`currentPeriodEnd`/`fetchedAt`/`cacheUntil`),
-  `limitsForPlan`, and the validation/constraint helpers the IPC layer should use.
-
-So both the **type** and the **plan-limit table** are duplicated between desktop and the
-shared package — a correctness risk once real entitlements flow.
+  `limitsForPlan`, and the validation/constraint helpers — shared by client and server. The
+  `source` enum is `stub | dev-override | server | cache | offline` (no `edge-function`).
 
 ---
 
 ## 5. End-to-end flows
 
-### 5.1 Sign-in (target)
+### 5.1 Sign-in
 
-1. Renderer asks main to sign in → main opens the system browser to Supabase OAuth.
-2. After consent, Supabase redirects to `/api/auth/callback`, which redirects to
-   `focuslock://auth/callback?code=…`.
-3. The desktop's deep-link handler receives the code, calls `exchangeCodeForSession`, and
-   persists the refresh token via `safeStorage`.
-4. `getAuthStatus()` now reports `{ signedIn: true, email }`.
+- **Google (browser OAuth):** renderer → `app:signInGoogle` → main builds the PKCE auth URL
+  (`redirectTo: focuslock://auth/callback`) and opens the system browser. Supabase redirects
+  to `focuslock://auth/callback?code=…`; the desktop deep-link handler calls
+  `completeOAuth(code)` (`exchangeCodeForSession`) and persists the session via `safeStorage`.
+- **Email/password:** renderer form → `app:signInPassword` → `supabase.auth.signInWithPassword`.
+- Either way, `onAuthStateChange` fires `app:event('authChanged')`; the renderer re-pulls auth
+  status + entitlement, and `getAuthStatus()` reports `{ signedIn: true, email }`.
 
-> **Today:** none of this runs — `getAuthStatus()` is hard-coded to `signedIn: false`.
+### 5.2 Upgrade / checkout
 
-### 5.2 Upgrade / checkout (target)
-
-1. Renderer "Upgrade" → main `POST /api/desktop/checkout` with the bearer token and
-   `{ price }`.
-2. Backend returns a Stripe Checkout URL; main opens it in the external browser.
-3. User pays; Stripe redirects to `/api/desktop/checkout/success`, which calls
+1. Renderer "Upgrade — Monthly/Yearly" → `app:startCheckout` → main
+   `POST /api/desktop/checkout` (bearer) → Stripe Checkout URL → `shell.openExternal`.
+2. User pays; Stripe redirects to `/api/desktop/checkout/success`, which calls
    `syncSubscription` and redirects to `focuslock://billing/success`.
-4. Desktop handles the deep link and **refreshes entitlement** (§5.4).
+3. The deep-link handler emits `app:event('entitlementChanged')`; the renderer refreshes and
+   the plan flips to **Pro**.
 
-> **Today:** the Upgrade button calls the dev-only `devSetEntitlementPlan`; no Stripe.
+### 5.3 Webhook sync (authoritative)
 
-### 5.3 Webhook sync (already real)
+Stripe → `/api/stripe/webhook` → `syncSubscription` → `subscriptions` table. Idempotent and
+independent of whether the user's browser completed the redirect.
 
-Stripe → `/api/stripe/webhook` → `syncSubscription` → `subscriptions` table. Authoritative,
-idempotent, and independent of whether the user's browser completed the redirect.
-
-### 5.4 Entitlement refresh (target)
+### 5.4 Entitlement refresh
 
 1. Main `GET /api/desktop/entitlement` with the bearer token.
 2. `getUserEntitlement` reads `active_subscriptions` and returns
    `{ active, plan, source: 'server', status?, currentPeriodEnd?, fetchedAt, cacheUntil }`.
-3. Main caches it (honoring `cacheUntil`) and pushes it to the renderer via
-   `app:entitlement`; limits are re-applied.
-
-> **Today:** step 1–2 don't happen; the renderer gets the local stub.
+3. Main caches it to disk and the renderer applies plan limits. Offline → last-known cache is
+   served with `source: 'offline'`.
 
 ---
 
-## 6. Gap analysis
+## 6. Status
 
-| Concern | Target | Current state |
+| Concern | Target | State |
 | --- | --- | --- |
-| Desktop auth | Real Supabase session in main process | `getAuthStatus()` → `signedIn: false` (stub) |
-| Token storage | Refresh token in `safeStorage` | `session.ts` no-ops |
-| Entitlement source | `GET /api/desktop/entitlement` over bearer token | Local JSON / hard-coded `pro` stub, no HTTP |
-| Offline behavior | Cache `cacheUntil`, fail **closed** (last-known/free) | No cache; always returns `pro` |
-| Type/limits sharing | Import `@focuslock/product` everywhere | Desktop redefines `Entitlement` + copies `productLimits` |
-| Checkout / portal | Desktop calls `/api/desktop/{checkout,portal}` | Upgrade button uses dev override |
-| Entitlement transport | Next.js `/api/desktop/*` web routes | Env/docs still reference Supabase **Edge Functions** (`functions/v1`) — unused |
-| Stripe mode | Live keys, live webhook | Test placeholders |
+| Desktop auth | Real Supabase session in main process | ✅ PKCE client; Google + email/password |
+| Token storage | Session in `safeStorage` | ✅ encrypted storage adapter |
+| Entitlement source | `GET /api/desktop/entitlement` over bearer token | ✅ implemented + disk cache |
+| Offline behavior | Keep last-known while signed in | ✅ indefinite, `source: 'offline'` |
+| Type/limits sharing | Import `@focuslock/product` everywhere | ✅ no local copy |
+| Checkout / portal | Desktop calls `/api/desktop/{checkout,portal}` | ✅ via `billing.ts` |
+| Entitlement transport | Next.js `/api/desktop/*` web routes | ✅ `API_BASE_URL` = web origin; edge-fn refs removed |
+| Stripe mode | Live keys, live webhook | ⏳ go-live hardening (§7) |
 
 ---
 
-## 7. Changes / upgrades for production
+## 7. Remaining work for production
 
-Grouped by area, with the concrete files to touch. The backend already exists, so most of
-this is desktop wiring plus go-live hardening.
+The desktop↔backend wiring is done (§2–§5). What's left is go-live hardening and
+environment/config setup that can't be done from code alone.
 
-### A. Wire desktop Supabase auth (main process)
-
-- **`apps/desktop/src/main/auth/supabase.ts`** — instantiate a real `supabase-js` client
-  from `VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY`. Expose `signIn` (open external
-  browser → OAuth → `focuslock://auth/callback` → `exchangeCodeForSession`), `signOut`, and
-  back `getAuthStatus()` with the live session. Keep it in the **main process** so tokens
-  never touch the renderer DOM.
-- **`apps/desktop/src/main/auth/session.ts`** — persist the refresh token with Electron
-  `safeStorage`; load it on startup; auto-refresh the access token; clear on sign-out.
-- **`apps/desktop/src/main/window.ts`** — confirm the deep-link handler routes
-  `auth/callback` (and `billing/*`) and that the `focuslock://` scheme is registered for
-  packaged builds.
-- Expose only `{ signedIn, email }` to the renderer via the preload bridge — never the raw
-  token.
-
-### B. Make entitlement a real server call
-
-- **`apps/desktop/src/main/auth/subscription.ts`** — replace the stub with
-  `GET {API_BASE_URL}/api/desktop/entitlement`, sending `Authorization: Bearer <accessToken>`.
-- **Standardize the base URL on the Next.js web server.** Drop the Supabase Edge Function
-  assumption: update `API_BASE_URL` in `.env.development` / `.env.production` /
-  `.env.example` to the web origin (e.g. `https://app.snorlax…`), and fix the
-  edge-function references in `snorlax-architecture.md`.
-- **Cache + offline grace:** store the returned entitlement and honor `cacheUntil` /
-  `fetchedAt`. On network failure, serve the cached value (source `'cache'` / `'offline'`)
-  until it expires, then **fail closed** toward the last-known plan (or `free`) — never
-  unlock the blocker because a request failed. This matches the product's anti-bypass
-  posture.
-- **Kill the duplication:** delete the desktop's local `Entitlement` type and
-  `shared/productLimits.js` copy; import `entitlementSchema` and `limitsForPlan` from
-  `@focuslock/product` so client and server share one contract. Validate the HTTP response
-  with `entitlementSchema.parse`.
-
-### C. Checkout & portal from the desktop
-
-- Wire the "Upgrade to Pro" button (`apps/desktop/src/renderer/pages/Plans.tsx`) to
-  `POST /api/desktop/checkout` → open the returned URL externally.
-- Handle `focuslock://billing/success` and `…/cancel` deep links → trigger an entitlement
-  refresh (§B) so the UI updates immediately.
-- Wire "Manage billing" (`Account.tsx`) to `POST /api/desktop/portal`.
-
-### D. Production hardening (backend + shared)
+### A. Stripe + Supabase go-live config
 
 - **Stripe live mode:** create live products/prices, set live `STRIPE_PRICE_*`, register the
-  live webhook endpoint + `STRIPE_WEBHOOK_SECRET`, switch `STRIPE_MODE=live`. Re-verify
-  webhook idempotency under Stripe retries (the `stripe_events` ledger covers this).
-- **JWT/token expiry on desktop:** refresh the access token before calls; on `401`, refresh
-  once and retry; allow some clock-skew tolerance on `cacheUntil`.
-- **`/api/desktop/*` abuse protection:** add rate limiting and confirm Sentry coverage on
-  every desktop route (entitlement already reports to Sentry).
-- **Secrets hygiene:** verify the Electron bundle ships only publishable/anon keys — no
-  `STRIPE_SECRET_KEY`, `SUPABASE_SECRET_KEY`, or `STRIPE_WEBHOOK_SECRET`.
+  live webhook endpoint + `STRIPE_WEBHOOK_SECRET`, switch `STRIPE_MODE=live`. Webhook
+  idempotency under retries is already covered by the `stripe_events` ledger.
+- **Supabase redirect allow-list:** add `focuslock://auth/callback` to the project's allowed
+  redirect URLs (local `supabase/config.toml` `additional_redirect_urls` **and** the hosted
+  project) — otherwise the OAuth round-trip can't complete. Enable the **Google** provider.
+- **`API_BASE_URL` per env:** set to the deployed Next.js origin in `.env.production`
+  (`.env.development` already points at `http://localhost:3000`).
+
+### B. Desktop robustness
+
+- **Token expiry:** supabase-js auto-refreshes via the `safeStorage` adapter; on a `401` from
+  `/api/desktop/*`, the entitlement path treats the user as signed-out. Consider an explicit
+  refresh-and-retry on `401` for checkout/portal too.
 - **Packaging:** confirm `electron-builder.yml` registers the `focuslock://` protocol on all
-  target OSes so deep links resolve in installed builds.
+  target OSes so deep links resolve in installed builds (registration code is in
+  `index.ts`/`window.ts`; the manifest side is build config).
 
-### E. Open decisions (flag, not blockers)
+### C. Backend hardening
 
-- One canonical value for `API_BASE_URL` (web origin) across all envs.
-- Whether to keep *any* Supabase Edge Function path, or commit fully to Next.js routes
-  (recommended: Next.js only, matching the stated goal).
-- How aggressive the offline fail-closed window should be (TTL is server-set to 5 min today;
-  decide the desktop's hard cutoff after `cacheUntil`).
+- **`/api/desktop/*` abuse protection:** add rate limiting; Sentry coverage already present on
+  the desktop routes.
+- **Secrets hygiene:** the Electron bundle ships only publishable/anon keys (`__APP_CONFIG__`
+  carries `API_BASE_URL` + `VITE_SUPABASE_URL` + `VITE_SUPABASE_ANON_KEY`); secret/webhook
+  keys stay server-only. Worth a CI check.
+
+### D. Decided this iteration
+
+- **Transport:** Next.js `/api/desktop/*` only; the Supabase Edge Function path was removed
+  from env + docs.
+- **Sign-in:** both Google browser-OAuth (PKCE) and in-app email/password.
+- **Offline:** keep the last-known entitlement **indefinitely while signed in** (the USB-key
+  disable gate, not entitlement, is the anti-bypass control).
 
 ---
 
@@ -369,8 +347,9 @@ this is desktop wiring plus go-live hardening.
 - `packages/product/src/index.ts` (entitlement + limits — canonical)
 - `packages/auth-contracts/src/index.ts` (bearer + deep links)
 
-**Desktop (stubbed — to wire):**
-- `apps/desktop/src/main/auth/{supabase,session,subscription}.ts`
-- `apps/desktop/src/main/ipc/handlers.ts`, `channels.ts`
-- `apps/desktop/src/renderer/pages/{Plans,Account,Settings}.tsx`
-- `apps/desktop/src/renderer/store/useFocusStore.ts`
+**Desktop (wired):**
+- `apps/desktop/src/main/auth/{supabase,session,subscription,billing}.ts`
+- `apps/desktop/src/main/ipc/{handlers,channels}.ts`, `main/window.ts`, `main/index.ts`
+- `apps/desktop/src/main/config.ts`, `electron.vite.config.ts`, `src/main/env.d.ts`
+- `apps/desktop/src/preload/index.ts`, `renderer/lib/bridge.ts`
+- `apps/desktop/src/renderer/pages/{Plans,Account}.tsx`, `renderer/store/useFocusStore.ts`

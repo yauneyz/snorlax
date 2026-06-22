@@ -12,6 +12,7 @@
   "references": [
     { "path": "../../packages/shared" },
     { "path": "../../packages/product" },
+    { "path": "../../packages/auth-contracts" },
     { "path": "../../packages/core" }
   ]
 }

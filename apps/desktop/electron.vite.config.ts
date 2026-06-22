@@ -16,6 +16,10 @@ export default defineConfig(({ mode }) => {
     APP_ENV: env.APP_ENV ?? 'development',
     FOCUSLOCK_PIPE:
       env.FOCUSLOCK_PIPE ?? (env.APP_ENV === 'production' ? 'focuslock' : 'focuslock-dev'),
+    // Public endpoints the main process needs to talk to the web backend + Supabase (§auth).
+    API_BASE_URL: env.API_BASE_URL ?? '',
+    VITE_SUPABASE_URL: env.VITE_SUPABASE_URL ?? '',
+    VITE_SUPABASE_ANON_KEY: env.VITE_SUPABASE_ANON_KEY ?? '',
   };
 
   const alias = {
@@ -23,6 +27,7 @@ export default defineConfig(({ mode }) => {
     '@core': resolve(__dirname, '../../packages/core/src'),
     '@focuslock/product': resolve(__dirname, '../../packages/product/src/index.ts'),
     '@focuslock/shared': resolve(__dirname, '../../packages/shared/src/index.ts'),
+    '@focuslock/auth-contracts': resolve(__dirname, '../../packages/auth-contracts/src/index.ts'),
     '@focuslock/core/browser': resolve(__dirname, '../../packages/core/src/browser.ts'),
     '@focuslock/core': resolve(__dirname, '../../packages/core/src/index.ts'),
   };

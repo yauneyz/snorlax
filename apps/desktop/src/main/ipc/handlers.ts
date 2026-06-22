@@ -16,6 +16,15 @@ import {
   setDevEntitlementPlan,
 } from '../auth/subscription.js';
 import {
+  getAuthStatus,
+  setAuthChangeListener,
+  signInWithGoogle,
+  signInWithPassword,
+  signOut,
+} from '../auth/supabase.js';
+import { openBillingPortal, startCheckout } from '../auth/billing.js';
+import {
+  type CheckoutPrice,
   constrainPolicyToLimits,
   constrainScheduleToLimits,
   limitsForPlan,
@@ -24,6 +33,23 @@ import {
   type SubscriptionPlan,
 } from '../../shared/productLimits.js';
 import { Channels } from './channels.js';
+
+/** Events pushed to renderers so the UI re-pulls auth/entitlement after a change. */
+export type AppEvent = 'authChanged' | 'entitlementChanged';
+
+let activeService: ServiceConnection | undefined;
+
+/** Broadcast an app-level event to every renderer window. */
+export function broadcastAppEvent(event: AppEvent): void {
+  for (const win of BrowserWindow.getAllWindows()) {
+    win.webContents.send(Channels.appEvent, { event });
+  }
+}
+
+/** Re-constrain service state to the current plan's limits (after sign-in / billing return). */
+export async function applyPlanLimitsNow(): Promise<void> {
+  if (activeService) await applyCurrentPlanLimits(activeService);
+}
 
 const FORWARDED_EVENTS: EventName[] = [
   'keyPresenceChanged',
@@ -56,7 +82,15 @@ async function applyCurrentPlanLimits(service: ServiceConnection): Promise<void>
 
 export async function registerIpcHandlers(ctx: HandlerContext): Promise<void> {
   const { service, mock } = ctx;
+  activeService = service;
   await applyCurrentPlanLimits(service);
+
+  // When the Supabase session changes (sign-in/out, token refresh), re-apply plan limits and
+  // tell renderers to re-pull auth + entitlement.
+  setAuthChangeListener(() => {
+    void applyPlanLimitsNow();
+    broadcastAppEvent('authChanged');
+  });
 
   // Forward service events to all renderer windows.
   for (const event of FORWARDED_EVENTS) {
@@ -125,4 +159,18 @@ export async function registerIpcHandlers(ctx: HandlerContext): Promise<void> {
     await applyCurrentPlanLimits(service);
     return { ok: true, entitlement };
   });
+
+  // --- auth ---
+  ipcMain.handle(Channels.authStatus, () => getAuthStatus());
+  ipcMain.handle(Channels.signInGoogle, () => signInWithGoogle());
+  ipcMain.handle(
+    Channels.signInPassword,
+    (_e, creds: { email: string; password: string }) =>
+      signInWithPassword(creds.email, creds.password),
+  );
+  ipcMain.handle(Channels.signOut, () => signOut());
+
+  // --- billing ---
+  ipcMain.handle(Channels.startCheckout, (_e, price: CheckoutPrice) => startCheckout(price));
+  ipcMain.handle(Channels.openBillingPortal, () => openBillingPortal());
 }

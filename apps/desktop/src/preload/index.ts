@@ -7,7 +7,7 @@
  */
 
 import { contextBridge, ipcRenderer } from 'electron';
-import type { SubscriptionPlan } from '../shared/productLimits.js';
+import type { CheckoutPrice, SubscriptionPlan } from '../shared/productLimits.js';
 import type { AppPickerItem } from '../shared/appPicker.js';
 
 const Channels = {
@@ -19,12 +19,31 @@ const Channels = {
   openExternal: 'app:openExternal',
   appInfo: 'app:info',
   listInstalledApps: 'app:listInstalledApps',
+  authStatus: 'app:authStatus',
+  signInGoogle: 'app:signInGoogle',
+  signInPassword: 'app:signInPassword',
+  signOut: 'app:signOut',
+  startCheckout: 'app:startCheckout',
+  openBillingPortal: 'app:openBillingPortal',
+  appEvent: 'app:event',
 } as const;
 
 export interface EntitlementInfo {
   active: boolean;
   plan: SubscriptionPlan;
   source: string;
+}
+
+export interface AuthStatusInfo {
+  signedIn: boolean;
+  email?: string;
+}
+
+export type AppEventName = 'authChanged' | 'entitlementChanged';
+
+export interface ActionResult {
+  ok: boolean;
+  message?: string;
 }
 
 export interface ServiceResponse {
@@ -67,6 +86,26 @@ const api = {
     plan: SubscriptionPlan,
   ): Promise<{ ok: boolean; entitlement?: EntitlementInfo; message?: string }> =>
     ipcRenderer.invoke(Channels.devSetEntitlementPlan, plan),
+
+  // --- auth ---
+  authStatus: (): Promise<AuthStatusInfo> => ipcRenderer.invoke(Channels.authStatus),
+  signInGoogle: (): Promise<ActionResult> => ipcRenderer.invoke(Channels.signInGoogle),
+  signInPassword: (email: string, password: string): Promise<ActionResult> =>
+    ipcRenderer.invoke(Channels.signInPassword, { email, password }),
+  signOut: (): Promise<ActionResult> => ipcRenderer.invoke(Channels.signOut),
+
+  // --- billing ---
+  startCheckout: (price: CheckoutPrice): Promise<ActionResult> =>
+    ipcRenderer.invoke(Channels.startCheckout, price),
+  openBillingPortal: (): Promise<ActionResult> =>
+    ipcRenderer.invoke(Channels.openBillingPortal),
+
+  /** Subscribe to main-pushed auth/entitlement change events. Returns an unsubscribe fn. */
+  onAppEvent: (cb: (event: AppEventName) => void): (() => void) => {
+    const listener = (_e: unknown, msg: { event: AppEventName }) => cb(msg.event);
+    ipcRenderer.on(Channels.appEvent, listener);
+    return () => ipcRenderer.removeListener(Channels.appEvent, listener);
+  },
 };
 
 export type FocusLockApi = typeof api;

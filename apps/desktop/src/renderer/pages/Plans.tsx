@@ -1,19 +1,38 @@
 import React, { useState } from 'react';
 import { Badge, Button, Card, CardTitle } from '../components/ui/index.js';
 import { useFocusStore } from '../store/useFocusStore.js';
+import { startCheckout, type CheckoutPrice } from '../lib/bridge.js';
 
 export function Plans() {
   const subscriptionPlan = useFocusStore((s) => s.subscriptionPlan);
+  const appEnv = useFocusStore((s) => s.appEnv);
+  const signedIn = useFocusStore((s) => s.signedIn);
   const setDevSubscriptionPlan = useFocusStore((s) => s.setDevSubscriptionPlan);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
 
-  async function upgrade() {
+  const isDev = appEnv !== 'production';
+
+  async function devUpgrade() {
     setBusy(true);
     setMessage(null);
     try {
       await setDevSubscriptionPlan('pro');
       setMessage('Pro enabled for development.');
+    } catch (e) {
+      setMessage((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function checkout(price: CheckoutPrice) {
+    setBusy(true);
+    setMessage(null);
+    try {
+      const res = await startCheckout(price);
+      if (!res.ok) setMessage(res.message ?? 'Could not start checkout.');
+      else setMessage('Opening secure checkout in your browser…');
     } catch (e) {
       setMessage((e as Error).message);
     } finally {
@@ -49,9 +68,30 @@ export function Plans() {
           <div>Whitelist mode</div>
           <div>All future Pro features by default</div>
         </div>
-        <Button onClick={upgrade} disabled={busy || subscriptionPlan === 'pro'}>
-          Upgrade to Pro
-        </Button>
+        {isDev ? (
+          <Button onClick={devUpgrade} disabled={busy || subscriptionPlan === 'pro'}>
+            Upgrade to Pro (dev)
+          </Button>
+        ) : (
+          <div className="flex flex-wrap gap-2">
+            <Button
+              onClick={() => checkout('monthly')}
+              disabled={busy || subscriptionPlan === 'pro' || !signedIn}
+            >
+              Upgrade — Monthly
+            </Button>
+            <Button
+              variant="ghost"
+              onClick={() => checkout('yearly')}
+              disabled={busy || subscriptionPlan === 'pro' || !signedIn}
+            >
+              Upgrade — Yearly
+            </Button>
+          </div>
+        )}
+        {!isDev && !signedIn && (
+          <p className="mt-3 text-sm text-slate-400">Sign in on the Account page to upgrade.</p>
+        )}
         {message && <p className="mt-3 text-sm text-slate-400">{message}</p>}
       </Card>
     </div>

@@ -6,12 +6,12 @@ export declare const subscriptionPlanSchema: z.ZodEnum<["free", "pro"]>;
 export declare const checkoutPriceSchema: z.ZodEnum<["monthly", "yearly"]>;
 export type SubscriptionPlan = z.infer<typeof subscriptionPlanSchema>;
 export type CheckoutPrice = z.infer<typeof checkoutPriceSchema>;
-export declare const entitlementSourceSchema: z.ZodEnum<["stub", "dev-override", "server", "edge-function", "cache", "offline"]>;
+export declare const entitlementSourceSchema: z.ZodEnum<["stub", "dev-override", "server", "cache", "offline"]>;
 export type EntitlementSource = z.infer<typeof entitlementSourceSchema>;
 export declare const entitlementSchema: z.ZodObject<{
     active: z.ZodBoolean;
     plan: z.ZodEnum<["free", "pro"]>;
-    source: z.ZodEnum<["stub", "dev-override", "server", "edge-function", "cache", "offline"]>;
+    source: z.ZodEnum<["stub", "dev-override", "server", "cache", "offline"]>;
     status: z.ZodOptional<z.ZodString>;
     currentPeriodEnd: z.ZodOptional<z.ZodString>;
     fetchedAt: z.ZodOptional<z.ZodString>;
@@ -19,7 +19,7 @@ export declare const entitlementSchema: z.ZodObject<{
 }, "strip", z.ZodTypeAny, {
     active: boolean;
     plan: "free" | "pro";
-    source: "stub" | "dev-override" | "server" | "edge-function" | "cache" | "offline";
+    source: "stub" | "dev-override" | "server" | "cache" | "offline";
     status?: string | undefined;
     currentPeriodEnd?: string | undefined;
     fetchedAt?: string | undefined;
@@ -27,7 +27,7 @@ export declare const entitlementSchema: z.ZodObject<{
 }, {
     active: boolean;
     plan: "free" | "pro";
-    source: "stub" | "dev-override" | "server" | "edge-function" | "cache" | "offline";
+    source: "stub" | "dev-override" | "server" | "cache" | "offline";
     status?: string | undefined;
     currentPeriodEnd?: string | undefined;
     fetchedAt?: string | undefined;

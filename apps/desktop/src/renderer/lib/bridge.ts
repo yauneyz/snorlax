@@ -10,8 +10,9 @@ import type {
   Params,
   Result,
 } from '@focuslock/shared';
-import type { SubscriptionPlan } from '../../shared/productLimits.js';
+import type { CheckoutPrice, SubscriptionPlan } from '../../shared/productLimits.js';
 import type { AppPickerItem } from '../../shared/appPicker.js';
+import type { AppEventName } from '../../preload/index.js';
 
 export interface BridgeError extends Error {
   code: string;
@@ -37,6 +38,11 @@ export function onEvent<E extends EventName>(event: E, cb: (payload: EventMap[E]
   });
 }
 
+/** Subscribe to main-pushed auth/entitlement change events. Returns an unsubscribe function. */
+export function onAppEvent(cb: (event: AppEventName) => void): () => void {
+  return window.api.onAppEvent(cb);
+}
+
 export const appInfo = () => window.api.appInfo();
 export const listInstalledApps = (): Promise<AppPickerItem[]> => window.api.listInstalledApps();
 export const openExternal = (url: string) => window.api.openExternal(url);
@@ -44,4 +50,13 @@ export const devToggleKey = () => window.api.devToggleKey();
 export const entitlement = () => window.api.entitlement();
 export const devSetEntitlementPlan = (plan: SubscriptionPlan) =>
   window.api.devSetEntitlementPlan(plan);
-export type { SubscriptionPlan };
+
+export const authStatus = () => window.api.authStatus();
+export const signInGoogle = () => window.api.signInGoogle();
+export const signInPassword = (email: string, password: string) =>
+  window.api.signInPassword(email, password);
+export const signOut = () => window.api.signOut();
+export const startCheckout = (price: CheckoutPrice) => window.api.startCheckout(price);
+export const openBillingPortal = () => window.api.openBillingPortal();
+
+export type { CheckoutPrice, SubscriptionPlan };

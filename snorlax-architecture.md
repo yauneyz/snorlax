@@ -591,17 +591,18 @@ the bar is "annoying enough to defeat impulse," not "defeats a motivated sysadmi
 Recommended flow, which still matches your "redirect to a URL we own" and "ping Stripe"
 requirements:
 
-1. **Purchase:** the Account page opens your owned hosted page (`PAYMENT_URL`) in the
-   external browser (`shell.openExternal`). That page runs Stripe Checkout. After payment,
-   Stripe redirects back to a deep link (`focuslock://billing/return`) that re-focuses the app.
-2. **Verification:** the app calls a **Supabase Edge Function** (your backend) that holds the
-   Stripe *secret* key and queries Stripe for the user's subscription status. The client
-   "pings Stripe" *through* this function — never directly with a secret. The function writes
-   an `entitlement` row guarded by RLS.
+1. **Purchase:** the Account/Plans page calls `POST /api/desktop/checkout` on the Next.js web
+   app, which returns a Stripe Checkout URL the app opens in the external browser
+   (`shell.openExternal`). After payment, Stripe redirects back to a deep link
+   (`focuslock://billing/success`) that re-focuses the app and refreshes entitlement.
+2. **Verification:** the app calls the **Next.js web backend** (`GET /api/desktop/entitlement`)
+   which holds the Stripe *secret* key and reads the user's subscription (kept in sync by the
+   Stripe webhook). The client "pings Stripe" *through* this backend — never directly with a
+   secret. Subscription state lives in Supabase guarded by RLS.
 3. **Entitlement check:** `src/main/auth/subscription.ts` reads that entitlement on launch
-   and caches it locally with an **offline grace period** (e.g. 7 days) so a flaky network
-   doesn't lock a paying user out — and, importantly, so a lapse can't suddenly *unblock*
-   someone mid-focus-session.
+   and caches it locally; while signed in it keeps the last-known entitlement through network
+   outages so a flaky network doesn't lock a paying user out — and, importantly, so a lapse
+   can't suddenly *unblock* someone mid-focus-session.
 
 Gating rule: a valid subscription is required to **configure and start** focus. Once focus is
 active it stays active until the USB key disables it, regardless of subscription state — you
@@ -623,9 +624,9 @@ clean dev/prod separation with local overrides.
 | `SUPABASE_ANON_KEY` | public (anon key is publishable) | main |
 | `STRIPE_PUBLISHABLE_KEY` | public | renderer/checkout page |
 | `PAYMENT_URL` (your owned billing page) | public | renderer |
-| `API_BASE_URL` (your edge functions) | public | main |
+| `API_BASE_URL` (your Next.js web origin) | public | main |
 | `UPDATE_FEED_URL` | public | updater |
-| `STRIPE_SECRET_KEY` | **SECRET — never in the app** | Supabase Edge Function only |
+| `STRIPE_SECRET_KEY` | **SECRET — never in the app** | web backend only |
 
 ### `.env` files & precedence
 
@@ -768,7 +769,8 @@ focuslock/
 │     │  │  └─ auth/
 │     │  │     ├─ supabase.ts        # supabase-js client (main process)
 │     │  │     ├─ session.ts         # persist session via safeStorage / keychain
-│     │  │     └─ subscription.ts    # entitlement check via edge function + offline grace
+│     │  │     ├─ subscription.ts    # entitlement check via /api/desktop/entitlement + offline grace
+│     │  │     └─ billing.ts         # checkout/portal via /api/desktop/{checkout,portal}
 │     │  ├─ preload/
 │     │  │  └─ index.ts              # contextBridge: the ONLY API surface the UI can touch
 │     │  └─ renderer/                 # ----- RENDERER (React UI) -----
@@ -942,7 +944,8 @@ focuslock/
 | `src/main/service/installer.ts` | Ensures the privileged service is installed and current; runs the elevated install/repair/upgrade when versions differ. |
 | `src/main/auth/supabase.ts` | Creates the `supabase-js` client from config; sign-in/out, session refresh. |
 | `src/main/auth/session.ts` | Persists/loads the session via `safeStorage` (DPAPI/Keychain). |
-| `src/main/auth/subscription.ts` | Calls the edge function to verify Stripe entitlement; caches with offline grace. |
+| `src/main/auth/subscription.ts` | Calls `GET /api/desktop/entitlement` on the web backend to verify Stripe entitlement; caches with offline grace. |
+| `src/main/auth/billing.ts` | Calls `POST /api/desktop/checkout` and `/api/desktop/portal`, opening the returned Stripe URL in the browser. |
 
 ### `apps/desktop` — preload & renderer
 
@@ -1081,7 +1084,7 @@ elevation/entitlements).
 | macOS service | **Swift** (NetworkExtension, EndpointSecurity, IOKit) | Required toolchain for the strong enforcement entitlements. |
 | Config validation | **Zod** | Fail-fast typed config from `.env`. |
 | Auth | **Supabase** (`supabase-js` in main) | Simple managed auth; tokens kept out of the renderer. |
-| Payments | **Stripe** via your hosted page + **Supabase Edge Function** | Secret key stays server-side; client only redirects + verifies entitlement. |
+| Payments | **Stripe** via the **Next.js web backend** (`/api/desktop/*` + Stripe webhook) | Secret key stays server-side; client only redirects + verifies entitlement. |
 | Tests | **vitest** + **playwright-electron** + native test harness | Maps to the three required categories. |
 
 ---
@@ -1103,7 +1106,8 @@ These are the real-world gating dependencies — surface them early, they have l
   blocking):** EV cert + Microsoft attestation signing. Not needed for v1's user-mode
   approach — explicitly deferred.
 - **Supabase project** (cloud) + local stack (`supabase start`) for dev, and a **Stripe**
-  account (test + live) with one Edge Function holding the secret key.
+  account (test + live). The secret key lives in the Next.js web backend (`/api/desktop/*` +
+  the Stripe webhook), never in the desktop app.
 
 ---
 
@@ -1118,8 +1122,8 @@ bits:
    packet-engine domain blocking (DNS sinkhole + 443 SNI inspection) with the firewall backstop,
    user-mode app blocking, persistence/recovery. Category-2 tests green. This is your first
    genuinely-enforcing Windows build.
-3. **Auth + payments:** Supabase sign-in, the edge function, entitlement gating, the billing
-   redirect + deep-link return.
+3. **Auth + payments:** Supabase sign-in, the `/api/desktop/*` entitlement + checkout calls,
+   entitlement gating, the billing redirect + deep-link return.
 4. **Auto-update + signing:** Authenticode, electron-updater, the elevated service-upgrade
    path. First real shippable Windows build.
 5. **macOS port:** request entitlements early (phase 1!), then build the Swift daemon, NE

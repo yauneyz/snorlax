@@ -30,12 +30,11 @@ pre-exec denial, DPAPI-wrapping of the (hash-only) secure store, and a `WM_DEVIC
 window. None are required for the v1 product goal (raise the activation energy of cheating).
 
 A **user-installed browser extension** (`apps/extension`, wired to the local native host by
-`enforce::extension_policy` via
-Chromium `ExtensionInstallForcelist` + Firefox `Extensions\Install`/`Locked`, fed live state by
-`focuslock-natmsg.exe`) does per-URL request-layer blocking where the wire/IP layer is too coarse or
-blind: encrypted SNI (ECH), VPNs, QUIC, and pooled browser connections. The native IP drop remains
-the backstop for network-visible traffic and non-browser apps. Store packaging and the permanent
-Chrome, Edge, and Firefox identities are documented in `apps/extension/README.md`.
+`enforce::extension_policy` and fed live state by `focuslock-natmsg.exe`) does per-URL request-layer
+blocking where the wire/IP layer is too coarse or blind: encrypted SNI (ECH), VPNs, QUIC, and pooled
+browser connections. The native IP drop remains the backstop for network-visible traffic and
+non-browser apps. Store packaging and the permanent Chrome, Edge, and Firefox identities are
+documented in `apps/extension/README.md`.
 
 ## Build
 

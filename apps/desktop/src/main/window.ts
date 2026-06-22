@@ -1,13 +1,19 @@
 /**
  * Creates the main BrowserWindow with secure defaults (contextIsolation on, nodeIntegration
- * off, sandboxed renderer) and handles the focuslock:// deep link (billing return in Phase 3,
- * tray re-focus now).
+ * off, sandboxed renderer) and handles the focuslock:// deep link: the Supabase OAuth return
+ * (auth/callback) and the Stripe checkout return (billing/success|cancel).
  */
 
 import { join } from 'node:path';
 import { app, BrowserWindow, shell } from 'electron';
+import {
+  DESKTOP_AUTH_CALLBACK_PATH,
+  DESKTOP_BILLING_SUCCESS_PATH,
+} from '@focuslock/auth-contracts';
 import { config } from './config.js';
 import { logger } from './logging.js';
+import { completeOAuth } from './auth/supabase.js';
+import { applyPlanLimitsNow, broadcastAppEvent } from './ipc/handlers.js';
 
 let mainWindow: BrowserWindow | null = null;
 
@@ -81,8 +87,32 @@ export function showMainWindow(): BrowserWindow | null {
   return win;
 }
 
-/** Handle a focuslock:// deep link (focus the window; billing return handled in Phase 3). */
-export function handleDeepLink(url: string): void {
+/**
+ * Handle a focuslock:// deep link:
+ *  - auth/callback?code=… → finish the Supabase OAuth exchange, then refresh entitlement.
+ *  - billing/success      → refresh entitlement (the webhook is the authoritative sync).
+ *  - billing/cancel       → just refocus the window.
+ */
+export async function handleDeepLink(url: string): Promise<void> {
   logger.info(`[deeplink] ${url}`);
+  try {
+    const parsed = new URL(url);
+    const path = `${parsed.host}${parsed.pathname}`.replace(/\/$/, '');
+
+    if (path === DESKTOP_AUTH_CALLBACK_PATH) {
+      const code = parsed.searchParams.get('code');
+      if (code) {
+        await completeOAuth(code);
+        await applyPlanLimitsNow();
+        broadcastAppEvent('authChanged');
+      }
+    } else if (path === DESKTOP_BILLING_SUCCESS_PATH) {
+      await applyPlanLimitsNow();
+      broadcastAppEvent('entitlementChanged');
+    }
+  } catch (e) {
+    logger.error('[deeplink] failed to handle', (e as Error).message);
+  }
+
   showMainWindow();
 }

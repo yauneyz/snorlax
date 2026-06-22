@@ -60,6 +60,11 @@ async function bootstrap(): Promise<void> {
   createWindow();
   createTray(service, mock);
   initUpdater();
+
+  // Cold start launched via a deep link (e.g. Windows protocol activation): the URL arrives
+  // in argv rather than via the second-instance / open-url events.
+  const initialDeepLink = process.argv.find((a) => a.startsWith(`${DEEP_LINK_SCHEME}://`));
+  if (initialDeepLink) void handleDeepLink(initialDeepLink);
 }
 
 // --- single instance ---

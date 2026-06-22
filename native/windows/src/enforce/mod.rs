@@ -8,8 +8,8 @@
 //! packet enforcement; they do not clear the resolved IP sets.
 //!
 //! Backed by persistent Windows-Firewall DoT/DoH-IP/QUIC rules (enforce::wfp) and the
-//! user-installed browser extension (native host registered by enforce::extension_policy); app blocking is process
-//! termination (enforce::apps).
+//! user-installed browser extension (native host registered by enforce::extension_policy); app
+//! blocking is process termination (enforce::apps).
 
 pub mod apps;
 pub mod divert;
