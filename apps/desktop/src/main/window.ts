@@ -31,7 +31,7 @@ export function createWindow(): BrowserWindow {
     backgroundColor: '#0b0f17',
     title: 'FocusLock',
     webPreferences: {
-      preload: join(__dirname, '../preload/index.js'),
+      preload: join(__dirname, '../preload/index.cjs'),
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,

@@ -5,16 +5,20 @@
 //! sets while focus is active.
 
 pub mod apps;
+pub mod browser_watchdog;
 pub mod dns;
 pub mod extension_policy;
 pub mod nft;
 pub mod properties;
 pub mod resolve;
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::net::IpAddr;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Mutex;
+use std::time::Instant;
+
+use focuslock_common::watchdog::Heartbeat;
 
 use crate::model::{Mode, Policy};
 use crate::policy_match::is_host_blocked;
@@ -27,6 +31,12 @@ pub struct EnforceShared {
     blocked: Mutex<HashSet<IpAddr>>,
     allowed: Mutex<HashSet<IpAddr>>,
     gen: AtomicU64,
+    /// Browser handshake dead-man's switch on/off (opt-in setting, see model::Settings). The
+    /// watchdog only acts while this is true and focus is active.
+    handshake_enabled: AtomicBool,
+    /// Latest heartbeat per browser root PID, fed by the `extHeartbeat` RPC and read by the
+    /// browser watchdog. Absence of a fresh entry is what the watchdog treats as failure.
+    heartbeats: Mutex<HashMap<u32, Heartbeat>>,
 }
 
 impl EnforceShared {
@@ -37,7 +47,44 @@ impl EnforceShared {
             blocked: Mutex::new(HashSet::new()),
             allowed: Mutex::new(HashSet::new()),
             gen: AtomicU64::new(0),
+            handshake_enabled: AtomicBool::new(false),
+            heartbeats: Mutex::new(HashMap::new()),
         }
+    }
+
+    /// Whether the browser handshake watchdog is enabled.
+    pub fn handshake_enabled(&self) -> bool {
+        self.handshake_enabled.load(Ordering::SeqCst)
+    }
+
+    /// Toggle the watchdog. Clearing it also drops recorded heartbeats so a later re-enable starts
+    /// from a clean slate.
+    pub fn set_handshake_enabled(&self, enabled: bool) {
+        self.handshake_enabled.store(enabled, Ordering::SeqCst);
+        if !enabled {
+            self.heartbeats.lock().unwrap().clear();
+        }
+    }
+
+    /// Record an extension heartbeat for `pid` (the browser instance the extension runs in).
+    pub fn record_heartbeat(&self, pid: u32, healthy: bool) {
+        self.heartbeats.lock().unwrap().insert(
+            pid,
+            Heartbeat {
+                last_seen: Instant::now(),
+                healthy,
+            },
+        );
+    }
+
+    /// A snapshot of all recorded heartbeats, for the watchdog tick.
+    pub fn heartbeats_snapshot(&self) -> HashMap<u32, Heartbeat> {
+        self.heartbeats.lock().unwrap().clone()
+    }
+
+    /// Drop heartbeat entries for PIDs that are no longer running (keeps the map bounded).
+    pub fn retain_heartbeats(&self, live: &HashSet<u32>) {
+        self.heartbeats.lock().unwrap().retain(|pid, _| live.contains(pid));
     }
 
     fn effective(mut policy: Policy) -> Policy {

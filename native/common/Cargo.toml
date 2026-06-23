@@ -1,0 +1,12 @@
+[package]
+name = "focuslock_common"
+version = "0.1.0"
+edition = "2021"
+description = "OS-agnostic logic shared by every FocusLock native backend (Windows/Linux/macOS)."
+publish = false
+
+[lib]
+name = "focuslock_common"
+path = "src/lib.rs"
+
+[dependencies]

@@ -31,6 +31,7 @@ path = "src/bin/natmsg.rs"
 
 [dependencies]
 anyhow = "1"
+focuslock_common = { path = "../common" }
 hex = "0.4"
 rand = "0.8"
 serde = { version = "1", features = ["derive"] }
@@ -57,8 +58,10 @@ features = [
     "Win32_Security",
     "Win32_Security_Authorization",
     "Win32_Storage_FileSystem",
+    "Win32_System_Diagnostics_ToolHelp",
     "Win32_System_SystemInformation",
     "Win32_System_Threading",
+    "Win32_UI_WindowsAndMessaging",
 ]
 
 # windivert-sys 0.10 links windows 0.48, so its WinDivertOpen/Recv/Send signatures use that

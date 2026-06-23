@@ -1,6 +1,7 @@
 /** Server-pushed event types (architecture §6). The service pushes these unsolicited. */
 
 import type { Policy } from './policy.js';
+import type { Settings } from './settings.js';
 import type { FocusSource } from './protocol.js';
 
 export interface EventMap {
@@ -8,6 +9,12 @@ export interface EventMap {
   focusChanged: { active: boolean; source: FocusSource };
   policyChanged: { policy: Policy };
   scheduleFired: { windowId: string; active: boolean };
+  settingsChanged: { settings: Settings };
+  /**
+   * The browser handshake watchdog is about to close a browser whose extension stopped responding
+   * (or an unsupported browser open during a locked session). Surfaced to the user as a warning.
+   */
+  browserWatchdogWarning: { browser: string; pid: number };
 }
 
 export type EventName = keyof EventMap;

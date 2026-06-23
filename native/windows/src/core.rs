@@ -77,6 +77,7 @@ impl Core {
             focus_source: self.state.focus_source,
             policy: self.state.policy.clone(),
             schedule: self.state.schedule.clone(),
+            settings: self.state.settings.clone(),
             paired_keys: self.state.paired_keys.clone(),
             key_present: self.key_present,
             present_key_id: self.present_key_id.clone(),
@@ -173,6 +174,36 @@ impl Core {
         self.persist();
     }
 
+    /// Toggle the browser handshake dead-man's switch. Enabling is free; **disabling** is gated
+    /// exactly like `disable_focus` (USB key + no locked window), so a user mid-session cannot
+    /// simply switch enforcement off.
+    fn set_browser_handshake(&mut self, enabled: bool) -> Result<(), RpcError> {
+        if !enabled {
+            if self.schedule_locked() {
+                return Err(RpcError::new(
+                    err::LOCKED,
+                    "A locked schedule window is active.",
+                ));
+            }
+            self.recompute_presence();
+            if !self.key_present {
+                return Err(RpcError::new(
+                    err::KEY_REQUIRED,
+                    "Insert your paired key to change this setting.",
+                ));
+            }
+        }
+        self.state.settings.browser_handshake_enabled = enabled;
+        self.shared.set_handshake_enabled(enabled);
+        self.persist();
+        self.emit(
+            "settingsChanged",
+            json!({ "settings": self.state.settings.clone() }),
+        );
+        tracing::info!("browser handshake set to {enabled}");
+        Ok(())
+    }
+
     fn pair_key(&mut self, drive_id: &str, label: &str) -> Result<PairedKey, RpcError> {
         let drives = usb::list_removable_drives();
         let drive = drives
@@ -247,6 +278,9 @@ impl Core {
 
     /// Re-arm enforcement at boot for whatever focus state we loaded from disk.
     pub fn rearm_on_boot(&mut self) {
+        // Restore the persisted handshake setting into the shared enforcement state.
+        self.shared
+            .set_handshake_enabled(self.state.settings.browser_handshake_enabled);
         if self.state.focus_active {
             self.shared.set_active(true);
             enforce::apply_network(true);
@@ -300,6 +334,35 @@ impl Core {
             "setSchedule" => {
                 let schedule: Schedule = parse_field(params, "schedule")?;
                 self.set_schedule(schedule);
+                Ok(ok())
+            }
+            "setBrowserHandshake" => {
+                let enabled = params
+                    .get("enabled")
+                    .and_then(|v| v.as_bool())
+                    .ok_or_else(|| RpcError::new(err::BAD_REQUEST, "Missing field: enabled"))?;
+                self.set_browser_handshake(enabled)?;
+                Ok(ok())
+            }
+            "extHeartbeat" => {
+                // Fire-and-forget liveness from the extension (relayed by focuslock-natmsg). Record
+                // it for the watchdog; never errors so a malformed beat can't disrupt the bridge.
+                let pid = params
+                    .get("browserPid")
+                    .and_then(|v| v.as_u64())
+                    .unwrap_or(0) as u32;
+                let health = params.get("health");
+                let can_block = health
+                    .and_then(|h| h.get("canBlock"))
+                    .and_then(|v| v.as_bool())
+                    .unwrap_or(false);
+                let perms_ok = health
+                    .and_then(|h| h.get("permissionsOk"))
+                    .and_then(|v| v.as_bool())
+                    .unwrap_or(false);
+                if pid != 0 {
+                    self.shared.record_heartbeat(pid, can_block && perms_ok);
+                }
                 Ok(ok())
             }
             "listRemovableDrives" => {

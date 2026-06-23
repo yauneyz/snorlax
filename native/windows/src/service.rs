@@ -60,6 +60,17 @@ pub async fn serve(pipe_path: String, shutdown: watch::Receiver<bool>) {
     // Always-on app blocker (self-gates on focus_active).
     tokio::spawn(apps::run_app_blocker(shared.clone(), shutdown.clone()));
 
+    // Browser handshake dead-man's switch (self-gates on focus_active + the handshake setting).
+    // It emits watchdog warnings through the core's event channel so the UI can surface them.
+    {
+        let events = core.lock().await.events.clone();
+        tokio::spawn(enforce::browser_watchdog::run_browser_watchdog(
+            shared.clone(),
+            events,
+            shutdown.clone(),
+        ));
+    }
+
     // USB presence poll.
     {
         let core = core.clone();

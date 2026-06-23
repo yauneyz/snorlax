@@ -26,11 +26,20 @@ export default function App() {
   const init = useFocusStore((s) => s.init);
   const ready = useFocusStore((s) => s.ready);
   const usingMock = useFocusStore((s) => s.usingMock);
+  const watchdogWarning = useFocusStore((s) => s.watchdogWarning);
+  const clearWatchdogWarning = useFocusStore((s) => s.clearWatchdogWarning);
   const [route, setRoute] = useState<Route>('dashboard');
 
   useEffect(() => {
     void init();
   }, [init]);
+
+  // Auto-dismiss the watchdog warning after a few seconds; it's a transient nudge.
+  useEffect(() => {
+    if (!watchdogWarning) return;
+    const t = setTimeout(() => clearWatchdogWarning(), 8000);
+    return () => clearTimeout(t);
+  }, [watchdogWarning, clearWatchdogWarning]);
 
   return (
     <div className="flex h-full">
@@ -57,6 +66,23 @@ export default function App() {
           {usingMock && <p className="mt-2 text-xs text-amber-400">mock service</p>}
         </div>
       </aside>
+
+      {watchdogWarning && (
+        <div className="pointer-events-none fixed inset-x-0 top-0 z-50 flex justify-center p-4">
+          <div className="pointer-events-auto flex items-center gap-3 rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-2 text-sm text-amber-200 shadow-lg">
+            <span>
+              {watchdogWarning.browser} isn’t proving the FocusLock extension is active — it will be
+              closed if it stays unprotected.
+            </span>
+            <button
+              onClick={() => clearWatchdogWarning()}
+              className="rounded px-2 py-0.5 text-amber-300 hover:bg-amber-500/20"
+            >
+              Dismiss
+            </button>
+          </div>
+        </div>
+      )}
 
       <main className="flex-1 overflow-auto p-8">
         {!ready ? (

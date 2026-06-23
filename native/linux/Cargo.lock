@@ -168,6 +168,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "chrono",
+ "focuslock_common",
  "hex",
  "rand",
  "serde",
@@ -178,6 +179,10 @@ dependencies = [
  "tracing",
  "tracing-subscriber",
 ]
+
+[[package]]
+name = "focuslock_common"
+version = "0.1.0"
 
 [[package]]
 name = "futures-core"

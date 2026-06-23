@@ -9,6 +9,7 @@
 
 import type { Policy } from './policy.js';
 import type { Schedule } from './schedule.js';
+import type { Settings, BrowserHealth } from './settings.js';
 import type { ErrorCode } from './constants.js';
 
 // ---------------------------------------------------------------------------
@@ -49,6 +50,7 @@ export interface ServiceState {
   focusSource: FocusSource;
   policy: Policy;
   schedule: Schedule;
+  settings: Settings;
   pairedKeys: PairedKey[];
   keyPresent: boolean;
   presentKeyId?: string;
@@ -64,6 +66,28 @@ export interface RequestMap {
   getState: { params: void; result: ServiceState };
   setPolicy: { params: { policy: Policy }; result: Ok };
   setSchedule: { params: { schedule: Schedule }; result: Ok };
+  /**
+   * Toggle the browser handshake dead-man's switch. Enabling is free; **disabling** is gated
+   * exactly like `disableFocus` (the service re-checks USB presence) and may fail KEY_REQUIRED /
+   * LOCKED.
+   */
+  setBrowserHandshake: { params: { enabled: boolean }; result: Ok };
+  /**
+   * Liveness heartbeat from the browser extension, relayed by the native-messaging host
+   * (focuslock-natmsg). Fire-and-forget; the service records it for the watchdog. `browserPid` is
+   * the host's parent process — the browser instance the extension runs in.
+   */
+  extHeartbeat: {
+    params: {
+      browserPid: number;
+      browser: string;
+      profileId?: string;
+      extensionVersion?: string;
+      lockedActive?: boolean;
+      health: BrowserHealth;
+    };
+    result: Ok;
+  };
   enableFocus: { params: { reason?: string }; result: Ok };
   /** Service re-checks USB presence itself; may fail KEY_REQUIRED / LOCKED. */
   disableFocus: { params: Record<string, never>; result: Ok };

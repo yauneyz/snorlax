@@ -13,8 +13,13 @@ export function Settings() {
   const entitlementActive = useFocusStore((s) => s.entitlementActive);
   const entitlementSource = useFocusStore((s) => s.entitlementSource);
   const setDevSubscriptionPlan = useFocusStore((s) => s.setDevSubscriptionPlan);
+  const handshakeEnabled = useFocusStore((s) => s.settings.browserHandshakeEnabled);
+  const keyPresent = useFocusStore((s) => s.keyPresent);
+  const setBrowserHandshake = useFocusStore((s) => s.setBrowserHandshake);
   const [planBusy, setPlanBusy] = useState(false);
   const [planError, setPlanError] = useState<string | null>(null);
+  const [handshakeBusy, setHandshakeBusy] = useState(false);
+  const [handshakeError, setHandshakeError] = useState<string | null>(null);
 
   const showDeveloper = appEnv !== 'production' || usingMock;
 
@@ -27,6 +32,25 @@ export function Settings() {
       setPlanError((e as Error).message);
     } finally {
       setPlanBusy(false);
+    }
+  }
+
+  async function toggleHandshake() {
+    setHandshakeBusy(true);
+    setHandshakeError(null);
+    try {
+      await setBrowserHandshake(!handshakeEnabled);
+    } catch (e) {
+      const code = (e as { code?: string }).code;
+      if (code === 'KEY_REQUIRED') {
+        setHandshakeError('Insert your paired USB key to turn this off.');
+      } else if (code === 'LOCKED') {
+        setHandshakeError('Locked by your schedule — this can’t be turned off right now.');
+      } else {
+        setHandshakeError((e as Error).message);
+      }
+    } finally {
+      setHandshakeBusy(false);
     }
   }
 
@@ -52,6 +76,36 @@ export function Settings() {
               <Badge tone="neutral">Checking…</Badge>
             )}
           </div>
+        </div>
+      </Card>
+
+      <Card>
+        <CardTitle hint="Closes browsers that can't prove the blocking extension is alive during a locked session.">
+          Browser handshake
+        </CardTitle>
+        <div className="flex flex-col gap-3 text-sm text-slate-300">
+          <p className="text-slate-400">
+            When on, FocusLock closes any supported browser whose extension stops responding — and any
+            browser that can’t run the extension — while a locked focus session is active. Turning it
+            off requires your paired USB key.
+          </p>
+          <div className="flex items-center justify-between gap-3">
+            <span className="font-medium text-slate-200">
+              Dead-man’s switch:{' '}
+              <Badge tone={handshakeEnabled ? 'ok' : 'neutral'}>{handshakeEnabled ? 'On' : 'Off'}</Badge>
+            </span>
+            <Button
+              variant={handshakeEnabled ? 'ghost' : 'primary'}
+              disabled={handshakeBusy || (handshakeEnabled && !keyPresent)}
+              onClick={() => toggleHandshake()}
+            >
+              {handshakeEnabled ? 'Turn off' : 'Turn on'}
+            </Button>
+          </div>
+          {handshakeEnabled && !keyPresent && (
+            <p className="text-xs text-slate-500">Insert your paired USB key to turn this off.</p>
+          )}
+          {handshakeError && <p className="text-sm text-amber-300">{handshakeError}</p>}
         </div>
       </Card>
 

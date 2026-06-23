@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(pnpm --filter @focuslock/shared build)",
+      "Bash(npx tsc *)",
+      "Bash(echo \"EXIT: $?\")",
+      "Bash(export _ZO_DOCTOR=0)",
+      "Bash(pnpm build:extension)",
+      "Bash(cargo test *)",
+      "Bash(git checkout *)",
+      "Bash(pnpm --filter web test)",
+      "Bash(pnpm exec *)"
+    ]
+  }
+}

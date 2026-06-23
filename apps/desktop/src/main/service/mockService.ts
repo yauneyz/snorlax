@@ -9,6 +9,7 @@
  */
 
 import {
+  DEFAULT_SETTINGS,
   EMPTY_POLICY,
   EMPTY_SCHEDULE,
   ErrorCode,
@@ -55,6 +56,7 @@ export class MockServiceConnection implements ServiceConnection {
     focusSource: 'boot',
     policy: { ...EMPTY_POLICY, domains: ['youtube.com', '*.reddit.com'] },
     schedule: EMPTY_SCHEDULE,
+    settings: { ...DEFAULT_SETTINGS },
     pairedKeys: [],
     keyPresent: false,
     scheduleLocked: false,
@@ -137,6 +139,23 @@ export class MockServiceConnection implements ServiceConnection {
         this.emit('focusChanged', { active: false, source: 'user' });
         return OK as Result<M>;
       }
+
+      case 'setBrowserHandshake': {
+        const enabled = (params as Params<'setBrowserHandshake'>).enabled;
+        // Turning ON is free; turning OFF is key-gated exactly like disableFocus.
+        if (!enabled) {
+          const snap = this.snapshot();
+          if (snap.scheduleLocked) throw err(ErrorCode.LOCKED, 'A locked schedule window is active.');
+          if (!this.keyPresent) throw err(ErrorCode.KEY_REQUIRED, 'Insert your paired key to unlock.');
+        }
+        this.state.settings = { ...this.state.settings, browserHandshakeEnabled: enabled };
+        this.emit('settingsChanged', { settings: this.state.settings });
+        return OK as Result<M>;
+      }
+
+      case 'extHeartbeat':
+        // The mock has no real browsers to watch; accept and ignore.
+        return OK as Result<M>;
 
       case 'listRemovableDrives':
         return { drives: MOCK_DRIVES } as Result<M>;

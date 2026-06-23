@@ -46,7 +46,7 @@ export default defineConfig(({ mode }) => {
           external: ['electron-updater', 'electron-log'],
           output: {
             format: 'cjs',
-            entryFileNames: 'index.js',
+            entryFileNames: 'index.cjs',
           },
         },
       },
@@ -57,7 +57,7 @@ export default defineConfig(({ mode }) => {
           input: resolve(__dirname, 'src/preload/index.ts'),
           output: {
             format: 'cjs',
-            entryFileNames: 'index.js',
+            entryFileNames: 'index.cjs',
           },
         },
       },

@@ -56,6 +56,8 @@ const FORWARDED_EVENTS: EventName[] = [
   'focusChanged',
   'policyChanged',
   'scheduleFired',
+  'settingsChanged',
+  'browserWatchdogWarning',
 ];
 
 export interface HandlerContext {

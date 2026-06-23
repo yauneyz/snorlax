@@ -21,6 +21,14 @@
       "mode": "blacklist|whitelist|block-all",
       "domains": "string[]",
       "apps": "AppRef[]"
+    },
+    "Settings": {
+      "browserHandshakeEnabled": "boolean"
+    },
+    "BrowserHealth": {
+      "canBlock": "boolean",
+      "permissionsOk": "boolean",
+      "dnrRulesApplied": "number?"
     }
   },
   "methods": {
@@ -29,6 +37,17 @@
     "getKeyPresence": { "params": null, "result": { "present": "boolean", "keyId": "string?" } },
     "setPolicy": { "params": { "policy": "Policy" }, "result": { "ok": true } },
     "setSchedule": { "params": { "schedule": "Schedule" }, "result": { "ok": true } },
+    "setBrowserHandshake": {
+      "params": { "enabled": "boolean" },
+      "result": { "ok": true },
+      "errors": ["KEY_REQUIRED", "LOCKED"],
+      "$comment": "Enabling is free; disabling is key-gated exactly like disableFocus."
+    },
+    "extHeartbeat": {
+      "params": { "browserPid": "number", "browser": "string", "profileId": "string?", "extensionVersion": "string?", "lockedActive": "boolean?", "health": "BrowserHealth" },
+      "result": { "ok": true },
+      "$comment": "Relayed by focuslock-natmsg from the extension. Fire-and-forget; feeds the watchdog. browserPid is the host's parent process (the browser instance)."
+    },
     "enableFocus": { "params": { "reason": "string?" }, "result": { "ok": true } },
     "disableFocus": { "params": {}, "result": { "ok": true }, "errors": ["KEY_REQUIRED", "LOCKED"] },
     "listRemovableDrives": { "params": null, "result": { "drives": "Drive[]" } },
@@ -45,7 +64,9 @@
     "keyPresenceChanged": { "present": "boolean", "keyId": "string?" },
     "focusChanged": { "active": "boolean", "source": "user|schedule|boot|recover" },
     "policyChanged": { "policy": "Policy" },
-    "scheduleFired": { "windowId": "string", "active": "boolean" }
+    "scheduleFired": { "windowId": "string", "active": "boolean" },
+    "settingsChanged": { "settings": "Settings" },
+    "browserWatchdogWarning": { "browser": "string", "pid": "number" }
   },
   "errorCodes": ["KEY_REQUIRED", "LOCKED", "BAD_RECOVERY_CODE", "BAD_REQUEST", "INTERNAL"]
 }

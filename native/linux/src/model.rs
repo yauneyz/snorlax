@@ -60,6 +60,15 @@ pub struct Schedule {
     pub windows: Vec<ScheduleWindow>,
 }
 
+/// Optional, opt-in enforcement settings (mirrors packages/shared/src/settings.ts).
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Settings {
+    /// Browser handshake dead-man's switch. Default off. Turning it off is key-gated.
+    #[serde(default)]
+    pub browser_handshake_enabled: bool,
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PairedKey {
@@ -94,6 +103,7 @@ pub struct ServiceState {
     pub focus_source: FocusSource,
     pub policy: Policy,
     pub schedule: Schedule,
+    pub settings: Settings,
     pub paired_keys: Vec<PairedKey>,
     pub key_present: bool,
     #[serde(skip_serializing_if = "Option::is_none")]

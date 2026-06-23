@@ -45,6 +45,16 @@ pub async fn serve(socket_path: String, shutdown: watch::Receiver<bool>) {
         shutdown.clone(),
     ));
 
+    // Browser handshake dead-man's switch (self-gates on focus_active + the handshake setting).
+    {
+        let events = core.lock().await.events.clone();
+        tokio::spawn(enforce::browser_watchdog::run_browser_watchdog(
+            shared.clone(),
+            events,
+            shutdown.clone(),
+        ));
+    }
+
     {
         let core = core.clone();
         let mut sd = shutdown.clone();

@@ -5,8 +5,8 @@
  */
 
 import { create } from 'zustand';
-import type { Policy, Schedule, ServiceState } from '@focuslock/shared';
-import { EMPTY_POLICY, EMPTY_SCHEDULE } from '@focuslock/shared';
+import type { Policy, Schedule, ServiceState, Settings } from '@focuslock/shared';
+import { EMPTY_POLICY, EMPTY_SCHEDULE, DEFAULT_SETTINGS } from '@focuslock/shared';
 import {
   appInfo,
   authStatus,
@@ -37,17 +37,22 @@ interface FocusStore {
   scheduleLocked: boolean;
   policy: Policy;
   schedule: Schedule;
+  settings: Settings;
   pairedKeys: ServiceState['pairedKeys'];
   serviceVersion: string;
 
   /** Last error surfaced from a request, for transient UI messaging. */
   lastError?: { code: string; message: string };
+  /** Transient watchdog warning surfaced as a toast in the UI. */
+  watchdogWarning?: { browser: string; pid: number };
 
   init: () => Promise<void>;
   refresh: () => Promise<void>;
   refreshAuth: () => Promise<void>;
   refreshEntitlement: () => Promise<void>;
   setDevSubscriptionPlan: (plan: SubscriptionPlan) => Promise<void>;
+  setBrowserHandshake: (enabled: boolean) => Promise<void>;
+  clearWatchdogWarning: () => void;
   setError: (e?: { code: string; message: string }) => void;
   applySnapshot: (s: ServiceState) => void;
 }
@@ -71,6 +76,7 @@ export const useFocusStore = create<FocusStore>((set, get) => ({
   scheduleLocked: false,
   policy: EMPTY_POLICY,
   schedule: EMPTY_SCHEDULE,
+  settings: DEFAULT_SETTINGS,
   pairedKeys: [],
   serviceVersion: 'unknown',
 
@@ -81,9 +87,12 @@ export const useFocusStore = create<FocusStore>((set, get) => ({
       scheduleLocked: s.scheduleLocked,
       policy: s.policy,
       schedule: s.schedule,
+      settings: s.settings,
       pairedKeys: s.pairedKeys,
       serviceVersion: s.serviceVersion,
     }),
+
+  clearWatchdogWarning: () => set({ watchdogWarning: undefined }),
 
   setError: (lastError) => set({ lastError }),
 
@@ -118,6 +127,12 @@ export const useFocusStore = create<FocusStore>((set, get) => ({
     await get().refresh();
   },
 
+  setBrowserHandshake: async (enabled) => {
+    await request('setBrowserHandshake', { enabled });
+    // The service emits settingsChanged; optimistically reflect it so the toggle feels instant.
+    set((s) => ({ settings: { ...s.settings, browserHandshakeEnabled: enabled } }));
+  },
+
   refresh: async () => {
     const snap = await request('getState', undefined);
     get().applySnapshot(snap);
@@ -134,6 +149,8 @@ export const useFocusStore = create<FocusStore>((set, get) => ({
     onEvent('keyPresenceChanged', ({ present }) => set({ keyPresent: present }));
     onEvent('focusChanged', ({ active }) => set({ focusActive: active }));
     onEvent('policyChanged', ({ policy }) => set({ policy }));
+    onEvent('settingsChanged', ({ settings }) => set({ settings }));
+    onEvent('browserWatchdogWarning', ({ browser, pid }) => set({ watchdogWarning: { browser, pid } }));
     onEvent('scheduleFired', () => {
       // Schedule boundaries can change focus + lock state; re-pull the snapshot.
       get().refresh();

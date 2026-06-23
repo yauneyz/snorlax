@@ -6,7 +6,7 @@ use std::fs;
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 
-use crate::model::{FocusSource, PairedKey, Policy, Schedule};
+use crate::model::{FocusSource, PairedKey, Policy, Schedule, Settings};
 use crate::paths;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -21,6 +21,8 @@ pub struct PersistentState {
     #[serde(default)]
     pub schedule: Schedule,
     #[serde(default)]
+    pub settings: Settings,
+    #[serde(default)]
     pub paired_keys: Vec<PairedKey>,
 }
 
@@ -31,6 +33,7 @@ impl Default for PersistentState {
             focus_source: FocusSource::Boot,
             policy: Policy::default(),
             schedule: Schedule::default(),
+            settings: Settings::default(),
             paired_keys: Vec::new(),
         }
     }
