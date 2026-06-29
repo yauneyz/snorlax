@@ -7,7 +7,7 @@ directories:
   buildResources: apps/desktop/build
 
 extraMetadata:
-  main: apps/desktop/out/main/index.js
+  main: apps/desktop/out/main/index.cjs
 
 files:
   - apps/desktop/out/**/*

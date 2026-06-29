@@ -15,7 +15,7 @@
  * from native/linux by pkgs/snorlax-daemon and started by a declarative systemd unit.
  */
 
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { copyFileSync, existsSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { dirname, join, relative, resolve } from 'node:path';
@@ -36,13 +36,29 @@ function capture(cmd, args, opts = {}) {
   return execFileSync(cmd, args, { cwd: root, encoding: 'utf8', ...opts }).trim();
 }
 
+function commandAvailable(cmd, args = ['--version']) {
+  const result = spawnSync(cmd, args, { cwd: root, stdio: 'ignore' });
+  return result.status === 0;
+}
+
+function rustToolchainAvailable() {
+  return commandAvailable('cargo') && commandAvailable('rustc');
+}
+
 function packageVersion() {
   return JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')).version;
 }
 
 function buildAppImage() {
   // Reuse the standard orchestration (native Rust + extension + electron + electron-builder).
-  run('pnpm', ['run', 'build:linux']);
+  if (rustToolchainAvailable()) {
+    run('pnpm', ['run', 'build:linux']);
+  } else if (commandAvailable('nix')) {
+    console.log('\n🧰 Rust toolchain not found; building with nixpkgs#cargo and nixpkgs#rustc');
+    run('nix', ['shell', 'nixpkgs#cargo', 'nixpkgs#rustc', '-c', 'pnpm', 'run', 'build:linux']);
+  } else {
+    throw new Error('cargo is required to build the native Linux service. Install Rust or run on a system with nix.');
+  }
 
   const built = readdirSync(distDir).filter(
     (f) => f.endsWith('.AppImage') && f !== 'snorlax.AppImage',
