@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import * as Sentry from "@sentry/nextjs";
-import { createCheckoutSession as createBillingCheckoutSession } from "@focuslock/billing-server";
+import { createCheckoutSession as createBillingCheckoutSession } from "@talysman/billing-server";
 import { checkoutSchema } from "@/lib/zod/checkout";
 import { requireBearerUser, UnauthorizedError } from "@/lib/auth/require-bearer-user";
 import { getStripe } from "@/lib/stripe/client";

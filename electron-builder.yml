@@ -1,5 +1,5 @@
-appId: com.focuslock.app
-productName: FocusLock
+appId: com.talysman.app
+productName: Talysman
 copyright: Copyright © 2026
 
 directories:
@@ -42,7 +42,7 @@ linux:
     - deb
     - AppImage
   category: Utility
-  maintainer: FocusLock <support@focuslock.app>
+  maintainer: Talysman <support@talysman.app>
   artifactName: ${productName}-${version}-${arch}.${ext}
 
 # The AppImage is a self-contained bundle for NixOS (wrapped via appimageTools in

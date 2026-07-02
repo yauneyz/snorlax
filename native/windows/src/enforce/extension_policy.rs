@@ -1,7 +1,7 @@
-//! Native-messaging registration for the user-installed FocusLock browser extension.
+//! Native-messaging registration for the user-installed Talysman browser extension.
 //!
 //! The extension is the browser request-layer blocker: it receives live `{active, mode, domains}`
-//! state over native messaging (host: focuslock-natmsg.exe) and applies declarativeNetRequest rules
+//! state over native messaging (host: talysman-natmsg.exe) and applies declarativeNetRequest rules
 //! above TLS, so ECH/QUIC/VPN/connection reuse do not hide requests from it.
 //!
 //! Lifecycle is persistent, not focus-toggled. We register the local native host at service startup
@@ -18,7 +18,7 @@ use crate::paths::nmh_dir;
 use crate::run::run_command;
 
 /// Native-messaging host name. MUST match `HOST_NAME` in the extension's `src/background.js`.
-pub const HOST_NAME: &str = "com.focuslock.host";
+pub const HOST_NAME: &str = "com.talysman.host";
 
 // --- Packaging-time identities -------------------------------------------------------------------
 // Chrome and Edge assign separate IDs when their store items are first created. Leave these empty
@@ -28,16 +28,16 @@ pub const CHROME_EXT_ID: &str = "";
 pub const EDGE_EXT_ID: &str = "";
 
 // Firefox uses the authored Gecko ID in manifest.json, including for AMO-listed builds.
-pub const FIREFOX_EXT_ID: &str = "focuslock@focuslock.app";
+pub const FIREFOX_EXT_ID: &str = "talysman@talysman.app";
 
 const LEGACY_CHROMIUM_FORCELIST_VALUE: &str =
-    "cpemmokfjbiicoaocpmpdeiobnilpokc;https://focuslock.app/ext/chromium/updates.xml";
-const LEGACY_FIREFOX_XPI_URL: &str = "https://focuslock.app/ext/firefox/focuslock-0.1.0.xpi";
+    "cpemmokfjbiicoaocpmpdeiobnilpokc;https://talysman.app/ext/chromium/updates.xml";
+const LEGACY_FIREFOX_XPI_URL: &str = "https://talysman.app/ext/firefox/talysman-0.1.0.xpi";
 const LEGACY_FIREFOX_AMO_URL: &str =
-    "https://addons.mozilla.org/firefox/downloads/latest/focuslock@focuslock.app/latest.xpi";
+    "https://addons.mozilla.org/firefox/downloads/latest/talysman@talysman.app/latest.xpi";
 
 /// (browser, policy root, app root, store extension ID) per Chromium browser. The policy root is
-/// retained only to remove FocusLock values written by older releases.
+/// retained only to remove Talysman values written by older releases.
 const CHROMIUM_BROWSERS: &[(&str, &str, &str, &str)] = &[
     (
         "Chrome",
@@ -68,7 +68,7 @@ const CHROMIUM_BROWSERS: &[(&str, &str, &str, &str)] = &[
 /// Locate the shipped native-messaging host exe (sibling of the running service binary).
 fn natmsg_exe() -> Option<PathBuf> {
     let cur = std::env::current_exe().ok()?;
-    Some(cur.with_file_name("focuslock-natmsg.exe"))
+    Some(cur.with_file_name("talysman-natmsg.exe"))
 }
 
 /// The native-messaging host manifest for Chromium (uses `allowed_origins`).
@@ -80,7 +80,7 @@ fn chromium_manifest(exe: &Path) -> String {
         .collect();
     serde_json::json!({
         "name": HOST_NAME,
-        "description": "FocusLock native messaging host",
+        "description": "Talysman native messaging host",
         "path": exe.to_string_lossy(),
         "type": "stdio",
         "allowed_origins": allowed_origins,
@@ -92,7 +92,7 @@ fn chromium_manifest(exe: &Path) -> String {
 fn firefox_manifest(exe: &Path) -> String {
     serde_json::json!({
         "name": HOST_NAME,
-        "description": "FocusLock native messaging host",
+        "description": "Talysman native messaging host",
         "path": exe.to_string_lossy(),
         "type": "stdio",
         "allowed_extensions": [FIREFOX_EXT_ID],
@@ -105,7 +105,7 @@ fn firefox_manifest(exe: &Path) -> String {
 /// remain user initiated and removable through the browser's normal controls.
 pub fn install() {
     let Some(exe) = natmsg_exe() else {
-        tracing::warn!("extension_policy: cannot locate focuslock-natmsg.exe; skipping");
+        tracing::warn!("extension_policy: cannot locate talysman-natmsg.exe; skipping");
         return;
     };
     if let Err(e) = std::fs::create_dir_all(nmh_dir()) {
@@ -141,7 +141,7 @@ pub fn install() {
         &format!(r"HKLM\SOFTWARE\Mozilla\NativeMessagingHosts\{HOST_NAME}"),
         &firefox_path.to_string_lossy(),
     );
-    remove_focuslock_managed_install_policies();
+    remove_talysman_managed_install_policies();
     tracing::info!("extension_policy: native host registered");
 }
 
@@ -156,13 +156,13 @@ pub fn uninstall() {
     reg_delete(&format!(
         r"HKLM\SOFTWARE\Mozilla\NativeMessagingHosts\{HOST_NAME}"
     ));
-    remove_focuslock_managed_install_policies();
+    remove_talysman_managed_install_policies();
     tracing::info!("extension_policy: native host removed");
 }
 
-/// Remove only policy values known to have been written by FocusLock. List-policy value names are
+/// Remove only policy values known to have been written by Talysman. List-policy value names are
 /// shared with administrators, so deleting value `1` unconditionally could remove unrelated policy.
-fn remove_focuslock_managed_install_policies() {
+fn remove_talysman_managed_install_policies() {
     let chromium_values = [LEGACY_CHROMIUM_FORCELIST_VALUE, CHROME_EXT_ID, EDGE_EXT_ID];
     for (_, policy_root, _, _) in CHROMIUM_BROWSERS {
         reg_delete_value_if_matches(
@@ -241,7 +241,7 @@ mod tests {
     #[test]
     fn chromium_manifest_has_stdio_and_configured_store_origins() {
         let m = chromium_manifest(Path::new(
-            r"C:\Program Files\FocusLock\focuslock-natmsg.exe",
+            r"C:\Program Files\Talysman\talysman-natmsg.exe",
         ));
         let v: serde_json::Value = serde_json::from_str(&m).unwrap();
         assert_eq!(v["name"], HOST_NAME);
@@ -258,12 +258,12 @@ mod tests {
                 .any(|origin| origin == &format!("chrome-extension://{id}/")));
         }
         // Backslashes in the path must be valid JSON (serde escapes them).
-        assert!(v["path"].as_str().unwrap().contains("focuslock-natmsg.exe"));
+        assert!(v["path"].as_str().unwrap().contains("talysman-natmsg.exe"));
     }
 
     #[test]
     fn firefox_manifest_uses_allowed_extensions() {
-        let m = firefox_manifest(Path::new(r"C:\x\focuslock-natmsg.exe"));
+        let m = firefox_manifest(Path::new(r"C:\x\talysman-natmsg.exe"));
         let v: serde_json::Value = serde_json::from_str(&m).unwrap();
         assert_eq!(v["allowed_extensions"][0], FIREFOX_EXT_ID);
         assert!(v.get("allowed_origins").is_none());

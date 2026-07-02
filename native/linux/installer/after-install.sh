@@ -2,9 +2,9 @@
 set -eu
 
 find_svcctl() {
-  for dir in /opt/FocusLock /opt/focuslock /opt/FocusLock-* /opt/focuslock-*; do
-    if [ -x "$dir/resources/bin/focuslock-svcctl" ]; then
-      printf '%s\n' "$dir/resources/bin/focuslock-svcctl"
+  for dir in /opt/Talysman /opt/talysman /opt/Talysman-* /opt/talysman-*; do
+    if [ -x "$dir/resources/bin/talysman-svcctl" ]; then
+      printf '%s\n' "$dir/resources/bin/talysman-svcctl"
       return 0
     fi
   done
@@ -12,7 +12,7 @@ find_svcctl() {
 }
 
 svcctl="$(find_svcctl)" || {
-  echo "FocusLock service control binary not found; service was not installed." >&2
+  echo "Talysman service control binary not found; service was not installed." >&2
   exit 1
 }
 

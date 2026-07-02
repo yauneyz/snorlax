@@ -1,5 +1,5 @@
 {
-  "name": "@focuslock/billing-server",
+  "name": "@talysman/billing-server",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -9,7 +9,7 @@
     ".": "./src/index.ts"
   },
   "dependencies": {
-    "@focuslock/product": "workspace:*",
+    "@talysman/product": "workspace:*",
     "stripe": "^22.2.0"
   }
 }

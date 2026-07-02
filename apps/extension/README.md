@@ -1,4 +1,4 @@
-# FocusLock browser extension
+# Talysman browser extension
 
 Request-layer URL blocking that survives the things the host/network layer can't see: **encrypted
 SNI (ECH), DoH, HTTP/3 (QUIC), VPNs, and pooled/keep-alive connection reuse.** The browser always
@@ -23,7 +23,7 @@ Chromium enterprise `URLBlocklist` policy for this anymore.
 ## How it works
 
 ```
-service (named pipe)  ──►  focuslock-natmsg.exe  ──►  extension background.js  ──►  DNR dynamic rules
+service (named pipe)  ──►  talysman-natmsg.exe  ──►  extension background.js  ──►  DNR dynamic rules
    getState + events       (native-messaging host)     buildRules(state)
 ```
 
@@ -31,11 +31,11 @@ service (named pipe)  ──►  focuslock-natmsg.exe  ──►  extension back
   `tests/electron/unit/extension-rules.test.ts`, no `chrome.*`). Blacklist blocks the listed domains
   (+ subdomains); whitelist default-denies and allows the listed domains at higher priority;
   block-all blocks everything; focus-off emits no rules.
-- `src/background.js` — connects to the native-messaging host `com.focuslock.host`, applies rules on
+- `src/background.js` — connects to the native-messaging host `com.talysman.host`, applies rules on
   each pushed state, and on host disconnect **keeps the last ruleset** while reconnecting (so killing
   the bridge can't unblock a locked session). DNR dynamic rules persist across service-worker
   restarts, so enforcement survives the MV3 worker sleeping.
-- `focuslock-natmsg.exe` (`native/windows/src/bin/natmsg.rs`) — bridges browser stdio ⇄ the service
+- `talysman-natmsg.exe` (`native/windows/src/bin/natmsg.rs`) — bridges browser stdio ⇄ the service
   pipe, deriving `{active, mode, domains}` from `getState` + the `focusChanged`/`policyChanged`
   events.
 
@@ -44,8 +44,8 @@ service (named pipe)  ──►  focuslock-natmsg.exe  ──►  extension back
 `enforce::extension_policy::install()` runs at service startup (persistent, **not** focus-toggled —
 the extension self-gates on `active`). It writes, in HKLM (LocalSystem-only):
 
-- Native-messaging host manifests to `%PROGRAMDATA%\FocusLock\nmh\{chromium,firefox}.json` and
-  registers them under each browser's `NativeMessagingHosts\com.focuslock.host`.
+- Native-messaging host manifests to `%PROGRAMDATA%\Talysman\nmh\{chromium,firefox}.json` and
+  registers them under each browser's `NativeMessagingHosts\com.talysman.host`.
 
 Users install the extension from the official browser store and retain the browser's normal
 disable/remove controls. The desktop service does not write enterprise force-install policies.
@@ -58,23 +58,32 @@ user-installed extension in place and pushes `active:false` so it clears its rul
 unpacked directory for each browser:
 
 ```text
-focuslock-chrome-<version>.zip
-focuslock-edge-<version>.zip
-focuslock-firefox-<version>.zip
+talysman-chrome-<version>.zip
+talysman-edge-<version>.zip
+talysman-firefox-<version>.zip
 ```
 
-Chrome Web Store, Edge Add-ons, and Firefox AMO sign, host, and update their respective packages.
-The manifests contain no custom `update_url`.
+`pnpm release:extension` rebuilds and audits those packages, then copies the store upload artifacts
+to `apps/extension/release/store/`:
 
-Firefox uses the authored ID `focuslock@focuslock.app`. Chrome and Edge assign separate IDs when
+```text
+talysman-chrome-<version>.zip
+talysman-edge-<version>.zip
+talysman-firefox-<version>.zip
+```
+
+Chrome Web Store, Microsoft Edge Add-ons, and Firefox AMO sign, host, and update their respective
+packages. The manifests contain no custom `update_url`.
+
+Firefox uses the authored ID `talysman@talysman.app`. Chrome and Edge assign separate IDs when
 their store items are created. After the first uploads, copy those IDs into `CHROME_EXT_ID` and
 `EDGE_EXT_ID` in `native/windows/src/enforce/extension_policy.rs`. The native host manifest must
 allow both Chromium store origins.
 
-The `HOST_NAME` (`com.focuslock.host`) must match between `background.js` and
-`extension_policy.rs`. `focuslock-natmsg.exe` is staged next to the service binaries by
+The `HOST_NAME` (`com.talysman.host`) must match between `background.js` and
+`extension_policy.rs`. `talysman-natmsg.exe` is staged next to the service binaries by
 `scripts/build-native-win.mjs`. Store metadata, disclosures, and reviewer notes are maintained in
-`STORE_SUBMISSION.md`.
+`STORE_SUBMISSION.md`. The store publication checklist is maintained in `extension-next-steps.md`.
 
 ## Verify
 
@@ -83,9 +92,11 @@ The `HOST_NAME` (`com.focuslock.host`) must match between `background.js` and
 2. **Build + load unpacked (dev):** `pnpm build:extension`, then load
    `apps/extension/dist/chrome`, `apps/extension/dist/edge`, or
    `apps/extension/dist/firefox/manifest.json`. Native messaging in Chrome/Edge will work after the
-   corresponding published store IDs are wired into the service policy.
-3. **End-to-end:** run the service (`focuslock-svc --console`), enable focus with `reddit.com`
+   corresponding store IDs are wired into the service policy.
+3. **Store release prep:** `pnpm release:extension`, then inspect
+   `apps/extension/release/store/` and `apps/extension/release/store-submission.json`.
+4. **End-to-end:** run the service (`talysman-svc --console`), enable focus with `reddit.com`
    blocked, and load reddit in **Firefox** — it should be blocked at the request layer even with ECH
    on and over a reused connection. Toggle focus off → the block clears within the push latency.
-4. **VPN:** repeat step 3 with a VPN active — the extension blocks identically (it never touched the
+5. **VPN:** repeat step 4 with a VPN active — the extension blocks identically (it never touched the
    network path).

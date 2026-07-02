@@ -1,5 +1,5 @@
 {
-  "name": "@focuslock/product",
+  "name": "@talysman/product",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -9,7 +9,7 @@
     ".": "./src/index.ts"
   },
   "dependencies": {
-    "@focuslock/shared": "workspace:*",
+    "@talysman/shared": "workspace:*",
     "zod": "^3.23.8"
   }
 }

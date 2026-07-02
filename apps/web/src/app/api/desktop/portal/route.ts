@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import * as Sentry from "@sentry/nextjs";
-import { NoStripeCustomerError } from "@focuslock/billing-server";
+import { NoStripeCustomerError } from "@talysman/billing-server";
 import { requireBearerUser, UnauthorizedError } from "@/lib/auth/require-bearer-user";
 import { createPortalSession } from "@/lib/stripe/portal";
 

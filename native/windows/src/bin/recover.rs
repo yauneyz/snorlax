@@ -1,7 +1,7 @@
-//! focuslock-recover.exe — the backdoor killswitch (architecture §9, and the user's explicit
+//! talysman-recover.exe — the backdoor killswitch (architecture §9, and the user's explicit
 //! safety-net requirement). Run as administrator:
 //!
-//!   focuslock-recover.exe --code XXXX-XXXX-XXXX
+//!   talysman-recover.exe --code XXXX-XXXX-XXXX
 //!
 //! Strategy:
 //!   1. Try the live service over the named pipe → privileged `recover` RPC, which verifies the
@@ -11,7 +11,7 @@
 //!      service via the SCM.
 //!
 //! Either way you can always recover without the USB key. The absolute last resort (Safe Mode
-//! + `sc delete FocusLockSvc`) is documented in build-guide.md.
+//! + `sc delete TalysmanSvc`) is documented in build-guide.md.
 
 use std::time::Duration;
 
@@ -20,10 +20,10 @@ use serde_json::{json, Value};
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tokio::net::windows::named_pipe::ClientOptions;
 
-use focuslock::constants::{pipe_path, PIPE_BASE_DEV, PIPE_BASE_PROD};
-use focuslock::enforce;
-use focuslock::pairing;
-use focuslock::secure_store::SecureStore;
+use talysman::constants::{pipe_path, PIPE_BASE_DEV, PIPE_BASE_PROD};
+use talysman::enforce;
+use talysman::pairing;
+use talysman::secure_store::SecureStore;
 
 fn parse_code() -> Option<String> {
     let mut args = std::env::args().skip(1);
@@ -95,9 +95,9 @@ fn offline_recover(code: &str) -> Result<()> {
     stop_service_best_effort();
 
     // Mark focus inactive in persisted state so a restart doesn't re-arm.
-    let mut state = focuslock::state::PersistentState::load();
+    let mut state = talysman::state::PersistentState::load();
     state.focus_active = false;
-    state.focus_source = focuslock::model::FocusSource::Recover;
+    state.focus_source = talysman::model::FocusSource::Recover;
     let _ = state.save();
 
     println!("Recovery complete: focus disabled, enforcement removed.");
@@ -110,7 +110,7 @@ fn stop_service_best_effort() {
     if let Ok(manager) = ServiceManager::local_computer(None::<&str>, ServiceManagerAccess::CONNECT)
     {
         if let Ok(service) =
-            manager.open_service(focuslock::constants::SERVICE_NAME, ServiceAccess::STOP)
+            manager.open_service(talysman::constants::SERVICE_NAME, ServiceAccess::STOP)
         {
             let _ = service.stop();
         }
@@ -120,7 +120,7 @@ fn stop_service_best_effort() {
 #[tokio::main]
 async fn main() -> Result<()> {
     let Some(code) = parse_code() else {
-        eprintln!("usage: focuslock-recover.exe --code XXXX-XXXX-XXXX");
+        eprintln!("usage: talysman-recover.exe --code XXXX-XXXX-XXXX");
         std::process::exit(2);
     };
 

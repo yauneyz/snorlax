@@ -1,4 +1,4 @@
-# FocusLock — Architecture & Build Walkthrough
+# Talysman — Architecture & Build Walkthrough
 
 > A cross-platform (Windows-first, macOS-second) distraction blocker built on Electron,
 > with native privileged helpers for real OS-level enforcement, gated by a paired USB key.
@@ -6,7 +6,7 @@
 This document is the single source of truth for how the app is structured, why it's
 structured that way, what every file does, and how it gets built, configured, and tested.
 
-Codename used throughout: **FocusLock**. Rename freely (`focuslock` → your brand).
+Codename used throughout: **Talysman**. Rename freely (`talysman` → your brand).
 
 ---
 
@@ -120,7 +120,7 @@ just doing the work.** That's the achievable and correct goal.
 ┌─────────────────────────────────────────────────────────────────────│─┐
 │                         PRIVILEGED SPACE (SYSTEM / root)              ▼  │
 │                                                                         │
-│   ┌──────────────────────── FocusLock Service ───────────────────────┐  │
+│   ┌──────────────────────── Talysman Service ───────────────────────┐  │
 │   │                                                                   │  │
 │   │   IPC server  ──►  State (authoritative)  ──►  Enforcement       │  │
 │   │                     - focus on/off              ┌───────────────┐ │  │
@@ -275,7 +275,7 @@ off:
 These are ordinary firewall rules, so they **persist if the service is killed** until focus is
 cleared, while the SCM restarts the service (~1s) to re-arm the WinDivert layers.
 
-**Browser extension blocking (`enforce::extension_policy`, `focuslock-natmsg.exe`).** Browser
+**Browser extension blocking (`enforce::extension_policy`, `talysman-natmsg.exe`).** Browser
 request-layer blocking lives in the user-installed store extension for Chromium variants and
 Firefox. The native service registers the local messaging host but does not force-install or lock
 the extension through enterprise browser policy.
@@ -362,7 +362,7 @@ We bind to two things for defense in depth:
 1. **Device identity** — the `(VID, PID, serialNumber)` tuple of the USB device. This is
    what we poll/enumerate to answer "is the key plugged in right now?" cheaply.
 2. **A secret key file** — at pairing time we generate a random 256-bit secret, write it to
-   a file on the drive (e.g. `/.focuslock/key.bin`), and store a salted hash of the secret
+   a file on the drive (e.g. `/.talysman/key.bin`), and store a salted hash of the secret
    in the service's secure store. This is a second factor: it defeats someone who merely
    spoofs a serial number, and it lets us detect cloned drives.
 
@@ -417,8 +417,8 @@ USB plugged in ──► OS device event ──► service re-enumerates ──�
 ## 6. The IPC protocol (UI ⇄ service)
 
 **Transport:** a local stream socket.
-- Windows: named pipe `\\.\pipe\focuslock`.
-- macOS: unix domain socket `/var/run/focuslock.sock` (or an XPC service).
+- Windows: named pipe `\\.\pipe\talysman`.
+- macOS: unix domain socket `/var/run/talysman.sock` (or an XPC service).
 
 **Wire format:** newline-delimited JSON (NDJSON). Each line is one message. Two message
 kinds: request/response (RPC) and server-pushed events. The contract is defined **once** in
@@ -594,7 +594,7 @@ requirements:
 1. **Purchase:** the Account/Plans page calls `POST /api/desktop/checkout` on the Next.js web
    app, which returns a Stripe Checkout URL the app opens in the external browser
    (`shell.openExternal`). After payment, Stripe redirects back to a deep link
-   (`focuslock://billing/success`) that re-focuses the app and refreshes entitlement.
+   (`talysman://billing/success`) that re-focuses the app and refreshes entitlement.
 2. **Verification:** the app calls the **Next.js web backend** (`GET /api/desktop/entitlement`)
    which holds the Stripe *secret* key and reads the user's subscription (kept in sync by the
    Stripe webhook). The client "pings Stripe" *through* this backend — never directly with a
@@ -689,7 +689,7 @@ native service embedded, in one command.
 ```
 1. Validate config        → scripts/gen-config.mjs (zod-check .env for the target mode)
 2. Build native helper    → scripts/build-native-win.mjs OR build-native-mac.mjs
-      Windows:  cargo build --release   → copy focuslock-svc.exe → apps/desktop/resources/bin/win/
+      Windows:  cargo build --release   → copy talysman-svc.exe → apps/desktop/resources/bin/win/
       macOS:    xcodebuild (daemon + sysext) → sign → copy into apps/desktop/resources/bin/mac/
 3. Build Electron bundles → electron-vite build (main + preload + renderer)
 4. Package + sign         → electron-builder (NSIS on Win / pkg+dmg on Mac)
@@ -731,7 +731,7 @@ native service embedded, in one command.
 ## 14. Full directory layout
 
 ```
-focuslock/
+talysman/
 ├─ package.json                      # root: workspaces + orchestration scripts
 ├─ pnpm-workspace.yaml               # pnpm workspaces definition
 ├─ turbo.json                        # (optional) task pipeline / caching
@@ -754,7 +754,7 @@ focuslock/
 │     ├─ src/
 │     │  ├─ main/                     # ----- MAIN process (Node) -----
 │     │  │  ├─ index.ts              # app lifecycle, single-instance, window, tray bootstrap
-│     │  │  ├─ window.ts             # BrowserWindow + deep-link (focuslock://) handling
+│     │  │  ├─ window.ts             # BrowserWindow + deep-link (talysman://) handling
 │     │  │  ├─ tray.ts               # system tray; swaps green/red icon on keyPresenceChanged
 │     │  │  ├─ config.ts             # builds the typed, validated runtime config object
 │     │  │  ├─ logging.ts            # electron-log setup
@@ -802,8 +802,8 @@ focuslock/
 │     │  ├─ tray-green.png / tray-red.png
 │     │  ├─ entitlements.mac.plist   # hardened-runtime entitlements for the app
 │     │  └─ bin/                      # native binaries embedded at build time
-│     │     ├─ win/                   # focuslock-svc.exe (+ deps) — populated by build
-│     │     └─ mac/                   # FocusLockDaemon, *.systemextension — populated by build
+│     │     ├─ win/                   # talysman-svc.exe (+ deps) — populated by build
+│     │     └─ mac/                   # TalysmanDaemon, *.systemextension — populated by build
 │     └─ build/                       # electron-builder extra resources (installer art, etc.)
 │
 ├─ packages/
@@ -853,8 +853,8 @@ focuslock/
 │  │     └─ nsis-include.nsh         # NSIS hooks: install/start svc; guard uninstall
 │  └─ macos/                         # ===== macOS daemon + system extension (Swift) =====
 │     ├─ project.yml                 # XcodeGen spec (generates the .xcodeproj)
-│     ├─ FocusLock.entitlements      # network-extension + endpoint-security + app groups
-│     ├─ FocusLockDaemon/            # the root LaunchDaemon
+│     ├─ Talysman.entitlements      # network-extension + endpoint-security + app groups
+│     ├─ TalysmanDaemon/            # the root LaunchDaemon
 │     │  ├─ main.swift               # entry; loads state; starts IPC + monitors
 │     │  ├─ IPCServer.swift          # unix-socket / XPC NDJSON-RPC server
 │     │  ├─ State.swift              # authoritative state + persistence
@@ -863,11 +863,11 @@ focuslock/
 │     │  ├─ Pairing.swift            # verify present device matches a paired key
 │     │  ├─ ScheduleEngine.swift     # timer-driven schedule enforcement
 │     │  └─ AppBlocker.swift         # Endpoint Security AUTH_EXEC deny
-│     ├─ FocusLockFilter/            # the Network Extension (System Extension)
+│     ├─ TalysmanFilter/            # the Network Extension (System Extension)
 │     │  ├─ FilterDataProvider.swift # NEFilterDataProvider: domain/app/all enforcement
 │     │  └─ Info.plist
 │     └─ Resources/
-│        └─ com.focuslock.daemon.plist  # LaunchDaemon plist (KeepAlive, RunAtLoad)
+│        └─ com.talysman.daemon.plist  # LaunchDaemon plist (KeepAlive, RunAtLoad)
 │
 ├─ scripts/
 │  ├─ build.mjs                      # orchestrates the full build (see §13)
@@ -931,7 +931,7 @@ focuslock/
 | File | Responsibility |
 |---|---|
 | `electron.vite.config.ts` | Three build targets (main/preload/renderer); injects validated env via `loadEnv`/`define`; sets up aliases and the renderer's `VITE_` exposure. |
-| `src/main/index.ts` | App entry: enforces single instance, registers the `focuslock://` protocol, creates the window and tray, connects the service client, starts the updater. |
+| `src/main/index.ts` | App entry: enforces single instance, registers the `talysman://` protocol, creates the window and tray, connects the service client, starts the updater. |
 | `src/main/window.ts` | Creates the `BrowserWindow` (secure defaults: contextIsolation on, nodeIntegration off), handles deep links (billing return). |
 | `src/main/tray.ts` | System tray; subscribes to `keyPresenceChanged` and swaps `tray-green/red.png`; quick focus toggle from the tray. |
 | `src/main/config.ts` | Produces the single typed `config` object from validated env; everything imports config from here, never `process.env`. |
@@ -1005,18 +1005,18 @@ focuslock/
 | File | Responsibility |
 |---|---|
 | `project.yml` | XcodeGen spec that generates the Xcode project (keeps project config in version-controllable YAML). |
-| `FocusLock.entitlements` | Requests network-extension + endpoint-security entitlements + app group for daemon↔extension sharing. |
-| `FocusLockDaemon/main.swift` | Daemon entry: load state, start IPC + USB + schedule + app blocker. |
-| `FocusLockDaemon/IPCServer.swift` | Unix-socket/XPC NDJSON-RPC server. |
-| `FocusLockDaemon/State.swift` | Authoritative state + persistence. |
-| `FocusLockDaemon/SecureStore.swift` | Keychain-backed paired key store. |
-| `FocusLockDaemon/USBMonitor.swift` | IOKit + DiskArbitration presence detection. |
-| `FocusLockDaemon/Pairing.swift` | Device-matches-paired-key check. |
-| `FocusLockDaemon/ScheduleEngine.swift` | Timer-driven schedule enforcement. |
-| `FocusLockDaemon/AppBlocker.swift` | Endpoint Security `AUTH_EXEC` deny for blocked apps. |
-| `FocusLockFilter/FilterDataProvider.swift` | `NEFilterDataProvider`: the actual domain/app/all-internet enforcement. |
-| `FocusLockFilter/Info.plist` | Network Extension declaration. |
-| `Resources/com.focuslock.daemon.plist` | LaunchDaemon plist with `RunAtLoad` + `KeepAlive`. |
+| `Talysman.entitlements` | Requests network-extension + endpoint-security entitlements + app group for daemon↔extension sharing. |
+| `TalysmanDaemon/main.swift` | Daemon entry: load state, start IPC + USB + schedule + app blocker. |
+| `TalysmanDaemon/IPCServer.swift` | Unix-socket/XPC NDJSON-RPC server. |
+| `TalysmanDaemon/State.swift` | Authoritative state + persistence. |
+| `TalysmanDaemon/SecureStore.swift` | Keychain-backed paired key store. |
+| `TalysmanDaemon/USBMonitor.swift` | IOKit + DiskArbitration presence detection. |
+| `TalysmanDaemon/Pairing.swift` | Device-matches-paired-key check. |
+| `TalysmanDaemon/ScheduleEngine.swift` | Timer-driven schedule enforcement. |
+| `TalysmanDaemon/AppBlocker.swift` | Endpoint Security `AUTH_EXEC` deny for blocked apps. |
+| `TalysmanFilter/FilterDataProvider.swift` | `NEFilterDataProvider`: the actual domain/app/all-internet enforcement. |
+| `TalysmanFilter/Info.plist` | Network Extension declaration. |
+| `Resources/com.talysman.daemon.plist` | LaunchDaemon plist with `RunAtLoad` + `KeepAlive`. |
 
 ### `scripts/`, `config/`, `tests/`
 

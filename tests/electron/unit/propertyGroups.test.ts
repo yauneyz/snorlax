@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { siblingsFor, expandDomains, PROPERTY_GROUPS } from '@focuslock/core';
+import { siblingsFor, expandDomains, PROPERTY_GROUPS } from '@talysman/core';
 
 describe('siblingsFor', () => {
   it('returns siblings for a known property', () => {

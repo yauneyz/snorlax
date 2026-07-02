@@ -17,7 +17,7 @@ use crate::secure_store::{KeySecret, SecureStore};
 use windows::core::PCWSTR;
 use windows::Win32::Storage::FileSystem::{GetDriveTypeW, GetVolumeInformationW};
 
-const KEY_REL_PATH: &str = r".focuslock\key.bin";
+const KEY_REL_PATH: &str = r".talysman\key.bin";
 const DRIVE_REMOVABLE: u32 = 2;
 
 #[derive(Clone, Debug)]
@@ -94,7 +94,7 @@ fn key_file_path(drive_root: &str) -> PathBuf {
     PathBuf::from(drive_root).join(KEY_REL_PATH)
 }
 
-/// Write the pairing secret to <drive>\.focuslock\key.bin.
+/// Write the pairing secret to <drive>\.talysman\key.bin.
 pub fn write_key_file(drive_root: &str, secret: &[u8]) -> std::io::Result<()> {
     let path = key_file_path(drive_root);
     if let Some(parent) = path.parent() {

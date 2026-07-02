@@ -2,4 +2,4 @@
 # Point this at a local static server hosting a latest.yml + installer when testing Phase 4.
 provider: generic
 url: http://localhost:8788/updates
-updaterCacheDirName: focuslock-updater
+updaterCacheDirName: talysman-updater

@@ -3,11 +3,11 @@
 pub const PROTOCOL_VERSION: u32 = 1;
 pub const SERVICE_VERSION: &str = env!("CARGO_PKG_VERSION");
 
-pub const SERVICE_NAME: &str = "focuslock";
-pub const SERVICE_DISPLAY_NAME: &str = "FocusLock Enforcement Service";
+pub const SERVICE_NAME: &str = "talysman";
+pub const SERVICE_DISPLAY_NAME: &str = "Talysman Enforcement Service";
 
-pub const PIPE_BASE_PROD: &str = "focuslock";
-pub const PIPE_BASE_DEV: &str = "focuslock-dev";
+pub const PIPE_BASE_PROD: &str = "talysman";
+pub const PIPE_BASE_DEV: &str = "talysman-dev";
 
 /// Build the Linux Unix-domain socket path from a base name.
 pub fn socket_path(base: &str) -> String {
@@ -15,7 +15,7 @@ pub fn socket_path(base: &str) -> String {
         return base.to_string();
     }
     if base == PIPE_BASE_PROD {
-        "/run/focuslock/focuslock.sock".to_string()
+        "/run/talysman/talysman.sock".to_string()
     } else {
         format!("/tmp/{base}.sock")
     }

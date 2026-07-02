@@ -1,9 +1,9 @@
 {
-  "name": "@focuslock/extension",
+  "name": "@talysman/extension",
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "FocusLock browser extension — request-layer URL blocking that survives ECH/QUIC/VPN/connection-reuse.",
+  "description": "Talysman browser extension — request-layer URL blocking that survives ECH/QUIC/VPN/connection-reuse.",
   "files": [
     "manifest.json",
     "src"

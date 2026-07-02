@@ -1,6 +1,6 @@
 import "server-only";
 import type Stripe from "stripe";
-import { createStripeClient } from "@focuslock/billing-server";
+import { createStripeClient } from "@talysman/billing-server";
 import { config } from "@/lib/config";
 
 let stripe: Stripe | null = null;

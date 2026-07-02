@@ -1,6 +1,6 @@
 import "server-only";
 import type { NextRequest } from "next/server";
-import { extractBearerToken } from "@focuslock/auth-contracts";
+import { extractBearerToken } from "@talysman/auth-contracts";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 
 export class UnauthorizedError extends Error {

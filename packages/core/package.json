@@ -1,5 +1,5 @@
 {
-  "name": "@focuslock/core",
+  "name": "@talysman/core",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -10,7 +10,7 @@
     "./browser": "./src/browser.ts"
   },
   "dependencies": {
-    "@focuslock/shared": "workspace:*"
+    "@talysman/shared": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^20.14.0"

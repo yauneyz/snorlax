@@ -85,7 +85,7 @@ pub async fn serve(socket_path: String, shutdown: watch::Receiver<bool>) {
         });
     }
 
-    tracing::info!("FocusLock Linux service running; IPC at {socket_path}");
+    tracing::info!("Talysman Linux service running; IPC at {socket_path}");
     ipc::run_server(core, socket_path, shutdown).await;
 }
 

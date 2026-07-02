@@ -55,7 +55,7 @@ run('node', ['scripts/build-extension.mjs']);
 run('node', ['scripts/audit-extension.mjs']);
 
 // 2. Electron bundles.
-run('pnpm', ['--filter', '@focuslock/desktop', 'build']);
+run('pnpm', ['--filter', '@talysman/desktop', 'build']);
 
 // 3. Package + NSIS installer.
 run('pnpm', [

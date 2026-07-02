@@ -1,28 +1,28 @@
 [package]
-name = "focuslock-linux"
+name = "talysman-linux"
 version = "0.1.0"
 edition = "2021"
-description = "FocusLock privileged Linux service + installer + recovery killswitch."
+description = "Talysman privileged Linux service + installer + recovery killswitch."
 publish = false
 
 [lib]
-name = "focuslock"
+name = "talysman"
 path = "src/lib.rs"
 
 [[bin]]
-name = "focuslock-svc"
+name = "talysman-svc"
 path = "src/main.rs"
 
 [[bin]]
-name = "focuslock-svcctl"
+name = "talysman-svcctl"
 path = "src/bin/svcctl.rs"
 
 [[bin]]
-name = "focuslock-recover"
+name = "talysman-recover"
 path = "src/bin/recover.rs"
 
 [[bin]]
-name = "focuslock-natmsg"
+name = "talysman-natmsg"
 path = "src/bin/natmsg.rs"
 
 [[bin]]
@@ -36,7 +36,7 @@ path = "src/bin/focus-disable.rs"
 [dependencies]
 anyhow = "1"
 chrono = { version = "0.4", default-features = false, features = ["clock"] }
-focuslock_common = { path = "../common" }
+talysman_common = { path = "../common" }
 hex = "0.4"
 rand = "0.8"
 serde = { version = "1", features = ["derive"] }

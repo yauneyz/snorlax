@@ -10,7 +10,7 @@
  *  - de-duplicated, order-stable
  */
 
-import type { AppRef, Policy } from '@focuslock/shared';
+import type { AppRef, Policy } from '@talysman/shared';
 
 export interface NormalizedPolicy extends Policy {
   /** Inputs that were dropped during normalization, with a reason. */

@@ -5,8 +5,8 @@
  */
 
 import { create } from 'zustand';
-import type { Policy, Schedule, ServiceState, Settings } from '@focuslock/shared';
-import { EMPTY_POLICY, EMPTY_SCHEDULE, DEFAULT_SETTINGS } from '@focuslock/shared';
+import type { Policy, Schedule, ServiceState, Settings } from '@talysman/shared';
+import { EMPTY_POLICY, EMPTY_SCHEDULE, DEFAULT_SETTINGS } from '@talysman/shared';
 import {
   appInfo,
   authStatus,

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { evaluateSchedule, parseHm, windowCovers } from '@focuslock/core';
-import type { Schedule, ScheduleWindow } from '@focuslock/shared';
+import { evaluateSchedule, parseHm, windowCovers } from '@talysman/core';
+import type { Schedule, ScheduleWindow } from '@talysman/shared';
 
 function at(day: number, h: number, m = 0): Date {
   // 2024-01-07 is a Sunday; add `day` days to land on the desired weekday.

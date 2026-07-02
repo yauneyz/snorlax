@@ -3,7 +3,7 @@ import * as Sentry from "@sentry/nextjs";
 import {
   DESKTOP_BILLING_SUCCESS_PATH,
   desktopDeepLinkUrl,
-} from "@focuslock/auth-contracts";
+} from "@talysman/auth-contracts";
 import { getStripe } from "@/lib/stripe/client";
 import { syncSubscription } from "@/lib/stripe/sync-subscription";
 

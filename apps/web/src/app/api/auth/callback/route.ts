@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { DESKTOP_DEEP_LINK_SCHEME } from "@focuslock/auth-contracts";
+import { DESKTOP_DEEP_LINK_SCHEME } from "@talysman/auth-contracts";
 import { supabaseServer } from "@/lib/supabase/server";
 
 function redirectTarget(origin: string, next: string): string {

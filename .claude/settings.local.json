@@ -1,7 +1,7 @@
 {
   "permissions": {
     "allow": [
-      "Bash(pnpm --filter @focuslock/shared build)",
+      "Bash(pnpm --filter @talysman/shared build)",
       "Bash(npx tsc *)",
       "Bash(echo \"EXIT: $?\")",
       "Bash(export _ZO_DOCTOR=0)",
@@ -9,7 +9,13 @@
       "Bash(cargo test *)",
       "Bash(git checkout *)",
       "Bash(pnpm --filter web test)",
-      "Bash(pnpm exec *)"
+      "Bash(pnpm exec *)",
+      "Bash(git check-ignore *)",
+      "Bash(perl -pi -e 's/\"focuslock_common\"/\"talysman_common\"/g; s/^name = \"focuslock\"/name = \"talysman\"/g; s/^name = \"focuslock-linux\"/name = \"talysman-linux\"/g;' native/common/Cargo.lock native/linux/Cargo.lock native/windows/Cargo.lock)",
+      "Bash(cargo build *)",
+      "Bash(pnpm typecheck *)",
+      "Bash(pnpm --filter @talysman/web test)",
+      "Bash(pnpm test *)"
     ]
   }
 }

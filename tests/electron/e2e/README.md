@@ -7,7 +7,7 @@ follow-up (needs `@playwright/test` + `playwright` installed and a built app).
 To run locally once dependencies are added:
 
 ```bash
-pnpm --filter @focuslock/desktop build
+pnpm --filter @talysman/desktop build
 pnpm exec playwright test tests/electron/e2e
 ```
 

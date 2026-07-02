@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ErrorCode } from '@focuslock/shared';
+import { ErrorCode } from '@talysman/shared';
 import { MockServiceConnection } from '../../helpers/mockService.js';
 
 describe('MockServiceConnection — disable gate', () => {

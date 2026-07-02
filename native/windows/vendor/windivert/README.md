@@ -18,5 +18,5 @@ The `.sys` is Authenticode-signed (and Microsoft attestation-signed) by the WinD
 maintainer, so it loads on stock x64 Windows 10/11 without our own driver-signing pipeline.
 
 **Runtime requirement:** `WinDivert64.sys` must sit in the same directory as `WinDivert.dll`.
-`scripts/build-native-win.mjs` stages both next to `focuslock-svc.exe` in
+`scripts/build-native-win.mjs` stages both next to `talysman-svc.exe` in
 `apps/desktop/resources/bin/win`, and `WINDIVERT_PATH` points the crate build at this folder.

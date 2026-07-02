@@ -4,7 +4,7 @@ import {
   entitlementForPlan,
   type CheckoutPrice,
   type Entitlement,
-} from '@focuslock/product';
+} from '@talysman/product';
 
 export const STRIPE_API_VERSION = '2026-05-27.dahlia';
 

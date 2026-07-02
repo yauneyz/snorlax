@@ -5,13 +5,13 @@ describe('config schema', () => {
   it('applies defaults', () => {
     const c = parseConfig({});
     expect(c.APP_ENV).toBe('development');
-    expect(c.FOCUSLOCK_PIPE).toBe('focuslock');
+    expect(c.TALYSMAN_PIPE).toBe('talysman');
   });
   it('accepts valid overrides', () => {
-    const c = parseConfig({ APP_ENV: 'production', FOCUSLOCK_PIPE: 'focuslock' });
+    const c = parseConfig({ APP_ENV: 'production', TALYSMAN_PIPE: 'talysman' });
     expect(c.APP_ENV).toBe('production');
   });
   it('rejects an invalid APP_ENV', () => {
-    expect(() => parseConfig({ APP_ENV: 'staging' })).toThrow(/Invalid FocusLock configuration/);
+    expect(() => parseConfig({ APP_ENV: 'staging' })).toThrow(/Invalid Talysman configuration/);
   });
 });

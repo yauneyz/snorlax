@@ -11,7 +11,7 @@
 //! never sends a healthy heartbeat is treated as a supported browser missing its extension and is
 //! closed). The unsupported list only needs the forks that carry a *distinct* binary name.
 
-/// Whether a browser can host the FocusLock extension.
+/// Whether a browser can host the Talysman extension.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum BrowserClass {
     /// We ship the extension for it; it must prove the extension is alive via heartbeats.

@@ -1,4 +1,4 @@
-//! focuslock-svcctl for Linux. Installs/removes the systemd service and manages recovery codes.
+//! talysman-svcctl for Linux. Installs/removes the systemd service and manages recovery codes.
 
 use std::io::{BufRead, BufReader, Write};
 use std::os::unix::net::UnixStream;
@@ -7,20 +7,20 @@ use std::process::Command;
 
 use anyhow::{bail, Context, Result};
 
-use focuslock::constants::{socket_path, PIPE_BASE_PROD, SERVICE_DISPLAY_NAME, SERVICE_NAME};
-use focuslock::enforce::dns;
-use focuslock::pairing;
-use focuslock::paths;
-use focuslock::secure_store::SecureStore;
+use talysman::constants::{socket_path, PIPE_BASE_PROD, SERVICE_DISPLAY_NAME, SERVICE_NAME};
+use talysman::enforce::dns;
+use talysman::pairing;
+use talysman::paths;
+use talysman::secure_store::SecureStore;
 
-const UNIT_PATH: &str = "/etc/systemd/system/focuslock.service";
+const UNIT_PATH: &str = "/etc/systemd/system/talysman.service";
 
 fn svc_exe_path() -> Result<PathBuf> {
     let dir = std::env::current_exe()?
         .parent()
         .context("no parent dir for current exe")?
         .to_path_buf();
-    Ok(dir.join("focuslock-svc"))
+    Ok(dir.join("talysman-svc"))
 }
 
 fn unit_text() -> Result<String> {
@@ -36,9 +36,9 @@ Type=simple
 ExecStart={}
 Restart=always
 RestartSec=1
-RuntimeDirectory=focuslock
+RuntimeDirectory=talysman
 RuntimeDirectoryMode=0755
-StateDirectory=focuslock
+StateDirectory=talysman
 StateDirectoryMode=0750
 
 [Install]
@@ -62,7 +62,7 @@ fn run(program: &str, args: &[&str]) -> Result<()> {
 }
 
 fn install() -> Result<()> {
-    paths::ensure_data_dir().context("create FocusLock data dir")?;
+    paths::ensure_data_dir().context("create Talysman data dir")?;
     dns::install_include().context("write dnsmasq include")?;
     std::fs::write(UNIT_PATH, unit_text()?).context("write systemd unit")?;
     run("systemctl", &["daemon-reload"])?;
@@ -77,7 +77,7 @@ fn uninstall() -> Result<()> {
     let _ = run("systemctl", &["disable", "--now", SERVICE_NAME]);
     let _ = std::fs::remove_file(UNIT_PATH);
     let _ = run("systemctl", &["daemon-reload"]);
-    focuslock::enforce::teardown_network();
+    talysman::enforce::teardown_network();
     dns::remove_include();
     println!("Service '{SERVICE_NAME}' removed.");
     Ok(())
@@ -106,12 +106,12 @@ fn gen_code() -> Result<()> {
     store.save().context("save secure store")?;
 
     let path = paths::recovery_code_file();
-    let _ = std::fs::write(&path, format!("FocusLock recovery code: {code}\n"));
+    let _ = std::fs::write(&path, format!("Talysman recovery code: {code}\n"));
 
-    println!("\n==================== FocusLock RECOVERY CODE ====================");
+    println!("\n==================== Talysman RECOVERY CODE ====================");
     println!("  {code}");
     println!("  Save this somewhere safe. If you ever get locked out and can't");
-    println!("  use your USB key, run: focuslock-recover --code {code}");
+    println!("  use your USB key, run: talysman-recover --code {code}");
     println!("  (also written to {})", path.display());
     println!("================================================================\n");
     Ok(())
@@ -156,7 +156,7 @@ fn main() {
         "guard-uninstall" => guard_uninstall(),
         _ => {
             eprintln!(
-                "usage: focuslock-svcctl <install|uninstall|start|stop|status|gen-code|guard-uninstall>"
+                "usage: talysman-svcctl <install|uninstall|start|stop|status|gen-code|guard-uninstall>"
             );
             std::process::exit(2);
         }

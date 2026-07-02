@@ -9,7 +9,7 @@ use std::time::Duration;
 use crate::enforce::EnforceShared;
 use crate::model::Mode;
 
-const TABLE_NAME: &str = "focuslock";
+const TABLE_NAME: &str = "talysman";
 const POLL: Duration = Duration::from_millis(250);
 
 pub fn run_manager(shared: Arc<EnforceShared>, shutdown: tokio::sync::watch::Receiver<bool>) {
@@ -170,7 +170,7 @@ mod tests {
             IpAddr::V6(Ipv6Addr::LOCALHOST),
         ];
         let s = ruleset(Mode::Blacklist, &ips, &[]);
-        assert!(s.contains("table inet focuslock"));
+        assert!(s.contains("table inet talysman"));
         assert!(s.contains("set blocked_ips_v4"));
         assert!(s.contains("151.101.1.140"));
         assert!(s.contains("ip daddr @blocked_ips_v4 drop"));

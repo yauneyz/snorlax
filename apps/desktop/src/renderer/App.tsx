@@ -45,7 +45,7 @@ export default function App() {
     <div className="flex h-full">
       <aside className="flex w-56 flex-col border-r border-border bg-panel">
         <div className="flex items-center gap-2 px-5 py-5">
-          <span className="text-lg font-bold text-white">FocusLock</span>
+          <span className="text-lg font-bold text-white">Talysman</span>
         </div>
         <nav className="flex flex-col gap-1 px-3">
           {NAV.map((n) => (
@@ -71,7 +71,7 @@ export default function App() {
         <div className="pointer-events-none fixed inset-x-0 top-0 z-50 flex justify-center p-4">
           <div className="pointer-events-auto flex items-center gap-3 rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-2 text-sm text-amber-200 shadow-lg">
             <span>
-              {watchdogWarning.browser} isn’t proving the FocusLock extension is active — it will be
+              {watchdogWarning.browser} isn’t proving the Talysman extension is active — it will be
               closed if it stays unprotected.
             </span>
             <button

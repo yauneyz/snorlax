@@ -22,26 +22,28 @@ const desktopInstallers: DesktopInstaller[] = [
 type ExtensionLink = {
   browser: string;
   note: string;
-  href: string;
+  href?: string;
+  action: string;
 };
 
-// Chrome/Edge block off-store .crx installs for normal users, so those point at the public store
-// listings; Firefox can install our signed .xpi directly from S3 (proxied via /ext).
 const extensionLinks: ExtensionLink[] = [
   {
     browser: "Chrome",
     note: "Install from the Chrome Web Store",
-    href: "https://chromewebstore.google.com/",
+    href: config.extensionStores.chromeUrl || undefined,
+    action: "Add to Chrome",
   },
   {
     browser: "Edge",
     note: "Install from Microsoft Edge Add-ons",
-    href: "https://microsoftedge.microsoft.com/addons",
+    href: config.extensionStores.edgeUrl || undefined,
+    action: "Add to Edge",
   },
   {
     browser: "Firefox",
-    note: "Install the signed add-on directly",
-    href: config.extensionHosting.firefoxXpiUrl,
+    note: "Install from Firefox Add-ons",
+    href: config.extensionStores.firefoxUrl || undefined,
+    action: "Add to Firefox",
   },
 ];
 
@@ -74,14 +76,20 @@ export default function DownloadPage() {
           <div key={ext.browser} className="pricing-card">
             <h2>{ext.browser}</h2>
             <p className="pricing-card__price">{ext.note}</p>
-            <a
-              className="landing__cta landing__cta--primary"
-              href={ext.href}
-              target="_blank"
-              rel="noreferrer"
-            >
-              Add to {ext.browser}
-            </a>
+            {ext.href ? (
+              <a
+                className="landing__cta landing__cta--primary"
+                href={ext.href}
+                target="_blank"
+                rel="noreferrer"
+              >
+                {ext.action}
+              </a>
+            ) : (
+              <span className="landing__cta landing__cta--primary" aria-disabled="true">
+                Coming soon
+              </span>
+            )}
           </div>
         ))}
       </div>

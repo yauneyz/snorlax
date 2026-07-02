@@ -18,7 +18,7 @@ use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Mutex;
 use std::time::Instant;
 
-use focuslock_common::watchdog::Heartbeat;
+use talysman_common::watchdog::Heartbeat;
 
 use crate::model::{Mode, Policy};
 use crate::policy_match::is_host_blocked;

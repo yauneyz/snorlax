@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Local NixOS release for the FocusLock/snorlax desktop app.
+ * Local NixOS release for the Talysman/snorlax desktop app.
  *
  * Mirrors the Thinky `release.js --no-upload` flow: build the Linux AppImage with
  * the repo's own toolchain, add it to /nix/store, and write+stage

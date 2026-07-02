@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
-import type { AppRef, Mode, Policy } from '@focuslock/shared';
-import { siblingsFor } from '@focuslock/core/browser';
+import type { AppRef, Mode, Policy } from '@talysman/shared';
+import { siblingsFor } from '@talysman/core/browser';
 import { listInstalledApps, request } from '../lib/bridge.js';
 import { useFocusStore } from '../store/useFocusStore.js';
 import { Badge, Button, Card, CardTitle, Input } from '../components/ui/index.js';

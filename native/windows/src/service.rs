@@ -103,7 +103,7 @@ pub async fn serve(pipe_path: String, shutdown: watch::Receiver<bool>) {
         });
     }
 
-    tracing::info!("FocusLock service running; IPC at {pipe_path}");
+    tracing::info!("Talysman service running; IPC at {pipe_path}");
     ipc::run_server(core, pipe_path, shutdown).await;
 
     // NOTE: we intentionally do NOT tear down enforcement on a clean stop — if focus is active,

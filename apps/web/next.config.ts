@@ -7,9 +7,9 @@ const nextConfig: NextConfig = {
   // Trace from the monorepo root so serverless bundles include workspace packages.
   outputFileTracingRoot: path.resolve(__dirname, "../.."),
   transpilePackages: [
-    "@focuslock/auth-contracts",
-    "@focuslock/billing-server",
-    "@focuslock/product",
+    "@talysman/auth-contracts",
+    "@talysman/billing-server",
+    "@talysman/product",
   ],
   images: {
     remotePatterns: [],

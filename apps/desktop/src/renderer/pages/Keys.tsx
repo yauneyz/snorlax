@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import type { Drive } from '@focuslock/shared';
-import { ErrorCode } from '@focuslock/shared';
+import type { Drive } from '@talysman/shared';
+import { ErrorCode } from '@talysman/shared';
 import { request } from '../lib/bridge.js';
 import { useFocusStore } from '../store/useFocusStore.js';
 import { formatTime } from '../lib/utils.js';

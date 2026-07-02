@@ -25,8 +25,8 @@ import {
   type Schedule,
   type ServiceState,
   OK,
-} from '@focuslock/shared';
-import { evaluateSchedule, normalizePolicy } from '@focuslock/core';
+} from '@talysman/shared';
+import { evaluateSchedule, normalizePolicy } from '@talysman/core';
 import type { ServiceConnection, ServiceError } from './connection.js';
 
 function err(code: string, message: string): ServiceError {

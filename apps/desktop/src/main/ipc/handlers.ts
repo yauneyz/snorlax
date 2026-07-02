@@ -5,7 +5,7 @@
  */
 
 import { BrowserWindow, ipcMain, shell } from 'electron';
-import { ErrorCode, type EventName, type Method, type Params } from '@focuslock/shared';
+import { ErrorCode, type EventName, type Method, type Params } from '@talysman/shared';
 import { config } from '../config.js';
 import { logger } from '../logging.js';
 import { listInstalledApps } from '../appDiscovery.js';

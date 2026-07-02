@@ -14,8 +14,8 @@ export default defineConfig(({ mode }) => {
 
   const appConfig = {
     APP_ENV: env.APP_ENV ?? 'development',
-    FOCUSLOCK_PIPE:
-      env.FOCUSLOCK_PIPE ?? (env.APP_ENV === 'production' ? 'focuslock' : 'focuslock-dev'),
+    TALYSMAN_PIPE:
+      env.TALYSMAN_PIPE ?? (env.APP_ENV === 'production' ? 'talysman' : 'talysman-dev'),
     // Public endpoints the main process needs to talk to the web backend + Supabase (§auth).
     API_BASE_URL: env.API_BASE_URL ?? '',
     VITE_SUPABASE_URL: env.VITE_SUPABASE_URL ?? '',
@@ -25,11 +25,11 @@ export default defineConfig(({ mode }) => {
   const alias = {
     '@shared': resolve(__dirname, '../../packages/shared/src'),
     '@core': resolve(__dirname, '../../packages/core/src'),
-    '@focuslock/product': resolve(__dirname, '../../packages/product/src/index.ts'),
-    '@focuslock/shared': resolve(__dirname, '../../packages/shared/src/index.ts'),
-    '@focuslock/auth-contracts': resolve(__dirname, '../../packages/auth-contracts/src/index.ts'),
-    '@focuslock/core/browser': resolve(__dirname, '../../packages/core/src/browser.ts'),
-    '@focuslock/core': resolve(__dirname, '../../packages/core/src/index.ts'),
+    '@talysman/product': resolve(__dirname, '../../packages/product/src/index.ts'),
+    '@talysman/shared': resolve(__dirname, '../../packages/shared/src/index.ts'),
+    '@talysman/auth-contracts': resolve(__dirname, '../../packages/auth-contracts/src/index.ts'),
+    '@talysman/core/browser': resolve(__dirname, '../../packages/core/src/browser.ts'),
+    '@talysman/core': resolve(__dirname, '../../packages/core/src/index.ts'),
   };
 
   const define = {

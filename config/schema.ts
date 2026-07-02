@@ -12,7 +12,7 @@ export const configSchema = z.object({
   APP_ENV: z.enum(['development', 'production']).default('development'),
 
   /** Base name for the local IPC pipe shared with the native service. */
-  FOCUSLOCK_PIPE: z.string().min(1).default('focuslock'),
+  TALYSMAN_PIPE: z.string().min(1).default('talysman'),
 
   // ---- Auth / payments (unused until Phase 3) ----
   VITE_SUPABASE_URL: z.string().optional().default(''),
@@ -37,7 +37,7 @@ export function parseConfig(raw: Record<string, string | undefined>): AppConfig 
     const issues = result.error.issues
       .map((i) => `  - ${i.path.join('.') || '(root)'}: ${i.message}`)
       .join('\n');
-    throw new Error(`Invalid FocusLock configuration:\n${issues}`);
+    throw new Error(`Invalid Talysman configuration:\n${issues}`);
   }
   return result.data;
 }

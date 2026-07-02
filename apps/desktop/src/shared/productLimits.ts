@@ -1,1 +1,1 @@
-export * from '@focuslock/product';
+export * from '@talysman/product';

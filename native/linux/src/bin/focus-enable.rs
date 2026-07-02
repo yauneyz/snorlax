@@ -1,5 +1,5 @@
-//! `focus-enable` — turn FocusLock blocking on.
+//! `focus-enable` — turn Talysman blocking on.
 
 fn main() -> std::process::ExitCode {
-    focuslock::focus_cli::run(true)
+    talysman::focus_cli::run(true)
 }

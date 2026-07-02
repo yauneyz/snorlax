@@ -1,7 +1,7 @@
 #!/bin/sh
 set -eu
 
-systemctl disable --now focuslock >/dev/null 2>&1 || true
-rm -f /etc/systemd/system/focuslock.service
+systemctl disable --now talysman >/dev/null 2>&1 || true
+rm -f /etc/systemd/system/talysman.service
 systemctl daemon-reload >/dev/null 2>&1 || true
-nft delete table inet focuslock >/dev/null 2>&1 || true
+nft delete table inet talysman >/dev/null 2>&1 || true

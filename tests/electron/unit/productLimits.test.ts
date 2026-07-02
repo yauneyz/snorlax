@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { Policy, Schedule } from '@focuslock/shared';
+import type { Policy, Schedule } from '@talysman/shared';
 import {
   constrainPolicyToLimits,
   constrainScheduleToLimits,

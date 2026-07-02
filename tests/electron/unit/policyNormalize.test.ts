@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { normalizeDomain, normalizePolicy } from '@focuslock/core';
-import type { Policy } from '@focuslock/shared';
+import { normalizeDomain, normalizePolicy } from '@talysman/core';
+import type { Policy } from '@talysman/shared';
 
 describe('normalizeDomain', () => {
   it('lowercases and strips scheme/path', () => {

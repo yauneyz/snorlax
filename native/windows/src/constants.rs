@@ -5,12 +5,12 @@ pub const PROTOCOL_VERSION: u32 = 1;
 pub const SERVICE_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 /// Windows service registration name.
-pub const SERVICE_NAME: &str = "FocusLockSvc";
-pub const SERVICE_DISPLAY_NAME: &str = "FocusLock Enforcement Service";
+pub const SERVICE_NAME: &str = "TalysmanSvc";
+pub const SERVICE_DISPLAY_NAME: &str = "Talysman Enforcement Service";
 
 /// Pipe base names (mirror PIPE_BASE_PROD / PIPE_BASE_DEV in TS).
-pub const PIPE_BASE_PROD: &str = "focuslock";
-pub const PIPE_BASE_DEV: &str = "focuslock-dev";
+pub const PIPE_BASE_PROD: &str = "talysman";
+pub const PIPE_BASE_DEV: &str = "talysman-dev";
 
 /// Build the full Windows named-pipe path from a base name.
 pub fn pipe_path(base: &str) -> String {

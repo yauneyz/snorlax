@@ -34,10 +34,10 @@ const TARGETS = {
       return { ...process.env, WINDIVERT_PATH: resolve(crate, 'vendor/windivert') };
     },
     artifacts: [
-      'focuslock-svc.exe',
-      'focuslock-svcctl.exe',
-      'focuslock-recover.exe',
-      'focuslock-natmsg.exe',
+      'talysman-svc.exe',
+      'talysman-svcctl.exe',
+      'talysman-recover.exe',
+      'talysman-natmsg.exe',
     ],
     extraFiles(crate) {
       return [
@@ -53,7 +53,7 @@ const TARGETS = {
     cargoEnv() {
       return process.env;
     },
-    artifacts: ['focuslock-svc', 'focuslock-svcctl', 'focuslock-recover', 'focuslock-natmsg'],
+    artifacts: ['talysman-svc', 'talysman-svcctl', 'talysman-recover', 'talysman-natmsg'],
     extraFiles(crate) {
       return [
         resolve(crate, 'installer/after-install.sh'),
@@ -69,7 +69,7 @@ const TARGETS = {
     cargoEnv() {
       return process.env;
     },
-    artifacts: ['focuslock-svc', 'focuslock-svcctl', 'focuslock-recover', 'focuslock-natmsg'],
+    artifacts: ['talysman-svc', 'talysman-svcctl', 'talysman-recover', 'talysman-natmsg'],
     extraFiles() {
       return [];
     },

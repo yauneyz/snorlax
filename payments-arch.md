@@ -75,7 +75,7 @@ backend.
   `apps/web/src/components/auth/{LoginForm,SignupForm,OAuthButtons}.tsx`.
 - **OAuth callback:** `apps/web/src/app/api/auth/callback/route.ts` exchanges the auth code
   for a session (`supabase.auth.exchangeCodeForSession`) and supports redirecting back into
-  the desktop app via the `focuslock://` deep link.
+  the desktop app via the `talysman://` deep link.
 - **Guards:**
   - `lib/auth/require-user.ts` — RSC/route guard, redirects to `/login` if unauthenticated.
   - `lib/auth/require-subscribed.ts` — additionally redirects to `/pricing` if the user has
@@ -109,7 +109,7 @@ The renderer only ever receives `{ signedIn, email }` — never the raw token. S
 
 Defined in `packages/auth-contracts/src/index.ts`:
 
-- Scheme: `focuslock://`
+- Scheme: `talysman://`
 - `auth/callback` — OAuth return into the desktop app
 - `billing/success`, `billing/cancel` — Stripe Checkout return into the desktop app
 
@@ -151,14 +151,14 @@ key; the secret key, webhook secret, and price IDs are server-only.
 ### 3.3 Desktop checkout / portal / entitlement routes (bearer auth)
 
 `apps/web/src/app/api/desktop/*` — same logic as the web routes, but authenticated with
-`requireBearerUser` and redirecting to `focuslock://` deep links:
+`requireBearerUser` and redirecting to `talysman://` deep links:
 
 | Route | Method | Auth | Purpose |
 | --- | --- | --- | --- |
 | `/api/desktop/entitlement` | GET | bearer | Returns the `Entitlement` JSON (`getUserEntitlement`). |
 | `/api/desktop/checkout` | POST | bearer | `{ price }` → Stripe Checkout URL. |
-| `/api/desktop/checkout/success` | GET | none | Syncs subscription, redirects to `focuslock://billing/success`. |
-| `/api/desktop/checkout/cancel` | GET | none | Redirects to `focuslock://billing/cancel`. |
+| `/api/desktop/checkout/success` | GET | none | Syncs subscription, redirects to `talysman://billing/success`. |
+| `/api/desktop/checkout/cancel` | GET | none | Redirects to `talysman://billing/cancel`. |
 | `/api/desktop/portal` | POST | bearer | Stripe billing portal URL. |
 
 ### 3.4 Stripe webhook (source of truth)
@@ -220,7 +220,7 @@ The renderer shows plan-gated UI based on an `Entitlement` that now comes from t
   - In **development**: still reads/writes `dev-entitlement.json` (default `pro`) so gated UI
     can be exercised without a subscription (Settings/Plans dev switch).
   - The desktop now imports the canonical `Entitlement` / `entitlementSchema` /
-    `entitlementForPlan` from `@focuslock/product` — no local type copy.
+    `entitlementForPlan` from `@talysman/product` — no local type copy.
 - **`apps/desktop/src/main/auth/billing.ts`** — `startCheckout(price)` →
   `POST /api/desktop/checkout`; `openBillingPortal()` → `POST /api/desktop/portal`; both open
   the returned Stripe URL with `shell.openExternal`.
@@ -243,8 +243,8 @@ The renderer shows plan-gated UI based on an `Entitlement` that now comes from t
 ### 5.1 Sign-in
 
 - **Google (browser OAuth):** renderer → `app:signInGoogle` → main builds the PKCE auth URL
-  (`redirectTo: focuslock://auth/callback`) and opens the system browser. Supabase redirects
-  to `focuslock://auth/callback?code=…`; the desktop deep-link handler calls
+  (`redirectTo: talysman://auth/callback`) and opens the system browser. Supabase redirects
+  to `talysman://auth/callback?code=…`; the desktop deep-link handler calls
   `completeOAuth(code)` (`exchangeCodeForSession`) and persists the session via `safeStorage`.
 - **Email/password:** renderer form → `app:signInPassword` → `supabase.auth.signInWithPassword`.
 - Either way, `onAuthStateChange` fires `app:event('authChanged')`; the renderer re-pulls auth
@@ -255,7 +255,7 @@ The renderer shows plan-gated UI based on an `Entitlement` that now comes from t
 1. Renderer "Upgrade — Monthly/Yearly" → `app:startCheckout` → main
    `POST /api/desktop/checkout` (bearer) → Stripe Checkout URL → `shell.openExternal`.
 2. User pays; Stripe redirects to `/api/desktop/checkout/success`, which calls
-   `syncSubscription` and redirects to `focuslock://billing/success`.
+   `syncSubscription` and redirects to `talysman://billing/success`.
 3. The deep-link handler emits `app:event('entitlementChanged')`; the renderer refreshes and
    the plan flips to **Pro**.
 
@@ -282,7 +282,7 @@ independent of whether the user's browser completed the redirect.
 | Token storage | Session in `safeStorage` | ✅ encrypted storage adapter |
 | Entitlement source | `GET /api/desktop/entitlement` over bearer token | ✅ implemented + disk cache |
 | Offline behavior | Keep last-known while signed in | ✅ indefinite, `source: 'offline'` |
-| Type/limits sharing | Import `@focuslock/product` everywhere | ✅ no local copy |
+| Type/limits sharing | Import `@talysman/product` everywhere | ✅ no local copy |
 | Checkout / portal | Desktop calls `/api/desktop/{checkout,portal}` | ✅ via `billing.ts` |
 | Entitlement transport | Next.js `/api/desktop/*` web routes | ✅ `API_BASE_URL` = web origin; edge-fn refs removed |
 | Stripe mode | Live keys, live webhook | ⏳ go-live hardening (§7) |
@@ -299,7 +299,7 @@ environment/config setup that can't be done from code alone.
 - **Stripe live mode:** create live products/prices, set live `STRIPE_PRICE_*`, register the
   live webhook endpoint + `STRIPE_WEBHOOK_SECRET`, switch `STRIPE_MODE=live`. Webhook
   idempotency under retries is already covered by the `stripe_events` ledger.
-- **Supabase redirect allow-list:** add `focuslock://auth/callback` to the project's allowed
+- **Supabase redirect allow-list:** add `talysman://auth/callback` to the project's allowed
   redirect URLs (local `supabase/config.toml` `additional_redirect_urls` **and** the hosted
   project) — otherwise the OAuth round-trip can't complete. Enable the **Google** provider.
 - **`API_BASE_URL` per env:** set to the deployed Next.js origin in `.env.production`
@@ -310,7 +310,7 @@ environment/config setup that can't be done from code alone.
 - **Token expiry:** supabase-js auto-refreshes via the `safeStorage` adapter; on a `401` from
   `/api/desktop/*`, the entitlement path treats the user as signed-out. Consider an explicit
   refresh-and-retry on `401` for checkout/portal too.
-- **Packaging:** confirm `electron-builder.yml` registers the `focuslock://` protocol on all
+- **Packaging:** confirm `electron-builder.yml` registers the `talysman://` protocol on all
   target OSes so deep links resolve in installed builds (registration code is in
   `index.ts`/`window.ts`; the manifest side is build config).
 

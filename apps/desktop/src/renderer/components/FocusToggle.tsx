@@ -4,7 +4,7 @@
  * trusting any local "key present" flag.
  */
 import React, { useState } from 'react';
-import { ErrorCode } from '@focuslock/shared';
+import { ErrorCode } from '@talysman/shared';
 import { request } from '../lib/bridge.js';
 import { useFocusStore } from '../store/useFocusStore.js';
 import { cx } from '../lib/utils.js';

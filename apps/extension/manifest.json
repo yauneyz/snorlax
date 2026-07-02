@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "FocusLock",
+  "name": "Talysman",
   "version": "0.1.0",
-  "description": "Companion for FocusLock desktop that applies your configured website-blocking rules in the browser.",
+  "description": "Companion for Talysman desktop that applies your configured website-blocking rules in the browser.",
   "minimum_chrome_version": "105",
   "permissions": ["declarativeNetRequest", "nativeMessaging"],
   "background": {

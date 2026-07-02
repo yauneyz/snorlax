@@ -7,10 +7,10 @@ use serde_json::{json, Value};
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tokio::net::UnixStream;
 
-use focuslock::constants::{socket_path, PIPE_BASE_DEV, PIPE_BASE_PROD};
-use focuslock::enforce;
-use focuslock::pairing;
-use focuslock::secure_store::SecureStore;
+use talysman::constants::{socket_path, PIPE_BASE_DEV, PIPE_BASE_PROD};
+use talysman::enforce;
+use talysman::pairing;
+use talysman::secure_store::SecureStore;
 
 fn parse_code() -> Option<String> {
     let mut args = std::env::args().skip(1);
@@ -72,12 +72,12 @@ fn offline_recover(code: &str) -> Result<()> {
     enforce::extension_policy::uninstall();
 
     let _ = std::process::Command::new("systemctl")
-        .args(["stop", "focuslock"])
+        .args(["stop", "talysman"])
         .output();
 
-    let mut state = focuslock::state::PersistentState::load();
+    let mut state = talysman::state::PersistentState::load();
     state.focus_active = false;
-    state.focus_source = focuslock::model::FocusSource::Recover;
+    state.focus_source = talysman::model::FocusSource::Recover;
     let _ = state.save();
 
     println!("Recovery complete: focus disabled, enforcement removed.");
@@ -87,7 +87,7 @@ fn offline_recover(code: &str) -> Result<()> {
 #[tokio::main]
 async fn main() -> Result<()> {
     let Some(code) = parse_code() else {
-        eprintln!("usage: focuslock-recover --code XXXX-XXXX-XXXX");
+        eprintln!("usage: talysman-recover --code XXXX-XXXX-XXXX");
         std::process::exit(2);
     };
 

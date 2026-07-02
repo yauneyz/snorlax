@@ -1,12 +1,12 @@
 /**
  * Billing intents from the desktop. The web backend owns all Stripe logic; here we just call
  * the bearer-authenticated `/api/desktop/*` routes and open the returned Stripe URL in the
- * system browser. The checkout/portal return trips back in via `focuslock://billing/*` deep
+ * system browser. The checkout/portal return trips back in via `talysman://billing/*` deep
  * links (see window.ts), which trigger an entitlement refresh.
  */
 
 import { shell } from 'electron';
-import type { CheckoutPrice } from '@focuslock/product';
+import type { CheckoutPrice } from '@talysman/product';
 import { config } from '../config.js';
 import { getAccessToken } from './supabase.js';
 

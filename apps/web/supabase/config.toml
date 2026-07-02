@@ -2,7 +2,7 @@
 # Real project config lives in the Supabase dashboard; this file controls the
 # local docker-based stack used for integration tests.
 
-project_id = "focuslock"
+project_id = "talysman"
 
 [api]
 enabled = true
@@ -33,7 +33,7 @@ enabled = true
 site_url = "http://localhost:3000"
 additional_redirect_urls = [
   "http://localhost:3000/api/auth/callback",
-  "focuslock://auth/callback",
+  "talysman://auth/callback",
 ]
 jwt_expiry = 3600
 enable_signup = true

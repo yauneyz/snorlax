@@ -1,44 +1,57 @@
-# Browser Extension Publication: Next Steps
+# Browser Extension Store Publication: Next Steps
 
-The build is prepared to create three store upload packages. Publication is required before users
-can install the browser companions and before the native host can be restricted to the final Chrome
-and Edge store IDs.
+The target distribution model is store install plus store-managed automatic updates. Users install
+the extension from the appropriate store listing, and routine updates are submitted as new store
+versions.
 
-## 1. Prepare the Common Submission Material
+## 1. Prepare Common Submission Material
 
-Before opening the store submissions:
+Before opening store submissions:
 
 - publish `apps/web/content/legal/browser-extension-privacy.md` and
   `apps/web/content/legal/edge-extension-privacy.md` at their stable HTTPS routes;
-- prepare store descriptions, support contact/URL, screenshots, and promotional images;
-- create final extension icons in each store's required dimensions (the package currently reuses
-  the desktop icon);
-- write reviewer instructions explaining that FocusLock is a companion extension and provide a
-  downloadable test desktop installer;
-- use the permission rationales and data declarations in `apps/extension/STORE_SUBMISSION.md`;
-- ensure reviewers can exercise focus on/off without needing production billing or inaccessible
-  hardware, or provide precise test-mode instructions;
-- review all three stores' developer and data-use policies.
+- prepare the common listing description from `apps/extension/STORE_SUBMISSION.md`;
+- prepare support contact/URL, screenshots, promotional images, and final extension icons;
+- write reviewer instructions explaining that Talysman is a desktop companion extension;
+- provide a downloadable test desktop installer or precise test-mode instructions;
+- make reviewer testing possible without production billing or inaccessible hardware;
+- review all three stores' developer, privacy, and data-use policies.
 
-Build and inspect the packages:
+## 2. Build Store Artifacts
+
+Run:
 
 ```bash
-pnpm build:extension
-unzip -l apps/extension/dist/focuslock-chrome-0.1.0.zip
-unzip -l apps/extension/dist/focuslock-edge-0.1.0.zip
-unzip -l apps/extension/dist/focuslock-firefox-0.1.0.zip
+pnpm release:extension
 ```
 
-Each archive must show `manifest.json`, `background.js`, and `icon.png` at its root.
+This runs the extension build and audit, then copies the upload packages to:
 
-## 2. Publish Chrome
+```text
+apps/extension/release/store/talysman-chrome-<version>.zip
+apps/extension/release/store/talysman-edge-<version>.zip
+apps/extension/release/store/talysman-firefox-<version>.zip
+apps/extension/release/store-submission.json
+```
 
-1. Register and verify the Chrome Web Store developer account; enable two-step verification.
-2. In the Chrome Developer Dashboard, create a new item.
-3. Upload `apps/extension/dist/focuslock-chrome-<version>.zip`.
-4. Complete the Package, Store Listing, Privacy, Distribution, and Test Instructions sections.
-5. Select Unlisted visibility initially. Do not select Private for the consumer release because
-   installation would be restricted to named Google accounts.
+Inspect the archives:
+
+```bash
+unzip -l apps/extension/release/store/talysman-chrome-<version>.zip
+unzip -l apps/extension/release/store/talysman-edge-<version>.zip
+unzip -l apps/extension/release/store/talysman-firefox-<version>.zip
+```
+
+Each archive must show only `manifest.json`, `background.js`, and `icon.png` at its root. No store
+package should contain `key` or `update_url`.
+
+## 3. Publish Chrome
+
+1. Register the Chrome Web Store developer account and complete any required payment/verification.
+2. Create a new Chrome Web Store item.
+3. Upload `apps/extension/release/store/talysman-chrome-<version>.zip`.
+4. Complete Package, Store Listing, Privacy, Distribution, and Test Instructions.
+5. Use Unlisted visibility initially unless public discovery is intended.
 6. Submit for review and publish after approval.
 7. Record:
 
@@ -47,101 +60,110 @@ Each archive must show `manifest.json`, `background.js`, and `icon.png` at its r
    Chrome listing URL:  ________________________________
    ```
 
-8. Install it manually once and confirm `chrome://extensions` reports the recorded ID.
+8. Install from the listing and confirm `chrome://extensions` reports the recorded ID.
 
-Do not download, repack, or self-host the store CRX. Google owns signing and updates.
+Chrome signs, hosts, and updates the extension. Do not self-host or repack the store CRX.
 
-## 3. Publish Edge
+## 4. Publish Edge
 
-1. Register an Edge extension developer account in Microsoft Partner Center.
-2. Create a new extension and upload
-   `apps/extension/dist/focuslock-edge-<version>.zip`.
-3. Complete availability, properties, listing assets, privacy information, and testing notes.
-4. Select Hidden visibility initially and appropriate markets.
-5. Submit for certification and publish after approval.
-6. Record:
+1. Register the Microsoft Edge Add-ons developer account in Partner Center and complete any required
+   verification.
+2. Create a new Edge extension listing.
+3. Upload `apps/extension/release/store/talysman-edge-<version>.zip`.
+4. Complete availability, properties, listing assets, privacy information, and testing notes.
+5. Use Hidden visibility initially unless public discovery is intended.
+6. Submit for certification and publish after approval.
+7. Record:
 
    ```text
    Edge extension ID: ________________________________
    Edge listing URL:  ________________________________
    ```
 
-7. Install it manually once and confirm `edge://extensions` reports the recorded Microsoft Catalog
-   ID. Do not assume it matches Chrome's ID.
+8. Install from the listing and confirm `edge://extensions` reports the recorded ID.
 
-Microsoft owns signing and updates; FocusLock does not host the Edge artifact.
+Edge signs, hosts, and updates the extension. Do not self-host or repack the Edge package.
 
-## 4. Publish Firefox
+## 5. Publish Firefox
 
 1. Register an addons.mozilla.org developer account.
-2. Create a new listed extension—not an unlisted/self-distributed submission.
-3. Upload `apps/extension/dist/focuslock-firefox-<version>.zip`.
-4. Confirm AMO recognizes the authored ID `focuslock@focuslock.app`.
-5. Supply listing metadata, privacy information, reviewer instructions, and the readable source
-   plus reproducible build instructions. The submitted `background.js` is generated by concatenating
-   the two unminified source modules.
-6. Submit and publish after review.
-7. Record and verify:
+2. Create a Firefox AMO extension listing.
+3. Upload `apps/extension/release/store/talysman-firefox-<version>.zip`.
+4. Confirm AMO recognizes the authored ID `talysman@talysman.app`.
+5. Supply listing metadata, privacy information, reviewer instructions, and source/build
+   instructions as requested by AMO.
+6. Submit for review and publish after approval.
+7. Record:
 
    ```text
-   Firefox Gecko ID:    focuslock@focuslock.app
+   Firefox Gecko ID:    talysman@talysman.app
    Firefox listing URL: ________________________________
-   AMO latest XPI URL:  ________________________________
    ```
 
-There is no FocusLock-hosted XPI and no `updates.json`. AMO performs both jobs.
+AMO signs, hosts, and updates the extension. Do not self-host an XPI for the consumer install path.
 
-## 5. Wire the Store IDs into the Desktop Service
+## 6. Wire Store IDs into the Desktop Service
 
 Edit `native/windows/src/enforce/extension_policy.rs`:
 
 ```rust
-pub const CHROME_EXT_ID: &str = "<32-character Chrome Web Store ID>";
-pub const EDGE_EXT_ID: &str = "<32-character Microsoft Catalog ID>";
+pub const CHROME_EXT_ID: &str = "<Chrome Web Store extension ID>";
+pub const EDGE_EXT_ID: &str = "<Microsoft Edge Add-ons extension ID>";
+pub const FIREFOX_EXT_ID: &str = "talysman@talysman.app";
 ```
 
-The service will then:
-
-- include both `chrome-extension://<id>/` values in the Chromium native-host manifest;
-- register `focuslock@focuslock.app` in Firefox's native-host manifest.
-
-Run the focused native tests after editing:
+The service will include those IDs in native-messaging allowlists. Run:
 
 ```bash
 cargo test --manifest-path native/windows/Cargo.toml extension_policy
 ```
 
-## 6. Validate on a Clean Windows VM
+Then build the desktop installer that reviewers and users will test.
+
+## 7. Configure Download Links
+
+After the listings exist, set these environment variables for the web app:
+
+```text
+EXTENSION_CHROME_STORE_URL=<Chrome listing URL>
+EXTENSION_EDGE_STORE_URL=<Edge listing URL>
+EXTENSION_FIREFOX_STORE_URL=<Firefox listing URL>
+```
+
+Until a URL is present, the download page shows that browser as coming soon.
+
+## 8. Validate on a Clean Windows VM
 
 Use an ordinary, unmanaged consumer Windows VM.
 
 For each supported browser:
 
 1. install the browser normally;
-2. install the FocusLock desktop app and approve elevation;
-3. install the extension manually from the correct official store;
-4. inspect the browser policy page and confirm FocusLock did not add managed-install policies;
+2. install the Talysman desktop app and approve elevation;
+3. install the extension manually from the official store listing;
+4. inspect the browser policy page and confirm Talysman did not add managed-install policies;
 5. confirm Disable and Remove remain available;
-6. confirm the extension connects to `com.focuslock.host`;
+6. confirm the extension connects to `com.talysman.host`;
 7. activate focus and confirm request-layer blocking;
-8. turn focus off through the authorized path and confirm rules clear without uninstalling the
-   extension;
+8. turn focus off through Talysman and confirm rules clear without uninstalling the extension;
 9. reboot and repeat the checks;
 10. publish a test version increment and confirm the browser updates automatically.
 
-Test incognito/private browsing separately and make the limitation explicit: browser-level blocking
-does not apply there unless the user enables extension access for private browsing.
+Test incognito/private browsing separately and document that browser-level blocking does not apply
+there unless the user enables extension access for private browsing.
 
-## 7. Release Checklist Thereafter
+## 9. Routine Release Checklist
 
-For each new extension release:
+For each extension release:
 
 1. increase the version in `apps/extension/manifest.json`;
-2. run `pnpm build:extension` and the extension unit tests;
-3. upload each store's matching ZIP;
-4. include release/reviewer notes;
-5. wait for all three reviews and publish the approved versions;
-6. verify the live store versions and automatic update behavior.
+2. run extension unit tests;
+3. run `pnpm release:extension`;
+4. upload each store's matching ZIP;
+5. include release/reviewer notes;
+6. wait for store review/certification;
+7. publish the approved versions;
+8. verify live store versions and automatic update behavior.
 
 Never change the Firefox Gecko ID or create replacement Chrome/Edge store items casually. Those
 identities are part of the native-messaging trust boundary.

@@ -1,4 +1,4 @@
-//! `focuslock_common` — OS-agnostic logic shared by every native backend (Windows, Linux, and the
+//! `talysman_common` — OS-agnostic logic shared by every native backend (Windows, Linux, and the
 //! future macOS daemon). Each backend supplies the system-level pieces (process enumeration, window
 //! close, process kill); this crate owns the **decisions** so they live in exactly one place and are
 //! unit-tested without touching the OS.

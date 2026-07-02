@@ -1,21 +1,21 @@
-//! focuslock-svc.exe — the privileged service.
+//! talysman-svc.exe — the privileged service.
 //!
 //! Two entry paths:
 //!   * default: registered with the Service Control Manager (LocalSystem, auto-start).
 //!   * `--console`: run in the foreground for development (Ctrl-C to stop). Uses the dev pipe
-//!     name unless FOCUSLOCK_PIPE overrides it.
+//!     name unless TALYSMAN_PIPE overrides it.
 
 use std::ffi::OsString;
 use std::time::Duration;
 
 use tokio::sync::watch;
 
-use focuslock::constants::{pipe_path, PIPE_BASE_DEV, PIPE_BASE_PROD, SERVICE_NAME};
-use focuslock::paths;
-use focuslock::service;
+use talysman::constants::{pipe_path, PIPE_BASE_DEV, PIPE_BASE_PROD, SERVICE_NAME};
+use talysman::paths;
+use talysman::service;
 
 fn resolve_pipe(default_base: &str) -> String {
-    let base = std::env::var("FOCUSLOCK_PIPE").unwrap_or_else(|_| default_base.to_string());
+    let base = std::env::var("TALYSMAN_PIPE").unwrap_or_else(|_| default_base.to_string());
     pipe_path(&base)
 }
 
@@ -43,7 +43,7 @@ fn main() -> anyhow::Result<()> {
 
     if console {
         init_tracing(false);
-        tracing::info!("starting FocusLock service in console (dev) mode");
+        tracing::info!("starting Talysman service in console (dev) mode");
         let (tx, rx) = watch::channel(false);
         ctrlc_set_handler(tx);
         service::run_blocking(resolve_pipe(PIPE_BASE_DEV), rx);
@@ -116,7 +116,7 @@ fn run_scm_service() -> anyhow::Result<()> {
     };
     status_handle.set_service_status(running)?;
 
-    tracing::info!("FocusLock service entering run loop");
+    tracing::info!("Talysman service entering run loop");
     service::run_blocking(resolve_pipe(PIPE_BASE_PROD), shutdown_rx);
 
     let stopped = ServiceStatus {

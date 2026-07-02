@@ -16,7 +16,7 @@ import {
   type Result,
   type RpcRequest,
   type RpcResponse,
-} from '@focuslock/shared';
+} from '@talysman/shared';
 import { logger } from '../logging.js';
 import type { ServiceConnection, ServiceError } from './connection.js';
 

@@ -1,13 +1,13 @@
-# FocusLock Windows service (Rust)
+# Talysman Windows service (Rust)
 
 One crate, three binaries (see `Cargo.toml`):
 
 | Binary | Role |
 |---|---|
-| `focuslock-svc.exe` | The privileged service. SCM-managed (LocalSystem, auto-start). Run `--console` for a foreground dev instance. |
-| `focuslock-svcctl.exe` | Elevated install/configure/recover/remove CLI. Generates the recovery code at install. |
-| `focuslock-recover.exe` | The killswitch — `--code XXXX-XXXX-XXXX` force-disables focus and tears down enforcement. |
-| `focuslock-natmsg.exe` | Browser native-messaging host. Bridges the FocusLock extension ⇄ the service pipe, pushing live `{active, mode, domains}`. Spawned by the browser; not user-run. |
+| `talysman-svc.exe` | The privileged service. SCM-managed (LocalSystem, auto-start). Run `--console` for a foreground dev instance. |
+| `talysman-svcctl.exe` | Elevated install/configure/recover/remove CLI. Generates the recovery code at install. |
+| `talysman-recover.exe` | The killswitch — `--code XXXX-XXXX-XXXX` force-disables focus and tears down enforcement. |
+| `talysman-natmsg.exe` | Browser native-messaging host. Bridges the Talysman extension ⇄ the service pipe, pushing live `{active, mode, domains}`. Spawned by the browser; not user-run. |
 
 ## Enforcement (v1 pragmatic subset)
 
@@ -30,7 +30,7 @@ pre-exec denial, DPAPI-wrapping of the (hash-only) secure store, and a `WM_DEVIC
 window. None are required for the v1 product goal (raise the activation energy of cheating).
 
 A **user-installed browser extension** (`apps/extension`, wired to the local native host by
-`enforce::extension_policy` and fed live state by `focuslock-natmsg.exe`) does per-URL request-layer
+`enforce::extension_policy` and fed live state by `talysman-natmsg.exe`) does per-URL request-layer
 blocking where the wire/IP layer is too coarse or blind: encrypted SNI (ECH), VPNs, QUIC, and pooled
 browser connections. The native IP drop remains the backstop for network-visible traffic and
 non-browser apps. Store packaging and the permanent Chrome, Edge, and Firefox identities are
@@ -39,7 +39,7 @@ documented in `apps/extension/README.md`.
 ## Build
 
 ```powershell
-cargo build --release   # produces target\release\focuslock-{svc,svcctl,recover}.exe
+cargo build --release   # produces target\release\talysman-{svc,svcctl,recover}.exe
 ```
 
 `scripts/build-native-win.mjs` runs this and stages the binaries into

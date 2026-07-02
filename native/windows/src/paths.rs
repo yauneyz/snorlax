@@ -1,11 +1,11 @@
-//! On-disk locations under %PROGRAMDATA%\FocusLock. This directory should have an ACL that
+//! On-disk locations under %PROGRAMDATA%\Talysman. This directory should have an ACL that
 //! denies write to non-admins (set by the installer); the service runs as LocalSystem.
 
 use std::path::PathBuf;
 
 pub fn data_dir() -> PathBuf {
     let base = std::env::var("ProgramData").unwrap_or_else(|_| r"C:\ProgramData".to_string());
-    PathBuf::from(base).join("FocusLock")
+    PathBuf::from(base).join("Talysman")
 }
 
 pub fn state_file() -> PathBuf {

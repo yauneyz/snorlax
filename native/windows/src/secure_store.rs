@@ -1,7 +1,7 @@
 //! At-rest store for pairing secrets' salted hashes + the recovery-code hash.
 //!
 //! v1 stores salted SHA-256 hashes (NOT reversible secrets) as JSON in
-//! %PROGRAMDATA%\FocusLock, which the installer ACLs to admin-only write. Wrapping this blob
+//! %PROGRAMDATA%\Talysman, which the installer ACLs to admin-only write. Wrapping this blob
 //! in DPAPI (CryptProtectData, machine scope) is the documented hardening upgrade; because we
 //! only persist non-reversible hashes, plaintext-at-rest here does not leak the key secret or
 //! the recovery code.

@@ -1,6 +1,6 @@
 //! Removable-drive discovery and paired-key presence for Linux.
 //!
-//! v1 uses the `.focuslock/key.bin` secret as the durable proof. Linux volume serial discovery is
+//! v1 uses the `.talysman/key.bin` secret as the durable proof. Linux volume serial discovery is
 //! distro/filesystem-specific, so keys are marked serial-ambiguous until we add udev/lsblk probing.
 
 use std::path::{Path, PathBuf};
@@ -8,7 +8,7 @@ use std::path::{Path, PathBuf};
 use crate::pairing;
 use crate::secure_store::{KeySecret, SecureStore};
 
-const KEY_REL_PATH: &str = ".focuslock/key.bin";
+const KEY_REL_PATH: &str = ".talysman/key.bin";
 
 #[derive(Clone, Debug)]
 pub struct DriveInfo {
@@ -52,7 +52,7 @@ fn candidate_mounts() -> Vec<PathBuf> {
     collect_two_level(Path::new("/run/media"), &mut out);
     collect_two_level(Path::new("/media"), &mut out);
     collect_one_level(Path::new("/mnt"), &mut out);
-    if let Ok(extra) = std::env::var("FOCUSLOCK_USB_MOUNTS") {
+    if let Ok(extra) = std::env::var("TALYSMAN_USB_MOUNTS") {
         for path in extra.split(':').filter(|p| !p.trim().is_empty()) {
             out.push(PathBuf::from(path));
         }

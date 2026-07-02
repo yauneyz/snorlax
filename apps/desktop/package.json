@@ -1,5 +1,5 @@
 {
-  "name": "@focuslock/desktop",
+  "name": "@talysman/desktop",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -10,10 +10,10 @@
     "preview": "electron-vite preview"
   },
   "dependencies": {
-    "@focuslock/auth-contracts": "workspace:*",
-    "@focuslock/core": "workspace:*",
-    "@focuslock/product": "workspace:*",
-    "@focuslock/shared": "workspace:*",
+    "@talysman/auth-contracts": "workspace:*",
+    "@talysman/core": "workspace:*",
+    "@talysman/product": "workspace:*",
+    "@talysman/shared": "workspace:*",
     "@supabase/supabase-js": "^2.47.10",
     "electron-log": "^5.2.0",
     "electron-updater": "^6.3.4",

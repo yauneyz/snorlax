@@ -3,7 +3,7 @@
  * tokens never reach the renderer's DOM — the renderer only learns `{ signedIn, email }`.
  *
  * Two sign-in paths are supported, matching the web app:
- *  - Google via the system browser (PKCE), returning through `focuslock://auth/callback`.
+ *  - Google via the system browser (PKCE), returning through `talysman://auth/callback`.
  *  - email/password directly from an in-app form.
  *
  * supabase-js owns token refresh + persistence; we hand it the encrypted storage adapter
@@ -16,7 +16,7 @@ import {
   DESKTOP_AUTH_CALLBACK_PATH,
   desktopDeepLinkUrl,
   type AuthStatus,
-} from '@focuslock/auth-contracts';
+} from '@talysman/auth-contracts';
 import { config } from '../config.js';
 import { logger } from '../logging.js';
 import { clearSession, supabaseAuthStorage } from './session.js';
@@ -101,7 +101,7 @@ export async function signInWithPassword(
   }
 }
 
-/** Finish a browser OAuth round-trip from `focuslock://auth/callback?code=...`. */
+/** Finish a browser OAuth round-trip from `talysman://auth/callback?code=...`. */
 export async function completeOAuth(code: string): Promise<void> {
   const { error } = await getClient().auth.exchangeCodeForSession(code);
   if (error) {

@@ -3,7 +3,7 @@ import { z } from 'zod';
 export const DESKTOP_AUTH_CALLBACK_PATH = 'auth/callback';
 export const DESKTOP_BILLING_SUCCESS_PATH = 'billing/success';
 export const DESKTOP_BILLING_CANCEL_PATH = 'billing/cancel';
-export const DESKTOP_DEEP_LINK_SCHEME = 'focuslock';
+export const DESKTOP_DEEP_LINK_SCHEME = 'talysman';
 
 export const authStatusSchema = z.object({
   signedIn: z.boolean(),

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import * as Sentry from "@sentry/nextjs";
-import { entitlementSchema } from "@focuslock/product";
-import { getUserEntitlement } from "@focuslock/billing-server";
+import { entitlementSchema } from "@talysman/product";
+import { getUserEntitlement } from "@talysman/billing-server";
 import { requireBearerUser, UnauthorizedError } from "@/lib/auth/require-bearer-user";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 

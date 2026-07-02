@@ -1,16 +1,16 @@
-//! focuslock-svc for Linux. Runs as a foreground process under systemd, or with --console for dev.
+//! talysman-svc for Linux. Runs as a foreground process under systemd, or with --console for dev.
 
 use tokio::sync::watch;
 
-use focuslock::constants::{socket_path, PIPE_BASE_DEV, PIPE_BASE_PROD};
-use focuslock::paths;
-use focuslock::service;
+use talysman::constants::{socket_path, PIPE_BASE_DEV, PIPE_BASE_PROD};
+use talysman::paths;
+use talysman::service;
 
 fn resolve_socket(default_base: &str) -> String {
-    if let Ok(path) = std::env::var("FOCUSLOCK_SOCKET") {
+    if let Ok(path) = std::env::var("TALYSMAN_SOCKET") {
         return path;
     }
-    let base = std::env::var("FOCUSLOCK_PIPE").unwrap_or_else(|_| default_base.to_string());
+    let base = std::env::var("TALYSMAN_PIPE").unwrap_or_else(|_| default_base.to_string());
     socket_path(&base)
 }
 
@@ -39,7 +39,7 @@ fn main() -> anyhow::Result<()> {
 
     let (tx, rx) = watch::channel(false);
     if console {
-        tracing::info!("starting FocusLock service in Linux console mode");
+        tracing::info!("starting Talysman service in Linux console mode");
         std::thread::spawn(move || {
             use std::io::BufRead;
             let stdin = std::io::stdin();
@@ -52,7 +52,7 @@ fn main() -> anyhow::Result<()> {
         });
         service::run_blocking(resolve_socket(PIPE_BASE_DEV), rx);
     } else {
-        tracing::info!("starting FocusLock service under systemd");
+        tracing::info!("starting Talysman service under systemd");
         service::run_blocking(resolve_socket(PIPE_BASE_PROD), rx);
     }
     Ok(())

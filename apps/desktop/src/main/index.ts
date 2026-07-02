@@ -1,5 +1,5 @@
 /**
- * App entry: single-instance lock, focuslock:// protocol registration, window + tray,
+ * App entry: single-instance lock, talysman:// protocol registration, window + tray,
  * service connection (real pipe, or in-process mock when the pipe is unavailable / dev),
  * IPC handlers, and the (stubbed) updater.
  *
@@ -9,7 +9,7 @@
  */
 
 import { app } from 'electron';
-import { DEEP_LINK_SCHEME } from '@focuslock/shared';
+import { DEEP_LINK_SCHEME } from '@talysman/shared';
 import { config } from './config.js';
 import { logger } from './logging.js';
 import { registerIpcHandlers } from './ipc/handlers.js';

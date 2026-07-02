@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import type { ScheduleWindow, Weekday } from '@focuslock/shared';
-import { WEEKDAYS } from '@focuslock/shared';
+import type { ScheduleWindow, Weekday } from '@talysman/shared';
+import { WEEKDAYS } from '@talysman/shared';
 import { request } from '../lib/bridge.js';
 import { useFocusStore } from '../store/useFocusStore.js';
 import { Badge, Button, Card, CardTitle, Input } from '../components/ui/index.js';

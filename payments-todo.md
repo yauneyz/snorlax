@@ -19,7 +19,7 @@ who/where, roughly in the order you'd do them.
 
 ## 2. Supabase project setup
 
-- [ ] Add `focuslock://auth/callback` to the allowed redirect URLs — **required** for desktop
+- [ ] Add `talysman://auth/callback` to the allowed redirect URLs — **required** for desktop
       OAuth to complete:
   - Local: `apps/web/supabase/config.toml` → `auth.additional_redirect_urls`.
   - Cloud: Dashboard → Authentication → URL Configuration → Redirect URLs.
@@ -41,7 +41,7 @@ who/where, roughly in the order you'd do them.
 
 - [ ] Set `[app].url_prod` to the deployed web origin so the desktop's `API_BASE_URL` resolves
       to production.
-- [ ] On Vercel (or host), push env via `pnpm --filter @focuslock/web sync:env:prod`
+- [ ] On Vercel (or host), push env via `pnpm --filter @talysman/web sync:env:prod`
       (`--production`) instead of committing `.env.local`.
 - [ ] Confirm only publishable/anon keys ship in the desktop bundle (`__APP_CONFIG__` carries
       `API_BASE_URL` + `VITE_SUPABASE_URL` + `VITE_SUPABASE_ANON_KEY`); no `*_SECRET_KEY` /
@@ -49,7 +49,7 @@ who/where, roughly in the order you'd do them.
 
 ## 5. Desktop packaging
 
-- [ ] Confirm `electron-builder.yml` registers the `focuslock://` protocol on every target OS
+- [ ] Confirm `electron-builder.yml` registers the `talysman://` protocol on every target OS
       so deep links resolve in installed (non-`pnpm dev`) builds.
 - [ ] Test the deep-link round-trips from a packaged build: `auth/callback`, `billing/success`,
       `billing/cancel` (cold-start argv + running-instance paths).
@@ -66,7 +66,7 @@ who/where, roughly in the order you'd do them.
 ## Manual verification (end-to-end)
 
 1. **Email/password:** sign in via the Account form → restart the app → still signed in.
-2. **Google:** Sign in with Google → browser consent → `focuslock://auth/callback` → signed in.
+2. **Google:** Sign in with Google → browser consent → `talysman://auth/callback` → signed in.
 3. **Checkout:** Upgrade (Stripe test card) → `billing/success` deep link → plan flips to Pro
       without a manual refresh; **Manage billing** opens the Stripe portal.
 4. **Offline:** stop the web server → entitlement stays last-known (`source: 'offline'`);

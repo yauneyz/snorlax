@@ -3,9 +3,9 @@
 use std::path::PathBuf;
 
 pub fn data_dir() -> PathBuf {
-    std::env::var("FOCUSLOCK_DATA_DIR")
+    std::env::var("TALYSMAN_DATA_DIR")
         .map(PathBuf::from)
-        .unwrap_or_else(|_| PathBuf::from("/var/lib/focuslock"))
+        .unwrap_or_else(|_| PathBuf::from("/var/lib/talysman"))
 }
 
 pub fn state_file() -> PathBuf {

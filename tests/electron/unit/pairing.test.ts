@@ -7,7 +7,7 @@ import {
   normalizeRecoveryCode,
   verifyRecoveryCode,
   verifySecret,
-} from '@focuslock/core';
+} from '@talysman/core';
 
 describe('pairing secret', () => {
   it('generates 256-bit secrets', () => {

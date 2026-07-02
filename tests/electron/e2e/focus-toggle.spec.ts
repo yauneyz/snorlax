@@ -10,7 +10,7 @@ import { resolve } from 'node:path';
 test('enable focus, then disabling without a key is blocked', async () => {
   const app = await electron.launch({
     args: [resolve(__dirname, '../../../apps/desktop/out/main/index.js')],
-    env: { ...process.env, APP_ENV: 'development', FOCUSLOCK_PIPE: 'focuslock-nonexistent' },
+    env: { ...process.env, APP_ENV: 'development', TALYSMAN_PIPE: 'talysman-nonexistent' },
   });
   const win = await app.firstWindow();
 

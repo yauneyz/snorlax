@@ -51,11 +51,22 @@ const optionalPosthogKey = z
 const extensionHostingBlock = z.object({
   bucket: z.string().min(1),
   public_s3_base_url: z.string().url(),
-  public_app_base_url: z.string().url(),
-  chromium_update_url: z.string().url(),
-  firefox_update_url: z.string().url(),
-  firefox_xpi_url: z.string().url(),
 });
+
+const optionalUrl = z.union([z.string().url(), z.literal("")]).optional().default("");
+
+const extensionStoresBlock = z
+  .object({
+    chrome_url: optionalUrl,
+    edge_url: optionalUrl,
+    firefox_url: optionalUrl,
+  })
+  .optional()
+  .default({
+    chrome_url: "",
+    edge_url: "",
+    firefox_url: "",
+  });
 
 const supabaseBlock = z.object({
   url: supabaseProjectUrl,
@@ -112,17 +123,7 @@ const credentialsSchema = z.object({
     secret_access_key: z.string().min(1),
   }),
   extension_hosting: extensionHostingBlock,
-  extension_signing: z.object({
-    chromium: z.object({
-      private_key_path: z.string().min(1),
-      expected_extension_id: z.string().regex(/^[a-p]{32}$/),
-    }),
-    firefox: z.object({
-      gecko_id: z.string().min(1),
-      amo_jwt_issuer: z.string().min(1),
-      amo_jwt_secret: z.string().min(1),
-    }),
-  }),
+  extension_stores: extensionStoresBlock,
   openai: z.object({
     api_key: z.string().optional().default(""),
     default_model: z.string().min(1).default("gpt-5.1"),
@@ -266,10 +267,9 @@ function toWebEnvPairs(c: Credentials, mode: Mode): Array<[string, string]> {
     ["EXTENSION_ARTIFACTS_BUCKET", c.extension_hosting.bucket],
     ["EXTENSION_ARTIFACTS_REGION", c.aws.region],
     ["EXTENSION_PUBLIC_S3_BASE_URL", c.extension_hosting.public_s3_base_url],
-    ["EXTENSION_PUBLIC_APP_BASE_URL", c.extension_hosting.public_app_base_url],
-    ["EXTENSION_CHROMIUM_UPDATE_URL", c.extension_hosting.chromium_update_url],
-    ["EXTENSION_FIREFOX_UPDATE_URL", c.extension_hosting.firefox_update_url],
-    ["EXTENSION_FIREFOX_XPI_URL", c.extension_hosting.firefox_xpi_url],
+    ["EXTENSION_CHROME_STORE_URL", c.extension_stores.chrome_url],
+    ["EXTENSION_EDGE_STORE_URL", c.extension_stores.edge_url],
+    ["EXTENSION_FIREFOX_STORE_URL", c.extension_stores.firefox_url],
 
     ["LLM_PROVIDER", llmProvider],
 
@@ -295,7 +295,7 @@ function toDesktopEnvPairs(c: Credentials, mode: Mode): Array<[string, string]> 
 
   return [
     ["APP_ENV", appEnvironment],
-    ["FOCUSLOCK_PIPE", mode === "prod" ? "focuslock" : "focuslock-dev"],
+    ["TALYSMAN_PIPE", mode === "prod" ? "talysman" : "talysman-dev"],
     ["VITE_SUPABASE_URL", supabase.url],
     ["VITE_SUPABASE_ANON_KEY", supabase.publishable_key],
     ["VITE_STRIPE_PUBLISHABLE_KEY", stripe.publishableKey ?? ""],

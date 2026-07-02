@@ -1,7 +1,7 @@
 //! At-rest store for pairing secrets' salted hashes + the recovery-code hash.
 //!
 //! v1 stores salted SHA-256 hashes (NOT reversible secrets) as JSON in
-//! /var/lib/focuslock, owned by root through systemd StateDirectory. Because we only persist
+//! /var/lib/talysman, owned by root through systemd StateDirectory. Because we only persist
 //! non-reversible hashes, plaintext-at-rest here does not leak the key secret or recovery code.
 
 use std::fs;

@@ -28,6 +28,7 @@ apps/extension/release/
 # Rust
 native/windows/target/
 native/linux/target/
+native/common/target/
 
 # Env (machine-local secrets/overrides)
 .credentials

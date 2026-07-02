@@ -7,7 +7,7 @@
 export const PROTOCOL_VERSION = 1;
 
 /** Deep-link scheme used for the billing return (Phase 3) and tray re-focus. */
-export const DEEP_LINK_SCHEME = 'focuslock';
+export const DEEP_LINK_SCHEME = 'talysman';
 
 /**
  * Resolve the full Windows named-pipe path from the base name in config.
@@ -24,12 +24,12 @@ export function windowsPipePath(baseName: string): string {
  */
 export function unixSocketPath(baseName: string): string {
   if (baseName.startsWith('/')) return baseName;
-  return baseName === PIPE_BASE_PROD ? '/run/focuslock/focuslock.sock' : `/tmp/${baseName}.sock`;
+  return baseName === PIPE_BASE_PROD ? '/run/talysman/talysman.sock' : `/tmp/${baseName}.sock`;
 }
 
-/** Default base names (overridable via FOCUSLOCK_PIPE in env). */
-export const PIPE_BASE_PROD = 'focuslock';
-export const PIPE_BASE_DEV = 'focuslock-dev';
+/** Default base names (overridable via TALYSMAN_PIPE in env). */
+export const PIPE_BASE_PROD = 'talysman';
+export const PIPE_BASE_DEV = 'talysman-dev';
 
 /** Standard error codes returned by the service across the IPC boundary. */
 export const ErrorCode = {

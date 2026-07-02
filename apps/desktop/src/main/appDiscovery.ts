@@ -1,7 +1,7 @@
 import { readdir, readFile } from 'node:fs/promises';
 import { basename, extname, join } from 'node:path';
 import { homedir, platform } from 'node:os';
-import type { AppRef } from '@focuslock/shared';
+import type { AppRef } from '@talysman/shared';
 import type { AppPickerItem } from '../shared/appPicker.js';
 
 interface DesktopEntry {

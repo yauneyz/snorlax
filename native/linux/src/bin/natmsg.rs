@@ -17,7 +17,7 @@ use tokio::io::{AsyncReadExt, AsyncWriteExt, BufReader};
 use tokio::net::UnixStream;
 use tokio::sync::{mpsc, Mutex};
 
-use focuslock::constants::{socket_path, PIPE_BASE_DEV, PIPE_BASE_PROD};
+use talysman::constants::{socket_path, PIPE_BASE_DEV, PIPE_BASE_PROD};
 
 const MAX_FRAME: u32 = 1024 * 1024;
 

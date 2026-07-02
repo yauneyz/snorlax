@@ -1,6 +1,6 @@
 //! Browser handshake dead-man's switch (Windows). Polls the process list (~1s, like `apps.rs`) and
 //! feeds the running *root* browser processes plus the latest extension heartbeats into the shared
-//! [`focuslock_common::watchdog`] state machine. The machine decides; this module performs the
+//! [`talysman_common::watchdog`] state machine. The machine decides; this module performs the
 //! OS-specific actions it returns: warn the user, post `WM_CLOSE` to the browser's windows, or
 //! `TerminateProcess`.
 //!
@@ -15,8 +15,8 @@ use serde_json::{json, Value};
 use sysinfo::System;
 use tokio::sync::broadcast;
 
-use focuslock_common::browsers::by_windows_image;
-use focuslock_common::watchdog::{roots, Action, ScannedProc, Watchdog};
+use talysman_common::browsers::by_windows_image;
+use talysman_common::watchdog::{roots, Action, ScannedProc, Watchdog};
 
 use crate::enforce::EnforceShared;
 

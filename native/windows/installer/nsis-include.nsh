@@ -5,28 +5,28 @@
 !include LogicLib.nsh
 
 !macro customInstall
-  DetailPrint "Registering and starting the FocusLock service..."
+  DetailPrint "Registering and starting the Talysman service..."
   ; svcctl install: creates the LocalSystem auto-start service, configures SCM restart
   ; recovery, and generates the one-time recovery code (written to
-  ; %PROGRAMDATA%\FocusLock\recovery-code.txt and printed to the install log).
-  nsExec::ExecToLog '"$INSTDIR\resources\bin\focuslock-svcctl.exe" install'
+  ; %PROGRAMDATA%\Talysman\recovery-code.txt and printed to the install log).
+  nsExec::ExecToLog '"$INSTDIR\resources\bin\talysman-svcctl.exe" install'
   Pop $0
   ${If} $0 != 0
-    MessageBox MB_OK|MB_ICONEXCLAMATION "FocusLock service install returned code $0. You can retry later with:$\n  focuslock-svcctl.exe install$\n(run as administrator)."
+    MessageBox MB_OK|MB_ICONEXCLAMATION "Talysman service install returned code $0. You can retry later with:$\n  talysman-svcctl.exe install$\n(run as administrator)."
   ${EndIf}
-  MessageBox MB_OK|MB_ICONINFORMATION "Your FocusLock recovery code was saved to:$\n  %PROGRAMDATA%\FocusLock\recovery-code.txt$\n$\nSave it somewhere safe. It can unlock focus if you ever lose your USB key."
+  MessageBox MB_OK|MB_ICONINFORMATION "Your Talysman recovery code was saved to:$\n  %PROGRAMDATA%\Talysman\recovery-code.txt$\n$\nSave it somewhere safe. It can unlock focus if you ever lose your USB key."
 !macroend
 
 !macro customUnInstall
   ; Guard: refuse to uninstall while focus is actively enforced and no paired key is present.
-  nsExec::ExecToStack '"$INSTDIR\resources\bin\focuslock-svcctl.exe" guard-uninstall'
+  nsExec::ExecToStack '"$INSTDIR\resources\bin\talysman-svcctl.exe" guard-uninstall'
   Pop $0
   ${If} $0 == 10
-    MessageBox MB_OK|MB_ICONSTOP "FocusLock is currently enforcing focus and no paired USB key is present.$\n$\nInsert your key (or run focuslock-recover.exe with your recovery code), then uninstall again."
+    MessageBox MB_OK|MB_ICONSTOP "Talysman is currently enforcing focus and no paired USB key is present.$\n$\nInsert your key (or run talysman-recover.exe with your recovery code), then uninstall again."
     Abort
   ${EndIf}
 
-  DetailPrint "Removing the FocusLock service..."
-  nsExec::ExecToLog '"$INSTDIR\resources\bin\focuslock-svcctl.exe" uninstall'
+  DetailPrint "Removing the Talysman service..."
+  nsExec::ExecToLog '"$INSTDIR\resources\bin\talysman-svcctl.exe" uninstall'
   Pop $0
 !macroend

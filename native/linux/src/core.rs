@@ -345,7 +345,7 @@ impl Core {
                 Ok(ok())
             }
             "extHeartbeat" => {
-                // Fire-and-forget liveness from the extension (relayed by focuslock-natmsg). Record
+                // Fire-and-forget liveness from the extension (relayed by talysman-natmsg). Record
                 // it for the watchdog; never errors so a malformed beat can't disrupt the bridge.
                 let pid = params
                     .get("browserPid")

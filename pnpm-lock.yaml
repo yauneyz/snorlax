@@ -38,21 +38,21 @@ importers:
 
   apps/desktop:
     dependencies:
-      '@focuslock/auth-contracts':
-        specifier: workspace:*
-        version: link:../../packages/auth-contracts
-      '@focuslock/core':
-        specifier: workspace:*
-        version: link:../../packages/core
-      '@focuslock/product':
-        specifier: workspace:*
-        version: link:../../packages/product
-      '@focuslock/shared':
-        specifier: workspace:*
-        version: link:../../packages/shared
       '@supabase/supabase-js':
         specifier: ^2.47.10
         version: 2.108.2
+      '@talysman/auth-contracts':
+        specifier: workspace:*
+        version: link:../../packages/auth-contracts
+      '@talysman/core':
+        specifier: workspace:*
+        version: link:../../packages/core
+      '@talysman/product':
+        specifier: workspace:*
+        version: link:../../packages/product
+      '@talysman/shared':
+        specifier: workspace:*
+        version: link:../../packages/shared
       electron-log:
         specifier: ^5.2.0
         version: 5.4.4
@@ -104,15 +104,6 @@ importers:
 
   apps/web:
     dependencies:
-      '@focuslock/auth-contracts':
-        specifier: workspace:*
-        version: link:../../packages/auth-contracts
-      '@focuslock/billing-server':
-        specifier: workspace:*
-        version: link:../../packages/billing-server
-      '@focuslock/product':
-        specifier: workspace:*
-        version: link:../../packages/product
       '@iarna/toml':
         specifier: ^2.2.5
         version: 2.2.5
@@ -131,6 +122,15 @@ importers:
       '@supabase/supabase-js':
         specifier: ^2.47.10
         version: 2.108.2
+      '@talysman/auth-contracts':
+        specifier: workspace:*
+        version: link:../../packages/auth-contracts
+      '@talysman/billing-server':
+        specifier: workspace:*
+        version: link:../../packages/billing-server
+      '@talysman/product':
+        specifier: workspace:*
+        version: link:../../packages/product
       '@tanstack/react-query':
         specifier: ^5.62.8
         version: 5.101.0(react@19.2.7)
@@ -240,7 +240,7 @@ importers:
 
   packages/billing-server:
     dependencies:
-      '@focuslock/product':
+      '@talysman/product':
         specifier: workspace:*
         version: link:../product
       stripe:
@@ -249,7 +249,7 @@ importers:
 
   packages/core:
     dependencies:
-      '@focuslock/shared':
+      '@talysman/shared':
         specifier: workspace:*
         version: link:../shared
     devDependencies:
@@ -259,7 +259,7 @@ importers:
 
   packages/product:
     dependencies:
-      '@focuslock/shared':
+      '@talysman/shared':
         specifier: workspace:*
         version: link:../shared
       zod:

@@ -2,7 +2,7 @@
   "$comment": "Language-neutral mirror of packages/shared/src/protocol.ts + events.ts. The TypeScript types are the source of truth; this file documents the same contract for the Rust service. Wire format: newline-delimited JSON, one message per line.",
   "protocolVersion": 1,
   "transport": {
-    "windows": "named pipe \\\\.\\pipe\\focuslock (dev: focuslock-dev)"
+    "windows": "named pipe \\\\.\\pipe\\talysman (dev: talysman-dev)"
   },
   "envelopes": {
     "request": { "kind": "request", "id": "number", "method": "string", "params": "object" },
@@ -46,7 +46,7 @@
     "extHeartbeat": {
       "params": { "browserPid": "number", "browser": "string", "profileId": "string?", "extensionVersion": "string?", "lockedActive": "boolean?", "health": "BrowserHealth" },
       "result": { "ok": true },
-      "$comment": "Relayed by focuslock-natmsg from the extension. Fire-and-forget; feeds the watchdog. browserPid is the host's parent process (the browser instance)."
+      "$comment": "Relayed by talysman-natmsg from the extension. Fire-and-forget; feeds the watchdog. browserPid is the host's parent process (the browser instance)."
     },
     "enableFocus": { "params": { "reason": "string?" }, "result": { "ok": true } },
     "disableFocus": { "params": {}, "result": { "ok": true }, "errors": ["KEY_REQUIRED", "LOCKED"] },
@@ -57,7 +57,7 @@
       "params": { "code": "string" },
       "result": { "ok": true },
       "errors": ["BAD_RECOVERY_CODE"],
-      "$comment": "Privileged out-of-band killswitch — not surfaced in the UI; used by focuslock-recover.exe. Bypasses the USB + locked gates when the code matches."
+      "$comment": "Privileged out-of-band killswitch — not surfaced in the UI; used by talysman-recover.exe. Bypasses the USB + locked gates when the code matches."
     }
   },
   "events": {

@@ -1,17 +1,17 @@
 ---
-title: "FocusLock Browser Extension Privacy Policy"
+title: "Talysman Browser Extension Privacy Policy"
 ---
 
-_Last updated: June 22, 2026_
+_Last updated: July 1, 2026_
 
-This policy applies to the FocusLock extensions for Google Chrome and Mozilla Firefox. The
-extension is a local companion to the FocusLock desktop application. A separate
+This policy applies to the Talysman extensions for Google Chrome and Mozilla Firefox. The
+extension is a local companion to the Talysman desktop application. A separate
 [Microsoft Edge extension policy](/edge-extension-privacy) is available for the Edge listing.
 
 ## What the extension does
 
 The extension receives the current focus status, blocking mode, and the domain list configured by
-the user in the locally installed FocusLock desktop application. It converts that configuration
+the user in the locally installed Talysman desktop application. It converts that configuration
 into browser-managed request-blocking rules.
 
 The browser evaluates those rules internally. The extension does not receive, read, or record the
@@ -21,14 +21,14 @@ contents.
 ## Data collection and transmission
 
 The extension does not collect or transmit personal information, browsing activity, analytics,
-telemetry, or advertising data to FocusLock or to any third party. It contains no advertising or
+telemetry, or advertising data to Talysman or to any third party. It contains no advertising or
 analytics SDKs and makes no Internet requests.
 
-The extension sends one fixed `hello` control message to the FocusLock native messaging host on the
+The extension sends one fixed `hello` control message to the Talysman native messaging host on the
 same computer. The local companion responds with the blocking configuration described above. This
 local communication is used only to provide the extension's website-blocking function.
 
-FocusLock does not sell extension data, use it for advertising, allow humans to read it, or transfer
+Talysman does not sell extension data, use it for advertising, allow humans to read it, or transfer
 it to third parties. Any use of information received from browser APIs is limited to providing the
 extension's disclosed website-blocking purpose and complies with the Chrome Web Store User Data
 Policy, including its Limited Use requirements.
@@ -36,12 +36,12 @@ Policy, including its Limited Use requirements.
 ## Local storage and retention
 
 The extension does not use browser storage. The browser stores its dynamic blocking rules locally
-so they survive a background-worker or browser restart. Rules are replaced when the FocusLock
+so they survive a background-worker or browser restart. Rules are replaced when the Talysman
 configuration changes and are removed automatically when the extension is uninstalled. If the
 desktop companion disconnects, the last applied rules remain until it reconnects or the user
 disables or removes the extension.
 
-The FocusLock desktop application separately stores the domain list the user configured. Users can
+The Talysman desktop application separately stores the domain list the user configured. Users can
 change or delete that configuration in the desktop application.
 
 ## Permissions
@@ -49,7 +49,7 @@ change or delete that configuration in the desktop application.
 - `declarativeNetRequest` lets the browser apply the configured block and allow rules without
   exposing individual requests to the extension.
 - `nativeMessaging` lets the extension exchange blocking state with the locally installed
-  FocusLock desktop companion.
+  Talysman desktop companion.
 
 The extension requests no website host permissions.
 
@@ -61,11 +61,11 @@ stops browser-level blocking. Removing the desktop application removes the nativ
 
 ## Security
 
-The native messaging registration permits only the official FocusLock extension IDs to launch the
+The native messaging registration permits only the official Talysman extension IDs to launch the
 local host. The extension contains all executable code in its reviewed store package and does not
 download or execute remote code.
 
 ## Changes and contact
 
 We will update this page and its date before materially changing the extension's data practices.
-Questions or privacy requests can be sent to [support@focuslock.app](mailto:support@focuslock.app).
+Questions or privacy requests can be sent to [support@talysman.app](mailto:support@talysman.app).

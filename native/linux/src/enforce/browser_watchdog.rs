@@ -1,6 +1,6 @@
 //! Browser handshake dead-man's switch (Linux). Mirror of the Windows watchdog: it polls the
 //! process list (~1s), feeds the running *root* browser processes plus the latest extension
-//! heartbeats into the shared [`focuslock_common::watchdog`] state machine, and performs the
+//! heartbeats into the shared [`talysman_common::watchdog`] state machine, and performs the
 //! actions it returns. The only OS-specific part is how we close/kill: `SIGTERM` for a graceful
 //! close, `SIGKILL` to force it.
 //!
@@ -15,8 +15,8 @@ use serde_json::{json, Value};
 use sysinfo::{Pid, Signal, System};
 use tokio::sync::broadcast;
 
-use focuslock_common::browsers::by_linux_process;
-use focuslock_common::watchdog::{roots, Action, ScannedProc, Watchdog};
+use talysman_common::browsers::by_linux_process;
+use talysman_common::watchdog::{roots, Action, ScannedProc, Watchdog};
 
 use crate::enforce::EnforceShared;
 

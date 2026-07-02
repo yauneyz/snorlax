@@ -74,7 +74,7 @@ export interface RequestMap {
   setBrowserHandshake: { params: { enabled: boolean }; result: Ok };
   /**
    * Liveness heartbeat from the browser extension, relayed by the native-messaging host
-   * (focuslock-natmsg). Fire-and-forget; the service records it for the watchdog. `browserPid` is
+   * (talysman-natmsg). Fire-and-forget; the service records it for the watchdog. `browserPid` is
    * the host's parent process — the browser instance the extension runs in.
    */
   extHeartbeat: {
@@ -100,7 +100,7 @@ export interface RequestMap {
 
   /**
    * Privileged out-of-band killswitch. NOT surfaced in the UI — invoked by
-   * focuslock-recover.exe. Bypasses the USB and `locked` gates iff `code` matches the
+   * talysman-recover.exe. Bypasses the USB and `locked` gates iff `code` matches the
    * recovery code stored at install time.
    */
   recover: { params: { code: string }; result: Ok };

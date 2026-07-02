@@ -108,6 +108,6 @@ const api = {
   },
 };
 
-export type FocusLockApi = typeof api;
+export type TalysmanApi = typeof api;
 
 contextBridge.exposeInMainWorld('api', api);

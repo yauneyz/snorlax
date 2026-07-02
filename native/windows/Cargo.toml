@@ -1,37 +1,37 @@
 [package]
-name = "focuslock"
+name = "talysman"
 version = "0.1.0"
 edition = "2021"
-description = "FocusLock privileged Windows service + installer + recovery killswitch."
+description = "Talysman privileged Windows service + installer + recovery killswitch."
 publish = false
 
 # Three binaries share one library crate (src/lib.rs):
-#   focuslock-svc      — the privileged service (SCM entry; --console for dev)
-#   focuslock-svcctl   — elevated install/configure/recover/remove CLI
-#   focuslock-recover  — the killswitch
+#   talysman-svc      — the privileged service (SCM entry; --console for dev)
+#   talysman-svcctl   — elevated install/configure/recover/remove CLI
+#   talysman-recover  — the killswitch
 [lib]
-name = "focuslock"
+name = "talysman"
 path = "src/lib.rs"
 
 [[bin]]
-name = "focuslock-svc"
+name = "talysman-svc"
 path = "src/main.rs"
 
 [[bin]]
-name = "focuslock-svcctl"
+name = "talysman-svcctl"
 path = "src/bin/svcctl.rs"
 
 [[bin]]
-name = "focuslock-recover"
+name = "talysman-recover"
 path = "src/bin/recover.rs"
 
 [[bin]]
-name = "focuslock-natmsg"
+name = "talysman-natmsg"
 path = "src/bin/natmsg.rs"
 
 [dependencies]
 anyhow = "1"
-focuslock_common = { path = "../common" }
+talysman_common = { path = "../common" }
 hex = "0.4"
 rand = "0.8"
 serde = { version = "1", features = ["derive"] }
@@ -45,7 +45,7 @@ windows-service = "0.7"
 
 # Raw WinDivert bindings for the packet engine (enforce::divert). The build links WinDivert.lib
 # via the WINDIVERT_PATH env var (set to native/windows/vendor/windivert); the matching
-# WinDivert.dll + WinDivert64.sys are shipped next to focuslock-svc.exe.
+# WinDivert.dll + WinDivert64.sys are shipped next to talysman-svc.exe.
 windivert-sys = "0.10"
 
 [dependencies.windows]

@@ -1,5 +1,5 @@
 {
-  "name": "@focuslock/web",
+  "name": "@talysman/web",
   "version": "0.1.0",
   "private": true,
   "scripts": {
@@ -22,9 +22,9 @@
     "email:dev": "email dev --dir emails"
   },
   "dependencies": {
-    "@focuslock/auth-contracts": "workspace:*",
-    "@focuslock/billing-server": "workspace:*",
-    "@focuslock/product": "workspace:*",
+    "@talysman/auth-contracts": "workspace:*",
+    "@talysman/billing-server": "workspace:*",
+    "@talysman/product": "workspace:*",
     "@iarna/toml": "^2.2.5",
     "@next/third-parties": "^15.0.3",
     "@react-email/components": "^0.0.31",

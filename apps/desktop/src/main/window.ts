@@ -1,6 +1,6 @@
 /**
  * Creates the main BrowserWindow with secure defaults (contextIsolation on, nodeIntegration
- * off, sandboxed renderer) and handles the focuslock:// deep link: the Supabase OAuth return
+ * off, sandboxed renderer) and handles the talysman:// deep link: the Supabase OAuth return
  * (auth/callback) and the Stripe checkout return (billing/success|cancel).
  */
 
@@ -9,7 +9,7 @@ import { app, BrowserWindow, shell } from 'electron';
 import {
   DESKTOP_AUTH_CALLBACK_PATH,
   DESKTOP_BILLING_SUCCESS_PATH,
-} from '@focuslock/auth-contracts';
+} from '@talysman/auth-contracts';
 import { config } from './config.js';
 import { logger } from './logging.js';
 import { completeOAuth } from './auth/supabase.js';
@@ -29,7 +29,7 @@ export function createWindow(): BrowserWindow {
     minHeight: 600,
     show: false,
     backgroundColor: '#0b0f17',
-    title: 'FocusLock',
+    title: 'Talysman',
     webPreferences: {
       preload: join(__dirname, '../preload/index.cjs'),
       contextIsolation: true,
@@ -88,7 +88,7 @@ export function showMainWindow(): BrowserWindow | null {
 }
 
 /**
- * Handle a focuslock:// deep link:
+ * Handle a talysman:// deep link:
  *  - auth/callback?code=… → finish the Supabase OAuth exchange, then refresh entitlement.
  *  - billing/success      → refresh entitlement (the webhook is the authoritative sync).
  *  - billing/cancel       → just refocus the window.

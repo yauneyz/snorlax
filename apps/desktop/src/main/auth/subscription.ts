@@ -20,7 +20,7 @@ import {
   type SubscriptionPlan,
   entitlementForPlan,
   entitlementSchema,
-} from '@focuslock/product';
+} from '@talysman/product';
 import { config } from '../config.js';
 import { logger } from '../logging.js';
 import { getAccessToken } from './supabase.js';

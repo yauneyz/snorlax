@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import type { Mode, Policy, Schedule } from '@focuslock/shared';
+import type { Mode, Policy, Schedule } from '@talysman/shared';
 export declare const SUBSCRIPTION_PLANS: readonly ["free", "pro"];
 export declare const CHECKOUT_PRICES: readonly ["monthly", "yearly"];
 export declare const subscriptionPlanSchema: z.ZodEnum<["free", "pro"]>;

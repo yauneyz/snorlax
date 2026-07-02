@@ -1,6 +1,6 @@
 import "server-only";
-import { createCheckoutSession as createBillingCheckoutSession } from "@focuslock/billing-server";
-import type { CheckoutPrice } from "@focuslock/product";
+import { createCheckoutSession as createBillingCheckoutSession } from "@talysman/billing-server";
+import type { CheckoutPrice } from "@talysman/product";
 import { getStripe } from "@/lib/stripe/client";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { config } from "@/lib/config";

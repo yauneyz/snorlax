@@ -18,7 +18,7 @@ function makeLogger(): Logger {
     return log as Logger;
   } catch {
     const emit = (level: Level) => (...args: unknown[]) =>
-      console[level === 'debug' ? 'log' : level](`[focuslock:${level}]`, ...args);
+      console[level === 'debug' ? 'log' : level](`[talysman:${level}]`, ...args);
     return { info: emit('info'), warn: emit('warn'), error: emit('error'), debug: emit('debug') };
   }
 }

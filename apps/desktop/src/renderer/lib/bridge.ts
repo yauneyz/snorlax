@@ -9,7 +9,7 @@ import type {
   Method,
   Params,
   Result,
-} from '@focuslock/shared';
+} from '@talysman/shared';
 import type { CheckoutPrice, SubscriptionPlan } from '../../shared/productLimits.js';
 import type { AppPickerItem } from '../../shared/appPicker.js';
 import type { AppEventName } from '../../preload/index.js';

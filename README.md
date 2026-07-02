@@ -1,4 +1,4 @@
-# FocusLock
+# Talysman
 
 A Windows-first (macOS-second) distraction blocker. A thin Electron control panel drives a
 separate **privileged native service** that does the real OS-level enforcement, gated by a
@@ -16,7 +16,7 @@ Implemented so far (architecture §19 phases 1–2):
 - **Phase 2 — Windows service v1 (Rust):** installs as a `LocalSystem` service, NDJSON-RPC
   over a named pipe, persisted state, USB pairing + presence, blacklist enforcement (local
   DNS sinkhole + user-mode WFP block filters + process-kill), and a **recovery-code
-  killswitch** (`focuslock-recover.exe`) as a safety net / support tool.
+  killswitch** (`talysman-recover.exe`) as a safety net / support tool.
 
 Not yet implemented (later phases): auth/payments, auto-update + signing, whitelist/block-all
 WFP, DoH hardening, macOS.

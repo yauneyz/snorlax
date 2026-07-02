@@ -1,4 +1,4 @@
-import type { AppRef } from '@focuslock/shared';
+import type { AppRef } from '@talysman/shared';
 
 export interface AppPickerItem {
   id: string;

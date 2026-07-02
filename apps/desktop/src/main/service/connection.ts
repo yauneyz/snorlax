@@ -12,7 +12,7 @@ import type {
   Method,
   Params,
   Result,
-} from '@focuslock/shared';
+} from '@talysman/shared';
 
 export interface ServiceError extends Error {
   code: string;

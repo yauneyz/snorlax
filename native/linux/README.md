@@ -1,13 +1,13 @@
-# FocusLock Linux Native Backend
+# Talysman Linux Native Backend
 
 This crate is the Linux counterpart to `native/windows`. It speaks the same NDJSON-RPC protocol as
 the Electron app, but swaps the platform edges:
 
-- IPC: Unix-domain socket at `/run/focuslock/focuslock.sock` in production and `/tmp/focuslock-dev.sock`
+- IPC: Unix-domain socket at `/run/talysman/talysman.sock` in production and `/tmp/talysman-dev.sock`
   in console/dev mode.
-- Service manager: `focuslock-svcctl install` writes and starts a systemd unit.
+- Service manager: `talysman-svcctl install` writes and starts a systemd unit.
 - Website blocking: focusd-style nftables output-hook rules fed by a warm resolver-owned IP bank.
-- USB keys: `.focuslock/key.bin` on mounted drives under `/run/media`, `/media`, or `/mnt`.
+- USB keys: `.talysman/key.bin` on mounted drives under `/run/media`, `/media`, or `/mnt`.
 
 The resolver refreshes A/AAAA records directly through `/etc/resolv.conf` nameservers, then public
 fallbacks, and swaps the full blocked/allowed set into nftables. Blacklist mode drops resolved

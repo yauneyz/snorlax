@@ -9,8 +9,8 @@
  * the local hour/minute/weekday off the provided Date, never a stored UTC offset).
  */
 
-import type { Schedule, ScheduleWindow, Weekday } from '@focuslock/shared';
-import { WEEKDAYS } from '@focuslock/shared';
+import type { Schedule, ScheduleWindow, Weekday } from '@talysman/shared';
+import { WEEKDAYS } from '@talysman/shared';
 
 export interface ScheduleEvaluation {
   /** Should focus be active now per the schedule? */

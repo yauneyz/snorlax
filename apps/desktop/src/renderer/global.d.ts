@@ -1,8 +1,8 @@
-import type { FocusLockApi } from '../preload/index.js';
+import type { TalysmanApi } from '../preload/index.js';
 
 declare global {
   interface Window {
-    api: FocusLockApi;
+    api: TalysmanApi;
   }
 }
 

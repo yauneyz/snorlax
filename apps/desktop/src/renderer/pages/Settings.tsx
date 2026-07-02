@@ -85,7 +85,7 @@ export function Settings() {
         </CardTitle>
         <div className="flex flex-col gap-3 text-sm text-slate-300">
           <p className="text-slate-400">
-            When on, FocusLock closes any supported browser whose extension stops responding — and any
+            When on, Talysman closes any supported browser whose extension stops responding — and any
             browser that can’t run the extension — while a locked focus session is active. Turning it
             off requires your paired USB key.
           </p>

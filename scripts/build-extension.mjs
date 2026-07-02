@@ -6,9 +6,9 @@
  *   apps/extension/dist/chrome/                         unpacked Chrome build
  *   apps/extension/dist/edge/                           unpacked Edge build
  *   apps/extension/dist/firefox/                        unpacked Firefox build
- *   apps/extension/dist/focuslock-chrome-<version>.zip  Chrome Web Store upload
- *   apps/extension/dist/focuslock-edge-<version>.zip    Edge Add-ons upload
- *   apps/extension/dist/focuslock-firefox-<version>.zip Firefox AMO upload
+ *   apps/extension/dist/talysman-chrome-<version>.zip  Chrome Web Store upload
+ *   apps/extension/dist/talysman-edge-<version>.zip    Edge Add-ons upload
+ *   apps/extension/dist/talysman-firefox-<version>.zip Firefox AMO upload
  *
  * The stores sign, host, and update the published packages. Store update URLs and store-assigned
  * Chromium IDs therefore do not belong in these manifests. Firefox keeps its authored Gecko ID.
@@ -33,8 +33,7 @@ const distDir = resolve(extDir, "dist");
 const iconPath = resolve(root, "apps/desktop/resources/icon.png");
 
 // This is authored by us and remains stable across AMO versions.
-// Chrome and Edge IDs are assigned by their stores after the first upload.
-const FIREFOX_ID = "focuslock@focuslock.app";
+const FIREFOX_ID = "talysman@talysman.app";
 
 function bundledBackground() {
   const rules = readFileSync(resolve(srcDir, "rules.js"), "utf8").replace(
@@ -203,7 +202,7 @@ firefoxManifest.browser_specific_settings = {
   gecko: {
     id: FIREFOX_ID,
     strict_min_version: "115.0",
-    // Required for new AMO submissions. FocusLock does not collect or transmit data for storage
+    // Required for new AMO submissions. Talysman does not collect or transmit data for storage
     // or processing outside the extension and the user's local companion application.
     data_collection_permissions: { required: ["none"] },
   },
@@ -219,7 +218,7 @@ const stores = [
 const artifacts = [];
 for (const store of stores) {
   const unpackedDir = stageStore(store.name, store.manifest, background);
-  const zipPath = resolve(distDir, `focuslock-${store.name}-${version}.zip`);
+  const zipPath = resolve(distDir, `talysman-${store.name}-${version}.zip`);
   zipDirectory(unpackedDir, zipPath);
   artifacts.push({ ...store, unpackedDir, zipPath });
 }

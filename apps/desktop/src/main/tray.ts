@@ -25,13 +25,13 @@ function iconFor(present: boolean): Electron.NativeImage {
 
 export function createTray(service: ServiceConnection, mock?: MockServiceConnection): Tray {
   tray = new Tray(iconFor(false));
-  tray.setToolTip('FocusLock');
+  tray.setToolTip('Talysman');
 
   const rebuildMenu = (present: boolean) => {
     const items: Electron.MenuItemConstructorOptions[] = [
       { label: present ? 'Key present ✅' : 'No key ❌', enabled: false },
       { type: 'separator' },
-      { label: 'Open FocusLock', click: () => showMainWindow() },
+      { label: 'Open Talysman', click: () => showMainWindow() },
     ];
     if (mock) {
       items.push({

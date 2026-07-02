@@ -1,4 +1,4 @@
-//! FocusLock shared library: the modules used by all three binaries (service, svcctl,
+//! Talysman shared library: the modules used by all three binaries (service, svcctl,
 //! recover). See snorlax-architecture.md §4–§9 for the design.
 //!
 //! Enforcement note (focusd-style IP blocking): website blocking is a stateless destination-IP

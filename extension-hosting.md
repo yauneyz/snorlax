@@ -1,37 +1,44 @@
-# Browser Extension Store Hosting Plan
+# Browser Extension Store Distribution Plan
 
-FocusLock publishes one extension build to each browser's official store. The stores sign, host,
-and update the packages:
+Talysman distributes the browser companion through each browser's official extension store. The
+stores sign, host, and update the packages after review:
 
-| Browser | Store                  | Visibility target  | Store-hosted artifact      |
-| ------- | ---------------------- | ------------------ | -------------------------- |
-| Chrome  | Chrome Web Store       | Unlisted initially | Google-signed CRX          |
-| Edge    | Microsoft Edge Add-ons | Hidden initially   | Microsoft-signed extension |
-| Firefox | Firefox AMO            | Listed             | Mozilla-signed XPI         |
+| Browser | Store | Initial visibility | Store-managed artifact |
+| ------- | ----- | ------------------ | ---------------------- |
+| Chrome | Chrome Web Store | Unlisted initially | Google-signed CRX |
+| Edge | Microsoft Edge Add-ons | Hidden initially | Microsoft-signed extension |
+| Firefox | Firefox AMO | Listed or unlisted per launch plan | Mozilla-signed XPI |
 
-FocusLock does not host CRX, XPI, or extension update metadata. There are no extension artifact S3
-buckets, `/ext` application routes, custom update manifests, or manifest `update_url` values.
-
-The stores provide trusted packages and updates. Users install the companion from the appropriate
-store and retain the browser's standard disable/remove controls. The privileged FocusLock service
-registers only the local native-messaging host.
+Talysman does not host browser-extension CRX/XPI files or extension update metadata for consumer
+distribution. Store packages do not include custom `update_url` values. Users install from store
+listings, and browsers update installed copies through their store channels.
 
 ## Build Outputs
 
-`pnpm build:extension` runs `scripts/build-extension.mjs` and produces:
+`pnpm build:extension` runs `scripts/build-extension.mjs` and `scripts/audit-extension.mjs`,
+producing:
 
 ```text
 apps/extension/dist/
-├── chrome/                              # unpacked local-inspection build
-├── edge/                                # unpacked local-inspection build
-├── firefox/                             # unpacked local-inspection build
-├── focuslock-chrome-<version>.zip       # upload to Chrome Web Store
-├── focuslock-edge-<version>.zip         # upload to Edge Add-ons
-└── focuslock-firefox-<version>.zip      # upload to Firefox AMO
+├── chrome/                              # unpacked Chrome inspection build
+├── edge/                                # unpacked Edge inspection build
+├── firefox/                             # unpacked Firefox inspection build
+├── talysman-chrome-<version>.zip       # upload to Chrome Web Store
+├── talysman-edge-<version>.zip         # upload to Microsoft Edge Add-ons
+└── talysman-firefox-<version>.zip      # upload to Firefox AMO
 ```
 
-Each ZIP contains `manifest.json` at its root together with `background.js` and `icon.png`. The full
-desktop build (`scripts/build.mjs`) invokes this fast extension build on every platform build.
+`pnpm release:extension` is a store-submission helper. It rebuilds and audits the extension, then
+copies the three ZIPs into:
+
+```text
+apps/extension/release/store/
+```
+
+It also writes `apps/extension/release/store-submission.json` with the version, artifact paths, and
+identity notes for the submission.
+
+## Manifests
 
 The shared source is `apps/extension/manifest.json` plus `apps/extension/src/`. The build script
 creates browser-specific manifests:
@@ -39,116 +46,90 @@ creates browser-specific manifests:
 - Chrome: Manifest V3 service worker, no `key`, no `update_url`.
 - Edge: Manifest V3 service worker, separate package so Edge-specific changes can diverge later,
   no `key`, no `update_url`.
-- Firefox: Manifest V3 background script, fixed Gecko ID `focuslock@focuslock.app`, no
+- Firefox: Manifest V3 background script, fixed Gecko ID `talysman@talysman.app`, no
   `update_url`.
 
-Chrome and Edge store IDs are not build inputs. Each store assigns its ID when the first package is
-uploaded. Firefox's ID is authored in its manifest and stays stable across AMO versions.
+Chrome and Edge IDs are assigned by their stores after first upload. Firefox's Gecko ID is authored
+by us and must remain stable.
 
-## Store Deliverables
+## First Publication
 
-### Chrome Web Store
-
-Upload `focuslock-chrome-<version>.zip` plus the store listing, screenshots, privacy disclosures,
-privacy-policy URL, and reviewer instructions. Use Unlisted visibility until public discovery is
-desired. After the first upload, record the 32-character Chrome extension ID.
-
-Chrome Web Store signs the extension, serves it, and distributes reviewed updates. FocusLock never
-uploads or serves a CRX.
-
-### Microsoft Edge Add-ons
-
-Upload `focuslock-edge-<version>.zip` through Partner Center with the listing assets, privacy-policy
-URL, markets, and reviewer instructions. Use Hidden visibility until public discovery is desired.
-After the first upload, record the Microsoft Catalog extension ID; it may differ from the Chrome
-ID.
-
-Edge Add-ons signs, serves, and updates the extension. FocusLock never uploads or serves a CRX.
-
-### Firefox AMO
-
-Upload `focuslock-firefox-<version>.zip` as a listed AMO extension. Listed is important: AMO hosts
-and updates listed extensions. The previous `web-ext sign --channel=unlisted` plan only asked
-Mozilla to sign an XPI for self-distribution and therefore required FocusLock hosting.
-
-The Firefox manifest owns the stable Gecko ID:
-
-```json
-{
-  "browser_specific_settings": {
-    "gecko": {
-      "id": "focuslock@focuslock.app",
-      "strict_min_version": "115.0"
-    }
-  }
-}
-```
-
-AMO signs, serves, and updates the extension. FocusLock does not host an XPI or `updates.json`.
+1. Bump `version` in `apps/extension/manifest.json`.
+2. Run `pnpm release:extension`.
+3. Create developer accounts and extension listings:
+   - Chrome Web Store developer account;
+   - Microsoft Partner Center / Edge Add-ons account;
+   - addons.mozilla.org developer account.
+4. Upload the matching ZIP to each store.
+5. Complete listing copy, screenshots, icons, privacy disclosures, data-use forms, and reviewer
+   instructions.
+6. Submit for review/certification.
+7. After first Chrome and Edge items exist, record their assigned extension IDs.
+8. Wire those IDs into `native/windows/src/enforce/extension_policy.rs`.
+9. Build the desktop installer with the final IDs and use that installer for reviewer and clean-VM
+   validation.
 
 ## Native Messaging Registration
 
-The Windows LocalSystem service writes machine-level policies in
-`native/windows/src/enforce/extension_policy.rs`.
+The Windows service registers only the local native-messaging host. It does not force-install or
+lock the browser extension.
 
-Chrome and Edge use separate store IDs:
+After first store publication, set:
 
 ```rust
-pub const CHROME_EXT_ID: &str = ""; // fill after Chrome Web Store creates the item
-pub const EDGE_EXT_ID: &str = "";   // fill after Edge Add-ons creates the item
+pub const CHROME_EXT_ID: &str = "<Chrome Web Store extension ID>";
+pub const EDGE_EXT_ID: &str = "<Microsoft Edge Add-ons extension ID>";
+pub const FIREFOX_EXT_ID: &str = "talysman@talysman.app";
 ```
 
-The IDs restrict the native messaging manifest to the official Chrome and Edge store builds. An
-empty ID means that browser cannot launch the local host.
+Those IDs restrict which store-installed extensions may launch `com.talysman.host`. An empty
+Chrome or Edge ID means that browser cannot launch the native host.
 
-The Chromium native-messaging manifest includes both published origins:
+## Routine Updates
+
+For each new extension release:
+
+1. Bump `version` in `apps/extension/manifest.json`.
+2. Run extension unit tests.
+3. Run `pnpm release:extension`.
+4. Upload each ZIP to its matching store as a new version.
+5. Submit the store review/certification forms.
+6. Publish after approval.
+7. Verify each live store listing offers the new version.
+8. Verify an existing install updates through the browser's normal extension update path.
+
+Routine extension releases do not require a desktop update unless native messaging behavior,
+permissions, or extension IDs change.
+
+## Website Links
+
+The web download page reads store URLs from environment/config:
 
 ```text
-chrome-extension://<CHROME_EXT_ID>/
-chrome-extension://<EDGE_EXT_ID>/
+EXTENSION_CHROME_STORE_URL
+EXTENSION_EDGE_STORE_URL
+EXTENSION_FIREFOX_STORE_URL
 ```
 
-Firefox uses the authored Gecko ID in the native host's `allowed_extensions` list. The service does
-not install or lock any extension through enterprise browser policies. Older FocusLock-managed
-install values are removed during upgrade only when their value exactly matches a value previously
-written by FocusLock.
-
-## Release Flow
-
-For every extension version:
-
-1. bump `version` in `apps/extension/manifest.json`;
-2. run `pnpm build:extension`;
-3. inspect all three unpacked manifests and ZIP contents;
-4. upload the Chrome ZIP and submit/publish it after review;
-5. upload the Edge ZIP and submit/publish it after certification;
-6. upload the Firefox ZIP as a listed AMO version and publish it after review;
-7. verify all stores offer the new version before depending on it in a desktop release.
-
-The extension IDs stay constant after first publication. Routine extension releases do not require
-a desktop update unless native-host behavior or managed-policy configuration changes.
+Leave a URL empty until the listing exists; the download page will show that browser as coming soon.
 
 ## Validation
 
 Before shipping the first store-backed desktop build:
 
 1. verify each store package installs manually from its store listing;
-2. verify the final Chrome, Edge, and Firefox IDs match the native-host allowlists;
+2. verify the final Chrome, Edge, and Firefox IDs match native-host allowlists;
 3. verify the desktop app does not add browser force-install or locked-extension policies;
 4. verify the extension can be disabled and removed in the browser UI;
-5. verify native messaging connects and receives FocusLock state after a user store install;
-6. publish a version bump to each store and verify automatic updates;
+5. verify native messaging connects and receives Talysman state after store install;
+6. publish a test version bump to each store and verify automatic updates;
 7. document that private/incognito blocking requires the user to enable extension access;
-8. verify uninstall removes the native-messaging registrations.
+8. verify uninstall/recover removes native-messaging registrations.
 
 ## Remaining Decisions
 
-- Whether the Chrome and Edge listings should become publicly searchable after launch.
-- Whether Firefox should be publicly promoted or remain listed but unpromoted.
-- How Brave and generic Chromium should consume the Chrome Web Store package; their policy behavior
-  must be validated separately before support is claimed.
-- Whether store uploads should later be automated through each store's publishing API. Initial
-  submissions should remain manual so listing, privacy, and review requirements are understood.
-
-The concrete account setup, submission, ID wiring, and clean-VM checklist is in
-`extension-next-steps.md`.
+- Whether Chrome and Edge listings should become public searchable listings after launch.
+- Whether Firefox should be listed publicly or kept unlisted but AMO-hosted.
+- How Brave and generic Chromium should be supported, if at all, since Chrome Web Store behavior
+  outside Chrome needs separate validation.
+- Whether to automate store uploads later through each store's publishing API.

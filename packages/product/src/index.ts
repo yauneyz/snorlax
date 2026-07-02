@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import type { Mode, Policy, Schedule } from '@focuslock/shared';
+import type { Mode, Policy, Schedule } from '@talysman/shared';
 
 export const SUBSCRIPTION_PLANS = ['free', 'pro'] as const;
 export const CHECKOUT_PRICES = ['monthly', 'yearly'] as const;

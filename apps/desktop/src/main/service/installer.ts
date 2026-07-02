@@ -1,7 +1,7 @@
 /**
  * Ensures the privileged service is installed and current (architecture §12). Full
  * implementation (version compare via `ping`, elevated install/repair via
- * focuslock-svcctl.exe) lands in Phase 4 alongside auto-update.
+ * talysman-svcctl.exe) lands in Phase 4 alongside auto-update.
  *
  * For phases 1-2 this is a stub: the service is installed by the NSIS installer, and in dev
  * you run it manually (see build-guide.md). This module exists so the import graph and the

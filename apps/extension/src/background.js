@@ -1,7 +1,7 @@
-// FocusLock extension background service worker (MV3).
+// Talysman extension background service worker (MV3).
 //
 // Receives live blocking state from the privileged service via a native-messaging host
-// (focuslock-natmsg.exe, which bridges browser stdio ⇄ the service's named pipe) and translates it
+// (talysman-natmsg.exe, which bridges browser stdio ⇄ the service's named pipe) and translates it
 // into declarativeNetRequest dynamic rules. DNR dynamic rules persist across service-worker
 // restarts, so enforcement survives the worker sleeping; we only touch them when state changes.
 //
@@ -15,7 +15,7 @@
 
 import { buildRules } from './rules.js';
 
-const HOST_NAME = 'com.focuslock.host';
+const HOST_NAME = 'com.talysman.host';
 const RECONNECT_MIN_MS = 1000;
 const RECONNECT_MAX_MS = 30000;
 const HEARTBEAT_MS = 5000;
@@ -52,7 +52,7 @@ async function applyState(state) {
   try {
     next = buildRules(state);
   } catch (e) {
-    console.error('[focuslock] buildRules failed', e);
+    console.error('[talysman] buildRules failed', e);
     lastApplyOk = false;
     return;
   }
@@ -65,9 +65,9 @@ async function applyState(state) {
     appliedRuleCount = next.length;
     lastApplyOk = true;
     // Do not log the configured domain list. It is local user data and is not needed for support.
-    console.info('[focuslock] applied', next.length, 'rule(s)');
+    console.info('[talysman] applied', next.length, 'rule(s)');
   } catch (e) {
-    console.error('[focuslock] updateDynamicRules failed', e);
+    console.error('[talysman] updateDynamicRules failed', e);
     lastApplyOk = false;
   }
 }
@@ -86,7 +86,7 @@ function connect() {
   try {
     port = chrome.runtime.connectNative(HOST_NAME);
   } catch (e) {
-    console.error('[focuslock] connectNative threw', e);
+    console.error('[talysman] connectNative threw', e);
     scheduleReconnect();
     return;
   }
@@ -101,7 +101,7 @@ function connect() {
 
   port.onDisconnect.addListener(() => {
     const err = chrome.runtime.lastError;
-    console.warn('[focuslock] native host disconnected', err && err.message);
+    console.warn('[talysman] native host disconnected', err && err.message);
     port = null;
     scheduleReconnect();
   });
@@ -110,7 +110,7 @@ function connect() {
   try {
     port.postMessage({ type: 'hello' });
   } catch (e) {
-    console.error('[focuslock] hello failed', e);
+    console.error('[talysman] hello failed', e);
   }
 }
 
@@ -133,7 +133,7 @@ function heartbeat() {
         health: currentHealth(),
       });
     } catch (e) {
-      console.warn('[focuslock] heartbeat post failed', e && e.message);
+      console.warn('[talysman] heartbeat post failed', e && e.message);
     }
   }
   setTimeout(heartbeat, HEARTBEAT_MS);

@@ -48,7 +48,7 @@ fn request(mut stream: UnixStream, method: &str) -> std::io::Result<Value> {
 pub fn run(enable: bool) -> ExitCode {
     let Some(stream) = connect() else {
         eprintln!(
-            "FocusLock service is not running (could not connect to {}).",
+            "Talysman service is not running (could not connect to {}).",
             socket_path(PIPE_BASE_PROD)
         );
         return ExitCode::FAILURE;
@@ -58,7 +58,7 @@ pub fn run(enable: bool) -> ExitCode {
     let resp = match request(stream, method) {
         Ok(v) => v,
         Err(e) => {
-            eprintln!("error talking to FocusLock service: {e}");
+            eprintln!("error talking to Talysman service: {e}");
             return ExitCode::FAILURE;
         }
     };

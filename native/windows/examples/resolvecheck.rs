@@ -19,7 +19,7 @@ fn main() {
         .collect();
     }
     println!("resolving (apex + www. variants): {targets:?}\n");
-    let pairs = focuslock::enforce::resolve::resolve_hosts(&targets);
+    let pairs = talysman::enforce::resolve::resolve_hosts(&targets);
     if pairs.is_empty() {
         println!("(no answers — port 5354 busy/blocked, or all upstreams timed out)");
         return;

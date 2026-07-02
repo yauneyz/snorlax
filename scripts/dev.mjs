@@ -6,7 +6,7 @@
  *
  * To exercise REAL enforcement in dev, separately run the native service in console mode
  * from an elevated terminal (see build-guide.md):
- *   cargo run --manifest-path native/windows/Cargo.toml --bin focuslock-svc -- --console
+ *   cargo run --manifest-path native/windows/Cargo.toml --bin talysman-svc -- --console
  */
 
 import { spawn } from 'node:child_process';
@@ -18,7 +18,7 @@ const desktop = resolve(root, 'apps/desktop');
 
 process.env.APP_ENV ??= 'development';
 
-const child = spawn('pnpm', ['--filter', '@focuslock/desktop', 'dev'], {
+const child = spawn('pnpm', ['--filter', '@talysman/desktop', 'dev'], {
   cwd: root,
   stdio: 'inherit',
   shell: process.platform === 'win32',

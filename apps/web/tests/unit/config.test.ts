@@ -7,14 +7,13 @@ const securityEnv = {
 };
 
 const extensionHostingEnv = {
-  EXTENSION_ARTIFACTS_BUCKET: "focuslock-extension-artifacts-prod",
+  EXTENSION_ARTIFACTS_BUCKET: "talysman-extension-artifacts-prod",
   EXTENSION_ARTIFACTS_REGION: "us-east-1",
   EXTENSION_PUBLIC_S3_BASE_URL:
-    "https://focuslock-extension-artifacts-prod.s3.us-east-1.amazonaws.com",
-  EXTENSION_PUBLIC_APP_BASE_URL: "https://focuslock.app/ext",
-  EXTENSION_CHROMIUM_UPDATE_URL: "https://focuslock.app/ext/chromium/updates.xml",
-  EXTENSION_FIREFOX_UPDATE_URL: "https://focuslock.app/ext/firefox/updates.json",
-  EXTENSION_FIREFOX_XPI_URL: "https://focuslock.app/ext/firefox/focuslock-0.1.0.xpi",
+    "https://talysman-extension-artifacts-prod.s3.us-east-1.amazonaws.com",
+  EXTENSION_CHROME_STORE_URL: "https://chromewebstore.google.com/detail/talysman",
+  EXTENSION_EDGE_STORE_URL: "https://microsoftedge.microsoft.com/addons/detail/talysman",
+  EXTENSION_FIREFOX_STORE_URL: "https://addons.mozilla.org/firefox/addon/talysman/",
 };
 
 describe("config schemas", () => {

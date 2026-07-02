@@ -1,4 +1,4 @@
-//! focuslock-natmsg.exe — the browser native-messaging host that bridges the FocusLock extension
+//! talysman-natmsg.exe — the browser native-messaging host that bridges the Talysman extension
 //! to the privileged service.
 //!
 //! Browsers can't talk to our named pipe, so the extension speaks Chrome/Firefox **native
@@ -26,7 +26,7 @@ use tokio::io::{AsyncReadExt, AsyncWriteExt, BufReader};
 use tokio::net::windows::named_pipe::ClientOptions;
 use tokio::sync::{mpsc, Mutex};
 
-use focuslock::constants::{pipe_path, PIPE_BASE_DEV, PIPE_BASE_PROD};
+use talysman::constants::{pipe_path, PIPE_BASE_DEV, PIPE_BASE_PROD};
 
 use windows::Win32::Foundation::CloseHandle;
 use windows::Win32::System::Diagnostics::ToolHelp::{

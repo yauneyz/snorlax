@@ -14,11 +14,11 @@
 
 use crate::run::run_command;
 
-const DOT_TCP_RULE: &str = "FocusLock-DoT-TCP";
-const DOT_UDP_RULE: &str = "FocusLock-DoT-UDP";
-const DOH_TCP_RULE: &str = "FocusLock-DoH-TCP";
-const DOH_UDP_RULE: &str = "FocusLock-DoH-UDP";
-const QUIC_UDP_RULE: &str = "FocusLock-QUIC-UDP";
+const DOT_TCP_RULE: &str = "Talysman-DoT-TCP";
+const DOT_UDP_RULE: &str = "Talysman-DoT-UDP";
+const DOH_TCP_RULE: &str = "Talysman-DoH-TCP";
+const DOH_UDP_RULE: &str = "Talysman-DoH-UDP";
+const QUIC_UDP_RULE: &str = "Talysman-QUIC-UDP";
 
 /// Well-known public DoH resolver endpoint IPs (v4 + v6, CIDR where providers use anycast
 /// ranges). Blocking 443 to these closes the hardcoded-IP DoH path; an app would need an
@@ -108,7 +108,7 @@ pub fn block_quic() {
     add_block_rule(QUIC_UDP_RULE, "UDP", 443, None);
 }
 
-/// Remove all FocusLock firewall rules.
+/// Remove all Talysman firewall rules.
 pub fn clear_rules() {
     delete_rule(DOT_TCP_RULE);
     delete_rule(DOT_UDP_RULE);

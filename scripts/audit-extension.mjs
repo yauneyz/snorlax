@@ -49,7 +49,7 @@ for (const store of ["chrome", "edge", "firefox"]) {
   assertMinimalManifest(manifest, store);
   if (store === "firefox") {
     const gecko = manifest.browser_specific_settings?.gecko;
-    if (gecko?.id !== "focuslock@focuslock.app") fail("firefox: Gecko ID changed");
+    if (gecko?.id !== "talysman@talysman.app") fail("firefox: Gecko ID changed");
     if (JSON.stringify(gecko?.data_collection_permissions?.required) !== '["none"]') {
       fail('firefox: data_collection_permissions.required must be ["none"]');
     }

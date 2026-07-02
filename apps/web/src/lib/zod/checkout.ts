@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { checkoutPriceSchema } from "@focuslock/product";
+import { checkoutPriceSchema } from "@talysman/product";
 
 export const checkoutSchema = z.object({
   price: checkoutPriceSchema,

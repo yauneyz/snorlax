@@ -1,4 +1,4 @@
-//! focuslock-svcctl.exe — the elevated install/configure/recover/remove CLI (architecture
+//! talysman-svcctl.exe — the elevated install/configure/recover/remove CLI (architecture
 //! §4, §13). Invoked by the NSIS installer (and usable by support). Must run as administrator.
 //!
 //! Subcommands:
@@ -13,10 +13,10 @@ use std::time::Duration;
 
 use anyhow::{Context, Result};
 
-use focuslock::constants::{pipe_path, PIPE_BASE_PROD, SERVICE_DISPLAY_NAME, SERVICE_NAME};
-use focuslock::pairing;
-use focuslock::paths;
-use focuslock::secure_store::SecureStore;
+use talysman::constants::{pipe_path, PIPE_BASE_PROD, SERVICE_DISPLAY_NAME, SERVICE_NAME};
+use talysman::pairing;
+use talysman::paths;
+use talysman::secure_store::SecureStore;
 use windows::Win32::Foundation::ERROR_SERVICE_EXISTS;
 
 use windows_service::service::{
@@ -30,7 +30,7 @@ fn svc_exe_path() -> Result<std::path::PathBuf> {
         .parent()
         .context("no parent dir for current exe")?
         .to_path_buf();
-    Ok(dir.join("focuslock-svc.exe"))
+    Ok(dir.join("talysman-svc.exe"))
 }
 
 fn install() -> Result<()> {
@@ -196,12 +196,12 @@ fn gen_code() -> Result<()> {
     store.save().context("save secure store")?;
 
     let path = paths::recovery_code_file();
-    let _ = std::fs::write(&path, format!("FocusLock recovery code: {code}\n"));
+    let _ = std::fs::write(&path, format!("Talysman recovery code: {code}\n"));
 
-    println!("\n==================== FocusLock RECOVERY CODE ====================");
+    println!("\n==================== Talysman RECOVERY CODE ====================");
     println!("  {code}");
     println!("  Save this somewhere safe. If you ever get locked out and can't");
-    println!("  use your USB key, run:  focuslock-recover.exe --code {code}");
+    println!("  use your USB key, run:  talysman-recover.exe --code {code}");
     println!("  (also written to {})", path.display());
     println!("================================================================\n");
     Ok(())
@@ -254,7 +254,7 @@ fn main() {
         "guard-uninstall" => guard_uninstall(),
         _ => {
             eprintln!(
-                "usage: focuslock-svcctl <install|uninstall|start|stop|status|gen-code|guard-uninstall>"
+                "usage: talysman-svcctl <install|uninstall|start|stop|status|gen-code|guard-uninstall>"
             );
             std::process::exit(2);
         }

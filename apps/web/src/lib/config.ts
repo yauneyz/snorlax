@@ -62,10 +62,9 @@ const serverSchemaBase = publicSchema.extend({
   EXTENSION_ARTIFACTS_BUCKET: z.string().min(1),
   EXTENSION_ARTIFACTS_REGION: z.string().min(1).default("us-east-1"),
   EXTENSION_PUBLIC_S3_BASE_URL: z.string().url(),
-  EXTENSION_PUBLIC_APP_BASE_URL: z.string().url(),
-  EXTENSION_CHROMIUM_UPDATE_URL: z.string().url(),
-  EXTENSION_FIREFOX_UPDATE_URL: z.string().url(),
-  EXTENSION_FIREFOX_XPI_URL: z.string().url(),
+  EXTENSION_CHROME_STORE_URL: z.union([z.string().url(), z.literal("")]).optional().default(""),
+  EXTENSION_EDGE_STORE_URL: z.union([z.string().url(), z.literal("")]).optional().default(""),
+  EXTENSION_FIREFOX_STORE_URL: z.union([z.string().url(), z.literal("")]).optional().default(""),
   LLM_PROVIDER: z.enum(["openai", "local"]).default("openai"),
   OPENAI_API_KEY: z.string().optional().default(""),
   OPENAI_DEFAULT_MODEL: z.string().min(1).default("gpt-5.1"),
@@ -210,17 +209,14 @@ export const config = {
     publicS3BaseUrl: isServer
       ? (parsed as z.infer<typeof serverSchema>).EXTENSION_PUBLIC_S3_BASE_URL
       : "",
-    publicAppBaseUrl: isServer
-      ? (parsed as z.infer<typeof serverSchema>).EXTENSION_PUBLIC_APP_BASE_URL
+  },
+  extensionStores: {
+    chromeUrl: isServer
+      ? (parsed as z.infer<typeof serverSchema>).EXTENSION_CHROME_STORE_URL
       : "",
-    chromiumUpdateUrl: isServer
-      ? (parsed as z.infer<typeof serverSchema>).EXTENSION_CHROMIUM_UPDATE_URL
-      : "",
-    firefoxUpdateUrl: isServer
-      ? (parsed as z.infer<typeof serverSchema>).EXTENSION_FIREFOX_UPDATE_URL
-      : "",
-    firefoxXpiUrl: isServer
-      ? (parsed as z.infer<typeof serverSchema>).EXTENSION_FIREFOX_XPI_URL
+    edgeUrl: isServer ? (parsed as z.infer<typeof serverSchema>).EXTENSION_EDGE_STORE_URL : "",
+    firefoxUrl: isServer
+      ? (parsed as z.infer<typeof serverSchema>).EXTENSION_FIREFOX_STORE_URL
       : "",
   },
   openai: {
