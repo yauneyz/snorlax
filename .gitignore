@@ -50,3 +50,4 @@ Thumbs.db
 
 # Recovery codes must never be committed
 recovery-code.txt
+.env.vercel

@@ -16,7 +16,7 @@
  */
 
 import { execFileSync, spawnSync } from 'node:child_process';
-import { copyFileSync, existsSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
+import { copyFileSync, existsSync, readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -50,6 +50,8 @@ function packageVersion() {
 }
 
 function buildAppImage() {
+  const buildStartedAt = Date.now();
+
   // Reuse the standard orchestration (native Rust + extension + electron + electron-builder).
   if (rustToolchainAvailable()) {
     run('pnpm', ['run', 'build:linux']);
@@ -60,15 +62,21 @@ function buildAppImage() {
     throw new Error('cargo is required to build the native Linux service. Install Rust or run on a system with nix.');
   }
 
-  const built = readdirSync(distDir).filter(
-    (f) => f.endsWith('.AppImage') && f !== 'snorlax.AppImage',
-  );
+  // Only accept AppImages written by this build — a leftover artifact from before a
+  // rename (e.g. FocusLock-*.AppImage) must never be released again.
+  const built = readdirSync(distDir)
+    .filter((f) => f.endsWith('.AppImage') && f !== 'snorlax.AppImage')
+    .map((f) => ({ name: f, mtimeMs: statSync(join(distDir, f)).mtimeMs }))
+    .filter((f) => f.mtimeMs >= buildStartedAt)
+    .sort((a, b) => b.mtimeMs - a.mtimeMs);
   if (built.length === 0) {
-    throw new Error(`No *.AppImage produced in ${distDir} — check the AppImage target in electron-builder.yml`);
+    throw new Error(
+      `No fresh *.AppImage produced in ${distDir} — check the AppImage target in electron-builder.yml (stale artifacts are ignored)`,
+    );
   }
   // Stable name so the Nix store key doesn't depend on the version string.
-  copyFileSync(join(distDir, built[0]), stableAppImage);
-  console.log(`\n📋 Copied ${built[0]} → snorlax.AppImage`);
+  copyFileSync(join(distDir, built[0].name), stableAppImage);
+  console.log(`\n📋 Copied ${built[0].name} → snorlax.AppImage`);
 }
 
 function installIntoNixStore(version) {

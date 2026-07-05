@@ -15,7 +15,15 @@
       "Bash(cargo build *)",
       "Bash(pnpm typecheck *)",
       "Bash(pnpm --filter @talysman/web test)",
-      "Bash(pnpm test *)"
+      "Bash(pnpm test *)",
+      "Bash(systemctl status *)",
+      "Read(//run/talysman/**)",
+      "Read(//var/lib/talysman/**)",
+      "Bash(talysman-svcctl status *)",
+      "Bash(/nix/store/n6r1kppclqgk197a2lrzc0spnpcj54j2-talysman-daemon-0.1.0/bin/talysman-svcctl status *)",
+      "Bash(talysman-svcctl --help)",
+      "Bash(sudo -n cat /var/lib/talysman/state.json)",
+      "Bash(pnpm run *)"
     ]
   }
 }

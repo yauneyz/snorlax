@@ -1,6 +1,5 @@
-import pkg from "@eslint/eslintrc";
+import { FlatCompat } from "@eslint/eslintrc";
 
-const { FlatCompat } = pkg;
 const compat = new FlatCompat({ baseDirectory: import.meta.dirname });
 
 export default [
