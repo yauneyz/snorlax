@@ -213,6 +213,10 @@ The renderer shows plan-gated UI based on an `Entitlement` that now comes from t
   - In **production**: `GET {API_BASE_URL}/api/desktop/entitlement` with the bearer access
     token; the result is validated with `entitlementSchema` and cached to
     `entitlement-cache.json` in `userData`. No token → `free`/inactive.
+  - **Local release override:** `pnpm run release:local` embeds a local Ed25519 public key and
+    writes a signed `~/.config/talysman/local-entitlement.json` granting Pro for the current
+    Linux user/hostname. Production desktop builds trust that file before the network only when
+    the matching public key was embedded at build time; the private key stays outside the app.
   - **Offline:** while signed in, the last-known cached entitlement is served **indefinitely**
     (`source: 'offline'`); re-evaluation happens on the next successful online call. (Focus
     enforcement is independent — native service + USB-key gate — so entitlement is feature

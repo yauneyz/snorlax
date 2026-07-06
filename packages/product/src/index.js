@@ -6,6 +6,7 @@ export const checkoutPriceSchema = z.enum(CHECKOUT_PRICES);
 export const entitlementSourceSchema = z.enum([
     'stub',
     'dev-override',
+    'local-license',
     'server',
     'cache',
     'offline',

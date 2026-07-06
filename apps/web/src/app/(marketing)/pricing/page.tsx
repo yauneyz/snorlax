@@ -17,13 +17,13 @@ export default function PricingPage() {
         <PricingCard
           plan="monthly"
           title="Monthly"
-          priceLabel="$20 / month"
+          priceLabel="$10 / month"
           features={["Full access", "Cancel anytime", "Standard support"]}
         />
         <PricingCard
           plan="yearly"
           title="Yearly"
-          priceLabel="$192 / year"
+          priceLabel="$100 / year"
           features={["Full access", "Two months free", "Priority support"]}
         />
       </div>

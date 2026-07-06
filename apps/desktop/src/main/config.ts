@@ -17,6 +17,8 @@ export interface MainConfig {
   /** Supabase project URL + publishable anon key for the main-process auth client. */
   supabaseUrl: string;
   supabaseAnonKey: string;
+  /** Optional base64 SPKI Ed25519 public key for signed offline local entitlements. */
+  localEntitlementPublicKey: string;
 }
 
 function build(): MainConfig {
@@ -30,6 +32,7 @@ function build(): MainConfig {
           API_BASE_URL: process.env.API_BASE_URL ?? '',
           VITE_SUPABASE_URL: process.env.VITE_SUPABASE_URL ?? '',
           VITE_SUPABASE_ANON_KEY: process.env.VITE_SUPABASE_ANON_KEY ?? '',
+          LOCAL_ENTITLEMENT_PUBLIC_KEY: process.env.LOCAL_ENTITLEMENT_PUBLIC_KEY ?? '',
         };
 
   const appEnv = injected.APP_ENV;
@@ -46,6 +49,7 @@ function build(): MainConfig {
     apiBaseUrl: injected.API_BASE_URL.replace(/\/$/, ''),
     supabaseUrl: injected.VITE_SUPABASE_URL,
     supabaseAnonKey: injected.VITE_SUPABASE_ANON_KEY,
+    localEntitlementPublicKey: injected.LOCAL_ENTITLEMENT_PUBLIC_KEY,
   };
 }
 

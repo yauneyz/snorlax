@@ -16,8 +16,18 @@
  */
 
 import { execFileSync, spawnSync } from 'node:child_process';
-import { copyFileSync, existsSync, readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs';
-import { homedir } from 'node:os';
+import { createPrivateKey, createPublicKey, generateKeyPairSync, sign } from 'node:crypto';
+import {
+  chmodSync,
+  copyFileSync,
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  readdirSync,
+  statSync,
+  writeFileSync,
+} from 'node:fs';
+import { homedir, hostname, userInfo } from 'node:os';
 import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -26,6 +36,11 @@ const distDir = join(root, 'dist');
 const nixSnorlaxDir = join(homedir(), 'nixos-config/pkgs/snorlax');
 const stableAppImage = join(distDir, 'snorlax.AppImage');
 const dryRun = process.argv.slice(2).includes('--dry-run');
+const localConfigDir = join(process.env.XDG_CONFIG_HOME ?? join(homedir(), '.config'), 'talysman');
+const localKeyDir = join(localConfigDir, 'keys');
+const localPrivateKeyPath = join(localKeyDir, 'local-entitlement-ed25519-private.pem');
+const localEntitlementPath = join(localConfigDir, 'local-entitlement.json');
+const localEntitlementDays = 365;
 
 function run(cmd, args, opts = {}) {
   console.log(`\n› ${cmd} ${args.join(' ')}`);
@@ -47,6 +62,87 @@ function rustToolchainAvailable() {
 
 function packageVersion() {
   return JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')).version;
+}
+
+function canonicalJson(value) {
+  if (value === null || typeof value !== 'object') return JSON.stringify(value);
+  if (Array.isArray(value)) return `[${value.map((item) => canonicalJson(item)).join(',')}]`;
+
+  const entries = Object.entries(value)
+    .filter(([, v]) => v !== undefined)
+    .sort(([a], [b]) => a.localeCompare(b));
+
+  return `{${entries.map(([k, v]) => `${JSON.stringify(k)}:${canonicalJson(v)}`).join(',')}}`;
+}
+
+function localUserName() {
+  try {
+    return userInfo().username;
+  } catch {
+    return process.env.USER ?? process.env.USERNAME ?? '';
+  }
+}
+
+function ensureLocalEntitlementKey() {
+  if (existsSync(localPrivateKeyPath)) {
+    const privateKey = createPrivateKey(readFileSync(localPrivateKeyPath, 'utf8'));
+    const publicKey = createPublicKey(privateKey)
+      .export({ format: 'der', type: 'spki' })
+      .toString('base64');
+    return { privateKey, publicKey };
+  }
+
+  const { privateKey } = generateKeyPairSync('ed25519');
+  if (!dryRun) {
+    mkdirSync(localKeyDir, { recursive: true, mode: 0o700 });
+    writeFileSync(
+      localPrivateKeyPath,
+      privateKey.export({ format: 'pem', type: 'pkcs8' }),
+      { mode: 0o600 },
+    );
+    chmodSync(localPrivateKeyPath, 0o600);
+    console.log(`🔐 Created local entitlement signing key at ${localPrivateKeyPath}`);
+  }
+
+  const publicKey = createPublicKey(privateKey)
+    .export({ format: 'der', type: 'spki' })
+    .toString('base64');
+  return { privateKey, publicKey };
+}
+
+function writeLocalEntitlementLicense(privateKey, version) {
+  const issuedAt = new Date();
+  const expiresAt = new Date(issuedAt.getTime() + localEntitlementDays * 24 * 60 * 60 * 1000);
+  const payload = {
+    version: 1,
+    plan: 'pro',
+    issuedAt: issuedAt.toISOString(),
+    expiresAt: expiresAt.toISOString(),
+    reason: 'release-local',
+    hostname: hostname(),
+    user: localUserName(),
+  };
+  const signature = sign(null, Buffer.from(canonicalJson(payload), 'utf8'), privateKey).toString(
+    'base64url',
+  );
+  const license = { ...payload, signature };
+
+  if (dryRun) {
+    console.log(
+      `🧪 [DRY RUN] would write signed local entitlement for ${payload.user}@${payload.hostname}`,
+    );
+    return;
+  }
+
+  mkdirSync(localConfigDir, { recursive: true, mode: 0o700 });
+  writeFileSync(localEntitlementPath, `${JSON.stringify(license, null, 2)}\n`, { mode: 0o600 });
+  chmodSync(localEntitlementPath, 0o600);
+  console.log(
+    `🎟️  Wrote local Pro entitlement for ${payload.user}@${payload.hostname} ` +
+      `(expires ${expiresAt.toISOString().slice(0, 10)})`,
+  );
+  console.log(`   ${localEntitlementPath}`);
+  console.log(`   app version ${version}`);
 }
 
 function buildAppImage() {
@@ -115,6 +211,10 @@ function installIntoNixStore(version) {
 
 const version = packageVersion();
 console.log(`🏷️  snorlax local release: v${version}${dryRun ? ' (dry run)' : ''}`);
+const localEntitlementKey = ensureLocalEntitlementKey();
+process.env.LOCAL_ENTITLEMENT_PUBLIC_KEY = localEntitlementKey.publicKey;
+console.log('🔏 Embedding local entitlement public key for release-local builds');
 buildAppImage();
+writeLocalEntitlementLicense(localEntitlementKey.privateKey, version);
 installIntoNixStore(version);
 console.log('\n🎉 Done.');

@@ -11,15 +11,18 @@ import react from '@vitejs/plugin-react';
  */
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, resolve(__dirname, '../..'), '');
+  const envValue = (name: string) => process.env[name] ?? env[name];
+  const appEnv = envValue('APP_ENV') ?? 'development';
 
   const appConfig = {
-    APP_ENV: env.APP_ENV ?? 'development',
+    APP_ENV: appEnv,
     TALYSMAN_PIPE:
-      env.TALYSMAN_PIPE ?? (env.APP_ENV === 'production' ? 'talysman' : 'talysman-dev'),
+      envValue('TALYSMAN_PIPE') ?? (appEnv === 'production' ? 'talysman' : 'talysman-dev'),
     // Public endpoints the main process needs to talk to the web backend + Supabase (§auth).
-    API_BASE_URL: env.API_BASE_URL ?? '',
-    VITE_SUPABASE_URL: env.VITE_SUPABASE_URL ?? '',
-    VITE_SUPABASE_ANON_KEY: env.VITE_SUPABASE_ANON_KEY ?? '',
+    API_BASE_URL: envValue('API_BASE_URL') ?? '',
+    VITE_SUPABASE_URL: envValue('VITE_SUPABASE_URL') ?? '',
+    VITE_SUPABASE_ANON_KEY: envValue('VITE_SUPABASE_ANON_KEY') ?? '',
+    LOCAL_ENTITLEMENT_PUBLIC_KEY: envValue('LOCAL_ENTITLEMENT_PUBLIC_KEY') ?? '',
   };
 
   const alias = {

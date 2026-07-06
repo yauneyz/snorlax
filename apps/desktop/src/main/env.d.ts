@@ -5,4 +5,5 @@ declare const __APP_CONFIG__: {
   API_BASE_URL: string;
   VITE_SUPABASE_URL: string;
   VITE_SUPABASE_ANON_KEY: string;
+  LOCAL_ENTITLEMENT_PUBLIC_KEY: string;
 };

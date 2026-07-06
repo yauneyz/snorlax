@@ -15,6 +15,7 @@
     "web:build": "pnpm --filter @talysman/web build",
     "web:start": "pnpm --filter @talysman/web start",
     "web:test": "pnpm --filter @talysman/web test",
+    "web:test:webhook": "pnpm --filter @talysman/web test:webhook",
     "web:test:e2e": "pnpm --filter @talysman/web test:e2e",
     "build:win": "cross-env APP_ENV=production node scripts/build.mjs --target win",
     "build:linux": "cross-env APP_ENV=production node scripts/build.mjs --target linux",

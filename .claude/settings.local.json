@@ -23,7 +23,28 @@
       "Bash(/nix/store/n6r1kppclqgk197a2lrzc0spnpcj54j2-talysman-daemon-0.1.0/bin/talysman-svcctl status *)",
       "Bash(talysman-svcctl --help)",
       "Bash(sudo -n cat /var/lib/talysman/state.json)",
-      "Bash(pnpm run *)"
+      "Bash(pnpm run *)",
+      "Bash(stripe --version)",
+      "Bash(stripe config *)",
+      "mcp__stripe__get_stripe_account_info",
+      "Bash(stripe products *)",
+      "mcp__stripe__stripe_api_read",
+      "mcp__stripe__stripe_api_write",
+      "Bash(stripe sandbox *)",
+      "Bash(XDG_CONFIG_HOME=/tmp/claude-1001/-data-zac-zac-development-snorlax/7592d466-8a1d-4a79-bffd-68faa3a5e700/scratchpad/stripe-clean stripe sandbox create)",
+      "Bash(XDG_CONFIG_HOME=/tmp/claude-1001/-data-zac-zac-development-snorlax/7592d466-8a1d-4a79-bffd-68faa3a5e700/scratchpad/stripe-clean stripe sandbox create --email zac.yauney@gmail.com)",
+      "Bash(export STRIPE_API_KEY=rkcs_test_51TpxGgCxjalW9oJnFaopC5jfBCaM4kMLpSZEVpMyLsKiEP1enjbYNxItOsZujDiPERIcT2Kl0W41weTMXKPbaT00nIW69DEP)",
+      "Bash(stripe listen *)",
+      "mcp__stripe__stripe_api_search",
+      "Bash(STRIPE_CLI_API_KEY=rkcs_test_51TpxGgCxjalW9oJnFaopC5jfBCaM4kMLpSZEVpMyLsKiEP1enjbYNxItOsZujDiPERIcT2Kl0W41weTMXKPbaT00nIW69DEP pnpm test:webhook)",
+      "Bash(grep -rn '\\\\$[0-9]\\\\+\\\\|price\\\\|month' /data/zac/zac/development/snorlax/apps/web/src/components/marketing/PricingCard.tsx)",
+      "Bash(grep -rn 'PricingCard\\\\|\\\\$[0-9]' \"/data/zac/zac/development/snorlax/apps/web/src/app/\\(marketing\\)/page.tsx\")",
+      "Bash(grep -rn 'priceLabel\\\\|\\\\$' \"/data/zac/zac/development/snorlax/apps/web/src/app/\\(marketing\\)/pricing/page.tsx\")",
+      "Bash(grep -rn '\\\\$[0-9]\\\\|/mo\\\\|/month\\\\|/year' /data/zac/zac/development/snorlax/apps/desktop/src/renderer/pages/Plans.tsx)",
+      "Bash(grep -rn 'month\\\\|year\\\\|\\\\$' /data/zac/zac/development/snorlax/apps/desktop/src/renderer/pages/Plans.tsx)"
     ]
+  },
+  "enabledPlugins": {
+    "stripe@claude-plugins-official": true
   }
 }

@@ -15,6 +15,7 @@
 import { app } from 'electron';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
+import { homedir } from 'node:os';
 import {
   type Entitlement,
   type SubscriptionPlan,
@@ -23,6 +24,10 @@ import {
 } from '@talysman/product';
 import { config } from '../config.js';
 import { logger } from '../logging.js';
+import {
+  LOCAL_ENTITLEMENT_FILE,
+  verifyLocalEntitlementLicense,
+} from './localEntitlement.js';
 import { getAccessToken } from './supabase.js';
 
 const DEFAULT_DEV_PLAN: SubscriptionPlan = 'pro';
@@ -41,6 +46,10 @@ async function userDataFile(name: string): Promise<string> {
   const dir = app.getPath('userData');
   await mkdir(dir, { recursive: true });
   return join(dir, name);
+}
+
+function xdgConfigFile(name: string): string {
+  return join(process.env.XDG_CONFIG_HOME ?? join(homedir(), '.config'), 'talysman', name);
 }
 
 // --- dev override (non-production only) ---------------------------------------------------
@@ -100,11 +109,43 @@ async function fetchServerEntitlement(token: string): Promise<Entitlement | unde
   return entitlementSchema.parse(await res.json());
 }
 
+// --- signed local entitlement (release-local / offline) ----------------------------------
+
+async function localEntitlementFiles(): Promise<string[]> {
+  const files = [await userDataFile(LOCAL_ENTITLEMENT_FILE), xdgConfigFile(LOCAL_ENTITLEMENT_FILE)];
+  return [...new Set(files)];
+}
+
+async function loadLocalEntitlement(): Promise<Entitlement | undefined> {
+  if (!config.localEntitlementPublicKey) return undefined;
+
+  for (const file of await localEntitlementFiles()) {
+    let raw: string;
+    try {
+      raw = await readFile(file, 'utf8');
+    } catch {
+      continue;
+    }
+
+    const result = verifyLocalEntitlementLicense(raw, {
+      publicKey: config.localEntitlementPublicKey,
+    });
+    if (result.ok) return result.entitlement;
+
+    logger.warn(`[entitlement] ignoring invalid local entitlement ${file}: ${result.reason}`);
+  }
+
+  return undefined;
+}
+
 // --- public API ---------------------------------------------------------------------------
 
 export async function getEntitlement(): Promise<Entitlement> {
   // Dev override short-circuits the network in non-production builds.
   if (config.appEnv !== 'production') return loadDevEntitlement();
+
+  const localEntitlement = await loadLocalEntitlement();
+  if (localEntitlement) return localEntitlement;
 
   const token = await getAccessToken();
   if (!token) return SIGNED_OUT;
