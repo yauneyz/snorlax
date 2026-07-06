@@ -25,7 +25,8 @@ fn connect() -> Option<UnixStream> {
 
 /// Send a single NDJSON request and return the parsed response envelope.
 fn request(mut stream: UnixStream, method: &str) -> std::io::Result<Value> {
-    let req = format!("{{\"kind\":\"request\",\"id\":1,\"method\":\"{method}\",\"params\":{{}}}}\n");
+    let req =
+        format!("{{\"kind\":\"request\",\"id\":1,\"method\":\"{method}\",\"params\":{{}}}}\n");
     stream.write_all(req.as_bytes())?;
 
     let mut reader = BufReader::new(stream);
@@ -54,7 +55,11 @@ pub fn run(enable: bool) -> ExitCode {
         return ExitCode::FAILURE;
     };
 
-    let method = if enable { "enableFocus" } else { "disableFocus" };
+    let method = if enable {
+        "enableFocus"
+    } else {
+        "disableFocus"
+    };
     let resp = match request(stream, method) {
         Ok(v) => v,
         Err(e) => {

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import * as Sentry from "@sentry/nextjs";
 import { requireUser } from "@/lib/auth/require-user";
+import { captureException } from "@/lib/sentry";
 import { createCheckoutSession } from "@/lib/stripe/checkout";
 import { checkoutSchema } from "@/lib/zod/checkout";
 
@@ -20,7 +20,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ url });
   } catch (err) {
     // Internal details (profile lookups, Stripe errors) go to Sentry, not the client.
-    Sentry.captureException(err, { extra: { userId: user.id, route: "stripe/checkout" } });
+    await captureException(err, { userId: user.id, route: "stripe/checkout" });
     return NextResponse.json({ error: "Checkout failed — please try again" }, { status: 500 });
   }
 }

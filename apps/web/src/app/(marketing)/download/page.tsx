@@ -16,7 +16,11 @@ type DesktopInstaller = {
 const desktopInstallers: DesktopInstaller[] = [
   { os: "Windows", note: "Windows 10/11 · 64-bit", href: "/api/desktop/download?platform=win" },
   { os: "macOS", note: "Apple Silicon & Intel", href: "/api/desktop/download?platform=mac" },
-  { os: "Linux", note: "AppImage · x86-64", href: "/api/desktop/download?platform=linux" },
+  {
+    os: "Linux",
+    note: ".deb · Debian/Ubuntu · x86-64",
+    href: "/api/desktop/download?platform=linux",
+  },
 ];
 
 type ExtensionLink = {

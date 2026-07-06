@@ -80,7 +80,7 @@ vi.mock("@/lib/resend/send", () => ({
   },
 }));
 
-vi.mock("@sentry/nextjs", () => ({
+vi.mock("@/lib/sentry", () => ({
   captureException: (err: unknown) => {
     state.errors.push(err);
     console.error("[stripe-webhook-cli] Sentry.captureException:", err);

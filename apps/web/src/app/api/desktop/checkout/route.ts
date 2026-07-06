@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import * as Sentry from "@sentry/nextjs";
 import { createCheckoutSession as createBillingCheckoutSession } from "@talysman/billing-server";
 import { checkoutSchema } from "@/lib/zod/checkout";
 import { requireBearerUser, UnauthorizedError } from "@/lib/auth/require-bearer-user";
+import { captureException } from "@/lib/sentry";
 import { getStripe } from "@/lib/stripe/client";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { config } from "@/lib/config";
@@ -38,7 +38,7 @@ export async function POST(request: NextRequest) {
     if (err instanceof UnauthorizedError) {
       return NextResponse.json({ error: err.message }, { status: 401 });
     }
-    Sentry.captureException(err, { extra: { route: "desktop/checkout" } });
+    await captureException(err, { route: "desktop/checkout" });
     return NextResponse.json({ error: "Checkout failed - please try again" }, { status: 500 });
   }
 }

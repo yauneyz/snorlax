@@ -306,7 +306,13 @@ mod tests {
 
         // Tick 1: warn.
         let a = wd.tick(t0, &roots, &hb);
-        assert_eq!(a, vec![Action::Warn { pid: 100, browser: "chrome".into() }]);
+        assert_eq!(
+            a,
+            vec![Action::Warn {
+                pid: 100,
+                browser: "chrome".into()
+            }]
+        );
 
         // Still within warn grace: nothing.
         let a = wd.tick(t0 + Duration::from_secs(5), &roots, &hb);
@@ -314,15 +320,33 @@ mod tests {
 
         // Past warn grace: close.
         let a = wd.tick(t0 + Duration::from_secs(11), &roots, &hb);
-        assert_eq!(a, vec![Action::Close { pid: 100, browser: "chrome".into() }]);
+        assert_eq!(
+            a,
+            vec![Action::Close {
+                pid: 100,
+                browser: "chrome".into()
+            }]
+        );
 
         // Past close grace: kill.
         let a = wd.tick(t0 + Duration::from_secs(20), &roots, &hb);
-        assert_eq!(a, vec![Action::Kill { pid: 100, browser: "chrome".into() }]);
+        assert_eq!(
+            a,
+            vec![Action::Kill {
+                pid: 100,
+                browser: "chrome".into()
+            }]
+        );
 
         // Still present next tick: keep killing.
         let a = wd.tick(t0 + Duration::from_secs(21), &roots, &hb);
-        assert_eq!(a, vec![Action::Kill { pid: 100, browser: "chrome".into() }]);
+        assert_eq!(
+            a,
+            vec![Action::Kill {
+                pid: 100,
+                browser: "chrome".into()
+            }]
+        );
     }
 
     #[test]
@@ -360,7 +384,13 @@ mod tests {
             },
         );
         let a = wd.tick(now, &[proc(100, BrowserClass::Supported, "chrome")], &hb);
-        assert_eq!(a, vec![Action::Warn { pid: 100, browser: "chrome".into() }]);
+        assert_eq!(
+            a,
+            vec![Action::Warn {
+                pid: 100,
+                browser: "chrome".into()
+            }]
+        );
     }
 
     #[test]
@@ -370,10 +400,22 @@ mod tests {
         let roots = vec![proc(300, BrowserClass::Unsupported, "librewolf")];
         // Straight to Close, no Warn.
         let a = wd.tick(t0, &roots, &HashMap::new());
-        assert_eq!(a, vec![Action::Close { pid: 300, browser: "librewolf".into() }]);
+        assert_eq!(
+            a,
+            vec![Action::Close {
+                pid: 300,
+                browser: "librewolf".into()
+            }]
+        );
         // Then Kill after close grace.
         let a = wd.tick(t0 + Duration::from_secs(9), &roots, &HashMap::new());
-        assert_eq!(a, vec![Action::Kill { pid: 300, browser: "librewolf".into() }]);
+        assert_eq!(
+            a,
+            vec![Action::Kill {
+                pid: 300,
+                browser: "librewolf".into()
+            }]
+        );
     }
 
     #[test]
@@ -382,11 +424,17 @@ mod tests {
         let t0 = Instant::now();
         let roots = vec![proc(100, BrowserClass::Supported, "chrome")];
         let _ = wd.tick(t0, &roots, &HashMap::new()); // Warn → tracked
-        // Process gone: empty scan clears its state.
+                                                      // Process gone: empty scan clears its state.
         let a = wd.tick(t0 + Duration::from_secs(1), &[], &HashMap::new());
         assert!(a.is_empty());
         // Same PID reappears → starts fresh at Warn, not mid-escalation.
         let a = wd.tick(t0 + Duration::from_secs(2), &roots, &HashMap::new());
-        assert_eq!(a, vec![Action::Warn { pid: 100, browser: "chrome".into() }]);
+        assert_eq!(
+            a,
+            vec![Action::Warn {
+                pid: 100,
+                browser: "chrome".into()
+            }]
+        );
     }
 }

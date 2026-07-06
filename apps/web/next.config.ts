@@ -14,6 +14,28 @@ const nextConfig: NextConfig = {
   images: {
     remotePatterns: [],
   },
+  webpack(config, { dev }) {
+    config.ignoreWarnings = [
+      ...(config.ignoreWarnings ?? []),
+      // Sentry's Node tracing integrations use dynamic require hooks. Webpack
+      // cannot statically trace them, but they are expected in this package.
+      {
+        module: /node_modules[\\/]@opentelemetry[\\/]instrumentation/,
+        message: /Critical dependency/,
+      },
+      {
+        module: /node_modules[\\/]require-in-the-middle[\\/]/,
+        message: /Critical dependency/,
+      },
+    ];
+    if (dev) {
+      config.infrastructureLogging = {
+        ...config.infrastructureLogging,
+        level: "error",
+      };
+    }
+    return config;
+  },
 };
 
 const sentryAuthToken = process.env.SENTRY_AUTH_TOKEN ?? "";

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import * as Sentry from "@sentry/nextjs";
 import { requireUser } from "@/lib/auth/require-user";
+import { captureException } from "@/lib/sentry";
 import { getStripe } from "@/lib/stripe/client";
 import { syncSubscription } from "@/lib/stripe/sync-subscription";
 import { config } from "@/lib/config";
@@ -31,7 +31,7 @@ export async function GET(request: NextRequest) {
     } catch (err) {
       // Non-fatal: the webhook will sync shortly; worst case the user is
       // bounced to /pricing until it does.
-      Sentry.captureException(err, { extra: { sessionId } });
+      await captureException(err, { sessionId });
     }
   }
 

@@ -5,7 +5,7 @@ import { syncSubscription } from "@/lib/stripe/sync-subscription";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { sendEmail } from "@/lib/resend/send";
 import { config } from "@/lib/config";
-import * as Sentry from "@sentry/nextjs";
+import { captureException } from "@/lib/sentry";
 
 // Node runtime is required: we read the raw body (`text()`) for signature
 // verification, and the Edge runtime does not expose what Stripe needs.
@@ -85,7 +85,7 @@ export async function POST(request: NextRequest) {
       }
     }
   } catch (err) {
-    Sentry.captureException(err, { extra: { eventType: event.type, eventId: event.id } });
+    await captureException(err, { eventType: event.type, eventId: event.id });
     // Returning 500 tells Stripe to retry.
     return NextResponse.json({ error: "Handler failed" }, { status: 500 });
   }
@@ -103,7 +103,7 @@ async function alreadyProcessed(eventId: string): Promise<boolean> {
   // On a failed lookup, process the event: sync is idempotent and a missed
   // dedup only risks a duplicate email, whereas skipping could lose the event.
   if (error) {
-    Sentry.captureException(error, { extra: { eventId, where: "alreadyProcessed" } });
+    await captureException(error, { eventId, where: "alreadyProcessed" });
     return false;
   }
   return data !== null;
@@ -114,7 +114,7 @@ async function markProcessed(event: Stripe.Event) {
     .from("stripe_events")
     .upsert({ id: event.id, type: event.type }, { onConflict: "id" });
   if (error) {
-    Sentry.captureException(error, { extra: { eventId: event.id, where: "markProcessed" } });
+    await captureException(error, { eventId: event.id, where: "markProcessed" });
   }
 }
 

@@ -1,7 +1,10 @@
-import * as Sentry from "@sentry/nextjs";
+import { isSentryEnabled } from "./config";
 
-export function captureException(err: unknown, context?: Record<string, unknown>) {
+export async function captureException(err: unknown, context?: Record<string, unknown>) {
+  if (!isSentryEnabled()) return;
+
+  const Sentry = await import("@sentry/nextjs");
   Sentry.captureException(err, context ? { extra: context } : undefined);
 }
 
-export { Sentry };
+export { isSentryEnabled, normalizeSentryDsn } from "./config";

@@ -40,17 +40,14 @@ nsis:
 linux:
   target:
     - deb
-    - AppImage
   category: Utility
   maintainer: Talysman <support@talysman.app>
   artifactName: ${productName}-${version}-${arch}.${ext}
 
-# The AppImage is a self-contained bundle for NixOS (wrapped via appimageTools in
-# the nixos-config repo). It must not rely on the deb installer hooks — on NixOS the
-# privileged daemon is built from source and started by a declarative systemd unit.
-appImage:
-  artifactName: ${productName}-${version}-${arch}.${ext}
-
+# The deb is the only Linux artifact. It ships the privileged daemon and installs it
+# via the after-install hook. On NixOS the same deb is unpacked by pkgs/snorlax in the
+# nixos-config repo (dpkg + autoPatchelf); there the daemon is built from source and
+# started by a declarative systemd unit instead of the deb hooks.
 deb:
   afterInstall: native/linux/installer/after-install.sh
   afterRemove: native/linux/installer/after-remove.sh

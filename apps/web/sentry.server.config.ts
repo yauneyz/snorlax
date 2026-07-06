@@ -1,8 +1,11 @@
 import * as Sentry from "@sentry/nextjs";
+import { normalizeSentryDsn } from "./src/lib/sentry/config";
 
-if (process.env.NEXT_PUBLIC_SENTRY_DSN) {
+const dsn = normalizeSentryDsn(process.env.NEXT_PUBLIC_SENTRY_DSN);
+
+if (dsn) {
   Sentry.init({
-    dsn: process.env.NEXT_PUBLIC_SENTRY_DSN,
+    dsn,
     environment: process.env.APP_ENVIRONMENT ?? "development",
     tracesSampleRate: 0.1,
   });

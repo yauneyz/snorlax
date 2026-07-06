@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import * as Sentry from "@sentry/nextjs";
 import { NoStripeCustomerError } from "@talysman/billing-server";
 import { requireBearerUser, UnauthorizedError } from "@/lib/auth/require-bearer-user";
+import { captureException } from "@/lib/sentry";
 import { createPortalSession } from "@/lib/stripe/portal";
 
 export async function POST(request: NextRequest) {
@@ -16,7 +16,7 @@ export async function POST(request: NextRequest) {
     if (err instanceof NoStripeCustomerError) {
       return NextResponse.json({ error: err.message }, { status: 400 });
     }
-    Sentry.captureException(err, { extra: { route: "desktop/portal" } });
+    await captureException(err, { route: "desktop/portal" });
     return NextResponse.json({ error: "Could not open the billing portal" }, { status: 500 });
   }
 }

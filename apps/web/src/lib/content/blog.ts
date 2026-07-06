@@ -5,7 +5,7 @@ import matter from "gray-matter";
 import { remark } from "remark";
 import remarkGfm from "remark-gfm";
 import remarkHtml from "remark-html";
-import { visit } from "unist-util-visit";
+import { visit, SKIP } from "unist-util-visit";
 import { blogFrontmatterSchema, type BlogFrontmatter } from "@/lib/zod/blog-frontmatter";
 import { config } from "@/lib/config";
 
@@ -25,6 +25,20 @@ function rewriteResourceUrls() {
       }
     });
   };
+}
+
+// Plain text of the post body (code blocks and raw HTML skipped), for excerpts.
+function extractText(content: string): string {
+  const tree = remark().parse(content);
+  const parts: string[] = [];
+  visit(tree as never, (node: { type: string; value?: string }) => {
+    if (node.type === "code" || node.type === "html") return SKIP;
+    if ((node.type === "text" || node.type === "inlineCode") && node.value) {
+      parts.push(node.value);
+    }
+    return undefined;
+  });
+  return parts.join(" ").replace(/\s+/g, " ").trim();
 }
 
 async function listPostFiles(): Promise<string[]> {
@@ -57,9 +71,9 @@ export async function listPosts(): Promise<PostSummary[]> {
     files.map(async (f) => {
       const { frontmatter, content } = await readPostFile(f);
       if (frontmatter.draft && config.app.environment === "production") return null;
+      const text = extractText(content);
       const excerpt =
-        content.replace(/\s+/g, " ").slice(0, EXCERPT_CHARS).trim() +
-        (content.length > EXCERPT_CHARS ? "…" : "");
+        text.slice(0, EXCERPT_CHARS).trim() + (text.length > EXCERPT_CHARS ? "…" : "");
       return { frontmatter, excerpt };
     }),
   );

@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import * as Sentry from "@sentry/nextjs";
 import {
   DESKTOP_BILLING_SUCCESS_PATH,
   desktopDeepLinkUrl,
 } from "@talysman/auth-contracts";
+import { captureException } from "@/lib/sentry";
 import { getStripe } from "@/lib/stripe/client";
 import { syncSubscription } from "@/lib/stripe/sync-subscription";
 
@@ -22,7 +22,7 @@ export async function GET(request: NextRequest) {
         await syncSubscription(session.subscription);
       }
     } catch (err) {
-      Sentry.captureException(err, { extra: { sessionId, route: "desktop/checkout/success" } });
+      await captureException(err, { sessionId, route: "desktop/checkout/success" });
     }
   }
 

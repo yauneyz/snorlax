@@ -10,7 +10,7 @@ export default defineConfig({
     },
   },
   test: {
-    include: ['tests/electron/unit/**/*.test.ts'],
+    include: ['tests/electron/unit/**/*.test.ts', 'tests/unit/**/*.test.ts'],
     environment: 'node',
   },
 });

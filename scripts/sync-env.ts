@@ -48,6 +48,26 @@ const optionalPosthogKey = z
     return trimmed.includes("...") ? "" : trimmed;
   });
 
+function normalizeOptionalSentryDsn(value: string | undefined): string {
+  const dsn = value?.trim() ?? "";
+  if (!dsn || dsn.includes("...")) {
+    return "";
+  }
+
+  try {
+    const url = new URL(dsn);
+    const projectPath = url.pathname.replace(/\/+$/, "");
+    if (!["http:", "https:"].includes(url.protocol) || !url.username || !url.host || !projectPath) {
+      return "";
+    }
+    return dsn;
+  } catch {
+    return "";
+  }
+}
+
+const optionalSentryDsn = z.string().optional().default("").transform(normalizeOptionalSentryDsn);
+
 const extensionHostingBlock = z.object({
   bucket: z.string().min(1),
   public_s3_base_url: z.string().url(),
@@ -102,7 +122,7 @@ const credentialsSchema = z.object({
     from: z.string().min(1),
   }),
   sentry: z.object({
-    dsn: z.string().min(1).optional().default(""),
+    dsn: optionalSentryDsn,
     org: z.string().optional().default(""),
     project: z.string().optional().default(""),
     auth_token: z.string().optional().default(""),

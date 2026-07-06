@@ -7,7 +7,6 @@ export const blogFrontmatterSchema = z.object({
   publishedAt: z.coerce.date(),
   updatedAt: z.coerce.date().optional(),
   author: z.string().min(1),
-  tags: z.array(z.string()).default([]),
   coverImage: z.string().optional(),
   draft: z.boolean().default(false),
 });

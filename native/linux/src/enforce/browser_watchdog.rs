@@ -15,7 +15,7 @@ use serde_json::{json, Value};
 use sysinfo::{Pid, Signal, System};
 use tokio::sync::broadcast;
 
-use talysman_common::browsers::by_linux_process;
+use talysman_common::browsers::by_linux_process_identity;
 use talysman_common::watchdog::{roots, Action, ScannedProc, Watchdog};
 
 use crate::enforce::EnforceShared;
@@ -46,7 +46,8 @@ pub async fn run_browser_watchdog(
                     .processes()
                     .values()
                     .filter_map(|p| {
-                        by_linux_process(p.name()).map(|def| ScannedProc {
+                        let argv0 = p.cmd().first().map(|arg| arg.as_str());
+                        by_linux_process_identity(p.name(), argv0).map(|def| ScannedProc {
                             pid: p.pid().as_u32(),
                             parent: p.parent().map(|pp| pp.as_u32()),
                             class: def.class,

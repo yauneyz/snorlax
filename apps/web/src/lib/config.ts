@@ -7,6 +7,7 @@
  * else is only safe to import from server modules.
  */
 import { z } from "zod";
+import { normalizeSentryDsn } from "./sentry/config";
 
 const supabaseProjectUrl = z
   .string()
@@ -29,13 +30,15 @@ const optionalPosthogKey = z
     return trimmed.includes("...") ? "" : trimmed;
   });
 
+const optionalSentryDsn = z.string().optional().default("").transform(normalizeSentryDsn);
+
 const publicSchema = z.object({
   NEXT_PUBLIC_APP_URL: z.string().url(),
   NEXT_PUBLIC_APP_NAME: z.string().min(1),
   NEXT_PUBLIC_SUPABASE_URL: supabaseProjectUrl,
   NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: z.string().min(1),
   NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: z.string().min(1),
-  NEXT_PUBLIC_SENTRY_DSN: z.string().optional().default(""),
+  NEXT_PUBLIC_SENTRY_DSN: optionalSentryDsn,
   NEXT_PUBLIC_POSTHOG_KEY: optionalPosthogKey,
   NEXT_PUBLIC_POSTHOG_HOST: z.string().optional().default("https://us.i.posthog.com"),
   NEXT_PUBLIC_GA4_MEASUREMENT_ID: z.string().optional().default(""),

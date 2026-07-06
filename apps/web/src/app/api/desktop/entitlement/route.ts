@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import * as Sentry from "@sentry/nextjs";
 import { entitlementSchema } from "@talysman/product";
 import { getUserEntitlement } from "@talysman/billing-server";
 import { requireBearerUser, UnauthorizedError } from "@/lib/auth/require-bearer-user";
+import { captureException } from "@/lib/sentry";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 
 export async function GET(request: NextRequest) {
@@ -17,7 +17,7 @@ export async function GET(request: NextRequest) {
     if (err instanceof UnauthorizedError) {
       return NextResponse.json({ error: err.message }, { status: 401 });
     }
-    Sentry.captureException(err, { extra: { route: "desktop/entitlement" } });
+    await captureException(err, { route: "desktop/entitlement" });
     return NextResponse.json({ error: "Unable to load entitlement" }, { status: 500 });
   }
 }

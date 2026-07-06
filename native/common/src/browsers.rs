@@ -11,6 +11,8 @@
 //! never sends a healthy heartbeat is treated as a supported browser missing its extension and is
 //! closed). The unsupported list only needs the forks that carry a *distinct* binary name.
 
+use std::path::Path;
+
 /// Whether a browser can host the Talysman extension.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum BrowserClass {
@@ -128,6 +130,19 @@ pub fn by_linux_process(name: &str) -> Option<&'static BrowserDef> {
     BROWSERS.iter().find(|b| b.linux_process == name)
 }
 
+/// Look up a Linux browser by the process `comm` name first, then by argv[0]'s basename.
+///
+/// Some packaged browsers launch through wrappers whose `comm` is truncated or wrapper-specific
+/// (for example `.firefox-wrappe` on Nix), while argv[0] is still the user-facing browser command.
+pub fn by_linux_process_identity(name: &str, argv0: Option<&str>) -> Option<&'static BrowserDef> {
+    by_linux_process(name).or_else(|| {
+        argv0
+            .and_then(|arg| Path::new(arg).file_name())
+            .and_then(|file| file.to_str())
+            .and_then(by_linux_process)
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -147,5 +162,20 @@ mod tests {
             Some(BrowserClass::Unsupported)
         );
         assert!(by_windows_image("notepad.exe").is_none());
+    }
+
+    #[test]
+    fn linux_identity_uses_argv0_for_wrapped_browsers() {
+        let def = by_linux_process_identity(
+            ".firefox-wrappe",
+            Some("/etc/profiles/per-user/zac/bin/firefox"),
+        );
+        assert_eq!(def.map(|b| b.key), Some("firefox"));
+    }
+
+    #[test]
+    fn linux_identity_prefers_process_name() {
+        let def = by_linux_process_identity("firefox", Some("/usr/bin/not-a-browser"));
+        assert_eq!(def.map(|b| b.key), Some("firefox"));
     }
 }

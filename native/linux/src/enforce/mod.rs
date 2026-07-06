@@ -84,7 +84,10 @@ impl EnforceShared {
 
     /// Drop heartbeat entries for PIDs that are no longer running (keeps the map bounded).
     pub fn retain_heartbeats(&self, live: &HashSet<u32>) {
-        self.heartbeats.lock().unwrap().retain(|pid, _| live.contains(pid));
+        self.heartbeats
+            .lock()
+            .unwrap()
+            .retain(|pid, _| live.contains(pid));
     }
 
     fn effective(mut policy: Policy) -> Policy {

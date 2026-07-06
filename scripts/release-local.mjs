@@ -2,16 +2,17 @@
 /**
  * Local NixOS release for the Talysman/snorlax desktop app.
  *
- * Mirrors the Thinky `release.js --no-upload` flow: build the Linux AppImage with
+ * Mirrors the Thinky `release.js --no-upload` flow: build the Linux deb with
  * the repo's own toolchain, add it to /nix/store, and write+stage
  * ~/nixos-config/pkgs/snorlax/release.nix so the next `nixos-rebuild` picks up the
- * new version. pkgs/snorlax/default.nix wraps that AppImage via appimageTools.
+ * new version. pkgs/snorlax/default.nix unpacks that deb (dpkg + autoPatchelf).
  *
  * Usage:
- *   pnpm run release:local            # build + install into /nix/store + stage release.nix
- *   pnpm run release:local --dry-run  # print intent, no nix-store/git writes
+ *   pnpm run release:local             # build + install into /nix/store + stage release.nix + upload to S3
+ *   pnpm run release:local --dry-run   # print intent, no nix-store/git/S3 writes
+ *   pnpm run release:local --no-upload # skip publishing installers to S3
  *
- * Note: the privileged daemon is NOT shipped via this AppImage on NixOS — it is built
+ * Note: on NixOS the deb's install hooks never run — the privileged daemon is built
  * from native/linux by pkgs/snorlax-daemon and started by a declarative systemd unit.
  */
 
@@ -34,8 +35,9 @@ import { fileURLToPath } from 'node:url';
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const distDir = join(root, 'dist');
 const nixSnorlaxDir = join(homedir(), 'nixos-config/pkgs/snorlax');
-const stableAppImage = join(distDir, 'snorlax.AppImage');
+const stableDeb = join(distDir, 'snorlax.deb');
 const dryRun = process.argv.slice(2).includes('--dry-run');
+const noUpload = process.argv.slice(2).includes('--no-upload');
 const localConfigDir = join(process.env.XDG_CONFIG_HOME ?? join(homedir(), '.config'), 'talysman');
 const localKeyDir = join(localConfigDir, 'keys');
 const localPrivateKeyPath = join(localKeyDir, 'local-entitlement-ed25519-private.pem');
@@ -145,7 +147,7 @@ function writeLocalEntitlementLicense(privateKey, version) {
   console.log(`   app version ${version}`);
 }
 
-function buildAppImage() {
+function buildDeb() {
   const buildStartedAt = Date.now();
 
   // Reuse the standard orchestration (native Rust + extension + electron + electron-builder).
@@ -158,21 +160,21 @@ function buildAppImage() {
     throw new Error('cargo is required to build the native Linux service. Install Rust or run on a system with nix.');
   }
 
-  // Only accept AppImages written by this build — a leftover artifact from before a
-  // rename (e.g. FocusLock-*.AppImage) must never be released again.
+  // Only accept debs written by this build — a leftover artifact from before a
+  // rename (e.g. FocusLock-*.deb) must never be released again.
   const built = readdirSync(distDir)
-    .filter((f) => f.endsWith('.AppImage') && f !== 'snorlax.AppImage')
+    .filter((f) => f.endsWith('.deb') && f !== 'snorlax.deb')
     .map((f) => ({ name: f, mtimeMs: statSync(join(distDir, f)).mtimeMs }))
     .filter((f) => f.mtimeMs >= buildStartedAt)
     .sort((a, b) => b.mtimeMs - a.mtimeMs);
   if (built.length === 0) {
     throw new Error(
-      `No fresh *.AppImage produced in ${distDir} — check the AppImage target in electron-builder.yml (stale artifacts are ignored)`,
+      `No fresh *.deb produced in ${distDir} — check the deb target in electron-builder.yml (stale artifacts are ignored)`,
     );
   }
   // Stable name so the Nix store key doesn't depend on the version string.
-  copyFileSync(join(distDir, built[0].name), stableAppImage);
-  console.log(`\n📋 Copied ${built[0].name} → snorlax.AppImage`);
+  copyFileSync(join(distDir, built[0].name), stableDeb);
+  console.log(`\n📋 Copied ${built[0].name} → snorlax.deb`);
 }
 
 function installIntoNixStore(version) {
@@ -184,8 +186,8 @@ function installIntoNixStore(version) {
     return;
   }
 
-  const storePath = capture('nix-store', ['--add-fixed', 'sha256', stableAppImage]);
-  const sha256 = capture('nix-hash', ['--type', 'sha256', '--flat', '--base32', stableAppImage]);
+  const storePath = capture('nix-store', ['--add-fixed', 'sha256', stableDeb]);
+  const sha256 = capture('nix-hash', ['--type', 'sha256', '--flat', '--base32', stableDeb]);
 
   const releaseNix = join(nixSnorlaxDir, 'release.nix');
   const body =
@@ -214,7 +216,18 @@ console.log(`🏷️  snorlax local release: v${version}${dryRun ? ' (dry run)' 
 const localEntitlementKey = ensureLocalEntitlementKey();
 process.env.LOCAL_ENTITLEMENT_PUBLIC_KEY = localEntitlementKey.publicKey;
 console.log('🔏 Embedding local entitlement public key for release-local builds');
-buildAppImage();
+buildDeb();
 writeLocalEntitlementLicense(localEntitlementKey.privateKey, version);
 installIntoNixStore(version);
+if (noUpload) {
+  console.log('⏭️  Skipping S3 upload (--no-upload)');
+} else {
+  // Publish the installer so /download links resolve; verifies the public URL after upload.
+  run('node', [
+    'scripts/upload-release.mjs',
+    '--require',
+    'linux,deb',
+    ...(dryRun ? ['--dry-run'] : []),
+  ]);
+}
 console.log('\n🎉 Done.');

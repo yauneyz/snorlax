@@ -15,11 +15,12 @@ export const dynamic = "force-dynamic";
 
 type Platform = "win" | "mac" | "linux";
 
-// Conventional artifact names produced by `pnpm build:win|mac|linux` (electron-builder output).
+// Stable names the release upload step (scripts/upload-release.mjs) publishes to; the versioned
+// electron-builder artifacts from `pnpm build:win|mac|linux` are uploaded under these keys.
 const INSTALLERS: Record<Platform, string> = {
   win: "Talysman-Setup.exe",
   mac: "Talysman.dmg",
-  linux: "Talysman.AppImage",
+  linux: "Talysman.deb",
 };
 
 function normalizeBaseUrl(value: string): string {

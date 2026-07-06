@@ -799,6 +799,65 @@ input:-webkit-autofill:focus {
   margin-bottom: 0.4rem;
 }
 
+.blog-post header {
+  margin-bottom: 2.5rem;
+  padding-bottom: 1.25rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.blog-post header h1 {
+  margin-top: 0;
+}
+
+.blog-post__meta,
+.blog-index__meta {
+  margin-top: 0.35rem;
+  font-size: 0.88rem;
+  color: var(--fg-2);
+}
+
+/* Blog index */
+.blog-index {
+  max-width: var(--container-narrow);
+  margin: 0 auto;
+}
+
+.blog-index__list {
+  list-style: none;
+  margin: 2.5rem 0 0;
+  padding: 0;
+}
+
+.blog-index__item {
+  padding: 1.75rem 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.blog-index__item:first-child {
+  padding-top: 0;
+}
+
+.blog-index__item:last-child {
+  border-bottom: 0;
+}
+
+.blog-index__item h2 {
+  margin: 0;
+  font-size: 1.35rem;
+  color: var(--fg-0);
+  transition: color var(--t-fast) var(--ease);
+}
+
+.blog-index__item a:hover h2 {
+  color: var(--accent-hi);
+}
+
+.blog-index__excerpt {
+  margin-top: 0.6rem;
+  color: var(--fg-1);
+  line-height: 1.7;
+}
+
 /* ============================================================
  * Auth surface
  * ========================================================== */

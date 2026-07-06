@@ -1,0 +1,139 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+import { describe, expect, it } from 'vitest';
+
+import {
+  PLATFORMS,
+  STABLE_INSTALLER_KEYS,
+  classifyArtifact,
+  contentTypeFor,
+  hostingFromCredentials,
+  platformsForHost,
+  publicUrlFor,
+  selectArtifacts,
+  // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+  // @ts-ignore — untyped .mjs module shared with release scripts
+} from '../../scripts/lib/release-hosting.mjs';
+
+type Platform = keyof typeof STABLE_INSTALLER_KEYS;
+const platforms = PLATFORMS as Platform[];
+
+describe('classifyArtifact', () => {
+  it('recognizes electron-builder artifact names for each platform', () => {
+    expect(classifyArtifact('Talysman-Setup-0.1.0.exe')).toBe('win');
+    expect(classifyArtifact('Talysman-0.1.0.dmg')).toBe('mac');
+    expect(classifyArtifact('Talysman-0.1.0-arm64.dmg')).toBe('mac');
+    expect(classifyArtifact('Talysman-0.1.0-amd64.deb')).toBe('linux');
+  });
+
+  it('recognizes prerelease versions', () => {
+    expect(classifyArtifact('Talysman-Setup-1.2.3-beta.1.exe')).toBe('win');
+    expect(classifyArtifact('Talysman-1.2.3-beta.1-amd64.deb')).toBe('linux');
+  });
+
+  it('ignores non-installer files, AppImages, and stale pre-rename artifacts', () => {
+    expect(classifyArtifact('Talysman-0.1.0-x86_64.AppImage')).toBeNull();
+    expect(classifyArtifact('snorlax.AppImage')).toBeNull();
+    expect(classifyArtifact('snorlax.deb')).toBeNull();
+    expect(classifyArtifact('FocusLock-0.1.0-amd64.deb')).toBeNull();
+    expect(classifyArtifact('latest-linux.yml')).toBeNull();
+    expect(classifyArtifact('builder-debug.yml')).toBeNull();
+  });
+});
+
+describe('selectArtifacts', () => {
+  it('picks the newest artifact per platform', () => {
+    const selected = selectArtifacts([
+      { name: 'Talysman-0.1.0-amd64.deb', mtimeMs: 100 },
+      { name: 'Talysman-0.2.0-amd64.deb', mtimeMs: 200 },
+      { name: 'Talysman-Setup-0.2.0.exe', mtimeMs: 150 },
+      { name: 'Talysman-0.2.0-x86_64.AppImage', mtimeMs: 999 },
+    ]);
+    expect(selected.linux?.name).toBe('Talysman-0.2.0-amd64.deb');
+    expect(selected.win?.name).toBe('Talysman-Setup-0.2.0.exe');
+    expect(selected.mac).toBeUndefined();
+  });
+});
+
+describe('platformsForHost', () => {
+  it('scopes uploads to what each build host is responsible for', () => {
+    expect(platformsForHost('linux')).toEqual(['win', 'linux']);
+    expect(platformsForHost('darwin')).toEqual(['mac']);
+    expect(platformsForHost('win32')).toEqual(['win']);
+    expect(platformsForHost('freebsd')).toEqual([]);
+  });
+});
+
+describe('STABLE_INSTALLER_KEYS', () => {
+  it('covers every platform under the app/ prefix, with no AppImage anywhere', () => {
+    for (const platform of platforms) {
+      expect(STABLE_INSTALLER_KEYS[platform]).toMatch(/^app\//);
+      expect(STABLE_INSTALLER_KEYS[platform]).not.toMatch(/AppImage/i);
+      expect(contentTypeFor(platform)).toBeTruthy();
+    }
+  });
+
+  it('matches the file names the web download route redirects to', () => {
+    // The route owns the public contract; this guards against the two maps drifting.
+    const routeSource = readFileSync(
+      resolve(__dirname, '../../apps/web/src/app/api/desktop/download/route.ts'),
+      'utf8',
+    );
+    for (const platform of platforms) {
+      const basename = STABLE_INSTALLER_KEYS[platform].replace(/^app\//, '');
+      expect(routeSource).toContain(`"${basename}"`);
+    }
+    expect(routeSource).toContain('/app/');
+    expect(routeSource).not.toMatch(/AppImage/);
+  });
+});
+
+describe('publicUrlFor', () => {
+  it('joins base URL and key, tolerating trailing slashes', () => {
+    const key = STABLE_INSTALLER_KEYS.linux;
+    expect(publicUrlFor('https://bucket.s3.amazonaws.com', key)).toBe(
+      'https://bucket.s3.amazonaws.com/app/Talysman.deb',
+    );
+    expect(publicUrlFor('https://bucket.s3.amazonaws.com/', key)).toBe(
+      'https://bucket.s3.amazonaws.com/app/Talysman.deb',
+    );
+  });
+});
+
+describe('hostingFromCredentials', () => {
+  const valid = {
+    aws: {
+      region: 'us-east-1',
+      access_key_id: 'AKIAEXAMPLE',
+      secret_access_key: 'secret',
+    },
+    extension_hosting: {
+      bucket: 'talysman-release-artifacts-prod',
+      public_s3_base_url: 'https://talysman-release-artifacts-prod.s3.us-east-1.amazonaws.com',
+    },
+  };
+
+  it('extracts region, keys, bucket, and public base URL', () => {
+    expect(hostingFromCredentials(valid)).toEqual({
+      region: 'us-east-1',
+      accessKeyId: 'AKIAEXAMPLE',
+      secretAccessKey: 'secret',
+      bucket: 'talysman-release-artifacts-prod',
+      publicBaseUrl: 'https://talysman-release-artifacts-prod.s3.us-east-1.amazonaws.com',
+    });
+  });
+
+  it('names every missing field', () => {
+    expect(() => hostingFromCredentials({})).toThrow(
+      /aws\.region.*aws\.access_key_id.*aws\.secret_access_key.*extension_hosting\.bucket.*extension_hosting\.public_s3_base_url/s,
+    );
+  });
+
+  it('rejects placeholder AWS keys from .credentials.example', () => {
+    const placeholder = {
+      ...valid,
+      aws: { ...valid.aws, access_key_id: 'AKIA...' },
+    };
+    expect(() => hostingFromCredentials(placeholder)).toThrow(/placeholder/);
+  });
+});

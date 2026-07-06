@@ -28,6 +28,13 @@ describe("blog content pipeline", () => {
     expect(slugs).toContain("hello-world");
   });
 
+  it("excerpts are plain text, not raw markdown", async () => {
+    const posts = await listPosts();
+    const hello = posts.find((p) => p.frontmatter.slug === "hello-world")!;
+    expect(hello.excerpt.length).toBeGreaterThan(0);
+    expect(hello.excerpt).not.toMatch(/[#*[\]]|```/);
+  });
+
   it("getPost returns null for unknown slug", async () => {
     const p = await getPost("does-not-exist");
     expect(p).toBeNull();
@@ -36,6 +43,8 @@ describe("blog content pipeline", () => {
   it("getPost renders HTML for hello-world", async () => {
     const p = await getPost("hello-world");
     expect(p).not.toBeNull();
-    expect(p!.html).toContain("<h1>");
+    // The page renders the frontmatter title as <h1>; body headings start at <h2>.
+    expect(p!.html).toContain("<h2>");
+    expect(p!.html).not.toContain("<h1>");
   });
 });

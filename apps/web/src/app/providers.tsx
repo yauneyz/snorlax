@@ -5,8 +5,8 @@ import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
 import { usePathname, useSearchParams } from "next/navigation";
 import posthog from "posthog-js";
 import { PostHogProvider } from "posthog-js/react";
-import * as Sentry from "@sentry/nextjs";
 import { config } from "@/lib/config";
+import { captureException } from "@/lib/sentry";
 import { supabaseBrowser } from "@/lib/supabase/browser";
 
 function makeQueryClient() {
@@ -15,7 +15,7 @@ function makeQueryClient() {
       queries: { staleTime: 30_000, retry: 1 },
       mutations: {
         onError: (err) => {
-          Sentry.captureException(err);
+          void captureException(err);
         },
       },
     },
