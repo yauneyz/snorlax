@@ -3,7 +3,9 @@ import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 import {
+  BUILD_SCRIPTS,
   PLATFORMS,
+  buildablePlatformsForHost,
   STABLE_INSTALLER_KEYS,
   classifyArtifact,
   contentTypeFor,
@@ -61,6 +63,28 @@ describe('platformsForHost', () => {
     expect(platformsForHost('darwin')).toEqual(['mac']);
     expect(platformsForHost('win32')).toEqual(['win']);
     expect(platformsForHost('freebsd')).toEqual([]);
+  });
+});
+
+describe('buildablePlatformsForHost', () => {
+  it('limits builds to the platform matching the host OS (scripts/build.mjs guard)', () => {
+    expect(buildablePlatformsForHost('linux')).toEqual(['linux']);
+    expect(buildablePlatformsForHost('darwin')).toEqual(['mac']);
+    expect(buildablePlatformsForHost('win32')).toEqual(['win']);
+    expect(buildablePlatformsForHost('freebsd')).toEqual([]);
+  });
+});
+
+describe('BUILD_SCRIPTS', () => {
+  it('maps every platform to an existing root package.json script', () => {
+    const rootPackage = JSON.parse(
+      readFileSync(resolve(__dirname, '../../package.json'), 'utf8'),
+    ) as { scripts: Record<string, string> };
+    for (const platform of platforms) {
+      const script = (BUILD_SCRIPTS as Record<Platform, string>)[platform];
+      expect(script, `missing build script mapping for ${platform}`).toBeTruthy();
+      expect(rootPackage.scripts[script], `${script} not in package.json`).toBeTruthy();
+    }
   });
 });
 

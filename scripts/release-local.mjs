@@ -225,9 +225,13 @@ installIntoNixStore(version);
 if (noUpload) {
   console.log('⏭️  Skipping S3 upload (--no-upload)');
 } else {
-  // Publish the installer so /download links resolve; verifies the public URL after upload.
+  // Publish the installers so /download links resolve; verifies the public URLs after
+  // upload. --no-build: this script already built linux above (with the local
+  // entitlement key baked in), and the win installer from the same dist/ is uploaded
+  // when present.
   run('node', [
     'scripts/upload-release.mjs',
+    '--no-build',
     '--require',
     'linux',
     ...(dryRun ? ['--dry-run'] : []),

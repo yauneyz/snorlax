@@ -47,6 +47,32 @@ export function platformsForHost(nodePlatform) {
   return HOST_RELEASE_PLATFORMS[nodePlatform] ?? [];
 }
 
+// Root package.json scripts that produce each platform's installer.
+export const BUILD_SCRIPTS = {
+  win: "build:win",
+  mac: "build:mac",
+  linux: "build:linux",
+};
+
+// scripts/build.mjs requires each target to build on its own OS (the native Rust
+// service is compiled per-host), so a host can only build the platform it runs on.
+const BUILD_HOST = {
+  win: "win32",
+  mac: "darwin",
+  linux: "linux",
+};
+
+/**
+ * The subset of this host's release platforms it can actually build locally.
+ * Anything else it publishes (e.g. the Windows installer from a Linux box) must be
+ * staged into dist/ from a build done on the right OS.
+ */
+export function buildablePlatformsForHost(nodePlatform) {
+  return platformsForHost(nodePlatform).filter(
+    (platform) => BUILD_HOST[platform] === nodePlatform,
+  );
+}
+
 /** Map a dist/ file name to its platform, or null if it is not a release installer. */
 export function classifyArtifact(fileName) {
   for (const platform of PLATFORMS) {

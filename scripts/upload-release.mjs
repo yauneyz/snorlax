@@ -9,15 +9,18 @@
  * its stable key (app/Talysman.AppImage). Credentials come from the monorepo
  * `.credentials` TOML; nothing is read from the shell environment.
  *
- * Each host only publishes the platforms it is responsible for building: Linux uploads
- * the Windows installer and the Linux deb, macOS uploads the dmg, Windows uploads its
- * own installer (see platformsForHost).
+ * The production build for this host's own platform runs first (pnpm build:<target>),
+ * so a release is a single command with no separate build step. Each target must build
+ * on its own OS (scripts/build.mjs enforces this), so cross-platform artifacts are only
+ * uploaded when staged into dist/: a Linux box publishes its deb plus a Windows
+ * installer if one is present, macOS publishes its dmg, Windows its own installer.
  *
  * Usage:
- *   node scripts/upload-release.mjs                    # upload this host's installers from dist/
+ *   node scripts/upload-release.mjs                    # build this host's installers, upload, verify
+ *   node scripts/upload-release.mjs --no-build         # upload existing dist/ artifacts only
  *   node scripts/upload-release.mjs --require linux    # fail if these platforms are not uploaded
- *   node scripts/upload-release.mjs --verify-only      # no upload; HEAD the public URLs
- *   node scripts/upload-release.mjs --dry-run          # print intent, no writes
+ *   node scripts/upload-release.mjs --verify-only      # no build/upload; HEAD the public URLs
+ *   node scripts/upload-release.mjs --dry-run          # print intent, no builds or writes
  *
  * Requires the `aws` CLI (uploads shell out to `aws s3 cp`).
  */
@@ -29,8 +32,10 @@ import { fileURLToPath } from "node:url";
 import toml from "@iarna/toml";
 
 import {
+  BUILD_SCRIPTS,
   PLATFORMS,
   STABLE_INSTALLER_KEYS,
+  buildablePlatformsForHost,
   contentTypeFor,
   hostingFromCredentials,
   platformsForHost,
@@ -44,6 +49,7 @@ const distDir = join(root, "dist");
 const args = process.argv.slice(2);
 const dryRun = args.includes("--dry-run");
 const verifyOnly = args.includes("--verify-only");
+const noBuild = args.includes("--no-build");
 const requireFlagIndex = args.indexOf("--require");
 const requiredPlatforms =
   requireFlagIndex === -1
@@ -77,6 +83,18 @@ function loadHosting() {
   } catch (error) {
     console.error(String(error instanceof Error ? error.message : error));
     process.exit(1);
+  }
+}
+
+function buildHostInstallers(platforms) {
+  for (const platform of platforms) {
+    const script = BUILD_SCRIPTS[platform];
+    if (dryRun) {
+      console.log(`🧪 [DRY RUN] would run pnpm ${script}`);
+      continue;
+    }
+    console.log(`\n🏗️  pnpm ${script}`);
+    execFileSync("pnpm", ["run", script], { cwd: root, stdio: "inherit" });
   }
 }
 
@@ -168,15 +186,29 @@ async function main() {
   let uploaded = {};
   if (!verifyOnly) {
     assertAwsCliAvailable();
+
+    // Only build/publish what this host is responsible for (e.g. a mac dmg lying
+    // around in dist/ on a Linux box is stale and must not be re-released from here).
+    const hostPlatforms = platformsForHost(process.platform);
+    if (hostPlatforms.length === 0) {
+      console.error(`No release platforms configured for ${process.platform} hosts.`);
+      process.exit(1);
+    }
+    // Each target only builds on its own OS; the rest of hostPlatforms is published
+    // from artifacts staged into dist/ (e.g. a Windows installer copied to a Linux box).
+    const buildable = buildablePlatformsForHost(process.platform);
+    if (noBuild) {
+      console.log("⏭️  Skipping builds (--no-build); uploading existing dist/ artifacts");
+    } else {
+      buildHostInstallers(buildable);
+    }
+
     const files = existsSync(distDir)
       ? readdirSync(distDir).map((name) => ({
           name,
           mtimeMs: statSync(join(distDir, name)).mtimeMs,
         }))
       : [];
-    // Only publish what this host is responsible for building (e.g. a mac dmg lying
-    // around in dist/ on a Linux box is stale and must not be re-released from here).
-    const hostPlatforms = platformsForHost(process.platform);
     const artifacts = Object.fromEntries(
       Object.entries(selectArtifacts(files)).filter(([platform]) => {
         if (hostPlatforms.includes(platform)) return true;
@@ -185,7 +217,10 @@ async function main() {
       }),
     );
 
-    const missing = requiredPlatforms.filter((platform) => !(platform in artifacts));
+    // When this run did the builds, every platform it built must have produced an
+    // installer; beyond that only the explicitly required ones must be present.
+    const expected = new Set(noBuild || dryRun ? requiredPlatforms : [...buildable, ...requiredPlatforms]);
+    const missing = [...expected].filter((platform) => !(platform in artifacts));
     if (missing.length > 0) {
       console.error(
         `Missing required installer(s) in dist/: ${missing.join(", ")}. ` +
