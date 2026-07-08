@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { ConnectGoogleButton } from "@/components/app/ConnectGoogleButton";
 import { GscWidget } from "@/components/app/GscWidget";
 import { requireAuthenticatedUiRoute } from "@/lib/auth/require-authenticated-ui-route";
-import { getConnectionForUser } from "@/lib/connections/store";
+import { getConnectionForUser } from "@/server/connections/store";
 import { googleClientForConnection } from "@/lib/google/oauth";
 import { listSites, type SiteEntry } from "@/lib/google/search-console";
 

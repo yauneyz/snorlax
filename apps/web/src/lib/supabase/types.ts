@@ -22,7 +22,7 @@ export type ConnectionKind = "gsc";
 
 // Bytea columns are returned by PostgREST as `\x...` hex strings or as base64
 // depending on the request; we always normalize to `Buffer` at the boundary
-// in `src/lib/connections/store.ts`. The Row type below describes the shape
+// in `src/server/connections/store.ts`. The Row type below describes the shape
 // PostgREST returns over the wire.
 export type ConnectionRow = {
   id: string;

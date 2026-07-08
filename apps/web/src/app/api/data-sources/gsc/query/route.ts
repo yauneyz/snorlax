@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 import { requireSubscribed } from "@/lib/auth/require-subscribed";
-import { getConnectionForUser, setConnectionMeta } from "@/lib/connections/store";
+import { getConnectionForUser, setConnectionMeta } from "@/server/connections/store";
 import { googleClientForConnection } from "@/lib/google/oauth";
 import { topPages, topQueries } from "@/lib/google/search-console";
 

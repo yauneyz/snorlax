@@ -1,7 +1,7 @@
 import "server-only";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import type { ConnectionKind, ConnectionRow } from "@/lib/supabase/types";
-import { decrypt, encrypt } from "./cipher";
+import { decrypt, encrypt } from "@/lib/connections/cipher";
 
 export type GoogleTokens = {
   access_token: string;
@@ -28,8 +28,16 @@ function byteaOut(s: string): Buffer {
 }
 
 function stripSecrets(row: ConnectionRow): ConnectionPublicRow {
-  const { ciphertext: _c, iv: _i, tag: _t, ...rest } = row;
-  return rest;
+  return {
+    id: row.id,
+    user_id: row.user_id,
+    kind: row.kind,
+    label: row.label,
+    meta: row.meta,
+    expires_at: row.expires_at,
+    created_at: row.created_at,
+    updated_at: row.updated_at,
+  };
 }
 
 export async function upsertGoogleConnection(input: {
@@ -44,7 +52,7 @@ export async function upsertGoogleConnection(input: {
 
   // Manual upsert: select first to keep the existing id; otherwise insert.
   // We can't use Postgres ON CONFLICT DO UPDATE through PostgREST while sending
-  // bytea as `\x...` strings — easier to branch in code.
+  // bytea as `\x...` strings - easier to branch in code.
   const { data: existing, error: selErr } = await db
     .from("connections")
     .select("id")
@@ -117,11 +125,7 @@ export async function getConnectionById(
   connectionId: string,
 ): Promise<{ row: ConnectionPublicRow; tokens: GoogleTokens }> {
   const db = supabaseAdmin();
-  const { data, error } = await db
-    .from("connections")
-    .select("*")
-    .eq("id", connectionId)
-    .single();
+  const { data, error } = await db.from("connections").select("*").eq("id", connectionId).single();
   if (error) throw error;
 
   const tokens = JSON.parse(

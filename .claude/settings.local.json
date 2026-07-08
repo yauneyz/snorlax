@@ -63,7 +63,21 @@
       "Bash(awk '{print $NF}')",
       "Bash(ar x *)",
       "Bash(tar tJf data.tar.xz)",
-      "Bash(python3 -c \"import json;print\\(json.dumps\\(json.load\\(open\\('/data/zac/zac/development/snorlax/package.json'\\)\\)['scripts'],indent=1\\)\\)\")"
+      "Bash(python3 -c \"import json;print\\(json.dumps\\(json.load\\(open\\('/data/zac/zac/development/snorlax/package.json'\\)\\)['scripts'],indent=1\\)\\)\")",
+      "Bash(supabase --version)",
+      "Bash(vercel --version)",
+      "Bash(supabase projects *)",
+      "Bash(python3 -)",
+      "Bash(vercel whoami *)",
+      "Bash(vercel env *)",
+      "Bash(cargo check *)",
+      "WebFetch(domain:supabase.com)",
+      "Bash(echo \"exit=$?\")",
+      "Bash(vercel project *)",
+      "Bash(vercel domains *)",
+      "Bash(rm -rf smoke)",
+      "Bash(mkdir -p smoke/data smoke/usbkey)",
+      "Bash(python3 smoke.py)"
     ]
   },
   "enabledPlugins": {

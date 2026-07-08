@@ -5,7 +5,7 @@ import {
   getConnectionById,
   updateConnectionTokens,
   type GoogleTokens,
-} from "@/lib/connections/store";
+} from "@/server/connections/store";
 
 const TOKEN_URL = "https://oauth2.googleapis.com/token";
 const AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth";

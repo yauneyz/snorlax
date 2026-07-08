@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { config } from "@/lib/config";
 import { requireSubscribed } from "@/lib/auth/require-subscribed";
-import { upsertGoogleConnection } from "@/lib/connections/store";
+import { upsertGoogleConnection } from "@/server/connections/store";
 import { emailFromIdToken, exchangeCode } from "@/lib/google/oauth";
 import { verifyState } from "@/lib/oauth/state";
 

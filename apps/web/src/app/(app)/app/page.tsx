@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { ManageBillingButton } from "@/components/app/ManageBillingButton";
 import { requireAuthenticatedUiRoute } from "@/lib/auth/require-authenticated-ui-route";
-import { getConnectionForUser } from "@/lib/connections/store";
+import { getConnectionForUser } from "@/server/connections/store";
 import { config } from "@/lib/config";
 
 export const metadata: Metadata = {

@@ -56,6 +56,7 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
+  runtime: "nodejs",
   matcher: [
     // Everything except Next internals, the webhook (raw body), and OAuth
     // callbacks (must run before auth state exists).

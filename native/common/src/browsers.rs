@@ -130,6 +130,16 @@ pub fn by_linux_process(name: &str) -> Option<&'static BrowserDef> {
     BROWSERS.iter().find(|b| b.linux_process == name)
 }
 
+/// Look up a browser by macOS bundle identifier (case-insensitive). Helper bundles carry the
+/// browser's bundle id plus a dotted suffix (e.g. "com.google.Chrome.helper"), so a prefix match
+/// on a dot boundary maps every helper to its browser.
+pub fn by_mac_bundle(bundle: &str) -> Option<&'static BrowserDef> {
+    let bundle = bundle.to_ascii_lowercase();
+    BROWSERS
+        .iter()
+        .find(|b| bundle == b.mac_bundle || bundle.starts_with(&format!("{}.", b.mac_bundle)))
+}
+
 /// Look up a Linux browser by the process `comm` name first, then by argv[0]'s basename.
 ///
 /// Some packaged browsers launch through wrappers whose `comm` is truncated or wrapper-specific
@@ -162,6 +172,26 @@ mod tests {
             Some(BrowserClass::Unsupported)
         );
         assert!(by_windows_image("notepad.exe").is_none());
+    }
+
+    #[test]
+    fn mac_bundle_matches_exact_and_helper_suffixes() {
+        assert_eq!(
+            by_mac_bundle("com.google.Chrome").map(|b| b.key),
+            Some("chrome")
+        );
+        assert_eq!(
+            by_mac_bundle("com.google.Chrome.helper").map(|b| b.key),
+            Some("chrome")
+        );
+        assert_eq!(
+            by_mac_bundle("org.mozilla.firefox").map(|b| b.key),
+            Some("firefox")
+        );
+        // Prefix must respect the dot boundary — a different product sharing the leading
+        // characters is not the same browser.
+        assert!(by_mac_bundle("com.google.chromethingy").is_none());
+        assert!(by_mac_bundle("com.apple.safari").is_none());
     }
 
     #[test]

@@ -3,9 +3,9 @@ import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { config } from "@/lib/config";
 
 /**
- * Creates a Supabase client bound to the current edge request and its
- * response. Must be called from `src/middleware.ts` — the `response` returned
- * here is what gets sent back to the client (with refreshed auth cookies).
+ * Creates a Supabase client bound to the current request and response. Must be
+ * called from `src/middleware.ts` — the returned response is sent to the client
+ * with any refreshed auth cookies.
  */
 export function supabaseMiddleware(request: NextRequest) {
   let response = NextResponse.next({ request });

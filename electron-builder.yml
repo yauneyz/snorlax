@@ -37,6 +37,17 @@ nsis:
   include: native/windows/installer/nsis-include.nsh
   artifactName: ${productName}-Setup-${version}.${ext}
 
+mac:
+  target:
+    - dmg
+  category: public.app-category.productivity
+  artifactName: ${productName}-${version}-${arch}.${ext}
+  # No hardened runtime / notarization yet: local dev builds only. Signing + notarization are
+  # required before distribution (wired in Phase 4, alongside Windows Authenticode).
+  identity: null
+  # A dmg has no install hooks; the privileged LaunchDaemon is registered on first run via
+  # `sudo talysman-svcctl install` (see native/macos/README.md).
+
 linux:
   target:
     - deb

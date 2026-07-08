@@ -1,4 +1,4 @@
-//! talysman-svcctl for Linux. Installs/removes the systemd service and manages recovery codes.
+//! talysman-svcctl for macOS. Installs/removes the LaunchDaemon and manages recovery codes.
 
 use std::io::{BufRead, BufReader, Write};
 use std::os::unix::net::UnixStream;
@@ -7,13 +7,11 @@ use std::process::Command;
 
 use anyhow::{bail, Context, Result};
 
-use talysman::constants::{socket_path, PIPE_BASE_PROD, SERVICE_DISPLAY_NAME, SERVICE_NAME};
-use talysman::enforce::dns;
+use talysman::constants::{socket_path, PIPE_BASE_PROD, SERVICE_NAME};
+use talysman::launchd;
 use talysman::pairing;
 use talysman::paths;
 use talysman::secure_store::SecureStore;
-
-const UNIT_PATH: &str = "/etc/systemd/system/talysman.service";
 
 fn svc_exe_path() -> Result<PathBuf> {
     let dir = std::env::current_exe()?
@@ -21,31 +19,6 @@ fn svc_exe_path() -> Result<PathBuf> {
         .context("no parent dir for current exe")?
         .to_path_buf();
     Ok(dir.join("talysman-svc"))
-}
-
-fn unit_text() -> Result<String> {
-    let exe = svc_exe_path()?;
-    Ok(format!(
-        r#"[Unit]
-Description={SERVICE_DISPLAY_NAME}
-After=network-online.target nftables.service
-Wants=network-online.target
-
-[Service]
-Type=simple
-ExecStart={}
-Restart=always
-RestartSec=1
-RuntimeDirectory=talysman
-RuntimeDirectoryMode=0755
-StateDirectory=talysman
-StateDirectoryMode=0750
-
-[Install]
-WantedBy=multi-user.target
-"#,
-        exe.display()
-    ))
 }
 
 fn run(program: &str, args: &[&str]) -> Result<()> {
@@ -63,42 +36,52 @@ fn run(program: &str, args: &[&str]) -> Result<()> {
 
 fn install() -> Result<()> {
     paths::ensure_data_dir().context("create Talysman data dir")?;
-    dns::install_include().context("write dnsmasq include")?;
-    std::fs::write(UNIT_PATH, unit_text()?).context("write systemd unit")?;
-    run("systemctl", &["daemon-reload"])?;
+    let exe = svc_exe_path()?;
+    std::fs::write(
+        launchd::plist_path(),
+        launchd::plist_text(&exe.to_string_lossy()),
+    )
+    .context("write LaunchDaemon plist")?;
     // Generate the recovery code before the daemon starts, so the store it loads at boot
     // already carries the hash.
     gen_code()?;
-    run("systemctl", &["enable", "--now", SERVICE_NAME])?;
+    // Reload cleanly if a previous copy is loaded; "not loaded" is fine.
+    launchd::bootout();
+    if !launchd::bootstrap().context("launchctl bootstrap")? {
+        bail!("launchctl could not load {}", launchd::PLIST_PATH);
+    }
     println!("Service '{SERVICE_NAME}' installed and started.");
     Ok(())
 }
 
 fn uninstall() -> Result<()> {
     let _ = guard_uninstall();
-    let _ = run("systemctl", &["disable", "--now", SERVICE_NAME]);
-    let _ = std::fs::remove_file(UNIT_PATH);
-    let _ = run("systemctl", &["daemon-reload"]);
+    launchd::bootout();
+    let _ = std::fs::remove_file(launchd::plist_path());
     talysman::enforce::teardown_network();
-    dns::remove_include();
     println!("Service '{SERVICE_NAME}' removed.");
     Ok(())
 }
 
 fn start() -> Result<()> {
-    run("systemctl", &["start", SERVICE_NAME])?;
+    if !launchd::bootstrap()? {
+        bail!("launchctl could not load {}", launchd::PLIST_PATH);
+    }
     println!("started");
     Ok(())
 }
 
 fn stop() -> Result<()> {
-    run("systemctl", &["stop", SERVICE_NAME])?;
+    launchd::bootout();
     println!("stop signalled");
     Ok(())
 }
 
 fn status() -> Result<()> {
-    run("systemctl", &["status", "--no-pager", SERVICE_NAME])
+    run(
+        "launchctl",
+        &["print", &format!("system/{}", launchd::LABEL)],
+    )
 }
 
 fn gen_code() -> Result<()> {

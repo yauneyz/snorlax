@@ -19,12 +19,15 @@ export function windowsPipePath(baseName: string): string {
 
 /**
  * Resolve the Unix-domain socket path from the base name in config.
- * Production lives under systemd's RuntimeDirectory; dev uses /tmp so an installed service and a
- * console service do not collide. Passing an absolute path is allowed for tests/support.
+ * Production lives under systemd's RuntimeDirectory on Linux and /var/run on macOS; dev uses /tmp
+ * so an installed service and a console service do not collide. Passing an absolute path is
+ * allowed for tests/support.
  */
 export function unixSocketPath(baseName: string): string {
   if (baseName.startsWith('/')) return baseName;
-  return baseName === PIPE_BASE_PROD ? '/run/talysman/talysman.sock' : `/tmp/${baseName}.sock`;
+  if (baseName !== PIPE_BASE_PROD) return `/tmp/${baseName}.sock`;
+  const darwin = typeof process !== 'undefined' && process.platform === 'darwin';
+  return darwin ? '/var/run/talysman/talysman.sock' : '/run/talysman/talysman.sock';
 }
 
 /** Default base names (overridable via TALYSMAN_PIPE in env). */

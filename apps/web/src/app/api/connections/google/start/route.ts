@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { NextResponse, type NextRequest } from "next/server";
+import { NextResponse } from "next/server";
 import { config } from "@/lib/config";
 import { requireSubscribed } from "@/lib/auth/require-subscribed";
 import { buildAuthUrl } from "@/lib/google/oauth";
@@ -7,7 +7,7 @@ import { signState } from "@/lib/oauth/state";
 
 const STATE_COOKIE = "oauth_state";
 
-export async function GET(_request: NextRequest) {
+export async function GET() {
   await requireSubscribed();
 
   const nonce = randomUUID();
