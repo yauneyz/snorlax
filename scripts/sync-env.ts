@@ -256,7 +256,7 @@ function toWebEnvPairs(c: Credentials, mode: Mode): Array<[string, string]> {
     ["APP_ENVIRONMENT", appEnvironment],
 
     ["NEXT_PUBLIC_SUPABASE_URL", supabase.url],
-    ["NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY", supabase.publishable_key],
+    ["NEXT_PUBLIC_SUPABASE_ANON_KEY", supabase.publishable_key],
     ["SUPABASE_SECRET_KEY", supabase.secret_key],
     ["SUPABASE_PROJECT_REF", supabase.project_ref],
 

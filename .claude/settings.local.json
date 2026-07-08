@@ -62,7 +62,8 @@
       "Bash(dpkg-deb -c dist/Talysman-0.1.0-amd64.deb)",
       "Bash(awk '{print $NF}')",
       "Bash(ar x *)",
-      "Bash(tar tJf data.tar.xz)"
+      "Bash(tar tJf data.tar.xz)",
+      "Bash(python3 -c \"import json;print\\(json.dumps\\(json.load\\(open\\('/data/zac/zac/development/snorlax/package.json'\\)\\)['scripts'],indent=1\\)\\)\")"
     ]
   },
   "enabledPlugins": {

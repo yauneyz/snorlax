@@ -36,7 +36,7 @@ const publicSchema = z.object({
   NEXT_PUBLIC_APP_URL: z.string().url(),
   NEXT_PUBLIC_APP_NAME: z.string().min(1),
   NEXT_PUBLIC_SUPABASE_URL: supabaseProjectUrl,
-  NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: z.string().min(1),
+  NEXT_PUBLIC_SUPABASE_ANON_KEY: z.string().min(1),
   NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: z.string().min(1),
   NEXT_PUBLIC_SENTRY_DSN: optionalSentryDsn,
   NEXT_PUBLIC_POSTHOG_KEY: optionalPosthogKey,
@@ -98,7 +98,8 @@ const publicEnv = {
   NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL,
   NEXT_PUBLIC_APP_NAME: process.env.NEXT_PUBLIC_APP_NAME,
   NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL,
-  NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY,
+  NEXT_PUBLIC_SUPABASE_ANON_KEY:
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY,
   NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY,
   NEXT_PUBLIC_SENTRY_DSN: process.env.NEXT_PUBLIC_SENTRY_DSN,
   NEXT_PUBLIC_POSTHOG_KEY: process.env.NEXT_PUBLIC_POSTHOG_KEY,
@@ -118,7 +119,12 @@ function parsePublic() {
 }
 
 function parseServer() {
-  const r = serverSchema.safeParse({ ...publicEnv, ...process.env });
+  const serverEnv = {
+    ...publicEnv,
+    ...process.env,
+    SUPABASE_SECRET_KEY: process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY,
+  };
+  const r = serverSchema.safeParse(serverEnv);
   if (!r.success) {
     throw new Error(
       "Invalid server env config:\n" +
@@ -165,7 +171,7 @@ export const config = {
   },
   supabase: {
     url: parsed.NEXT_PUBLIC_SUPABASE_URL,
-    publishableKey: parsed.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY,
+    publishableKey: parsed.NEXT_PUBLIC_SUPABASE_ANON_KEY,
     secretKey: isServer ? (parsed as z.infer<typeof serverSchema>).SUPABASE_SECRET_KEY : "",
     projectRef: isServer ? (parsed as z.infer<typeof serverSchema>).SUPABASE_PROJECT_REF : "",
   },

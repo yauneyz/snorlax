@@ -1,0 +1,54 @@
+[package]
+name = "talysman-macos"
+version = "0.1.0"
+edition = "2021"
+description = "Talysman privileged macOS daemon + installer + recovery killswitch."
+publish = false
+
+[lib]
+name = "talysman"
+path = "src/lib.rs"
+
+[[bin]]
+name = "talysman-svc"
+path = "src/main.rs"
+
+[[bin]]
+name = "talysman-svcctl"
+path = "src/bin/svcctl.rs"
+
+[[bin]]
+name = "talysman-recover"
+path = "src/bin/recover.rs"
+
+[[bin]]
+name = "talysman-natmsg"
+path = "src/bin/natmsg.rs"
+
+[[bin]]
+name = "focus-enable"
+path = "src/bin/focus-enable.rs"
+
+[[bin]]
+name = "focus-disable"
+path = "src/bin/focus-disable.rs"
+
+[dependencies]
+anyhow = "1"
+chrono = { version = "0.4", default-features = false, features = ["clock"] }
+talysman_common = { path = "../common" }
+hex = "0.4"
+plist = "1"
+rand = "0.8"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sha2 = "0.10"
+sysinfo = "0.30"
+tokio = { version = "1", features = ["rt-multi-thread", "net", "time", "sync", "io-util", "io-std", "macros", "signal"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+[profile.release]
+opt-level = 2
+lto = false
+strip = true

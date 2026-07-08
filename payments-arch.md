@@ -191,7 +191,7 @@ authoritative sync.**
 
 | Variable | Visibility | Used by |
 | --- | --- | --- |
-| `NEXT_PUBLIC_SUPABASE_URL` / `…PUBLISHABLE_KEY` (web), `VITE_SUPABASE_URL` / `…ANON_KEY` (desktop) | **client** | Supabase clients |
+| `NEXT_PUBLIC_SUPABASE_URL` / `…ANON_KEY` (web), `VITE_SUPABASE_URL` / `…ANON_KEY` (desktop) | **client** | Supabase clients |
 | `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` / `VITE_STRIPE_PUBLISHABLE_KEY` | **client** | display only |
 | `SUPABASE_SECRET_KEY` | server-only | `supabaseAdmin()` |
 | `STRIPE_SECRET_KEY` | server-only | all Stripe API calls |

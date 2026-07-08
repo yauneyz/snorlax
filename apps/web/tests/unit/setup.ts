@@ -2,7 +2,7 @@
 process.env.NEXT_PUBLIC_APP_URL ??= "http://localhost:3000";
 process.env.NEXT_PUBLIC_APP_NAME ??= "Test App";
 process.env.NEXT_PUBLIC_SUPABASE_URL ??= "http://localhost:54321";
-process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ??= "sb_publishable_test";
+process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ??= "sb_publishable_test";
 process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY ??= "pk_test_xxx";
 process.env.SUPABASE_SECRET_KEY ??= "sb_secret_test";
 process.env.STRIPE_SECRET_KEY ??= "sk_test_xxx";
