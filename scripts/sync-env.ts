@@ -174,13 +174,47 @@ const credentialsSchema = z.object({
 
 type Credentials = z.infer<typeof credentialsSchema>;
 type Mode = "dev" | "prod";
+type VercelEnvironment = "development" | "preview" | "production";
 
 const isVercelBuild = process.env.VERCEL === "1";
 const isProductionPush = process.argv.includes("--production");
 const skipOnVercel = process.argv.includes("--skip-on-vercel");
+const isDryRun = process.argv.includes("--dry-run");
+
+const SENSITIVE_VERCEL_VARIABLES = new Set([
+  "SUPABASE_SECRET_KEY",
+  "STRIPE_SECRET_KEY",
+  "STRIPE_WEBHOOK_SECRET",
+  "RESEND_API_KEY",
+  "SENTRY_AUTH_TOKEN",
+  "GOOGLE_OAUTH_CLIENT_SECRET",
+  "OPENAI_API_KEY",
+  "LOCAL_LLM_API_KEY",
+  "TOKEN_ENCRYPTION_KEY",
+  "OAUTH_STATE_SECRET",
+]);
+
+function resolveVercelEnvironment(): VercelEnvironment | null {
+  if (isProductionPush) return "production";
+
+  const flag = process.argv.find((arg) => arg.startsWith("--vercel="));
+  if (!flag) return null;
+
+  const value = flag.slice("--vercel=".length);
+  if (value === "development" || value === "preview" || value === "production") {
+    return value;
+  }
+
+  console.error(
+    `Invalid --vercel=${value}. Expected "development", "preview", or "production".`,
+  );
+  process.exit(1);
+}
+
+const vercelEnvironment = resolveVercelEnvironment();
 
 function resolveMode(): Mode {
-  if (isProductionPush || process.argv.includes("--prod")) return "prod";
+  if (vercelEnvironment === "production" || process.argv.includes("--prod")) return "prod";
   const flag = process.argv.find((arg) => arg.startsWith("--mode="));
   if (!flag) return "dev";
   const value = flag.slice("--mode=".length);
@@ -201,7 +235,7 @@ function loadCredentials(): Credentials | null {
 
   let source = firstExisting(CREDENTIALS_CANDIDATES);
   if (!source) {
-    if (isVercelBuild || isProductionPush || process.env.CI === "true") {
+    if (isVercelBuild || vercelEnvironment || process.env.CI === "true") {
       console.error(`Missing .credentials. Checked:\n${CREDENTIALS_CANDIDATES.join("\n")}`);
       console.error("Refusing to fall back to example credentials in CI/production.");
       process.exit(1);
@@ -345,26 +379,89 @@ function quote(value: string): string {
   return value;
 }
 
-function pushToVercel(pairs: Array<[string, string]>) {
+type VercelEnvMetadata = {
+  key: string;
+  configurationId: string | null;
+};
+
+function listVercelEnvironment(environment: VercelEnvironment): Map<string, VercelEnvMetadata> {
+  const res = spawnSync("vercel", ["env", "list", environment, "--format", "json"], {
+    cwd: ROOT,
+    stdio: ["ignore", "pipe", "inherit"],
+    encoding: "utf8",
+  });
+  if (res.status !== 0) {
+    console.error(`failed to list Vercel ${environment} environment variables.`);
+    process.exit(res.status ?? 1);
+  }
+
+  try {
+    const data = JSON.parse(res.stdout) as { envs?: VercelEnvMetadata[] };
+    if (!Array.isArray(data.envs)) {
+      throw new Error("response is missing envs array");
+    }
+    return new Map(data.envs.map((env) => [env.key, env]));
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.error(`failed to parse Vercel environment metadata: ${message}`);
+    process.exit(1);
+  }
+}
+
+function pushToVercel(
+  pairs: Array<[string, string]>,
+  environment: VercelEnvironment,
+) {
+  const existing = isDryRun ? new Map<string, VercelEnvMetadata>() : listVercelEnvironment(environment);
+  let pushed = 0;
+  let skipped = 0;
+  let integrationManaged = 0;
+
   for (const [name, value] of pairs) {
     if (value === "") {
       console.log(`  - skipping empty ${name}`);
+      skipped += 1;
       continue;
     }
-    console.log(`  - pushing ${name} to Vercel production`);
-    const res = spawnSync("vercel", ["env", "add", name, "production"], {
+
+    const remote = existing.get(name);
+    if (remote?.configurationId) {
+      console.log(`  - preserving integration-managed ${name}`);
+      integrationManaged += 1;
+      continue;
+    }
+
+    const action = remote ? "update" : "add";
+    const args = ["env", action, name, environment, "--yes"];
+    if (SENSITIVE_VERCEL_VARIABLES.has(name)) {
+      args.push("--sensitive");
+    }
+
+    if (isDryRun) {
+      console.log(`  - would sync ${name} to Vercel ${environment}`);
+      pushed += 1;
+      continue;
+    }
+
+    console.log(`  - syncing ${name} to Vercel ${environment}`);
+    const res = spawnSync("vercel", args, {
+      cwd: ROOT,
       input: value + "\n",
       stdio: ["pipe", "inherit", "inherit"],
       encoding: "utf8",
     });
     if (res.status !== 0) {
-      console.error(
-        `failed to push ${name}. If it already exists, remove it first with: vercel env rm ${name} production`,
-      );
+      console.error(`failed to sync ${name} to Vercel ${environment}.`);
       process.exit(res.status ?? 1);
     }
+    pushed += 1;
   }
-  console.log("pushed web env vars to Vercel production.");
+
+  const verb = isDryRun ? "would sync" : "synced";
+  console.log(
+    `${verb} ${pushed} web env vars to Vercel ${environment}; ` +
+      `preserved ${integrationManaged} integration-managed and skipped ${skipped} empty.`,
+  );
 }
 
 function main() {
@@ -378,8 +475,8 @@ function main() {
   }
 
   const webPairs = toWebEnvPairs(creds, mode);
-  if (isProductionPush) {
-    pushToVercel(webPairs);
+  if (vercelEnvironment) {
+    pushToVercel(webPairs, vercelEnvironment);
     return;
   }
 

@@ -10,6 +10,8 @@
   "scripts": {
     "dev": "node scripts/dev.mjs",
     "sync:env": "pnpm --filter @talysman/web sync:env",
+    "sync:env:prod": "pnpm --filter @talysman/web sync:env:prod",
+    "sync:env:preview": "pnpm --filter @talysman/web sync:env:preview",
     "web:dev": "pnpm --filter @talysman/web dev",
     "web:prod": "pnpm --filter @talysman/web prod",
     "web:build": "pnpm --filter @talysman/web build",

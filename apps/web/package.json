@@ -5,7 +5,8 @@
   "scripts": {
     "sync:env": "tsx ../../scripts/sync-env.ts",
     "sync:env:build": "tsx ../../scripts/sync-env.ts --mode=prod --skip-on-vercel",
-    "sync:env:prod": "tsx ../../scripts/sync-env.ts --production",
+    "sync:env:prod": "tsx ../../scripts/sync-env.ts --vercel=production",
+    "sync:env:preview": "tsx ../../scripts/sync-env.ts --vercel=preview --mode=prod",
     "predev": "pnpm sync:env",
     "prebuild": "pnpm sync:env:build",
     "dev": "next dev",

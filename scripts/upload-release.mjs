@@ -16,7 +16,7 @@
  * installer if one is present, macOS publishes its dmg, Windows its own installer.
  *
  * Usage:
- *   node scripts/upload-release.mjs                    # build this host's installers, upload, verify
+ *   node scripts/upload-release.mjs                    # sync prod env, build, upload, verify
  *   node scripts/upload-release.mjs --no-build         # upload existing dist/ artifacts only
  *   node scripts/upload-release.mjs --require linux    # fail if these platforms are not uploaded
  *   node scripts/upload-release.mjs --verify-only      # no build/upload; HEAD the public URLs
@@ -84,6 +84,14 @@ function loadHosting() {
     console.error(String(error instanceof Error ? error.message : error));
     process.exit(1);
   }
+}
+
+function syncProductionEnv() {
+  const syncArgs = ["run", "sync:env:prod"];
+  if (dryRun) syncArgs.push("--", "--dry-run");
+
+  console.log(`\n☁️  Syncing .credentials to Vercel production${dryRun ? " (dry run)" : ""}`);
+  execFileSync("pnpm", syncArgs, { cwd: root, stdio: "inherit" });
 }
 
 function buildHostInstallers(platforms) {
@@ -185,6 +193,7 @@ async function main() {
 
   let uploaded = {};
   if (!verifyOnly) {
+    syncProductionEnv();
     assertAwsCliAvailable();
 
     // Only build/publish what this host is responsible for (e.g. a mac dmg lying

@@ -71,13 +71,17 @@ here fails loudly at sync time, not at request time in production.
 | `pnpm sync:env` | mode=dev → writes `apps/web/.env.local` (dev Supabase, local LLM) and root `.env.local` (desktop `VITE_*` vars). Runs automatically before `pnpm dev` (`predev` hook). |
 | `pnpm sync:env -- --mode=prod` | Same two files but with prod values (cloud Supabase, OpenAI, `https://talysman.app`). This is what `pnpm prod` does before starting `next dev`. |
 | `pnpm sync:env:build` | Runs before `pnpm build` (`prebuild` hook). On a Vercel build (`VERCEL=1`) with no `.credentials` present it **skips entirely** and lets Vercel's own env vars win. Locally it writes prod-mode files. |
-| `pnpm sync:env:prod` | **Pushes** every non-empty var to Vercel's *production* environment via `vercel env add <NAME> production`. Does not write local files. |
+| `pnpm sync:env:prod` | **Upserts** every non-empty var to Vercel's *production* environment. Does not write local files. |
+| `pnpm sync:env:preview` | Upserts the same prod-mode values to Vercel's *preview* environment. Does not write local files. |
 
 Gotchas baked into the script (worth knowing, they will bite otherwise):
 
-- `vercel env add` **fails if the variable already exists**. The script stops on the
-  first conflict and tells you to `vercel env rm <NAME> production` first. There is no
-  built-in "update" — to re-push everything you remove the old vars first (see §6.3).
+- Vercel syncs are idempotent: the script lists remote metadata, updates existing
+  app-owned variables, and adds missing variables without first deleting them.
+- Variables owned by a Vercel integration are preserved. For example, the Supabase
+  integration remains the source of truth for the variables it manages.
+- Known server secrets are stored as Vercel sensitive variables. Values are piped over
+  stdin and are never printed by the script.
 - Empty values are skipped on push, so optional stuff (Sentry, PostHog) never creates
   empty vars on Vercel.
 - Prod mode **requires** `openai.api_key` to be set, because prod uses OpenAI.
@@ -290,24 +294,9 @@ cd apps/web
 pnpm sync:env:prod         # pushes every non-empty var from .credentials → production env
 ```
 
-Because `vercel env add` errors on existing vars, on *re*-pushes remove the changed
-var(s) first:
-
-```bash
-vercel env rm STRIPE_SECRET_KEY production -y
-pnpm sync:env:prod         # will now fail on the NEXT existing var… 
-```
-
-…which means for anything more than a one-off var change, the practical pattern is:
-remove all app-managed vars, then push fresh. A quick loop:
-
-```bash
-# from apps/web — removes only vars that sync-env manages (leaves integration vars alone)
-for v in $(grep -oE '^\s*\["([A-Z0-9_]+)"' ../../scripts/sync-env.ts | grep -oE '[A-Z0-9_]+'); do
-  vercel env rm "$v" production -y 2>/dev/null
-done
-pnpm sync:env:prod
-```
+The command is safe to re-run after any `.credentials` change. It creates missing
+variables and updates existing variables in place. To inspect what would be synced
+without changing Vercel, run `pnpm sync:env:prod -- --dry-run` from the repository root.
 
 Rules to remember:
 
@@ -321,10 +310,8 @@ Rules to remember:
   and `SUPABASE_SECRET_KEY` from `.credentials`. Having both is harmless — just make
   sure `[supabase.prod]` in `.credentials` matches the same project the integration is
   linked to, or you'll have two sources of truth disagreeing.
-- `sync:env:prod` only populates the **production** environment. If you adopt Git
-  preview deploys later, preview builds will fail validation until you either add
-  preview values (dashboard or `vercel env add <NAME> preview`) or decide previews
-  aren't needed.
+- `sync:env:prod` only populates the **production** environment. Run
+  `pnpm sync:env:preview` if Git preview builds should use the same prod-mode services.
 - To see what's set: `vercel env ls production`. To mirror prod env into a local file
   for inspection: `vercel env pull --environment=production /tmp/prod.env`.
 
@@ -397,10 +384,10 @@ supabase stop                        # when done (add --no-backup to wipe data)
 # 1. Schema first (safe: additive migrations deploy before the code that uses them)
 cd apps/web && supabase db push
 
-# 2. Env, only if .credentials changed
-pnpm sync:env:prod                   # (rm changed vars first — §6.3)
+# 2. Desktop artifacts + production env
+pnpm release:upload                  # syncs .credentials to Vercel before build/upload
 
-# 3. Code
+# 3. Web code
 vercel --prod                        # or `git push origin main` once Git integration is on
 
 # 4. Verify

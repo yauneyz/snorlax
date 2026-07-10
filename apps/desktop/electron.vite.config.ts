@@ -46,7 +46,9 @@ export default defineConfig(({ mode }) => {
       build: {
         rollupOptions: {
           input: resolve(__dirname, 'src/main/index.ts'),
-          external: ['electron-updater', 'electron-log'],
+          // `ws` optionally loads these native accelerators and falls back to JS when absent.
+          // Keeping just the accelerators external preserves that fallback in the bundle.
+          external: ['electron-updater', 'electron-log', 'bufferutil', 'utf-8-validate'],
           output: {
             format: 'cjs',
             entryFileNames: 'index.cjs',
