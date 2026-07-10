@@ -12,6 +12,7 @@
 
 import { shell } from 'electron';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
+import WebSocket from 'ws';
 import {
   DESKTOP_AUTH_CALLBACK_PATH,
   desktopDeepLinkUrl,
@@ -36,6 +37,9 @@ function getClient(): SupabaseClient {
   }
   if (!client) {
     client = createClient(config.supabaseUrl, config.supabaseAnonKey, {
+      // Electron 31 embeds Node 20, which does not expose a native WebSocket.
+      // Supabase initializes its Realtime client eagerly, even when we only use Auth.
+      realtime: { transport: WebSocket },
       auth: {
         flowType: 'pkce',
         autoRefreshToken: true,
