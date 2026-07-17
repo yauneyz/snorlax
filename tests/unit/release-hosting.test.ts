@@ -20,6 +20,19 @@ import {
 type Platform = keyof typeof STABLE_INSTALLER_KEYS;
 const platforms = PLATFORMS as Platform[];
 
+describe('release command boundaries', () => {
+  it('keeps release:local free of cloud publishing operations', () => {
+    const localReleaseSource = readFileSync(
+      resolve(__dirname, '../../scripts/release-local.mjs'),
+      'utf8',
+    );
+
+    expect(localReleaseSource).not.toContain('scripts/upload-release.mjs');
+    expect(localReleaseSource).not.toContain('sync:env:prod');
+    expect(localReleaseSource).not.toMatch(/execFileSync\(['"](?:aws|vercel)['"]/);
+  });
+});
+
 describe('classifyArtifact', () => {
   it('recognizes electron-builder artifact names for each platform', () => {
     expect(classifyArtifact('Talysman-Setup-0.1.0.exe')).toBe('win');

@@ -2,18 +2,18 @@
 /**
  * Local NixOS release for the Talysman/snorlax desktop app.
  *
- * Mirrors the Thinky `release.js --no-upload` flow: build the Linux artifacts with
- * the repo's own toolchain, add the AppImage to /nix/store, and write+stage
+ * Builds the Linux artifacts with the repo's own toolchain, adds the AppImage to
+ * /nix/store, and writes+stages
  * ~/nixos-config/pkgs/snorlax/release.nix so the next `nixos-rebuild` picks up the
  * new version. pkgs/snorlax/default.nix wraps that AppImage via appimageTools.
  *
- * The AppImage is strictly local-to-NixOS; the public release chain only ever
- * publishes the deb (see scripts/upload-release.mjs), which this script runs last.
+ * This command is strictly local-to-NixOS. It never syncs credentials, uploads
+ * artifacts, or otherwise changes cloud hosting. Use `pnpm release:upload` for the
+ * public release chain.
  *
  * Usage:
- *   pnpm run release:local             # build + install into /nix/store + stage release.nix + upload to S3
- *   pnpm run release:local --dry-run   # print intent, no nix-store/git/S3 writes
- *   pnpm run release:local --no-upload # skip publishing installers to S3
+ *   pnpm run release:local             # prod build + local install + stage release.nix
+ *   pnpm run release:local --dry-run   # build, but skip local nix-store/git/config writes
  *
  * Note: the privileged daemon is NOT shipped via this AppImage on NixOS — it is built
  * from native/linux by pkgs/snorlax-daemon and started by a declarative systemd unit.
@@ -40,7 +40,6 @@ const distDir = join(root, 'dist');
 const nixSnorlaxDir = join(homedir(), 'nixos-config/pkgs/snorlax');
 const stableAppImage = join(distDir, 'snorlax.AppImage');
 const dryRun = process.argv.slice(2).includes('--dry-run');
-const noUpload = process.argv.slice(2).includes('--no-upload');
 const localConfigDir = join(process.env.XDG_CONFIG_HOME ?? join(homedir(), '.config'), 'talysman');
 const localKeyDir = join(localConfigDir, 'keys');
 const localPrivateKeyPath = join(localKeyDir, 'local-entitlement-ed25519-private.pem');
@@ -222,19 +221,4 @@ console.log('🔏 Embedding local entitlement public key for release-local build
 buildAppImage();
 writeLocalEntitlementLicense(localEntitlementKey.privateKey, version);
 installIntoNixStore(version);
-if (noUpload) {
-  console.log('⏭️  Skipping S3 upload (--no-upload)');
-} else {
-  // Publish the installers so /download links resolve; verifies the public URLs after
-  // upload. --no-build: this script already built linux above (with the local
-  // entitlement key baked in), and the win installer from the same dist/ is uploaded
-  // when present.
-  run('node', [
-    'scripts/upload-release.mjs',
-    '--no-build',
-    '--require',
-    'linux',
-    ...(dryRun ? ['--dry-run'] : []),
-  ]);
-}
 console.log('\n🎉 Done.');

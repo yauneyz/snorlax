@@ -378,6 +378,15 @@ stripe listen --forward-to http://localhost:3000/api/stripe/webhook   # when tes
 supabase stop                        # when done (add --no-backup to wipe data)
 ```
 
+### Install a production build locally
+
+```bash
+pnpm release:local                  # build and install on this machine only
+```
+
+This command does not sync credentials, upload artifacts, or change cloud hosting.
+Use `pnpm release:upload` for those release operations.
+
 ### Ship a change to prod
 
 ```bash
