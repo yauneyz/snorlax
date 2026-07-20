@@ -15,6 +15,11 @@ export interface EventMap {
    * (or an unsupported browser open during a locked session). Surfaced to the user as a warning.
    */
   browserWatchdogWarning: { browser: string; pid: number };
+  /**
+   * The watchdog force-terminated a browser after its warning and graceful-close windows expired.
+   * The desktop main process turns this into a native system notification with recovery steps.
+   */
+  browserWatchdogKilled: { browser: string; pid: number };
 }
 
 export type EventName = keyof EventMap;

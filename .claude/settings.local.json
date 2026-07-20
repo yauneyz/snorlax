@@ -116,7 +116,9 @@
       "Bash(sudo mkdir -p /run/systemd/system/talysman.service.d)",
       "Bash(sudo tee /run/systemd/system/talysman.service.d/override.conf)",
       "Bash(sudo systemctl daemon-reload)",
-      "Bash(sudo systemctl restart talysman.service)"
+      "Bash(sudo systemctl restart talysman.service)",
+      "Bash(sudo grep -A2 -B2 \"pid 3100\" /var/lib/talysman/service.log)",
+      "Bash(ps -p 3100 -o pid,comm)"
     ]
   },
   "enabledPlugins": {

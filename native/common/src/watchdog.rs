@@ -48,8 +48,13 @@ pub enum Action {
     Warn { pid: u32, browser: String },
     /// Ask the browser to close gracefully (WM_CLOSE / SIGTERM).
     Close { pid: u32, browser: String },
-    /// Force-terminate the browser (TerminateProcess / SIGKILL).
-    Kill { pid: u32, browser: String },
+    /// Force-terminate the browser (TerminateProcess / SIGKILL). `first_attempt` lets backends
+    /// notify the user once without repeating the notification on every kill retry.
+    Kill {
+        pid: u32,
+        browser: String,
+        first_attempt: bool,
+    },
 }
 
 impl Action {
@@ -214,6 +219,7 @@ impl Watchdog {
                         actions.push(Action::Kill {
                             pid: proc.pid,
                             browser: proc.key.clone(),
+                            first_attempt: true,
                         });
                     }
                 }
@@ -222,6 +228,7 @@ impl Watchdog {
                     actions.push(Action::Kill {
                         pid: proc.pid,
                         browser: proc.key.clone(),
+                        first_attempt: false,
                     });
                 }
             }
@@ -334,7 +341,8 @@ mod tests {
             a,
             vec![Action::Kill {
                 pid: 100,
-                browser: "chrome".into()
+                browser: "chrome".into(),
+                first_attempt: true,
             }]
         );
 
@@ -344,7 +352,8 @@ mod tests {
             a,
             vec![Action::Kill {
                 pid: 100,
-                browser: "chrome".into()
+                browser: "chrome".into(),
+                first_attempt: false,
             }]
         );
     }
@@ -413,7 +422,8 @@ mod tests {
             a,
             vec![Action::Kill {
                 pid: 300,
-                browser: "librewolf".into()
+                browser: "librewolf".into(),
+                first_attempt: true,
             }]
         );
     }

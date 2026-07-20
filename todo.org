@@ -14,7 +14,7 @@ payments
 - cancel payment
 - resume payment
 
-- deadman switch works on windows and linux
+- deadman switch works on windows
 - macos added to release options, installed on jessica's computer
 
 - app picker for app blocking needs improvement

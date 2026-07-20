@@ -23,6 +23,9 @@ import { createWindow, handleDeepLink, showMainWindow } from './window.js';
 
 const CONNECT_TIMEOUT_MS = 2000;
 
+// Required for reliable native toast attribution on Windows (and harmless elsewhere).
+app.setAppUserModelId('com.talysman.app');
+
 async function connectService(): Promise<{ service: ServiceConnection; mock?: MockServiceConnection }> {
   const pipe = new PipeServiceConnection(config.pipePath);
   const connected = await Promise.race([

@@ -4,7 +4,7 @@
  * Phase 3.
  */
 
-import { BrowserWindow, ipcMain, shell } from 'electron';
+import { BrowserWindow, dialog, ipcMain, Notification, shell } from 'electron';
 import { ErrorCode, type EventName, type Method, type Params } from '@talysman/shared';
 import { config } from '../config.js';
 import { logger } from '../logging.js';
@@ -67,7 +67,52 @@ const FORWARDED_EVENTS: EventName[] = [
   'scheduleFired',
   'settingsChanged',
   'browserWatchdogWarning',
+  'browserWatchdogKilled',
 ];
+
+const WATCHDOG_KILLED_DETAIL =
+  'The browser could not prove that the Talysman extension was active during locked Focus mode. ' +
+  'Enable or reinstall the extension, allow its permissions, and then reopen the browser. ' +
+  'If this browser does not support the extension, use a supported browser instead.';
+
+/** Show the kill explanation in the logged-in desktop session, not the privileged service session. */
+function notifyBrowserWatchdogKilled(browser: string): void {
+  const title = `Talysman closed ${browser}`;
+
+  if (Notification.isSupported()) {
+    const notification = new Notification({
+      title,
+      body: WATCHDOG_KILLED_DETAIL,
+      urgency: 'critical',
+      timeoutType: 'never',
+      silent: false,
+    });
+    notification.on('click', () => {
+      void import('../window.js').then(({ showMainWindow }) => showMainWindow());
+    });
+    notification.show();
+    return;
+  }
+
+  // Some minimal Linux desktops have no notification server. A native warning dialog is the
+  // fallback so the explanation is still visible rather than silently disappearing.
+  void dialog
+    .showMessageBox({
+      type: 'warning',
+      title,
+      message: title,
+      detail: WATCHDOG_KILLED_DETAIL,
+      buttons: ['Open Talysman', 'Dismiss'],
+      defaultId: 0,
+      cancelId: 1,
+      noLink: true,
+    })
+    .then(({ response }) => {
+      if (response === 0) {
+        void import('../window.js').then(({ showMainWindow }) => showMainWindow());
+      }
+    });
+}
 
 export interface HandlerContext {
   service: ServiceConnection;
@@ -111,6 +156,10 @@ export async function registerIpcHandlers(ctx: HandlerContext): Promise<void> {
       }
     });
   }
+
+  service.on('browserWatchdogKilled', ({ browser }) => {
+    notifyBrowserWatchdogKilled(browser);
+  });
 
   ipcMain.handle(Channels.serviceRequest, async (_e, arg: { method: Method; params: unknown }) => {
     try {

@@ -81,8 +81,15 @@ pub async fn run_browser_watchdog(
                             tracing::warn!("browser watchdog: closing {browser} (pid {pid})");
                             close_windows(pid);
                         }
-                        Action::Kill { pid, browser } => {
+                        Action::Kill { pid, browser, first_attempt } => {
                             tracing::warn!("browser watchdog: killing {browser} (pid {pid})");
+                            if first_attempt {
+                                let _ = events.send(json!({
+                                    "kind": "event",
+                                    "event": "browserWatchdogKilled",
+                                    "payload": { "browser": browser, "pid": pid },
+                                }));
+                            }
                             terminate(pid);
                         }
                     }
