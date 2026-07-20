@@ -16,7 +16,7 @@ export interface EventMap {
    */
   browserWatchdogWarning: { browser: string; pid: number };
   /**
-   * The watchdog force-terminated a browser after its warning and graceful-close windows expired.
+   * The watchdog force-terminated a browser after its graceful-close window expired.
    * The desktop main process turns this into a native system notification with recovery steps.
    */
   browserWatchdogKilled: { browser: string; pid: number };

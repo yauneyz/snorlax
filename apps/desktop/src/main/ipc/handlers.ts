@@ -75,6 +75,9 @@ const WATCHDOG_KILLED_DETAIL =
   'Enable or reinstall the extension, allow its permissions, and then reopen the browser. ' +
   'If this browser does not support the extension, use a supported browser instead.';
 
+// Keep active notifications alive until the OS closes them so click handlers remain reliable.
+const activeWatchdogNotifications = new Set<Notification>();
+
 /** Show the kill explanation in the logged-in desktop session, not the privileged service session. */
 function notifyBrowserWatchdogKilled(browser: string): void {
   const title = `Talysman closed ${browser}`;
@@ -90,6 +93,8 @@ function notifyBrowserWatchdogKilled(browser: string): void {
     notification.on('click', () => {
       void import('../window.js').then(({ showMainWindow }) => showMainWindow());
     });
+    notification.once('close', () => activeWatchdogNotifications.delete(notification));
+    activeWatchdogNotifications.add(notification);
     notification.show();
     return;
   }

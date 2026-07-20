@@ -2,6 +2,7 @@
 auth
 - get dev setup working
 - dev new account
+- create account with oauth
 - dev login/logout
 - dev password reset
 - dev OAuth
