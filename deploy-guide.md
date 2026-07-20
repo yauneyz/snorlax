@@ -371,12 +371,13 @@ and `config.ts`). The Sentry auth token is build-time only (source-map upload).
 ### Daily dev
 
 ```bash
-cd apps/web && supabase start        # if not already running (survives reboots via Docker)
-pnpm web:dev                         # from repo root
-stripe listen --forward-to http://localhost:3000/api/stripe/webhook   # when testing billing
+pnpm dev                             # Supabase + Stripe forwarding + web + Electron
 # schema change: supabase migration new x → edit SQL → supabase db reset
-supabase stop                        # when done (add --no-backup to wipe data)
+pnpm dev:down                        # optional: stop Supabase when done
 ```
+
+Ctrl+C stops the three attached processes but leaves Supabase running for faster restarts.
+Use `pnpm dev:desktop` when only the Electron app is needed.
 
 ### Install a production build locally
 

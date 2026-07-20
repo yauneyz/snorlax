@@ -285,7 +285,7 @@ independent of whether the user's browser completed the redirect.
 | Desktop auth | Real Supabase session in main process | ✅ PKCE client; Google + email/password |
 | Token storage | Session in `safeStorage` | ✅ encrypted storage adapter |
 | Entitlement source | `GET /api/desktop/entitlement` over bearer token | ✅ implemented + disk cache |
-| Offline behavior | Keep last-known while signed in | ✅ indefinite, `source: 'offline'` |
+| Offline behavior | Keep last-known while signed in | ✅ 30-day verification lease, `source: 'offline'` |
 | Type/limits sharing | Import `@talysman/product` everywhere | ✅ no local copy |
 | Checkout / portal | Desktop calls `/api/desktop/{checkout,portal}` | ✅ via `billing.ts` |
 | Entitlement transport | Next.js `/api/desktop/*` web routes | ✅ `API_BASE_URL` = web origin; edge-fn refs removed |

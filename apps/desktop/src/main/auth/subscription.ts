@@ -3,10 +3,9 @@
  * pings `GET {API_BASE_URL}/api/desktop/entitlement` with the Supabase access token and
  * gates UI on the result.
  *
- * Offline policy: while a session exists we keep the last-known entitlement *indefinitely*
- * and only re-evaluate when an online call succeeds. Focus enforcement is independent (it
- * lives in the native service behind the USB-key disable gate), so entitlement is purely
- * feature-gating and must not strip a paying user's features over a network blip.
+ * Offline policy: while a session exists we keep the last server-verified entitlement for
+ * up to 30 days. This lets a paying user retain premium features during extended offline use,
+ * while still requiring the app to reconnect periodically to verify billing state.
  *
  * Development builds can still override the plan from Settings (dev-override) so gated UI
  * can be exercised without a real subscription.
@@ -28,6 +27,7 @@ import {
   LOCAL_ENTITLEMENT_FILE,
   verifyLocalEntitlementLicense,
 } from './localEntitlement.js';
+import { entitlementForOfflineUse } from './offlineEntitlement.js';
 import { getAccessToken } from './supabase.js';
 
 const DEFAULT_DEV_PLAN: SubscriptionPlan = 'pro';
@@ -156,12 +156,18 @@ export async function getEntitlement(): Promise<Entitlement> {
     await writeCache(entitlement);
     return entitlement;
   } catch (e) {
-    // Offline / server unreachable: keep the last-known entitlement indefinitely while a
-    // session exists. Re-evaluation happens on the next successful call.
     const cached = await readCache();
-    if (cached) {
+    const offlineEntitlement = cached ? entitlementForOfflineUse(cached) : undefined;
+    if (offlineEntitlement) {
       logger.warn('[entitlement] offline — serving cached entitlement', (e as Error).message);
-      return { ...cached, source: 'offline' };
+      return offlineEntitlement;
+    }
+    if (cached) {
+      logger.warn(
+        '[entitlement] offline cache needs verification — defaulting to free',
+        (e as Error).message,
+      );
+      return SIGNED_OUT;
     }
     logger.warn('[entitlement] offline with no cache — defaulting to free', (e as Error).message);
     return SIGNED_OUT;

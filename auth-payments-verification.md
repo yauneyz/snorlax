@@ -52,20 +52,22 @@ these pieces misconfigured.
 ### Dev stack (everything local)
 
 ```sh
-# 1. Local Supabase (Postgres + auth + Inbucket email catcher)
-cd apps/web && supabase start          # Inbucket UI: http://localhost:54324
-
-# 2. Web app
-pnpm dev                                # http://localhost:3000
-
-# 3. Stripe webhook forwarding (sandbox account)
-stripe listen --forward-to localhost:3000/api/stripe/webhook
-# put the printed whsec_... into STRIPE_WEBHOOK_SECRET
-
-# 4. Desktop app (separate terminal)
-cd apps/desktop && pnpm dev
-# needs API_BASE_URL=http://localhost:3000, VITE_SUPABASE_URL/ANON_KEY from `supabase status`
+# From the repository root: starts Supabase, Stripe forwarding, the web app,
+# and the desktop app. The Stripe signing secret is injected automatically.
+pnpm dev
 ```
+
+Web: http://localhost:3000 · Supabase Studio: http://localhost:54323 · local email
+catcher (Inbucket/Mailpit): http://localhost:54324
+
+Ctrl+C stops Stripe, Next, and Electron. The Docker-based Supabase stack remains running
+for faster restarts; stop it explicitly with `pnpm dev:down`. To run only Electron against
+an already-running backend, use `pnpm dev:desktop`.
+
+The first run needs Docker plus authenticated Supabase and Stripe CLIs and may take longer
+while Supabase downloads its service images. The repo's `.credentials` remains the source
+for application secrets; the ephemeral secret returned by `stripe listen --print-secret`
+is passed directly to Next.js and is not written back to `.credentials`.
 
 **⚠ Dev gotcha — the entitlement override.** Non-production desktop builds short-circuit
 `getEntitlement()` with `dev-entitlement.json` (default plan: **pro**, source
@@ -267,6 +269,9 @@ one row per event id).
 - **Offline grace:** subscribe, then kill the network (or stop the web server in dev) and
   restart the desktop app → plan stays Pro from `entitlement-cache.json` (source `offline`);
   the subscription detail card may be stale/absent — that's by design (display-only, no cache).
+  The last server-verified entitlement remains valid offline for 30 days. Change its
+  `fetchedAt` to more than 30 days ago and restart offline → the app requires verification
+  again and falls back to Free until it can reach the server.
 - Prod only: verify the desktop is NOT running with a `dev-entitlement.json` override
   (source shown must be `server`/`cache`, never `dev-override`).
 

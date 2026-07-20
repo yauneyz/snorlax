@@ -88,7 +88,13 @@
       "Bash(systemctl show *)",
       "Bash(sudo -n grep -iE \"watchdog|heartbeat|handshake\" /var/lib/talysman/service.log)",
       "Bash(sudo -n tail -5 /var/lib/talysman/service.log)",
-      "Read(//nix/store/n6r1kppclqgk197a2lrzc0spnpcj54j2-talysman-daemon-0.1.0/bin/**)"
+      "Read(//nix/store/n6r1kppclqgk197a2lrzc0spnpcj54j2-talysman-daemon-0.1.0/bin/**)",
+      "Bash(git -C /data/zac/zac/development/snorlax show 62a8997 --stat)",
+      "Bash(git -C /data/zac/zac/development/snorlax show 62a8997 -- native/common/src/browsers.rs)",
+      "Bash(git -C /data/zac/zac/development/snorlax log --all --oneline -S \"by_linux_process_identity\" -- .)",
+      "Bash(git -C /data/zac/zac/development/snorlax log --oneline -S \"Restore the persisted handshake setting\" -- native/linux/src/core.rs)",
+      "Bash(git -C /data/zac/zac/development/snorlax log --oneline --all -- native/linux/src/core.rs)",
+      "Bash(git -C /data/zac/zac/development/snorlax status --short -- native/)"
     ]
   },
   "enabledPlugins": {

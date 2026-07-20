@@ -27,7 +27,10 @@ WFP, DoH hardening, macOS.
 pnpm install
 pnpm typecheck
 pnpm test        # Category-1 unit tests (run anywhere, incl. WSL/CI)
-pnpm dev         # launches the Electron app against the mock service
+pnpm dev         # launches Supabase + Stripe forwarding + web + Electron
 ```
+
+`pnpm dev` leaves the local Supabase containers running for fast restarts. Use
+`pnpm dev:down` to stop them, or `pnpm dev:desktop` when only the Electron app is needed.
 
 For the real enforcing build you must be on **native Windows** — see `build-guide.md`.
