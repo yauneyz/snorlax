@@ -47,7 +47,8 @@ pub async fn run_browser_watchdog(
                     .values()
                     .filter_map(|p| {
                         let argv0 = p.cmd().first().map(|arg| arg.as_str());
-                        by_linux_process_identity(p.name(), argv0).map(|def| ScannedProc {
+                        let exe = p.exe().and_then(|e| e.to_str());
+                        by_linux_process_identity(p.name(), argv0, exe).map(|def| ScannedProc {
                             pid: p.pid().as_u32(),
                             parent: p.parent().map(|pp| pp.as_u32()),
                             class: def.class,

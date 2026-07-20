@@ -15,7 +15,6 @@ payments
 - resume payment
 
 - deadman switch works on windows and linux
-- macos port of the backend
 - macos added to release options, installed on jessica's computer
 
 - app picker for app blocking needs improvement

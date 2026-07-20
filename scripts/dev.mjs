@@ -118,7 +118,8 @@ async function shutdown(exitCode = 0) {
   if (setupChild) setupChild.kill('SIGTERM');
 
   const running = [...children.values()];
-  for (const child of running.reverse()) signalProcess(child, 'SIGTERM');
+  const gracefulSignal = process.platform === 'win32' ? 'SIGTERM' : 'SIGINT';
+  for (const child of running.reverse()) signalProcess(child, gracefulSignal);
 
   await Promise.race([
     Promise.allSettled(running.map((child) => new Promise((resolvePromise) => child.once('exit', resolvePromise)))),
@@ -192,7 +193,7 @@ async function main() {
   const webProcess = startProcess(
     'web app',
     pnpm,
-    ['--filter', '@talysman/web', 'exec', 'next', 'dev'],
+    ['--filter', '@talysman/web', 'exec', 'next', 'dev', '--port', '3000'],
     webEnv,
   );
 
@@ -206,6 +207,12 @@ async function main() {
 
 process.once('SIGINT', () => void shutdown(0));
 process.once('SIGTERM', () => void shutdown(0));
+process.once('SIGHUP', () => void shutdown(0));
+process.once('exit', () => {
+  // Synchronous backstop for a second signal or an outer package runner exiting
+  // before the graceful-shutdown timer completes.
+  for (const child of children.values()) signalProcess(child, 'SIGKILL');
+});
 
 main().catch((error) => {
   console.error(`\n[dev] ${error.message}`);

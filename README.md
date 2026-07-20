@@ -32,5 +32,7 @@ pnpm dev         # launches Supabase + Stripe forwarding + web + Electron
 
 `pnpm dev` leaves the local Supabase containers running for fast restarts. Use
 `pnpm dev:down` to stop them, or `pnpm dev:desktop` when only the Electron app is needed.
+Ctrl+C and closing the terminal both clean up the attached Stripe, web, and Electron
+processes.
 
 For the real enforcing build you must be on **native Windows** — see `build-guide.md`.

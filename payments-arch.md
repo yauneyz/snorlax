@@ -217,10 +217,10 @@ The renderer shows plan-gated UI based on an `Entitlement` that now comes from t
     writes a signed `~/.config/talysman/local-entitlement.json` granting Pro for the current
     Linux user/hostname. Production desktop builds trust that file before the network only when
     the matching public key was embedded at build time; the private key stays outside the app.
-  - **Offline:** while signed in, the last-known cached entitlement is served **indefinitely**
-    (`source: 'offline'`); re-evaluation happens on the next successful online call. (Focus
-    enforcement is independent — native service + USB-key gate — so entitlement is feature
-    gating only and must not strip a paying user's features over a network blip.)
+  - **Offline:** while signed in, the last server-verified entitlement is served for up to
+    **30 days** (`source: 'offline'`). After that lease expires, the app falls back to Free
+    until it can reach the server again. (Focus enforcement is independent — native service
+    + USB-key gate — so entitlement remains feature gating only.)
   - In **development**: still reads/writes `dev-entitlement.json` (default `pro`) so gated UI
     can be exercised without a subscription (Settings/Plans dev switch).
   - The desktop now imports the canonical `Entitlement` / `entitlementSchema` /
@@ -331,8 +331,8 @@ environment/config setup that can't be done from code alone.
 - **Transport:** Next.js `/api/desktop/*` only; the Supabase Edge Function path was removed
   from env + docs.
 - **Sign-in:** both Google browser-OAuth (PKCE) and in-app email/password.
-- **Offline:** keep the last-known entitlement **indefinitely while signed in** (the USB-key
-  disable gate, not entitlement, is the anti-bypass control).
+- **Offline:** keep the last server-verified entitlement for **30 days while signed in**;
+  reconnect after that to verify billing state again.
 
 ---
 

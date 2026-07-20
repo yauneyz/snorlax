@@ -140,16 +140,48 @@ pub fn by_mac_bundle(bundle: &str) -> Option<&'static BrowserDef> {
         .find(|b| bundle == b.mac_bundle || bundle.starts_with(&format!("{}.", b.mac_bundle)))
 }
 
-/// Look up a Linux browser by the process `comm` name first, then by argv[0]'s basename.
+/// Look up a Linux browser from every available identity signal, most reliable first:
 ///
-/// Some packaged browsers launch through wrappers whose `comm` is truncated or wrapper-specific
-/// (for example `.firefox-wrappe` on Nix), while argv[0] is still the user-facing browser command.
-pub fn by_linux_process_identity(name: &str, argv0: Option<&str>) -> Option<&'static BrowserDef> {
-    by_linux_process(name).or_else(|| {
-        argv0
-            .and_then(|arg| Path::new(arg).file_name())
-            .and_then(|file| file.to_str())
-            .and_then(by_linux_process)
+/// 1. The process `comm` name, matched directly — the fast path for ordinary (non-wrapped)
+///    installs, where `comm` already is the browser's own name.
+/// 2. `/proc/pid/exe`'s basename — resolves through wrapper symlinks/scripts to the real ELF, so
+///    it is correct even when both `comm` and argv[0] are wrapper artifacts.
+/// 3. argv[0]'s basename — the user-facing command name; a fallback for when `exe` couldn't be
+///    read (process already exited, permission denied, sandboxed).
+/// 4. `comm` again, this time checked against Nix's `wrapProgram` convention (see
+///    [`by_nix_wrapped_comm`]) — a last resort for when neither `exe` nor argv[0] is available.
+///
+/// Nix-packaged browsers commonly run through a wrapper: `wrapProgram` renames the real binary to
+/// `<name>-wrapped` and installs a thin shim at the original name, so the kernel's `comm` for the
+/// real process is that wrapped name, truncated to 15 bytes (e.g. Firefox shows up as
+/// `.firefox-wrappe`). `exe` sees straight through this because it resolves the actual file the
+/// process is running, regardless of what it's named.
+pub fn by_linux_process_identity(
+    name: &str,
+    argv0: Option<&str>,
+    exe: Option<&str>,
+) -> Option<&'static BrowserDef> {
+    by_linux_process(name)
+        .or_else(|| exe.and_then(basename).and_then(by_linux_process))
+        .or_else(|| argv0.and_then(basename).and_then(by_linux_process))
+        .or_else(|| by_nix_wrapped_comm(name))
+}
+
+fn basename(path: &str) -> Option<&str> {
+    Path::new(path).file_name().and_then(|f| f.to_str())
+}
+
+/// Match a `comm` value against Nix's `wrapProgram` convention: the real binary is renamed to
+/// `<key>-wrapped` and the kernel truncates `comm` to 15 bytes, so e.g. Firefox's wrapped ELF
+/// shows up as `.firefox-wrappe`, and a longer name like Chromium's truncates further still. A
+/// match requires `comm` (after stripping a leading `.`) to be a prefix of `<key>-wrapped` *and*
+/// at least as long as `<key>` itself — that second condition guarantees the full key was present
+/// before truncation, so a short comm can't accidentally match a different, longer browser key.
+fn by_nix_wrapped_comm(name: &str) -> Option<&'static BrowserDef> {
+    let trimmed = name.strip_prefix('.').unwrap_or(name).to_ascii_lowercase();
+    BROWSERS.iter().find(|b| {
+        trimmed.len() >= b.linux_process.len()
+            && format!("{}-wrapped", b.linux_process).starts_with(&trimmed)
     })
 }
 
@@ -199,13 +231,56 @@ mod tests {
         let def = by_linux_process_identity(
             ".firefox-wrappe",
             Some("/etc/profiles/per-user/zac/bin/firefox"),
+            None,
         );
         assert_eq!(def.map(|b| b.key), Some("firefox"));
     }
 
     #[test]
     fn linux_identity_prefers_process_name() {
-        let def = by_linux_process_identity("firefox", Some("/usr/bin/not-a-browser"));
+        let def = by_linux_process_identity("firefox", Some("/usr/bin/not-a-browser"), None);
         assert_eq!(def.map(|b| b.key), Some("firefox"));
+    }
+
+    #[test]
+    fn linux_identity_uses_exe_for_wrapped_browsers() {
+        // No usable argv0 (e.g. it was empty or unreadable) but /proc/pid/exe resolved through
+        // the Nix wrapper to the real binary — exe should be enough on its own.
+        let def = by_linux_process_identity(
+            ".firefox-wrappe",
+            None,
+            Some("/nix/store/r9ryxxm7nm3qklvh2b3vp0slp3ypd69z-firefox-152.0.4/lib/firefox/firefox"),
+        );
+        assert_eq!(def.map(|b| b.key), Some("firefox"));
+    }
+
+    #[test]
+    fn linux_identity_exe_wins_over_misleading_argv0() {
+        let def = by_linux_process_identity(
+            ".firefox-wrappe",
+            Some("/usr/bin/not-a-browser"),
+            Some("/nix/store/r9ryxxm7nm3qklvh2b3vp0slp3ypd69z-firefox-152.0.4/lib/firefox/firefox"),
+        );
+        assert_eq!(def.map(|b| b.key), Some("firefox"));
+    }
+
+    #[test]
+    fn linux_identity_falls_back_to_wrapped_comm_pattern() {
+        // Neither argv0 nor exe was available (e.g. a restricted /proc read) — the wrapped-comm
+        // heuristic alone should still recognize Firefox's Nix wrapper naming.
+        let def = by_linux_process_identity(".firefox-wrappe", None, None);
+        assert_eq!(def.map(|b| b.key), Some("firefox"));
+
+        // A longer key truncates further still; the prefix match must generalize past the
+        // one-character truncation Firefox happens to hit.
+        let def = by_linux_process_identity(".chromium-wrap", None, None);
+        assert_eq!(def.map(|b| b.key), Some("chromium"));
+    }
+
+    #[test]
+    fn linux_identity_wrapped_comm_does_not_false_positive() {
+        // Real-world noise: Spotify is also Nix-wrapped but is not a browser at all, and must
+        // not be misclassified just because it shares the wrapper naming convention.
+        assert!(by_linux_process_identity(".spotify-wrappe", None, None).is_none());
     }
 }

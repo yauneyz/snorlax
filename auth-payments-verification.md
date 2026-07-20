@@ -60,14 +60,16 @@ pnpm dev
 Web: http://localhost:3000 · Supabase Studio: http://localhost:54323 · local email
 catcher (Inbucket/Mailpit): http://localhost:54324
 
-Ctrl+C stops Stripe, Next, and Electron. The Docker-based Supabase stack remains running
-for faster restarts; stop it explicitly with `pnpm dev:down`. To run only Electron against
-an already-running backend, use `pnpm dev:desktop`.
+Ctrl+C, terminal closure, and normal termination all stop Stripe, Next, and Electron. The
+Docker-based Supabase stack remains running for faster restarts; stop it explicitly with
+`pnpm dev:down`. To run only Electron against an already-running backend, use
+`pnpm dev:desktop`.
 
-The first run needs Docker plus authenticated Supabase and Stripe CLIs and may take longer
-while Supabase downloads its service images. The repo's `.credentials` remains the source
-for application secrets; the ephemeral secret returned by `stripe listen --print-secret`
-is passed directly to Next.js and is not written back to `.credentials`.
+The first run needs Docker, the Supabase CLI, and an authenticated Stripe CLI, and may take
+longer while Supabase downloads its service images. The repo's `.credentials` remains the
+source for application secrets; the listener secret returned by
+`stripe listen --print-secret` is passed directly to Next.js and is not written back to
+`.credentials`.
 
 **⚠ Dev gotcha — the entitlement override.** Non-production desktop builds short-circuit
 `getEntitlement()` with `dev-entitlement.json` (default plan: **pro**, source

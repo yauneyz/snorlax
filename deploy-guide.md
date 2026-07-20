@@ -376,8 +376,8 @@ pnpm dev                             # Supabase + Stripe forwarding + web + Elec
 pnpm dev:down                        # optional: stop Supabase when done
 ```
 
-Ctrl+C stops the three attached processes but leaves Supabase running for faster restarts.
-Use `pnpm dev:desktop` when only the Electron app is needed.
+Ctrl+C or closing the terminal stops the three attached processes but leaves Supabase
+running for faster restarts. Use `pnpm dev:desktop` when only the Electron app is needed.
 
 ### Install a production build locally
 
