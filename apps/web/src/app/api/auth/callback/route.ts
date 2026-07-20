@@ -1,32 +1,30 @@
 import { NextRequest, NextResponse } from "next/server";
-import { DESKTOP_DEEP_LINK_SCHEME } from "@talysman/auth-contracts";
 import { supabaseServer } from "@/lib/supabase/server";
+import { config } from "@/lib/config";
+import { authRedirectTarget, safeInternalPath } from "@/lib/auth/redirects";
 
-function redirectTarget(origin: string, next: string): string {
-  if (next.startsWith("/")) return `${origin}${next}`;
-
-  try {
-    const parsed = new URL(next);
-    if (parsed.protocol === `${DESKTOP_DEEP_LINK_SCHEME}:`) return parsed.toString();
-  } catch {
-    return `${origin}/app`;
-  }
-
-  return `${origin}/app`;
+function errorRedirect(code: string, next: string, flow: string | null): NextResponse {
+  const target = new URL(flow === "signup" ? "/signup" : "/login", config.app.url);
+  target.searchParams.set("error", code);
+  if (flow !== "signup") target.searchParams.set("next", safeInternalPath(next));
+  return NextResponse.redirect(target);
 }
 
 export async function GET(request: NextRequest) {
-  const { searchParams, origin } = new URL(request.url);
+  const { searchParams } = new URL(request.url);
   const code = searchParams.get("code");
   const next = searchParams.get("next") ?? "/app";
+  const flow = searchParams.get("flow");
+  const oauthError = searchParams.get("error");
 
-  if (code) {
-    const supabase = await supabaseServer();
-    const { error } = await supabase.auth.exchangeCodeForSession(code);
-    if (error) {
-      return NextResponse.redirect(`${origin}/login?error=${encodeURIComponent(error.message)}`);
-    }
+  if (oauthError) return errorRedirect(oauthError, next, flow);
+  if (!code) return errorRedirect("missing_code", next, flow);
+
+  const supabase = await supabaseServer();
+  const { error } = await supabase.auth.exchangeCodeForSession(code);
+  if (error) {
+    return errorRedirect("exchange_failed", next, flow);
   }
 
-  return NextResponse.redirect(redirectTarget(origin, next));
+  return NextResponse.redirect(authRedirectTarget(config.app.url, next));
 }

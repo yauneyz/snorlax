@@ -45,6 +45,8 @@ export interface AuthStatusInfo {
   email?: string;
   /** Set while a password-recovery session awaits a new password. */
   passwordRecovery?: boolean;
+  /** Friendly error from the latest browser-based authentication callback. */
+  authError?: string;
 }
 
 export interface SubscriptionDetailInfo {

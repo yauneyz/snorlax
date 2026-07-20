@@ -11,6 +11,8 @@ export const authStatusSchema = z.object({
   email: z.string().email().optional(),
   /** Set while a password-recovery session awaits a new password (desktop reset flow). */
   passwordRecovery: z.boolean().optional(),
+  /** Friendly error from the most recent browser-based authentication callback. */
+  authError: z.string().optional(),
 });
 
 export type AuthStatus = z.infer<typeof authStatusSchema>;

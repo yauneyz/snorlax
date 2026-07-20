@@ -35,6 +35,7 @@ native/common/target/
 .credentials
 .env.local
 .env.*.local
+apps/web/.env
 .vercel/
 
 # Logs

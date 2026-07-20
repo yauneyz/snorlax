@@ -16,6 +16,7 @@ export default defineConfig(({ mode }) => {
 
   const appConfig = {
     APP_ENV: appEnv,
+    GOOGLE_AUTH_ENABLED: envValue('GOOGLE_AUTH_ENABLED') === 'true',
     TALYSMAN_PIPE:
       envValue('TALYSMAN_PIPE') ?? (appEnv === 'production' ? 'talysman' : 'talysman-dev'),
     // Public endpoints the main process needs to talk to the web backend + Supabase (§auth).

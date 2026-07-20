@@ -29,6 +29,7 @@ interface FocusStore {
   email?: string;
   /** True while a password-recovery session awaits a new password (reset deep link). */
   passwordRecovery: boolean;
+  authError?: string;
   /** False until the first entitlement fetch resolves — UI shows a neutral state meanwhile. */
   entitlementLoaded: boolean;
   subscriptionPlan: SubscriptionPlan;
@@ -71,6 +72,7 @@ export const useFocusStore = create<FocusStore>((set, get) => ({
   signedIn: false,
   email: undefined,
   passwordRecovery: false,
+  authError: undefined,
   // Unknown until the first fetch resolves; pages render a neutral "Checking…" state. Values
   // below are placeholders (fail-closed) and are not shown while entitlementLoaded is false.
   entitlementLoaded: false,
@@ -110,6 +112,7 @@ export const useFocusStore = create<FocusStore>((set, get) => ({
       signedIn: status.signedIn,
       email: status.email,
       passwordRecovery: Boolean(status.passwordRecovery),
+      authError: status.authError,
     });
   },
 

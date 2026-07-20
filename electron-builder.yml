@@ -2,6 +2,11 @@ appId: com.talysman.app
 productName: Talysman
 copyright: Copyright © 2026
 
+protocols:
+  - name: Talysman authentication and billing callbacks
+    schemes:
+      - talysman
+
 directories:
   output: dist
   buildResources: apps/desktop/build

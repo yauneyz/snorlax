@@ -13,8 +13,9 @@ import {
 } from '@talysman/auth-contracts';
 import { config } from './config.js';
 import { logger } from './logging.js';
-import { completeOAuth } from './auth/supabase.js';
+import { completeOAuth, reportAuthFlowError } from './auth/supabase.js';
 import { applyPlanLimitsNow, broadcastAppEvent } from './ipc/handlers.js';
+import { parseDeepLink } from './deepLink.js';
 
 let mainWindow: BrowserWindow | null = null;
 
@@ -97,24 +98,39 @@ export function showMainWindow(): BrowserWindow | null {
  *  - billing/cancel             → just refocus the window.
  */
 export async function handleDeepLink(url: string): Promise<void> {
-  logger.info(`[deeplink] ${url}`);
   try {
-    const parsed = new URL(url);
-    const path = `${parsed.host}${parsed.pathname}`.replace(/\/$/, '');
+    const parsed = parseDeepLink(url);
+    // Never log the query string: authentication deep links contain a short-lived code.
+    logger.info(`[deeplink] ${parsed.logLabel}`);
 
-    if (path === DESKTOP_AUTH_CALLBACK_PATH || path === DESKTOP_AUTH_RESET_CALLBACK_PATH) {
-      const code = parsed.searchParams.get('code');
-      if (code) {
-        await completeOAuth(code, { recovery: path === DESKTOP_AUTH_RESET_CALLBACK_PATH });
+    if (
+      parsed.path === DESKTOP_AUTH_CALLBACK_PATH ||
+      parsed.path === DESKTOP_AUTH_RESET_CALLBACK_PATH
+    ) {
+      const oauthError = parsed.error;
+      const code = parsed.code;
+      if (oauthError) {
+        reportAuthFlowError(
+          oauthError === 'access_denied'
+            ? 'Google sign-in was cancelled.'
+            : 'Google sign-in could not be completed. Please try again.',
+        );
+      } else if (code) {
+        await completeOAuth(code, {
+          recovery: parsed.path === DESKTOP_AUTH_RESET_CALLBACK_PATH,
+        });
         await applyPlanLimitsNow();
         broadcastAppEvent('authChanged');
+      } else {
+        reportAuthFlowError('Google sign-in returned without an authorization code.');
       }
-    } else if (path === DESKTOP_BILLING_SUCCESS_PATH) {
+    } else if (parsed.path === DESKTOP_BILLING_SUCCESS_PATH) {
       await applyPlanLimitsNow();
       broadcastAppEvent('entitlementChanged');
     }
   } catch (e) {
     logger.error('[deeplink] failed to handle', (e as Error).message);
+    reportAuthFlowError((e as Error).message);
   }
 
   showMainWindow();

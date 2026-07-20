@@ -37,6 +37,7 @@ let authChangeListener: (() => void) | undefined;
  * deep links where a broadcast would be lost.
  */
 let passwordRecoveryPending = false;
+let authFlowError: string | undefined;
 
 type RealtimeTransport = NonNullable<
   NonNullable<SupabaseClientOptions<'public'>['realtime']>['transport']
@@ -83,15 +84,36 @@ export function setAuthChangeListener(cb: () => void): void {
   authChangeListener = cb;
 }
 
+function clearAuthFlowError(): void {
+  if (!authFlowError) return;
+  authFlowError = undefined;
+  authChangeListener?.();
+}
+
+/** Surface a sanitized browser/deep-link failure to the renderer. */
+export function reportAuthFlowError(message: string): void {
+  authFlowError = message;
+  authChangeListener?.();
+}
+
 export async function getAuthStatus(): Promise<AuthStatus> {
-  if (!isAuthConfigured()) return { signedIn: false };
+  if (!isAuthConfigured())
+    return {
+      signedIn: false,
+      ...(authFlowError ? { authError: authFlowError } : {}),
+    };
   const { data } = await getClient().auth.getSession();
   const user = data.session?.user;
-  if (!user) return { signedIn: false };
+  if (!user)
+    return {
+      signedIn: false,
+      ...(authFlowError ? { authError: authFlowError } : {}),
+    };
   return {
     signedIn: true,
     email: user.email ?? undefined,
     ...(passwordRecoveryPending ? { passwordRecovery: true } : {}),
+    ...(authFlowError ? { authError: authFlowError } : {}),
   };
 }
 
@@ -104,7 +126,14 @@ export async function getAccessToken(): Promise<string | null> {
 
 /** Open the system browser for Google OAuth; completes via the auth/callback deep link. */
 export async function signInWithGoogle(): Promise<{ ok: boolean; message?: string }> {
+  if (!config.googleAuthEnabled) {
+    return {
+      ok: false,
+      message: 'Google sign-in is not available in this environment.',
+    };
+  }
   try {
+    clearAuthFlowError();
     const { data, error } = await getClient().auth.signInWithOAuth({
       provider: 'google',
       options: {
@@ -113,7 +142,10 @@ export async function signInWithGoogle(): Promise<{ ok: boolean; message?: strin
       },
     });
     if (error || !data?.url) {
-      return { ok: false, message: error?.message ?? 'Could not start Google sign-in.' };
+      return {
+        ok: false,
+        message: error?.message ?? 'Could not start Google sign-in.',
+      };
     }
     await shell.openExternal(data.url);
     return { ok: true };
@@ -127,6 +159,7 @@ export async function signInWithPassword(
   password: string,
 ): Promise<{ ok: boolean; message?: string }> {
   try {
+    clearAuthFlowError();
     const { error } = await getClient().auth.signInWithPassword({ email, password });
     if (error) return { ok: false, message: error.message };
     return { ok: true };
@@ -146,6 +179,7 @@ export async function signUpWithPassword(
   fullName?: string,
 ): Promise<{ ok: boolean; confirmEmail?: boolean; message?: string }> {
   try {
+    clearAuthFlowError();
     const { data, error } = await getClient().auth.signUp({
       email,
       password,
@@ -211,10 +245,12 @@ export async function completeOAuth(code: string, opts?: { recovery?: boolean })
     passwordRecoveryPending = true;
     authChangeListener?.();
   }
+  clearAuthFlowError();
 }
 
 export async function signOut(): Promise<{ ok: boolean; message?: string }> {
   passwordRecoveryPending = false;
+  clearAuthFlowError();
   try {
     if (isAuthConfigured()) await getClient().auth.signOut();
     await clearSession();

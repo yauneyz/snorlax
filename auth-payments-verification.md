@@ -65,6 +65,34 @@ Docker-based Supabase stack remains running for faster restarts; stop it explici
 `pnpm dev:down`. To run only Electron against an already-running backend, use
 `pnpm dev:desktop`.
 
+### Google account authentication
+
+Google account authentication uses a separate OAuth client from the Google Search Console
+connection. The authentication client needs only `openid`, email, and profile access; do not
+add the Search Console scope to it.
+
+1. In Google Auth Platform, create a **Web application** client and add
+   `http://127.0.0.1:54321/auth/v1/callback` as an authorized redirect URI.
+2. Add the following block to the gitignored root `.credentials`:
+
+   ```toml
+   [google_auth]
+   enabled_dev = true
+   enabled_prod = false
+   client_id = "...apps.googleusercontent.com"
+   client_secret = "GOCSPX-..."
+   ```
+
+3. Run `pnpm sync:env`. This writes the client secret only to the gitignored
+   `apps/web/.env` consumed by the local Supabase CLI; browser and desktop builds receive only
+   `GOOGLE_AUTH_ENABLED`.
+4. If Supabase is already running, run `pnpm dev:down` once before the next `pnpm dev` so Auth
+   reloads the provider configuration.
+
+For production, configure the client ID and secret in the Supabase dashboard, add the callback
+URL shown there to Google, set `enabled_prod = true`, and sync the production environment. The
+production client secret is not copied into Vercel or Electron by this repository.
+
 The first run needs Docker, the Supabase CLI, and an authenticated Stripe CLI, and may take
 longer while Supabase downloads its service images. The repo's `.credentials` remains the
 source for application secrets; the listener secret returned by
@@ -91,6 +119,9 @@ Supabase dashboard (production project):
 - [ ] Email templates (Confirm signup, Reset password) still use the default
       `{{ .ConfirmationURL }}` so `redirect_to` is honored.
 - [ ] Google provider enabled with prod OAuth credentials.
+- [ ] Google Auth Platform branding, external audience, homepage, privacy policy, terms, and
+      authorized domain are configured; login requests only `openid`, email, and profile.
+- [ ] Google authorized redirect URIs include the exact production Supabase Auth callback.
 
 Stripe dashboard (the correct account for the environment — sandbox for staging tests,
 real Talysman account for prod once verified):
@@ -103,7 +134,8 @@ real Talysman account for prod once verified):
 - [ ] Billing portal configuration exists; `STRIPE_PORTAL_CONFIG_ID` set if using a custom one.
 
 Vercel env (production): `NEXT_PUBLIC_APP_URL=https://talysman.app`, Supabase URL +
-publishable + secret keys, all `STRIPE_*`, `RESEND_API_KEY`.
+publishable + secret keys, `NEXT_PUBLIC_GOOGLE_AUTH_ENABLED=true`, all `STRIPE_*`,
+`RESEND_API_KEY`.
 
 Desktop production build config: `API_BASE_URL=https://talysman.app`, prod
 `VITE_SUPABASE_URL`/`VITE_SUPABASE_ANON_KEY`.
@@ -163,6 +195,14 @@ Dev: set `enable_confirmations = true` under `[auth.email]` in `apps/web/supabas
 - Email/password: correct → signed in; wrong password → inline Supabase error.
 - Google: opens system browser → account chooser → redirects to `talysman://auth/callback`
   → app signed in. Also verify a **first-time** Google identity creates a `profiles` row.
+- Repeat from both website and desktop **Create account** surfaces. A first-time Google account
+  creates one `auth.users` row and one `profiles` row populated with name/avatar; a returning
+  account reuses those rows.
+- Start with a confirmed email/password account, then continue with the Google account carrying
+  the same verified email. Expect Supabase to link the identity without creating a duplicate
+  profile or losing subscription state.
+- Cancel the Google chooser. Expect a recoverable inline message on the surface that started the
+  flow, and confirm desktop logs do not contain the callback authorization code.
 - Restart the app while signed in → still signed in (encrypted session restore). On Linux
   check the log for the `safeStorage` plaintext-fallback warning — if it appears, session
   encryption is not active on that machine.

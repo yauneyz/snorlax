@@ -16,6 +16,7 @@ const ROOT = path.resolve(__dirname, "..");
 const WEB_DIR = path.join(ROOT, "apps", "web");
 const ROOT_ENV_OUT = path.join(ROOT, ".env.local");
 const WEB_ENV_OUT = path.join(WEB_DIR, ".env.local");
+const SUPABASE_ENV_OUT = path.join(WEB_DIR, ".env");
 
 const CREDENTIALS_CANDIDATES = [
   path.join(ROOT, ".credentials"),
@@ -137,6 +138,20 @@ const credentialsSchema = z.object({
     oauth_client_id: z.string().optional().default(""),
     oauth_client_secret: z.string().optional().default(""),
   }),
+  google_auth: z
+    .object({
+      enabled_dev: z.boolean().default(false),
+      enabled_prod: z.boolean().default(false),
+      client_id: z.string().optional().default(""),
+      client_secret: z.string().optional().default(""),
+    })
+    .optional()
+    .default({
+      enabled_dev: false,
+      enabled_prod: false,
+      client_id: "",
+      client_secret: "",
+    }),
   aws: z.object({
     region: z.string().min(1),
     access_key_id: z.string().min(1),
@@ -264,7 +279,17 @@ function loadCredentials(): Credentials | null {
     }
     process.exit(1);
   }
-  return result.data;
+  const credentials = result.data;
+  if (
+    credentials.google_auth.enabled_dev &&
+    (!credentials.google_auth.client_id || !credentials.google_auth.client_secret)
+  ) {
+    console.error(
+      ".credentials google_auth.client_id and client_secret are required when enabled_dev is true.",
+    );
+    process.exit(1);
+  }
+  return credentials;
 }
 
 function stripeValues(c: Credentials) {
@@ -288,6 +313,10 @@ function toWebEnvPairs(c: Credentials, mode: Mode): Array<[string, string]> {
     ["NEXT_PUBLIC_APP_URL", appUrl],
     ["NEXT_PUBLIC_APP_NAME", c.app.name],
     ["APP_ENVIRONMENT", appEnvironment],
+    [
+      "NEXT_PUBLIC_GOOGLE_AUTH_ENABLED",
+      String(mode === "dev" ? c.google_auth.enabled_dev : c.google_auth.enabled_prod),
+    ],
 
     ["NEXT_PUBLIC_SUPABASE_URL", supabase.url],
     ["NEXT_PUBLIC_SUPABASE_ANON_KEY", supabase.publishable_key],
@@ -350,12 +379,32 @@ function toDesktopEnvPairs(c: Credentials, mode: Mode): Array<[string, string]> 
   return [
     ["APP_ENV", appEnvironment],
     ["TALYSMAN_PIPE", mode === "prod" ? "talysman" : "talysman-dev"],
+    [
+      "GOOGLE_AUTH_ENABLED",
+      String(mode === "dev" ? c.google_auth.enabled_dev : c.google_auth.enabled_prod),
+    ],
     ["VITE_SUPABASE_URL", supabase.url],
     ["VITE_SUPABASE_ANON_KEY", supabase.publishable_key],
     ["VITE_STRIPE_PUBLISHABLE_KEY", stripe.publishableKey ?? ""],
     ["VITE_PAYMENT_URL", appUrl],
     ["API_BASE_URL", appUrl],
     ["UPDATE_FEED_URL", ""],
+  ];
+}
+
+function toSupabaseEnvPairs(c: Credentials): Array<[string, string]> {
+  // The provider remains configured in config.toml so the checked-in config is stable.
+  // Dummy values keep ordinary local development working when Google Auth is disabled;
+  // the client UI is independently hidden by NEXT_PUBLIC_GOOGLE_AUTH_ENABLED.
+  return [
+    [
+      "SUPABASE_AUTH_EXTERNAL_GOOGLE_CLIENT_ID",
+      c.google_auth.enabled_dev ? c.google_auth.client_id : "google-auth-disabled",
+    ],
+    [
+      "SUPABASE_AUTH_EXTERNAL_GOOGLE_CLIENT_SECRET",
+      c.google_auth.enabled_dev ? c.google_auth.client_secret : "google-auth-disabled",
+    ],
   ];
 }
 
@@ -482,6 +531,7 @@ function main() {
 
   writeEnvFile(WEB_ENV_OUT, webPairs, mode);
   writeEnvFile(ROOT_ENV_OUT, toDesktopEnvPairs(creds, mode), mode);
+  writeEnvFile(SUPABASE_ENV_OUT, toSupabaseEnvPairs(creds), mode);
 }
 
 main();

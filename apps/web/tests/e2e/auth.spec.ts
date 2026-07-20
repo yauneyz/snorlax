@@ -1,5 +1,7 @@
 import { test, expect } from "@playwright/test";
 
+const googleAuthEnabled = process.env.NEXT_PUBLIC_GOOGLE_AUTH_ENABLED === "true";
+
 test.describe("auth flow (surface only — DB writes require a live Supabase)", () => {
   test("/login renders form", async ({ page }) => {
     await page.goto("/login");
@@ -8,10 +10,12 @@ test.describe("auth flow (surface only — DB writes require a live Supabase)", 
     await expect(page.getByLabel(/password/i)).toBeVisible();
   });
 
-  test("/signup renders form + google button", async ({ page }) => {
+  test("/signup renders form and configured auth methods", async ({ page }) => {
     await page.goto("/signup");
     await expect(page.getByRole("heading", { name: /create account/i })).toBeVisible();
-    await expect(page.getByRole("button", { name: /continue with google/i })).toBeVisible();
+    const googleButton = page.getByRole("button", { name: /sign up with google/i });
+    if (googleAuthEnabled) await expect(googleButton).toBeVisible();
+    else await expect(googleButton).toHaveCount(0);
   });
 
   test("/forgot-password and /reset-password render", async ({ page }) => {

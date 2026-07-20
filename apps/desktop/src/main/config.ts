@@ -9,6 +9,7 @@ import { PIPE_BASE_DEV, PIPE_BASE_PROD, unixSocketPath, windowsPipePath } from '
 export interface MainConfig {
   appEnv: 'development' | 'production';
   isDev: boolean;
+  googleAuthEnabled: boolean;
   pipeBaseName: string;
   /** Full platform IPC endpoint used by the service client. */
   pipePath: string;
@@ -28,6 +29,7 @@ function build(): MainConfig {
       ? __APP_CONFIG__
       : {
           APP_ENV: (process.env.APP_ENV as 'development' | 'production') ?? 'development',
+          GOOGLE_AUTH_ENABLED: process.env.GOOGLE_AUTH_ENABLED === 'true',
           TALYSMAN_PIPE: process.env.TALYSMAN_PIPE ?? PIPE_BASE_DEV,
           API_BASE_URL: process.env.API_BASE_URL ?? '',
           VITE_SUPABASE_URL: process.env.VITE_SUPABASE_URL ?? '',
@@ -44,6 +46,7 @@ function build(): MainConfig {
   return {
     appEnv,
     isDev,
+    googleAuthEnabled: injected.GOOGLE_AUTH_ENABLED,
     pipeBaseName,
     pipePath,
     apiBaseUrl: injected.API_BASE_URL.replace(/\/$/, ''),

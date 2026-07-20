@@ -21,6 +21,9 @@ payments
 - app picker for app blocking needs improvement
 - ui sensible & sexy
 - browser extension hosting/upload
+  - get a logo
+  - extension screenshots
+  - domain verification
 - auto-update?
 - free accounts?
 - free accounts?

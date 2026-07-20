@@ -91,6 +91,19 @@ describe("config schemas", () => {
     }
   });
 
+  it("parses the public Google Auth feature flag", () => {
+    const r = publicSchema.safeParse({
+      NEXT_PUBLIC_APP_URL: "http://localhost:3000",
+      NEXT_PUBLIC_APP_NAME: "x",
+      NEXT_PUBLIC_GOOGLE_AUTH_ENABLED: "true",
+      NEXT_PUBLIC_SUPABASE_URL: "http://localhost:54321",
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: "sb_publishable_test",
+      NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: "pk_test_xxx",
+    });
+    expect(r.success).toBe(true);
+    if (r.success) expect(r.data.NEXT_PUBLIC_GOOGLE_AUTH_ENABLED).toBe(true);
+  });
+
   it("serverSchema allows local LLM provider without an OpenAI key", () => {
     const r = serverSchema.safeParse({
       NEXT_PUBLIC_APP_URL: "http://localhost:3000",

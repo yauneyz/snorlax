@@ -4,14 +4,15 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { supabaseBrowser } from "@/lib/supabase/browser";
 import { loginSchema } from "@/lib/zod/auth";
+import { safeInternalPath } from "@/lib/auth/redirects";
 
-type Props = { next?: string };
+type Props = { next?: string; initialError?: string };
 
-export function LoginForm({ next = "/app" }: Props) {
+export function LoginForm({ next = "/app", initialError }: Props) {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(initialError ?? null);
   const [pending, setPending] = useState(false);
 
   const onSubmit = async (e: React.FormEvent) => {
@@ -30,7 +31,7 @@ export function LoginForm({ next = "/app" }: Props) {
       setError(err.message);
       return;
     }
-    router.push(next);
+    router.push(safeInternalPath(next));
     router.refresh();
   };
 

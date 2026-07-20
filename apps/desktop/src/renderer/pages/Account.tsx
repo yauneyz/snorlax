@@ -41,6 +41,7 @@ export function Account() {
   const signedIn = useFocusStore((s) => s.signedIn);
   const email = useFocusStore((s) => s.email);
   const passwordRecovery = useFocusStore((s) => s.passwordRecovery);
+  const authError = useFocusStore((s) => s.authError);
   const entitlementLoaded = useFocusStore((s) => s.entitlementLoaded);
   const subscriptionPlan = useFocusStore((s) => s.subscriptionPlan);
   const entitlementActive = useFocusStore((s) => s.entitlementActive);
@@ -274,6 +275,14 @@ export function Account() {
           </div>
         ) : view === 'signup' ? (
           <div className="mt-4 flex flex-col gap-4">
+            {__APP_CONFIG__.GOOGLE_AUTH_ENABLED && (
+              <>
+                <Button disabled={busy} onClick={() => run(() => signInGoogle())}>
+                  Sign up with Google
+                </Button>
+                <div className="text-center text-xs uppercase tracking-wide text-slate-500">or</div>
+              </>
+            )}
             <form className="flex flex-col gap-2" onSubmit={emailSignUp}>
               <Input
                 type="text"
@@ -334,10 +343,14 @@ export function Account() {
           </div>
         ) : (
           <div className="mt-4 flex flex-col gap-4">
-            <Button disabled={busy} onClick={() => run(() => signInGoogle())}>
-              Sign in with Google
-            </Button>
-            <div className="text-center text-xs uppercase tracking-wide text-slate-500">or</div>
+            {__APP_CONFIG__.GOOGLE_AUTH_ENABLED && (
+              <>
+                <Button disabled={busy} onClick={() => run(() => signInGoogle())}>
+                  Continue with Google
+                </Button>
+                <div className="text-center text-xs uppercase tracking-wide text-slate-500">or</div>
+              </>
+            )}
             <form className="flex flex-col gap-2" onSubmit={emailSignIn}>
               <Input
                 type="email"
@@ -366,7 +379,9 @@ export function Account() {
           </div>
         )}
 
-        {message && <p className="mt-3 text-sm text-amber-300">{message}</p>}
+        {(message ?? authError) && (
+          <p className="mt-3 text-sm text-amber-300">{message ?? authError}</p>
+        )}
       </Card>
     </div>
   );
