@@ -13,15 +13,24 @@ export const metadata: Metadata = {
 export default async function AccountPage() {
   const user = await requireUser();
   const supabase = await supabaseServer();
-  const [{ data: profile }, { data: subscriptions }] = await Promise.all([
+  const [{ data: profile }, { data: subscriptions }, { data: grants }] = await Promise.all([
     supabase
       .from("profiles")
       .select("full_name,email,avatar_url")
       .eq("id", user.id)
       .single<Pick<ProfileRow, "full_name" | "email" | "avatar_url">>(),
     supabase.from("active_subscriptions").select("*").eq("user_id", user.id).limit(1),
+    // Comped accounts (see migration 0004) have no Stripe customer, so the
+    // billing portal would throw for them — show the plan, hide the button.
+    supabase
+      .from("active_entitlements")
+      .select("current_period_end")
+      .eq("user_id", user.id)
+      .eq("source", "grant")
+      .limit(1),
   ]);
   const subscription = subscriptions?.[0];
+  const grant = grants?.[0];
 
   return (
     <section className="account">
@@ -32,17 +41,28 @@ export default async function AccountPage() {
         <dt>Email</dt>
         <dd>{profile?.email ?? user.email}</dd>
         <dt>Plan</dt>
-        <dd>{subscription ? subscription.price_id : "Not subscribed"}</dd>
+        <dd>
+          {subscription
+            ? subscription.price_id
+            : grant
+              ? "Pro (complimentary)"
+              : "Not subscribed"}
+        </dd>
         {subscription ? (
           <>
             <dt>Renews</dt>
             <dd>{new Date(subscription.current_period_end).toLocaleDateString()}</dd>
           </>
+        ) : grant?.current_period_end ? (
+          <>
+            <dt>Ends</dt>
+            <dd>{new Date(grant.current_period_end).toLocaleDateString()}</dd>
+          </>
         ) : null}
       </dl>
       {subscription ? (
         <ManageBillingButton />
-      ) : (
+      ) : grant ? null : (
         <Link href="/pricing" className="account__subscribe">
           Choose a plan
         </Link>

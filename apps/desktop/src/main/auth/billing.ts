@@ -89,3 +89,18 @@ export async function resumeSubscription(): Promise<BillingResult> {
   const res = await callDesktopApi('/api/desktop/subscription/resume', 'POST');
   return res.ok ? { ok: true } : res;
 }
+
+/**
+ * Redeem a complimentary-access code. The server decides everything (the code is
+ * matched by hash and burned in one transaction); we only report the outcome so
+ * the caller can refresh the entitlement.
+ */
+export async function redeemCompCode(
+  code: string,
+): Promise<BillingResult & { granted?: boolean }> {
+  const res = await callDesktopApi('/api/desktop/comp/redeem', 'POST', { code });
+  if (!res.ok) return res;
+  const data = res.data as { outcome?: string; message?: string } | null;
+  const granted = data?.outcome === 'ok' || data?.outcome === 'already_comped';
+  return { ok: true, granted, message: data?.message };
+}

@@ -39,7 +39,7 @@ export type LocalEntitlementVerification =
   | { ok: false; reason: string };
 
 export function currentLocalEntitlementSubject(): LocalEntitlementSubject {
-  let user = '';
+  let user: string;
   try {
     user = userInfo().username;
   } catch {
@@ -133,7 +133,7 @@ export function verifyLocalEntitlementLicense(
     return { ok: false, reason: 'license user mismatch' };
   }
 
-  let verified = false;
+  let verified: boolean;
   try {
     verified = verify(
       null,

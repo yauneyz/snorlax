@@ -14,8 +14,8 @@ body,
 }
 
 body {
-  background: #0b0f17;
-  color: #e5e9f0;
+  background: #08090a;
+  color: #dcdee2;
   font-family: ui-sans-serif, system-ui, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
   -webkit-font-smoothing: antialiased;
 }
@@ -25,6 +25,18 @@ body {
   height: 10px;
 }
 ::-webkit-scrollbar-thumb {
-  background: #243049;
+  background: rgba(255, 255, 255, 0.08);
   border-radius: 6px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.14);
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* Focus ring: silver, never the browser default blue. */
+:focus-visible {
+  outline: 2px solid rgba(199, 204, 212, 0.5);
+  outline-offset: 2px;
 }

@@ -95,7 +95,7 @@ describe('BUILD_SCRIPTS', () => {
     ) as { scripts: Record<string, string> };
     for (const platform of platforms) {
       const script = (BUILD_SCRIPTS as Record<Platform, string>)[platform];
-      expect(script, `missing build script mapping for ${platform}`).toBeTruthy();
+      expect(script, `missing build script mapping for ${String(platform)}`).toBeTruthy();
       expect(rootPackage.scripts[script], `${script} not in package.json`).toBeTruthy();
     }
   });

@@ -179,7 +179,7 @@ export const useFocusStore = create<FocusStore>((set, get) => ({
     onEvent('browserWatchdogWarning', ({ browser, pid }) => set({ watchdogWarning: { browser, pid } }));
     onEvent('scheduleFired', () => {
       // Schedule boundaries can change focus + lock state; re-pull the snapshot.
-      get().refresh();
+      void get().refresh();
     });
 
     // Main pushes these after sign-in/out and billing deep-link returns.

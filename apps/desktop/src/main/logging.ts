@@ -13,8 +13,9 @@ function makeLogger(): Logger {
   try {
     // electron-log is optional at runtime (not present in pure unit tests).
 
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
     const log = require('electron-log');
-    log.transports?.file && (log.transports.file.level = 'info');
+    if (log.transports?.file) log.transports.file.level = 'info';
     return log as Logger;
   } catch {
     const emit = (level: Level) => (...args: unknown[]) =>

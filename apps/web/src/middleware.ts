@@ -17,8 +17,8 @@ export async function middleware(request: NextRequest) {
   let subscribed = false;
   if (user) {
     const { data } = await client
-      .from("active_subscriptions")
-      .select("id")
+      .from("active_entitlements")
+      .select("user_id")
       .eq("user_id", user.id)
       .limit(1);
     subscribed = (data?.length ?? 0) > 0;

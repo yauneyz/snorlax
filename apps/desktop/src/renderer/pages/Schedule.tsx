@@ -37,7 +37,7 @@ export function SchedulePage({ onUpgrade }: { onUpgrade: () => void }) {
     if (!scheduleEnabled) return onUpgrade();
     if (days.length === 0) return setError('Pick at least one day.');
     const w: ScheduleWindow = { id: newId(), days, start, end, locked };
-    save([...schedule.windows, w]);
+    void save([...schedule.windows, w]);
   };
   const removeWindow = (id: string) => save(schedule.windows.filter((w) => w.id !== id));
 
@@ -57,7 +57,9 @@ export function SchedulePage({ onUpgrade }: { onUpgrade: () => void }) {
               onClick={() => toggleDay(d)}
               disabled={!scheduleEnabled}
               className={`rounded-md px-3 py-1.5 text-xs font-medium uppercase disabled:cursor-not-allowed disabled:opacity-50 ${
-                days.includes(d) ? 'bg-accent text-white' : 'bg-panel2 text-slate-400'
+                days.includes(d)
+                  ? 'bg-accent text-accentInk'
+                  : 'border border-white/[0.08] bg-white/[0.04] text-slate-400 hover:bg-white/[0.08]'
               }`}
             >
               {d}

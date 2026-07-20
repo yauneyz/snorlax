@@ -9,7 +9,7 @@ export type SignUpOutcome = 'signedIn' | 'confirmEmail' | 'alreadyRegistered';
  */
 export function classifySignUpResult(data: {
   user: { identities?: unknown[] | null } | null;
-  session: unknown | null;
+  session: unknown;
 }): SignUpOutcome {
   if (data.session) return 'signedIn';
   if (data.user?.identities && data.user.identities.length === 0) return 'alreadyRegistered';

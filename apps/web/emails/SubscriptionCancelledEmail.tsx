@@ -15,7 +15,7 @@ export function SubscriptionCancelledEmail({ appName, periodEnd }: SubscriptionC
         <Container>
           <Heading>Subscription cancelled</Heading>
           <Text>
-            Your {appName} subscription has been cancelled. You'll have access until {when}, then
+            Your {appName} subscription has been cancelled. You&apos;ll have access until {when}, then
             your account will lose paid features.
           </Text>
           <Text>If this was a mistake, sign in and resubscribe from the billing portal.</Text>

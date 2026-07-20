@@ -27,7 +27,7 @@ describe('MockServiceConnection — disable gate', () => {
     expect(state.focusActive).toBe(false);
   });
 
-  it('pushes keyPresenceChanged events', async () => {
+  it('pushes keyPresenceChanged events', () => {
     const svc = new MockServiceConnection();
     const seen: boolean[] = [];
     svc.on('keyPresenceChanged', ({ present }) => seen.push(present));

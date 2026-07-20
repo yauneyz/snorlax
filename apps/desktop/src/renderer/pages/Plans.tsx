@@ -57,7 +57,7 @@ export function Plans() {
         </div>
       </Card>
 
-      <Card className="border-accent/60 bg-accent/5">
+      <Card className="border-white/20 bg-white/[0.04]">
         <div className="mb-4 flex items-center justify-between gap-3">
           <CardTitle hint="Everything in the app, including future Pro capabilities.">Pro</CardTitle>
           {entitlementLoaded && subscriptionPlan === 'pro' && <Badge tone="ok">current</Badge>}

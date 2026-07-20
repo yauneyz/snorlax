@@ -1,14 +1,14 @@
 # Category-1 E2E (playwright-electron)
 
 These specs drive the **real Electron UI** against the **in-process mock service** (no
-privileges / real blocking needed). They are scaffolded here; wiring them into CI is a
-follow-up (needs `@playwright/test` + `playwright` installed and a built app).
+privileges / real blocking needed). The test command builds a development bundle with a
+dedicated nonexistent service pipe before launching Electron, and the test fails closed unless
+the main process reports that it is using the mock.
 
-To run locally once dependencies are added:
+To run locally:
 
 ```bash
-pnpm --filter @talysman/desktop build
-pnpm exec playwright test tests/electron/e2e
+pnpm test:electron:e2e
 ```
 
 The mock service starts automatically because the app falls back to it when the native

@@ -20,9 +20,7 @@ import {
   type Method,
   type PairedKey,
   type Params,
-  type Policy,
   type Result,
-  type Schedule,
   type ServiceState,
   OK,
 } from '@talysman/shared';
@@ -103,7 +101,7 @@ export class MockServiceConnection implements ServiceConnection {
   async request<M extends Method>(method: M, params: Params<M>): Promise<Result<M>> {
     switch (method) {
       case 'getState':
-        return this.snapshot() as Result<M>;
+        return this.snapshot();
 
       case 'ping':
         return { version: this.state.serviceVersion, protocolVersion: PROTOCOL_VERSION } as Result<M>;
@@ -113,21 +111,21 @@ export class MockServiceConnection implements ServiceConnection {
 
       case 'setPolicy': {
         const policy = (params as Params<'setPolicy'>).policy;
-        this.state.policy = normalizePolicy(policy) as Policy;
+        this.state.policy = normalizePolicy(policy);
         this.emit('policyChanged', { policy: this.state.policy });
-        return OK as Result<M>;
+        return OK;
       }
 
       case 'setSchedule': {
-        this.state.schedule = (params as Params<'setSchedule'>).schedule as Schedule;
-        return OK as Result<M>;
+        this.state.schedule = (params as Params<'setSchedule'>).schedule;
+        return OK;
       }
 
       case 'enableFocus': {
         this.state.focusActive = true;
         this.state.focusSource = 'user';
         this.emit('focusChanged', { active: true, source: 'user' });
-        return OK as Result<M>;
+        return OK;
       }
 
       case 'disableFocus': {
@@ -137,7 +135,7 @@ export class MockServiceConnection implements ServiceConnection {
         this.state.focusActive = false;
         this.state.focusSource = 'user';
         this.emit('focusChanged', { active: false, source: 'user' });
-        return OK as Result<M>;
+        return OK;
       }
 
       case 'setBrowserHandshake': {
@@ -150,12 +148,12 @@ export class MockServiceConnection implements ServiceConnection {
         }
         this.state.settings = { ...this.state.settings, browserHandshakeEnabled: enabled };
         this.emit('settingsChanged', { settings: this.state.settings });
-        return OK as Result<M>;
+        return OK;
       }
 
       case 'extHeartbeat':
         // The mock has no real browsers to watch; accept and ignore.
-        return OK as Result<M>;
+        return OK;
 
       case 'listRemovableDrives':
         return { drives: MOCK_DRIVES } as Result<M>;
@@ -177,7 +175,7 @@ export class MockServiceConnection implements ServiceConnection {
         if (!this.keyPresent) throw err(ErrorCode.KEY_REQUIRED, 'Insert your key to remove a key.');
         const { keyId } = params as Params<'unpairKey'>;
         this.state.pairedKeys = this.state.pairedKeys.filter((k) => k.id !== keyId);
-        return OK as Result<M>;
+        return OK;
       }
 
       case 'recover':
@@ -186,7 +184,7 @@ export class MockServiceConnection implements ServiceConnection {
         this.state.focusActive = false;
         this.state.focusSource = 'recover';
         this.emit('focusChanged', { active: false, source: 'recover' });
-        return OK as Result<M>;
+        return OK;
 
       default:
         throw err(ErrorCode.BAD_REQUEST, `Unknown method: ${String(method)}`);

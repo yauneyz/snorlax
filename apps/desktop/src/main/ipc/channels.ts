@@ -41,6 +41,8 @@ export const Channels = {
   cancelSubscription: 'app:cancelSubscription',
   /** invoke: un-schedule a pending cancellation. */
   resumeSubscription: 'app:resumeSubscription',
+  /** invoke: { code } → redeem a complimentary-access code. */
+  redeemCode: 'app:redeemCode',
   /** main→renderer push: { event } where event is 'authChanged' | 'entitlementChanged'. */
   appEvent: 'app:event',
 } as const;

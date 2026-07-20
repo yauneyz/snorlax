@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { DevBadge } from "@/components/DevBadge";
 import { AccountMenu } from "@/components/marketing/AccountMenu";
 import { config } from "@/lib/config";
 import { supabaseServer } from "@/lib/supabase/server";
@@ -11,9 +12,12 @@ export async function Header() {
 
   return (
     <header className="site-header">
-      <Link href="/" className="site-brand">
-        {config.app.name}
-      </Link>
+      <div className="brand-row">
+        <Link href="/" className="site-brand">
+          {config.app.name}
+        </Link>
+        <DevBadge />
+      </div>
       <nav className="site-nav">
         <Link href="/download">Download</Link>
         <Link href="/pricing">Pricing</Link>

@@ -3,8 +3,9 @@ import { redirect } from "next/navigation";
 import { supabaseServer } from "@/lib/supabase/server";
 
 /**
- * RSC / route handler guard. Redirects unauthed → /login and unsubscribed → /pricing.
- * Returns { user, subscription } when the user is entitled.
+ * RSC / route handler guard. Redirects unauthed → /login and unentitled → /pricing.
+ * Returns { user, entitlement } when the user is entitled — by subscription or
+ * by a complimentary grant.
  */
 export const requireSubscribed = cache(async function requireSubscribed() {
   const supabase = await supabaseServer();
@@ -13,14 +14,15 @@ export const requireSubscribed = cache(async function requireSubscribed() {
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  const { data: subs } = await supabase
-    .from("active_subscriptions")
+  // `active_entitlements` covers paid subscriptions and complimentary grants alike.
+  const { data: rows } = await supabase
+    .from("active_entitlements")
     .select("*")
     .eq("user_id", user.id)
     .limit(1);
 
-  const subscription = subs?.[0];
-  if (!subscription) redirect("/pricing");
+  const entitlement = rows?.[0];
+  if (!entitlement) redirect("/pricing");
 
-  return { user, subscription };
+  return { user, entitlement };
 });

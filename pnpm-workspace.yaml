@@ -20,6 +20,7 @@ allowBuilds:
   '@sentry/cli': true
   core-js: true
   electron: true
+  electron-winstaller: false
   esbuild: true
   sharp: true
   unrs-resolver: true

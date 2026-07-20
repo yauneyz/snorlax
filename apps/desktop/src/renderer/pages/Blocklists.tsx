@@ -91,7 +91,7 @@ export function Blocklists({ onUpgrade }: { onUpgrade: () => void }) {
   const addDomain = () => {
     if (!domain.trim()) return;
     if (domainLimitReached) return setError(`Free supports up to ${maxDomains} blocked websites.`);
-    save({ ...policy, domains: [...policy.domains, domain.trim()] });
+    void save({ ...policy, domains: [...policy.domains, domain.trim()] });
     setDomain('');
   };
   const removeDomain = (d: string) => save({ ...policy, domains: policy.domains.filter((x) => x !== d) });
@@ -101,7 +101,7 @@ export function Blocklists({ onUpgrade }: { onUpgrade: () => void }) {
       return setError('Free does not include app blocking.');
     }
     const name = appName.trim();
-    save({
+    void save({
       ...policy,
       apps: [...policy.apps, { windowsImageName: name, linuxProcessName: name, label: name }],
     });
@@ -166,8 +166,8 @@ export function Blocklists({ onUpgrade }: { onUpgrade: () => void }) {
                 className={cx(
                   'rounded-lg border p-4 text-left transition',
                   policy.mode === m.value
-                    ? 'border-accent bg-accent/10'
-                    : 'border-border bg-panel2 hover:border-slate-500',
+                    ? 'border-white/25 bg-white/[0.07] shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]'
+                    : 'border-white/[0.07] bg-white/[0.02] hover:border-white/[0.14] hover:bg-white/[0.05]',
                   locked && 'opacity-65',
                 )}
               >

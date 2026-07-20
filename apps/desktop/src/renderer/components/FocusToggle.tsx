@@ -41,10 +41,10 @@ export function FocusToggle() {
         onClick={toggle}
         disabled={busy}
         className={cx(
-          'relative flex h-44 w-44 items-center justify-center rounded-full border-4 text-xl font-bold transition',
+          'relative flex h-44 w-44 items-center justify-center rounded-full border-4 text-xl font-bold tracking-wide backdrop-blur-sm transition duration-200',
           focusActive
             ? 'border-ok bg-green-500/10 text-green-300 shadow-[0_0_40px_rgba(34,197,94,0.25)]'
-            : 'border-border bg-panel2 text-slate-300 hover:border-accent',
+            : 'border-white/[0.10] bg-white/[0.04] text-slate-300 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] hover:border-white/25 hover:bg-white/[0.07] hover:text-white',
           busy && 'opacity-60',
         )}
       >

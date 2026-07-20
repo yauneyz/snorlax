@@ -4,6 +4,7 @@ import { useFocusStore } from '../store/useFocusStore.js';
 import {
   cancelSubscription,
   openBillingPortal,
+  redeemCode,
   resumeSubscription,
   sendPasswordReset,
   signInGoogle,
@@ -57,6 +58,12 @@ export function Account() {
   const [message, setMessage] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [confirmingCancel, setConfirmingCancel] = useState(false);
+  // Redemption codes are for the handful of people we hand one to, so the entry
+  // point stays a plain text link until it's clicked. Local state means it
+  // folds itself away again whenever the Account tab unmounts.
+  const [redeeming, setRedeeming] = useState(false);
+  const [redeemInput, setRedeemInput] = useState('');
+  const [redeemMessage, setRedeemMessage] = useState<string | null>(null);
 
   function switchView(next: AuthView) {
     setView(next);
@@ -131,6 +138,30 @@ export function Account() {
     }
   }
 
+  async function submitCode(e: React.FormEvent) {
+    e.preventDefault();
+    setBusy(true);
+    setRedeemMessage(null);
+    try {
+      const res = await redeemCode(redeemInput);
+      setRedeemMessage(res.message ?? (res.ok ? 'Code accepted.' : 'Something went wrong.'));
+      if (res.granted) {
+        setRedeemInput('');
+        void refreshSubscriptionDetail();
+      }
+    } catch (err) {
+      setRedeemMessage((err as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function closeRedeem() {
+    setRedeeming(false);
+    setRedeemInput('');
+    setRedeemMessage(null);
+  }
+
   async function cancelOrResume(action: () => Promise<{ ok: boolean; message?: string }>) {
     setConfirmingCancel(false);
     const ok = await run(action);
@@ -202,6 +233,9 @@ export function Account() {
                 · billed {detail.price === 'yearly' ? 'yearly' : 'monthly'}
               </span>
             )}
+            {signedIn && detail?.status === 'comped' && (
+              <span className="text-slate-400">· complimentary</span>
+            )}
             {signedIn && detail?.status === 'past_due' && (
               <Badge tone="danger">Payment issue</Badge>
             )}
@@ -221,14 +255,18 @@ export function Account() {
         </div>
 
         {signedIn ? (
+          <>
           <div className="mt-4 flex flex-wrap gap-2">
-            <Button
-              variant="ghost"
-              disabled={busy}
-              onClick={() => run(() => openBillingPortal())}
-            >
-              Manage billing
-            </Button>
+            {/* Comped accounts have no Stripe customer — the portal would error. */}
+            {detail?.status !== 'comped' && (
+              <Button
+                variant="ghost"
+                disabled={busy}
+                onClick={() => run(() => openBillingPortal())}
+              >
+                Manage billing
+              </Button>
+            )}
             {detail?.hasSubscription &&
               (detail.cancelAtPeriodEnd ? (
                 <Button
@@ -263,6 +301,34 @@ export function Account() {
               Sign out
             </Button>
           </div>
+          {redeeming ? (
+            <form className="mt-4 flex max-w-sm flex-col gap-2" onSubmit={submitCode}>
+              <Input
+                type="text"
+                placeholder="TLY-XXXX-XXXX"
+                value={redeemInput}
+                onChange={(e) => setRedeemInput(e.target.value)}
+                autoComplete="off"
+                spellCheck={false}
+                autoFocus
+                required
+              />
+              <div className="flex gap-2">
+                <Button type="submit" disabled={busy || redeemInput.trim().length === 0}>
+                  Redeem
+                </Button>
+                <Button type="button" variant="ghost" disabled={busy} onClick={closeRedeem}>
+                  Cancel
+                </Button>
+              </div>
+              {redeemMessage && <p className="text-sm text-slate-300">{redeemMessage}</p>}
+            </form>
+          ) : (
+            <div className="mt-4">
+              <AuthLink onClick={() => setRedeeming(true)}>Redeem a code</AuthLink>
+            </div>
+          )}
+          </>
         ) : view === 'checkEmail' ? (
           <div className="mt-4 flex flex-col gap-3 text-sm text-slate-300">
             <p>

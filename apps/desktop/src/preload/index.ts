@@ -31,6 +31,7 @@ const Channels = {
   subscriptionDetail: 'app:subscriptionDetail',
   cancelSubscription: 'app:cancelSubscription',
   resumeSubscription: 'app:resumeSubscription',
+  redeemCode: 'app:redeemCode',
   appEvent: 'app:event',
 } as const;
 
@@ -136,6 +137,9 @@ const api = {
     ipcRenderer.invoke(Channels.cancelSubscription),
   resumeSubscription: (): Promise<ActionResult> =>
     ipcRenderer.invoke(Channels.resumeSubscription),
+  /** Redeem a complimentary-access code. `granted` is true once the account holds Pro. */
+  redeemCode: (code: string): Promise<ActionResult & { granted?: boolean }> =>
+    ipcRenderer.invoke(Channels.redeemCode, { code }),
 
   /** Subscribe to main-pushed auth/entitlement change events. Returns an unsubscribe fn. */
   onAppEvent: (cb: (event: AppEventName) => void): (() => void) => {

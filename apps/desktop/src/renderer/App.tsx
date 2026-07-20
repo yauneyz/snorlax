@@ -49,9 +49,16 @@ export default function App() {
 
   return (
     <div className="flex h-full">
-      <aside className="flex w-56 flex-col border-r border-border bg-panel">
+      <aside className="flex w-56 flex-col border-r border-white/[0.06] bg-gradient-to-b from-white/[0.035] to-transparent bg-panel">
         <div className="flex items-center gap-2 px-5 py-5">
-          <span className="text-lg font-bold text-white">Talysman</span>
+          <span className="bg-gradient-to-b from-white to-slate-300 bg-clip-text text-lg font-bold tracking-tight text-transparent">
+            Talysman
+          </span>
+          {import.meta.env.DEV && (
+            <span className="rounded border border-red-500/60 px-1.5 py-0.5 text-sm font-extrabold tracking-widest text-red-500">
+              DEV
+            </span>
+          )}
         </div>
         <nav className="flex flex-col gap-1 px-3">
           {NAV.map((n) => (
@@ -59,15 +66,19 @@ export default function App() {
               key={n.route}
               onClick={() => setRoute(n.route)}
               className={cx(
-                'rounded-lg px-3 py-2 text-left text-sm font-medium transition',
-                route === n.route ? 'bg-accent/15 text-white' : 'text-slate-400 hover:bg-panel2 hover:text-slate-200',
+                // Glass: translucent fill + hairline border + a top inset highlight
+                // so the pill reads as a lit pane rather than a flat swatch.
+                'rounded-lg border px-3 py-2 text-left text-sm font-medium backdrop-blur-sm transition duration-150',
+                route === n.route
+                  ? 'border-white/10 bg-white/[0.08] text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.10)]'
+                  : 'border-transparent text-slate-400 hover:border-white/[0.07] hover:bg-white/[0.045] hover:text-slate-100',
               )}
             >
               {n.label}
             </button>
           ))}
         </nav>
-        <div className="mt-auto border-t border-border px-5 py-4">
+        <div className="mt-auto border-t border-white/[0.06] px-5 py-4">
           <UsbIndicator />
           {usingMock && <p className="mt-2 text-xs text-amber-400">mock service</p>}
         </div>

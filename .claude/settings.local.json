@@ -118,7 +118,27 @@
       "Bash(sudo systemctl daemon-reload)",
       "Bash(sudo systemctl restart talysman.service)",
       "Bash(sudo grep -A2 -B2 \"pid 3100\" /var/lib/talysman/service.log)",
-      "Bash(ps -p 3100 -o pid,comm)"
+      "Bash(ps -p 3100 -o pid,comm)",
+      "Bash(pnpm build *)",
+      "Bash(supabase status *)",
+      "Bash(supabase migration *)",
+      "Bash(pnpm comp *)",
+      "Bash(psql \"postgresql://postgres:postgres@127.0.0.1:54322/postgres\" -c \"\\\\dp public.entitlement_grants\" -c \"\\\\dp public.subscriptions\")",
+      "Bash(psql \"postgresql://postgres:postgres@127.0.0.1:54322/postgres\" -c \"set role service_role; select count\\(*\\) from public.subscriptions;\")",
+      "Bash(psql \"postgresql://postgres:postgres@127.0.0.1:54322/postgres\" -c \"\\\\dp public.profiles\")",
+      "Bash(psql *)",
+      "Bash(pnpm -F @talysman/desktop exec tsc -p tsconfig.json --noEmit)",
+      "Bash(node_modules/eslint/package.json)",
+      "Bash(pnpm add *)",
+      "Bash(npx eslint *)",
+      "Bash(echo \"EXIT=$?\")",
+      "Bash(cp /tmp/claude-1001/-data-zac-zac-development-snorlax/38a70835-5d1e-47ed-a6e8-1e19645af164/scratchpad/verify.mjs ./verify.tmp.mjs)",
+      "Bash(rm -f ./verify.tmp.mjs)",
+      "Bash(pnpm web:dev *)",
+      "Bash(curl -sf -o /dev/null http://localhost:3000/)",
+      "Bash(break)",
+      "Bash(echo \"TYPECHECK=$?\")",
+      "Bash(echo \"LINT_EXIT=$?\")"
     ]
   },
   "enabledPlugins": {

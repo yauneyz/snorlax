@@ -57,6 +57,7 @@ linux:
   target:
     - deb
     - AppImage
+  syncDesktopName: true
   category: Utility
   maintainer: Talysman <support@talysman.app>
   artifactName: ${productName}-${version}-${arch}.${ext}

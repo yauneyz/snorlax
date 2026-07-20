@@ -47,9 +47,14 @@ X initial post
 - Reddit Posts
 
 * Part 3: Product Finishing
-** Plumbing
-- auth
-- payments
+- metrics - can I see how much my users are blocking, who is actually using it?
+
+* Extra features:
+- Timeout blocking w/ daily limits
+- delayed unlock
+- unlock cooldown timers
+- "reset ritual" - based on anti-proctrastination checklist
+- themes, custom themes
 
 * Audience Building Loop
 - Discord
@@ -62,71 +67,3 @@ X initial post
 - Short-form content
 - Creator seeding
 - Paid Ads
-
-* Extra features:
-- Timeout blocking w/ daily limits
-- delayed unlockllllllllll hiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiillllllllll]
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-[[[[[[[[[[[[[[[[[kmnj bbbbbbbbbbhhhhhhhhhhhhhi00000000000000000                                    'cgn    b vvvvvvvvvvvvvvv
-- unlock cooldown timers
-- "reset ritual" - based on anti-proctrastination checklist
-
-- vercel prod base site
-  0llllllllllllllllllllllllllll
-- blog still works

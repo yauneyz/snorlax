@@ -65,5 +65,6 @@ export const openBillingPortal = () => window.api.openBillingPortal();
 export const subscriptionDetail = () => window.api.subscriptionDetail();
 export const cancelSubscription = () => window.api.cancelSubscription();
 export const resumeSubscription = () => window.api.resumeSubscription();
+export const redeemCode = (code: string) => window.api.redeemCode(code);
 
 export type { CheckoutPrice, SubscriptionPlan, SubscriptionDetailInfo };

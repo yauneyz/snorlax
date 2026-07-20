@@ -77,12 +77,14 @@ if (!gotLock) {
 } else {
   app.on('second-instance', (_e, argv) => {
     const deepLink = argv.find((a) => a.startsWith(`${DEEP_LINK_SCHEME}://`));
-    if (deepLink) handleDeepLink(deepLink);
+    if (deepLink) void handleDeepLink(deepLink);
     else showMainWindow();
   });
 
   // macOS deep link (harmless on Windows).
-  app.on('open-url', (_e, url) => handleDeepLink(url));
+  app.on('open-url', (_e, url) => {
+    void handleDeepLink(url);
+  });
 
   app.whenReady().then(bootstrap).catch((e) => {
     logger.error('[main] bootstrap failed', e);

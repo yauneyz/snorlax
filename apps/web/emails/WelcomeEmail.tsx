@@ -13,7 +13,7 @@ export function WelcomeEmail({ appName, userName }: WelcomeEmailProps) {
       <Body>
         <Container>
           <Heading>Welcome{userName ? `, ${userName}` : ""}.</Heading>
-          <Text>Thanks for signing up for {appName}. We're glad you're here.</Text>
+          <Text>Thanks for signing up for {appName}. We&apos;re glad you&apos;re here.</Text>
           <Text>Reply to this email if you have any questions.</Text>
         </Container>
       </Body>

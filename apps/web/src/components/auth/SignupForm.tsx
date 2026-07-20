@@ -4,8 +4,11 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { supabaseBrowser } from "@/lib/supabase/browser";
 import { signupSchema } from "@/lib/zod/auth";
+import { safeInternalPath } from "@/lib/auth/redirects";
 
-export function SignupForm() {
+type Props = { next?: string };
+
+export function SignupForm({ next = "/app" }: Props) {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -35,7 +38,7 @@ export function SignupForm() {
       setError(err.message);
       return;
     }
-    router.push("/app");
+    router.push(safeInternalPath(next));
     router.refresh();
   };
 
@@ -66,7 +69,9 @@ export function SignupForm() {
         {pending ? "Creating…" : "Sign up"}
       </button>
       <div className="auth-links">
-        <Link href="/login">Already have an account?</Link>
+        <Link href={next === "/app" ? "/login" : `/login?next=${encodeURIComponent(next)}`}>
+          Already have an account?
+        </Link>
       </div>
     </form>
   );

@@ -20,7 +20,7 @@ export function PaymentFailedEmail({ appName, invoiceUrl, amount, currency }: Pa
         <Container>
           <Heading>Your payment failed</Heading>
           <Text>
-            We couldn't charge your card for {formatted}. Please update your payment method to keep
+            We couldn&apos;t charge your card for {formatted}. Please update your payment method to keep
             your {appName} subscription active.
           </Text>
           <Button href={invoiceUrl}>Update payment</Button>

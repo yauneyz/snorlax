@@ -29,6 +29,7 @@ import {
   cancelSubscription,
   fetchSubscriptionDetail,
   openBillingPortal,
+  redeemCompCode,
   resumeSubscription,
   startCheckout,
 } from '../auth/billing.js';
@@ -78,29 +79,7 @@ const WATCHDOG_KILLED_DETAIL =
 // Keep active notifications alive until the OS closes them so click handlers remain reliable.
 const activeWatchdogNotifications = new Set<Notification>();
 
-/** Show the kill explanation in the logged-in desktop session, not the privileged service session. */
-function notifyBrowserWatchdogKilled(browser: string): void {
-  const title = `Talysman closed ${browser}`;
-
-  if (Notification.isSupported()) {
-    const notification = new Notification({
-      title,
-      body: WATCHDOG_KILLED_DETAIL,
-      urgency: 'critical',
-      timeoutType: 'never',
-      silent: false,
-    });
-    notification.on('click', () => {
-      void import('../window.js').then(({ showMainWindow }) => showMainWindow());
-    });
-    notification.once('close', () => activeWatchdogNotifications.delete(notification));
-    activeWatchdogNotifications.add(notification);
-    notification.show();
-    return;
-  }
-
-  // Some minimal Linux desktops have no notification server. A native warning dialog is the
-  // fallback so the explanation is still visible rather than silently disappearing.
+function showWatchdogKilledDialog(title: string): void {
   void dialog
     .showMessageBox({
       type: 'warning',
@@ -117,6 +96,45 @@ function notifyBrowserWatchdogKilled(browser: string): void {
         void import('../window.js').then(({ showMainWindow }) => showMainWindow());
       }
     });
+}
+
+/** Show the kill explanation in the logged-in desktop session, not the privileged service session. */
+function notifyBrowserWatchdogKilled(browser: string): void {
+  const title = `Talysman closed ${browser}`;
+
+  if (Notification.isSupported()) {
+    const notification = new Notification({
+      title,
+      body: WATCHDOG_KILLED_DETAIL,
+      urgency: 'critical',
+      timeoutType: 'never',
+      silent: false,
+    });
+    notification.on('click', () => {
+      void import('../window.js').then(({ showMainWindow }) => showMainWindow());
+    });
+    // Electron 42+ uses UNNotification on macOS, which rejects notifications from unsigned
+    // apps. Local mac builds are intentionally unsigned, so preserve the warning via a dialog.
+    notification.once('failed', (_event, error) => {
+      activeWatchdogNotifications.delete(notification);
+      logger.warn('[notification] native watchdog alert failed; using dialog fallback', error);
+      showWatchdogKilledDialog(title);
+    });
+    notification.once('close', () => activeWatchdogNotifications.delete(notification));
+    activeWatchdogNotifications.add(notification);
+    try {
+      notification.show();
+    } catch (error) {
+      activeWatchdogNotifications.delete(notification);
+      logger.warn('[notification] native watchdog alert threw; using dialog fallback', error);
+      showWatchdogKilledDialog(title);
+    }
+    return;
+  }
+
+  // Some minimal Linux desktops have no notification server. A native warning dialog is the
+  // fallback so the explanation is still visible rather than silently disappearing.
+  showWatchdogKilledDialog(title);
 }
 
 export interface HandlerContext {
@@ -263,6 +281,14 @@ export async function registerIpcHandlers(ctx: HandlerContext): Promise<void> {
   ipcMain.handle(Channels.resumeSubscription, async () => {
     const result = await resumeSubscription();
     if (result.ok) {
+      await applyPlanLimitsNow();
+      broadcastAppEvent('entitlementChanged');
+    }
+    return result;
+  });
+  ipcMain.handle(Channels.redeemCode, async (_e, args: { code: string }) => {
+    const result = await redeemCompCode(String(args?.code ?? ''));
+    if (result.granted) {
       await applyPlanLimitsNow();
       broadcastAppEvent('entitlementChanged');
     }

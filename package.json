@@ -1,11 +1,12 @@
 {
   "name": "talysman",
+  "desktopName": "com.talysman.app.desktop",
   "version": "0.1.0",
   "private": true,
   "description": "Talysman — a USB-key-gated distraction blocker (Electron UI + privileged native service).",
-  "packageManager": "pnpm@11.5.2",
+  "packageManager": "pnpm@11.15.0",
   "engines": {
-    "node": ">=20"
+    "node": ">=22.12.0"
   },
   "scripts": {
     "dev": "node scripts/dev.mjs",
@@ -19,6 +20,7 @@
     "web:build": "pnpm --filter @talysman/web build",
     "web:start": "pnpm --filter @talysman/web start",
     "web:test": "pnpm --filter @talysman/web test",
+    "comp": "pnpm --filter @talysman/web comp",
     "web:test:webhook": "pnpm --filter @talysman/web test:webhook",
     "web:test:e2e": "pnpm --filter @talysman/web test:e2e",
     "build:win": "cross-env APP_ENV=production node scripts/build.mjs --target win",
@@ -36,16 +38,24 @@
     "build:native:mac": "node scripts/build-native.mjs --target mac",
     "typecheck": "tsc -b && tsc -p apps/desktop/tsconfig.json --noEmit",
     "test": "vitest run",
+    "test:electron:e2e": "cross-env APP_ENV=development TALYSMAN_PIPE=talysman-e2e pnpm --filter @talysman/desktop exec electron-vite build --mode development && playwright test tests/electron/e2e --workers=1",
     "test:watch": "vitest",
-    "lint": "eslint ."
+    "lint": "eslint . && pnpm --filter @talysman/web lint",
+    "lint:fix": "eslint . --fix && pnpm --filter @talysman/web lint --fix"
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
     "@iarna/toml": "^2.2.5",
-    "@types/node": "^20.14.0",
+    "@playwright/test": "^1.61.0",
+    "@types/node": "^24.9.0",
     "cross-env": "^7.0.3",
-    "electron-builder": "^24.13.3",
+    "electron": "^43.1.1",
+    "electron-builder": "^26.15.7",
+    "eslint": "^9.39.4",
+    "globals": "^17.7.0",
     "tsx": "^4.19.2",
     "typescript": "^5.5.4",
+    "typescript-eslint": "^8.64.0",
     "vitest": "^2.0.5",
     "zod": "^3.23.8"
   }

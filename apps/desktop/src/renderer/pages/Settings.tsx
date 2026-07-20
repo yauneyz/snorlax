@@ -135,7 +135,9 @@ export function Settings() {
                       onClick={() => choosePlan(plan)}
                       className={cx(
                         'min-w-24 rounded-md px-4 py-2 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-60',
-                        selected ? 'bg-accent text-white shadow-sm' : 'text-slate-300 hover:bg-[#222c42]',
+                        selected
+                          ? 'bg-accent text-accentInk shadow-sm'
+                          : 'text-slate-300 hover:bg-white/[0.07] hover:text-white',
                       )}
                     >
                       {plan === 'pro' ? 'Pro' : 'Free'}

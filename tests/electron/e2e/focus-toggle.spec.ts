@@ -9,17 +9,24 @@ import { resolve } from 'node:path';
 
 test('enable focus, then disabling without a key is blocked', async () => {
   const app = await electron.launch({
-    args: [resolve(__dirname, '../../../apps/desktop/out/main/index.js')],
-    env: { ...process.env, APP_ENV: 'development', TALYSMAN_PIPE: 'talysman-nonexistent' },
+    args: [resolve(__dirname, '../../../apps/desktop/out/main/index.cjs')],
   });
-  const win = await app.firstWindow();
+  try {
+    const win = await app.firstWindow();
 
-  await win.getByText('Connecting…').waitFor({ state: 'detached' });
-  await win.getByRole('button', { name: 'Turn on focus' }).click();
-  await expect(win.getByText('FOCUSED')).toBeVisible();
+    await win.getByText('Connecting…').waitFor({ state: 'detached' });
 
-  await win.getByRole('button', { name: 'Turn off focus' }).click();
-  await expect(win.getByText('Insert your paired key')).toBeVisible();
+    // Never let this test mutate the installed privileged service. The E2E script compiles
+    // a dedicated nonexistent pipe into the bundle; fail closed if that setup regresses.
+    const info = await win.evaluate(() => window.api.appInfo());
+    expect(info.usingMock).toBe(true);
 
-  await app.close();
+    await win.getByRole('button', { name: 'Turn on focus' }).click();
+    await expect(win.getByText('FOCUSED')).toBeVisible();
+
+    await win.getByRole('button', { name: 'Turn off focus' }).click();
+    await expect(win.getByText('Insert your paired key')).toBeVisible();
+  } finally {
+    await app.close();
+  }
 });

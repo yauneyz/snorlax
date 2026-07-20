@@ -44,17 +44,17 @@ export function createWindow(): BrowserWindow {
 
   // Open target=_blank / external links in the system browser, never in-app.
   win.webContents.setWindowOpenHandler(({ url }) => {
-    shell.openExternal(url);
+    void shell.openExternal(url);
     return { action: 'deny' };
   });
 
   // electron-vite serves the renderer from a dev URL in dev, and from a file in prod.
   const devUrl = process.env['ELECTRON_RENDERER_URL'];
   if (config.isDev && devUrl) {
-    win.loadURL(devUrl);
+    void win.loadURL(devUrl);
     win.webContents.openDevTools({ mode: 'detach' });
   } else {
-    win.loadFile(join(__dirname, '../renderer/index.html'));
+    void win.loadFile(join(__dirname, '../renderer/index.html'));
   }
 
   mainWindow = win;

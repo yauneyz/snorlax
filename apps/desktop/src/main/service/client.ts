@@ -72,7 +72,7 @@ export class PipeServiceConnection implements ServiceConnection {
     socket.on('data', (chunk: string) => this.onData(chunk));
 
     socket.on('error', (e) => {
-      logger.warn(`[service] socket error: ${(e as Error).message}`);
+      logger.warn(`[service] socket error: ${(e).message}`);
     });
 
     socket.on('close', () => {

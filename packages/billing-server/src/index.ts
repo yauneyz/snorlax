@@ -39,9 +39,15 @@ interface PortalProfile {
   stripe_customer_id: string | null;
 }
 
-interface ActiveSubscription {
+/**
+ * A row of `active_entitlements`: either a live Stripe subscription or a
+ * complimentary grant (see migration 0004). `current_period_end` is null for a
+ * lifetime grant.
+ */
+interface ActiveEntitlementRow {
+  source?: 'subscription' | 'grant';
   status?: string;
-  current_period_end?: string;
+  current_period_end?: string | null;
 }
 
 export class NoStripeCustomerError extends Error {
@@ -217,29 +223,52 @@ export async function getUserEntitlement(args: {
   const { db, userId, now = new Date(), cacheTtlMs = 5 * 60 * 1000 } = args;
 
   const { data, error } = await db
-    .from('active_subscriptions')
-    .select('status,current_period_end')
+    .from('active_entitlements')
+    .select('source,status,current_period_end')
     .eq('user_id', userId)
-    .limit(1);
+    .limit(2);
   if (error) throw new Error(`Failed to load entitlement: ${error.message}`);
 
-  const subscription = Array.isArray(data)
-    ? (data[0] as ActiveSubscription | undefined)
-    : (data as ActiveSubscription | null);
+  const rows: ActiveEntitlementRow[] = Array.isArray(data)
+    ? (data as ActiveEntitlementRow[])
+    : data
+      ? [data as ActiveEntitlementRow]
+      : [];
 
-  if (!subscription) {
-    return entitlementForPlan('free', 'server', {
-      fetchedAt: now.toISOString(),
-      cacheUntil: new Date(now.getTime() + cacheTtlMs).toISOString(),
-    });
-  }
+  // A paying subscription and a comp can coexist; report the paid one so the
+  // billing UI keeps showing renewal state.
+  const entitled = rows.find((row) => row.source === 'subscription') ?? rows[0];
 
-  return entitlementForPlan('pro', 'server', {
-    status: subscription.status,
-    currentPeriodEnd: subscription.current_period_end,
+  const timing = {
     fetchedAt: now.toISOString(),
     cacheUntil: new Date(now.getTime() + cacheTtlMs).toISOString(),
+  };
+
+  if (!entitled) return entitlementForPlan('free', 'server', timing);
+
+  return entitlementForPlan('pro', 'server', {
+    status: entitled.status,
+    // Omitted entirely for a lifetime grant — there is no period to end.
+    ...(entitled.current_period_end ? { currentPeriodEnd: entitled.current_period_end } : {}),
+    ...timing,
   });
+}
+
+/** Whether the user holds an active complimentary grant (see migration 0004). */
+export async function hasActiveCompGrant(args: {
+  db: SupabaseTableClient;
+  userId: string;
+}): Promise<boolean> {
+  const { db, userId } = args;
+  const { data, error } = await db
+    .from('active_entitlements')
+    .select('user_id')
+    .eq('user_id', userId)
+    .eq('source', 'grant')
+    .limit(1);
+  if (error) throw new Error(`Failed to load comp grant: ${error.message}`);
+  const rows = Array.isArray(data) ? data : data ? [data] : [];
+  return rows.length > 0;
 }
 
 /** Statuses that count as a "current" subscription for display and cancel/resume. */
@@ -277,7 +306,15 @@ export async function getSubscriptionDetail(args: {
 }): Promise<SubscriptionDetail> {
   const { db, config, userId } = args;
   const sub = await findCurrentSubscription(db, userId);
-  if (!sub) return { hasSubscription: false, plan: 'free' };
+  if (!sub) {
+    // Comped accounts have no Stripe customer, so `hasSubscription` stays false
+    // (it gates the billing-portal button, which would throw for them) while the
+    // plan reads Pro.
+    const comped = await hasActiveCompGrant({ db, userId });
+    return comped
+      ? { hasSubscription: false, plan: 'pro', status: 'comped' }
+      : { hasSubscription: false, plan: 'free' };
+  }
 
   return {
     hasSubscription: true,
@@ -315,12 +352,12 @@ async function resolveUserId(
   db: SupabaseTableClient,
   sub: Stripe.Subscription,
 ): Promise<string | null> {
-  const metaUserId = (sub.metadata?.user_id as string | undefined) ?? null;
+  const metaUserId = (sub.metadata?.user_id) ?? null;
   if (metaUserId) return metaUserId;
 
   const customerMetaUserId =
     typeof sub.customer !== 'string' && !sub.customer.deleted
-      ? ((sub.customer.metadata?.user_id as string | undefined) ?? null)
+      ? ((sub.customer.metadata?.user_id) ?? null)
       : null;
   if (customerMetaUserId) return customerMetaUserId;
 

@@ -1,0 +1,22 @@
+{
+  // Not part of the `tsc -b` graph — this exists so type-aware ESLint rules can
+  // resolve types for the test suite.
+  "extends": "../tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "composite": false,
+    "declaration": false,
+    "types": ["node"],
+    "paths": {
+      "@shared/*": ["../packages/shared/src/*"],
+      "@core/*": ["../packages/core/src/*"],
+      "@talysman/shared": ["../packages/shared/src/index.ts"],
+      "@talysman/core": ["../packages/core/src/index.ts"],
+      "@talysman/product": ["../packages/product/src/index.ts"],
+      "@talysman/auth-contracts": ["../packages/auth-contracts/src/index.ts"],
+      "@talysman/billing-server": ["../packages/billing-server/src/index.ts"],
+      "@config/*": ["../config/*"]
+    }
+  },
+  "include": ["**/*.ts", "**/*.tsx"]
+}

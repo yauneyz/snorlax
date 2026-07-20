@@ -11,12 +11,7 @@
  */
 
 import { shell } from 'electron';
-import {
-  createClient,
-  type SupabaseClient,
-  type SupabaseClientOptions,
-} from '@supabase/supabase-js';
-import WebSocket from 'ws';
+import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import {
   DESKTOP_AUTH_CALLBACK_PATH,
   DESKTOP_AUTH_RESET_CALLBACK_PATH,
@@ -39,14 +34,6 @@ let authChangeListener: (() => void) | undefined;
 let passwordRecoveryPending = false;
 let authFlowError: string | undefined;
 
-type RealtimeTransport = NonNullable<
-  NonNullable<SupabaseClientOptions<'public'>['realtime']>['transport']
->;
-
-// `ws` implements the WebSocket API at runtime, but its overloaded Node constructor is not
-// structurally assignable to Supabase's narrower browser-shaped constructor type.
-const nodeWebSocketTransport = WebSocket as unknown as RealtimeTransport;
-
 export function isAuthConfigured(): boolean {
   return Boolean(config.supabaseUrl && config.supabaseAnonKey);
 }
@@ -59,9 +46,6 @@ function getClient(): SupabaseClient {
   }
   if (!client) {
     client = createClient(config.supabaseUrl, config.supabaseAnonKey, {
-      // Electron 31 embeds Node 20, which does not expose a native WebSocket.
-      // Supabase initializes its Realtime client eagerly, even when we only use Auth.
-      realtime: { transport: nodeWebSocketTransport },
       auth: {
         flowType: 'pkce',
         autoRefreshToken: true,
