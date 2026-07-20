@@ -8,6 +8,7 @@ import { join } from 'node:path';
 import { app, BrowserWindow, shell } from 'electron';
 import {
   DESKTOP_AUTH_CALLBACK_PATH,
+  DESKTOP_AUTH_RESET_CALLBACK_PATH,
   DESKTOP_BILLING_SUCCESS_PATH,
 } from '@talysman/auth-contracts';
 import { config } from './config.js';
@@ -89,9 +90,11 @@ export function showMainWindow(): BrowserWindow | null {
 
 /**
  * Handle a talysman:// deep link:
- *  - auth/callback?code=… → finish the Supabase OAuth exchange, then refresh entitlement.
- *  - billing/success      → refresh entitlement (the webhook is the authoritative sync).
- *  - billing/cancel       → just refocus the window.
+ *  - auth/callback?code=…       → finish the Supabase OAuth/confirmation exchange.
+ *  - auth/reset-callback?code=… → establish a password-recovery session; the renderer sees
+ *                                 `passwordRecovery` via authStatus and shows the reset form.
+ *  - billing/success            → refresh entitlement (the webhook is the authoritative sync).
+ *  - billing/cancel             → just refocus the window.
  */
 export async function handleDeepLink(url: string): Promise<void> {
   logger.info(`[deeplink] ${url}`);
@@ -99,10 +102,10 @@ export async function handleDeepLink(url: string): Promise<void> {
     const parsed = new URL(url);
     const path = `${parsed.host}${parsed.pathname}`.replace(/\/$/, '');
 
-    if (path === DESKTOP_AUTH_CALLBACK_PATH) {
+    if (path === DESKTOP_AUTH_CALLBACK_PATH || path === DESKTOP_AUTH_RESET_CALLBACK_PATH) {
       const code = parsed.searchParams.get('code');
       if (code) {
-        await completeOAuth(code);
+        await completeOAuth(code, { recovery: path === DESKTOP_AUTH_RESET_CALLBACK_PATH });
         await applyPlanLimitsNow();
         broadcastAppEvent('authChanged');
       }

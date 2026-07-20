@@ -22,9 +22,15 @@ const Channels = {
   authStatus: 'app:authStatus',
   signInGoogle: 'app:signInGoogle',
   signInPassword: 'app:signInPassword',
+  signUpPassword: 'app:signUpPassword',
+  sendPasswordReset: 'app:sendPasswordReset',
+  updatePassword: 'app:updatePassword',
   signOut: 'app:signOut',
   startCheckout: 'app:startCheckout',
   openBillingPortal: 'app:openBillingPortal',
+  subscriptionDetail: 'app:subscriptionDetail',
+  cancelSubscription: 'app:cancelSubscription',
+  resumeSubscription: 'app:resumeSubscription',
   appEvent: 'app:event',
 } as const;
 
@@ -37,6 +43,18 @@ export interface EntitlementInfo {
 export interface AuthStatusInfo {
   signedIn: boolean;
   email?: string;
+  /** Set while a password-recovery session awaits a new password. */
+  passwordRecovery?: boolean;
+}
+
+export interface SubscriptionDetailInfo {
+  hasSubscription: boolean;
+  plan: SubscriptionPlan;
+  status?: string;
+  price?: CheckoutPrice;
+  cancelAtPeriodEnd?: boolean;
+  currentPeriodEnd?: string;
+  canceledAt?: string | null;
 }
 
 export type AppEventName = 'authChanged' | 'entitlementChanged';
@@ -92,6 +110,16 @@ const api = {
   signInGoogle: (): Promise<ActionResult> => ipcRenderer.invoke(Channels.signInGoogle),
   signInPassword: (email: string, password: string): Promise<ActionResult> =>
     ipcRenderer.invoke(Channels.signInPassword, { email, password }),
+  signUpPassword: (
+    email: string,
+    password: string,
+    fullName?: string,
+  ): Promise<ActionResult & { confirmEmail?: boolean }> =>
+    ipcRenderer.invoke(Channels.signUpPassword, { email, password, fullName }),
+  sendPasswordReset: (email: string): Promise<ActionResult> =>
+    ipcRenderer.invoke(Channels.sendPasswordReset, { email }),
+  updatePassword: (password: string): Promise<ActionResult> =>
+    ipcRenderer.invoke(Channels.updatePassword, { password }),
   signOut: (): Promise<ActionResult> => ipcRenderer.invoke(Channels.signOut),
 
   // --- billing ---
@@ -99,6 +127,13 @@ const api = {
     ipcRenderer.invoke(Channels.startCheckout, price),
   openBillingPortal: (): Promise<ActionResult> =>
     ipcRenderer.invoke(Channels.openBillingPortal),
+  subscriptionDetail: (): Promise<
+    ActionResult & { detail?: SubscriptionDetailInfo }
+  > => ipcRenderer.invoke(Channels.subscriptionDetail),
+  cancelSubscription: (): Promise<ActionResult> =>
+    ipcRenderer.invoke(Channels.cancelSubscription),
+  resumeSubscription: (): Promise<ActionResult> =>
+    ipcRenderer.invoke(Channels.resumeSubscription),
 
   /** Subscribe to main-pushed auth/entitlement change events. Returns an unsubscribe fn. */
   onAppEvent: (cb: (event: AppEventName) => void): (() => void) => {

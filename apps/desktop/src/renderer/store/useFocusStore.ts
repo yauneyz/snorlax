@@ -15,6 +15,8 @@ import {
   onAppEvent,
   onEvent,
   request,
+  subscriptionDetail,
+  type SubscriptionDetailInfo,
   type SubscriptionPlan,
 } from '../lib/bridge.js';
 import { limitsForPlan, type ProductLimits } from '../../shared/productLimits.js';
@@ -25,12 +27,16 @@ interface FocusStore {
   appEnv: string;
   signedIn: boolean;
   email?: string;
+  /** True while a password-recovery session awaits a new password (reset deep link). */
+  passwordRecovery: boolean;
   /** False until the first entitlement fetch resolves — UI shows a neutral state meanwhile. */
   entitlementLoaded: boolean;
   subscriptionPlan: SubscriptionPlan;
   entitlementActive: boolean;
   entitlementSource: string;
   productLimits: ProductLimits | null;
+  /** Display-only subscription snapshot from the web API; undefined when signed out/offline. */
+  subscriptionDetail?: SubscriptionDetailInfo;
 
   focusActive: boolean;
   keyPresent: boolean;
@@ -50,6 +56,7 @@ interface FocusStore {
   refresh: () => Promise<void>;
   refreshAuth: () => Promise<void>;
   refreshEntitlement: () => Promise<void>;
+  refreshSubscriptionDetail: () => Promise<void>;
   setDevSubscriptionPlan: (plan: SubscriptionPlan) => Promise<void>;
   setBrowserHandshake: (enabled: boolean) => Promise<void>;
   clearWatchdogWarning: () => void;
@@ -63,6 +70,7 @@ export const useFocusStore = create<FocusStore>((set, get) => ({
   appEnv: 'development',
   signedIn: false,
   email: undefined,
+  passwordRecovery: false,
   // Unknown until the first fetch resolves; pages render a neutral "Checking…" state. Values
   // below are placeholders (fail-closed) and are not shown while entitlementLoaded is false.
   entitlementLoaded: false,
@@ -98,7 +106,21 @@ export const useFocusStore = create<FocusStore>((set, get) => ({
 
   refreshAuth: async () => {
     const status = await authStatus();
-    set({ signedIn: status.signedIn, email: status.email });
+    set({
+      signedIn: status.signedIn,
+      email: status.email,
+      passwordRecovery: Boolean(status.passwordRecovery),
+    });
+  },
+
+  refreshSubscriptionDetail: async () => {
+    if (!get().signedIn) {
+      set({ subscriptionDetail: undefined });
+      return;
+    }
+    const res = await subscriptionDetail();
+    // Keep the last snapshot on transient failures (offline etc.).
+    if (res.ok && res.detail) set({ subscriptionDetail: res.detail });
   },
 
   refreshEntitlement: async () => {
@@ -143,6 +165,7 @@ export const useFocusStore = create<FocusStore>((set, get) => ({
     set({ usingMock: info.usingMock, appEnv: info.appEnv });
     await get().refreshAuth();
     await get().refreshEntitlement();
+    void get().refreshSubscriptionDetail();
 
     await get().refresh();
 
@@ -158,7 +181,9 @@ export const useFocusStore = create<FocusStore>((set, get) => ({
 
     // Main pushes these after sign-in/out and billing deep-link returns.
     onAppEvent(() => {
-      void get().refreshAuth();
+      void get()
+        .refreshAuth()
+        .then(() => get().refreshSubscriptionDetail());
       void get().refreshEntitlement();
     });
 

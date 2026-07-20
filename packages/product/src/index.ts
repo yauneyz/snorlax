@@ -33,6 +33,23 @@ export const entitlementSchema = z.object({
 
 export type Entitlement = z.infer<typeof entitlementSchema>;
 
+/**
+ * Display-only snapshot of the user's current subscription. Separate from
+ * `entitlementSchema` on purpose: entitlements are disk-cached and mirrored by
+ * the signed local-license verifier, so their shape must stay frozen.
+ */
+export const subscriptionDetailSchema = z.object({
+  hasSubscription: z.boolean(),
+  plan: subscriptionPlanSchema,
+  status: z.string().optional(),
+  price: checkoutPriceSchema.optional(),
+  cancelAtPeriodEnd: z.boolean().optional(),
+  currentPeriodEnd: z.string().optional(),
+  canceledAt: z.string().nullable().optional(),
+});
+
+export type SubscriptionDetail = z.infer<typeof subscriptionDetailSchema>;
+
 type LimitedValue = number | null;
 
 export interface ProductLimits {

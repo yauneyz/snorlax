@@ -6,7 +6,7 @@
  */
 
 import { shell } from 'electron';
-import type { CheckoutPrice } from '@talysman/product';
+import { subscriptionDetailSchema, type CheckoutPrice, type SubscriptionDetail } from '@talysman/product';
 import { config } from '../config.js';
 import { getAccessToken } from './supabase.js';
 
@@ -15,28 +15,44 @@ interface BillingResult {
   message?: string;
 }
 
-async function postForUrl(path: string, body?: unknown): Promise<BillingResult> {
+type ApiResult =
+  | { ok: true; data: unknown }
+  | { ok: false; message: string };
+
+async function callDesktopApi(
+  path: string,
+  method: 'GET' | 'POST',
+  body?: unknown,
+): Promise<ApiResult> {
   const token = await getAccessToken();
   if (!token) return { ok: false, message: 'Sign in first.' };
 
   try {
     const res = await fetch(`${config.apiBaseUrl}${path}`, {
-      method: 'POST',
+      method,
       headers: {
         Authorization: `Bearer ${token}`,
         'Content-Type': 'application/json',
       },
       body: body ? JSON.stringify(body) : undefined,
     });
-    const data = (await res.json().catch(() => null)) as { url?: string; error?: string } | null;
-    if (!res.ok || !data?.url) {
+    const data = (await res.json().catch(() => null)) as { error?: string } | null;
+    if (!res.ok) {
       return { ok: false, message: data?.error ?? `Request failed: ${res.status}` };
     }
-    await shell.openExternal(data.url);
-    return { ok: true };
+    return { ok: true, data };
   } catch (e) {
     return { ok: false, message: (e as Error).message };
   }
+}
+
+async function postForUrl(path: string, body?: unknown): Promise<BillingResult> {
+  const res = await callDesktopApi(path, 'POST', body);
+  if (!res.ok) return res;
+  const url = (res.data as { url?: string } | null)?.url;
+  if (!url) return { ok: false, message: 'Unexpected billing response.' };
+  await shell.openExternal(url);
+  return { ok: true };
 }
 
 /** Open Stripe Checkout for the chosen plan in the system browser. */
@@ -47,4 +63,29 @@ export function startCheckout(price: CheckoutPrice): Promise<BillingResult> {
 /** Open the Stripe billing portal for an existing subscriber. */
 export function openBillingPortal(): Promise<BillingResult> {
   return postForUrl('/api/desktop/portal');
+}
+
+/** Current subscription snapshot for the Account page (display only, never cached). */
+export async function fetchSubscriptionDetail(): Promise<{
+  ok: boolean;
+  detail?: SubscriptionDetail;
+  message?: string;
+}> {
+  const res = await callDesktopApi('/api/desktop/subscription', 'GET');
+  if (!res.ok) return res;
+  const parsed = subscriptionDetailSchema.safeParse(res.data);
+  if (!parsed.success) return { ok: false, message: 'Unexpected subscription response.' };
+  return { ok: true, detail: parsed.data };
+}
+
+/** Schedule cancellation at the end of the current billing period. */
+export async function cancelSubscription(): Promise<BillingResult> {
+  const res = await callDesktopApi('/api/desktop/subscription/cancel', 'POST');
+  return res.ok ? { ok: true } : res;
+}
+
+/** Un-schedule a pending cancellation. */
+export async function resumeSubscription(): Promise<BillingResult> {
+  const res = await callDesktopApi('/api/desktop/subscription/resume', 'POST');
+  return res.ok ? { ok: true } : res;
 }

@@ -28,11 +28,17 @@ export default function App() {
   const usingMock = useFocusStore((s) => s.usingMock);
   const watchdogWarning = useFocusStore((s) => s.watchdogWarning);
   const clearWatchdogWarning = useFocusStore((s) => s.clearWatchdogWarning);
+  const passwordRecovery = useFocusStore((s) => s.passwordRecovery);
   const [route, setRoute] = useState<Route>('dashboard');
 
   useEffect(() => {
     void init();
   }, [init]);
+
+  // A password-recovery deep link needs the Account page's reset form on screen.
+  useEffect(() => {
+    if (passwordRecovery) setRoute('account');
+  }, [passwordRecovery]);
 
   // Auto-dismiss the watchdog warning after a few seconds; it's a transient nudge.
   useEffect(() => {

@@ -17,12 +17,21 @@ import {
 } from '../auth/subscription.js';
 import {
   getAuthStatus,
+  sendPasswordReset,
   setAuthChangeListener,
   signInWithGoogle,
   signInWithPassword,
   signOut,
+  signUpWithPassword,
+  updatePassword,
 } from '../auth/supabase.js';
-import { openBillingPortal, startCheckout } from '../auth/billing.js';
+import {
+  cancelSubscription,
+  fetchSubscriptionDetail,
+  openBillingPortal,
+  resumeSubscription,
+  startCheckout,
+} from '../auth/billing.js';
 import {
   type CheckoutPrice,
   constrainPolicyToLimits,
@@ -170,9 +179,39 @@ export async function registerIpcHandlers(ctx: HandlerContext): Promise<void> {
     (_e, creds: { email: string; password: string }) =>
       signInWithPassword(creds.email, creds.password),
   );
+  ipcMain.handle(
+    Channels.signUpPassword,
+    (_e, creds: { email: string; password: string; fullName?: string }) =>
+      signUpWithPassword(creds.email, creds.password, creds.fullName),
+  );
+  ipcMain.handle(Channels.sendPasswordReset, (_e, args: { email: string }) =>
+    sendPasswordReset(args.email),
+  );
+  ipcMain.handle(Channels.updatePassword, async (_e, args: { password: string }) => {
+    const result = await updatePassword(args.password);
+    if (result.ok) broadcastAppEvent('authChanged');
+    return result;
+  });
   ipcMain.handle(Channels.signOut, () => signOut());
 
   // --- billing ---
   ipcMain.handle(Channels.startCheckout, (_e, price: CheckoutPrice) => startCheckout(price));
   ipcMain.handle(Channels.openBillingPortal, () => openBillingPortal());
+  ipcMain.handle(Channels.subscriptionDetail, () => fetchSubscriptionDetail());
+  ipcMain.handle(Channels.cancelSubscription, async () => {
+    const result = await cancelSubscription();
+    if (result.ok) {
+      await applyPlanLimitsNow();
+      broadcastAppEvent('entitlementChanged');
+    }
+    return result;
+  });
+  ipcMain.handle(Channels.resumeSubscription, async () => {
+    const result = await resumeSubscription();
+    if (result.ok) {
+      await applyPlanLimitsNow();
+      broadcastAppEvent('entitlementChanged');
+    }
+    return result;
+  });
 }

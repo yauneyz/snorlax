@@ -4,6 +4,7 @@ import {
   entitlementForPlan,
   type CheckoutPrice,
   type Entitlement,
+  type SubscriptionDetail,
 } from '@talysman/product';
 
 export const STRIPE_API_VERSION = '2026-05-27.dahlia';
@@ -47,6 +48,13 @@ export class NoStripeCustomerError extends Error {
   constructor() {
     super('No billing account yet - subscribe first.');
     this.name = 'NoStripeCustomerError';
+  }
+}
+
+export class NoActiveSubscriptionError extends Error {
+  constructor() {
+    super('No active subscription.');
+    this.name = 'NoActiveSubscriptionError';
   }
 }
 
@@ -232,6 +240,75 @@ export async function getUserEntitlement(args: {
     fetchedAt: now.toISOString(),
     cacheUntil: new Date(now.getTime() + cacheTtlMs).toISOString(),
   });
+}
+
+/** Statuses that count as a "current" subscription for display and cancel/resume. */
+const CURRENT_SUBSCRIPTION_STATUSES = ['trialing', 'active', 'past_due'] as const;
+
+interface CurrentSubscriptionRow {
+  id: string;
+  status: string;
+  price_id: string;
+  cancel_at_period_end: boolean;
+  current_period_end: string;
+  canceled_at: string | null;
+}
+
+async function findCurrentSubscription(
+  db: SupabaseTableClient,
+  userId: string,
+): Promise<CurrentSubscriptionRow | null> {
+  const { data, error } = await db
+    .from('subscriptions')
+    .select('id,status,price_id,cancel_at_period_end,current_period_end,canceled_at')
+    .eq('user_id', userId)
+    .in('status', CURRENT_SUBSCRIPTION_STATUSES)
+    .order('current_period_end', { ascending: false })
+    .limit(1);
+  if (error) throw new Error(`Failed to load subscription: ${error.message}`);
+  const rows = (data ?? []) as CurrentSubscriptionRow[];
+  return rows[0] ?? null;
+}
+
+export async function getSubscriptionDetail(args: {
+  db: SupabaseTableClient;
+  config: Pick<BillingConfig, 'priceMonthly' | 'priceYearly'>;
+  userId: string;
+}): Promise<SubscriptionDetail> {
+  const { db, config, userId } = args;
+  const sub = await findCurrentSubscription(db, userId);
+  if (!sub) return { hasSubscription: false, plan: 'free' };
+
+  return {
+    hasSubscription: true,
+    plan: 'pro',
+    status: sub.status,
+    price: sub.price_id === config.priceYearly ? 'yearly' : 'monthly',
+    cancelAtPeriodEnd: sub.cancel_at_period_end,
+    currentPeriodEnd: sub.current_period_end,
+    canceledAt: sub.canceled_at,
+  };
+}
+
+/**
+ * Schedule or un-schedule cancellation at period end. Syncs the updated
+ * subscription into the DB immediately so callers see fresh state before the
+ * webhook delivery lands (the webhook's upsert is idempotent).
+ */
+export async function setCancelAtPeriodEnd(args: {
+  db: SupabaseTableClient;
+  stripe: Stripe;
+  userId: string;
+  cancel: boolean;
+}): Promise<void> {
+  const { db, stripe, userId, cancel } = args;
+  const sub = await findCurrentSubscription(db, userId);
+  if (!sub) throw new NoActiveSubscriptionError();
+
+  const updated = await stripe.subscriptions.update(sub.id, {
+    cancel_at_period_end: cancel,
+  });
+  await syncSubscription({ db, subscription: updated });
 }
 
 async function resolveUserId(

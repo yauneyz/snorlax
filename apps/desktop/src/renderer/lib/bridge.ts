@@ -12,7 +12,7 @@ import type {
 } from '@talysman/shared';
 import type { CheckoutPrice, SubscriptionPlan } from '../../shared/productLimits.js';
 import type { AppPickerItem } from '../../shared/appPicker.js';
-import type { AppEventName } from '../../preload/index.js';
+import type { AppEventName, SubscriptionDetailInfo } from '../../preload/index.js';
 
 export interface BridgeError extends Error {
   code: string;
@@ -55,8 +55,15 @@ export const authStatus = () => window.api.authStatus();
 export const signInGoogle = () => window.api.signInGoogle();
 export const signInPassword = (email: string, password: string) =>
   window.api.signInPassword(email, password);
+export const signUpPassword = (email: string, password: string, fullName?: string) =>
+  window.api.signUpPassword(email, password, fullName);
+export const sendPasswordReset = (email: string) => window.api.sendPasswordReset(email);
+export const updatePassword = (password: string) => window.api.updatePassword(password);
 export const signOut = () => window.api.signOut();
 export const startCheckout = (price: CheckoutPrice) => window.api.startCheckout(price);
 export const openBillingPortal = () => window.api.openBillingPortal();
+export const subscriptionDetail = () => window.api.subscriptionDetail();
+export const cancelSubscription = () => window.api.cancelSubscription();
+export const resumeSubscription = () => window.api.resumeSubscription();
 
-export type { CheckoutPrice, SubscriptionPlan };
+export type { CheckoutPrice, SubscriptionPlan, SubscriptionDetailInfo };

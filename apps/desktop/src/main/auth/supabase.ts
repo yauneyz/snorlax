@@ -19,15 +19,24 @@ import {
 import WebSocket from 'ws';
 import {
   DESKTOP_AUTH_CALLBACK_PATH,
+  DESKTOP_AUTH_RESET_CALLBACK_PATH,
   desktopDeepLinkUrl,
   type AuthStatus,
 } from '@talysman/auth-contracts';
 import { config } from '../config.js';
 import { logger } from '../logging.js';
 import { clearSession, supabaseAuthStorage } from './session.js';
+import { classifySignUpResult } from './signUpResult.js';
 
 let client: SupabaseClient | undefined;
 let authChangeListener: (() => void) | undefined;
+
+/**
+ * True after a password-recovery link established a session, until the user picks a new
+ * password. The renderer polls this through `authStatus`, so recovery survives cold-start
+ * deep links where a broadcast would be lost.
+ */
+let passwordRecoveryPending = false;
 
 type RealtimeTransport = NonNullable<
   NonNullable<SupabaseClientOptions<'public'>['realtime']>['transport']
@@ -60,7 +69,11 @@ function getClient(): SupabaseClient {
         storage: supabaseAuthStorage,
       },
     });
-    client.auth.onAuthStateChange(() => authChangeListener?.());
+    client.auth.onAuthStateChange((event) => {
+      if (event === 'PASSWORD_RECOVERY') passwordRecoveryPending = true;
+      if (event === 'SIGNED_OUT') passwordRecoveryPending = false;
+      authChangeListener?.();
+    });
   }
   return client;
 }
@@ -74,7 +87,12 @@ export async function getAuthStatus(): Promise<AuthStatus> {
   if (!isAuthConfigured()) return { signedIn: false };
   const { data } = await getClient().auth.getSession();
   const user = data.session?.user;
-  return user ? { signedIn: true, email: user.email ?? undefined } : { signedIn: false };
+  if (!user) return { signedIn: false };
+  return {
+    signedIn: true,
+    email: user.email ?? undefined,
+    ...(passwordRecoveryPending ? { passwordRecovery: true } : {}),
+  };
 }
 
 /** Current access token for `Authorization: Bearer` calls, or null when signed out. */
@@ -117,16 +135,86 @@ export async function signInWithPassword(
   }
 }
 
-/** Finish a browser OAuth round-trip from `talysman://auth/callback?code=...`. */
-export async function completeOAuth(code: string): Promise<void> {
+/**
+ * Create an email/password account. When Supabase requires email confirmation, the
+ * confirmation link redirects back through `talysman://auth/callback` and completes on this
+ * machine (the PKCE verifier lives in our encrypted storage).
+ */
+export async function signUpWithPassword(
+  email: string,
+  password: string,
+  fullName?: string,
+): Promise<{ ok: boolean; confirmEmail?: boolean; message?: string }> {
+  try {
+    const { data, error } = await getClient().auth.signUp({
+      email,
+      password,
+      options: {
+        data: { full_name: fullName || null },
+        emailRedirectTo: desktopDeepLinkUrl(DESKTOP_AUTH_CALLBACK_PATH),
+      },
+    });
+    if (error) return { ok: false, message: error.message };
+    const outcome = classifySignUpResult(data);
+    if (outcome === 'alreadyRegistered') {
+      return { ok: false, message: 'An account with this email already exists - try signing in.' };
+    }
+    return { ok: true, confirmEmail: outcome === 'confirmEmail' };
+  } catch (e) {
+    return { ok: false, message: (e as Error).message };
+  }
+}
+
+/** Email a password-reset link that returns via `talysman://auth/reset-callback`. */
+export async function sendPasswordReset(email: string): Promise<{ ok: boolean; message?: string }> {
+  try {
+    const { error } = await getClient().auth.resetPasswordForEmail(email, {
+      redirectTo: desktopDeepLinkUrl(DESKTOP_AUTH_RESET_CALLBACK_PATH),
+    });
+    if (error) return { ok: false, message: error.message };
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, message: (e as Error).message };
+  }
+}
+
+/** Set a new password on the current session (used after a recovery deep link). */
+export async function updatePassword(
+  newPassword: string,
+): Promise<{ ok: boolean; message?: string }> {
+  try {
+    const { error } = await getClient().auth.updateUser({ password: newPassword });
+    if (error) return { ok: false, message: error.message };
+    passwordRecoveryPending = false;
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, message: (e as Error).message };
+  }
+}
+
+/**
+ * Finish a browser round-trip from `talysman://auth/callback?code=...` or
+ * `talysman://auth/reset-callback?code=...` (OAuth, email confirmation, password recovery).
+ * `recovery` marks the session as awaiting a new password; we set it explicitly because a
+ * manual code exchange emits SIGNED_IN, not PASSWORD_RECOVERY.
+ */
+export async function completeOAuth(code: string, opts?: { recovery?: boolean }): Promise<void> {
   const { error } = await getClient().auth.exchangeCodeForSession(code);
   if (error) {
     logger.error('[auth] exchangeCodeForSession failed', error.message);
-    throw new Error(error.message);
+    throw new Error(
+      `${error.message} - email links must be opened on the computer that requested them; ` +
+        'use the website to sign in or reset your password from another device.',
+    );
+  }
+  if (opts?.recovery) {
+    passwordRecoveryPending = true;
+    authChangeListener?.();
   }
 }
 
 export async function signOut(): Promise<{ ok: boolean; message?: string }> {
+  passwordRecoveryPending = false;
   try {
     if (isAuthConfigured()) await getClient().auth.signOut();
     await clearSession();

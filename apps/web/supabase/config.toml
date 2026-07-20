@@ -33,7 +33,9 @@ enabled = true
 site_url = "http://localhost:3000"
 additional_redirect_urls = [
   "http://localhost:3000/api/auth/callback",
+  "http://localhost:3000/reset-password",
   "talysman://auth/callback",
+  "talysman://auth/reset-callback",
 ]
 jwt_expiry = 3600
 enable_signup = true

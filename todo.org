@@ -1,13 +1,14 @@
 * part 1: demo
-- vercel prod base site
-- blog still works
 auth
+- get dev setup working
 - dev new account
 - dev login/logout
 - dev password reset
+- dev OAuth
 - prod new account
 - prod login/logout
 - prod password reset
+- prod Oauth
 payments
 - payment succeeds
 - cancel payment
@@ -21,6 +22,8 @@ payments
 - ui sensible & sexy
 - browser extension hosting/upload
 - auto-update?
+- free accounts?
+- free accounts?
 
 
 * Easy:
@@ -59,6 +62,68 @@ X initial post
 
 * Extra features:
 - Timeout blocking w/ daily limits
-- delayed unlock
+- delayed unlockllllllllll hiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiillllllllll]
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+[[[[[[[[[[[[[[[[[kmnj bbbbbbbbbbhhhhhhhhhhhhhi00000000000000000                                    'cgn    b vvvvvvvvvvvvvvv
 - unlock cooldown timers
 - "reset ritual" - based on anti-proctrastination checklist
+
+- vercel prod base site
+  0llllllllllllllllllllllllllll
+- blog still works

@@ -23,12 +23,24 @@ export const Channels = {
   signInGoogle: 'app:signInGoogle',
   /** invoke: { email, password } → sign in via Supabase. */
   signInPassword: 'app:signInPassword',
+  /** invoke: { email, password, fullName? } → create an account via Supabase. */
+  signUpPassword: 'app:signUpPassword',
+  /** invoke: { email } → send a password-reset email (returns via deep link). */
+  sendPasswordReset: 'app:sendPasswordReset',
+  /** invoke: { password } → set a new password on the recovery session. */
+  updatePassword: 'app:updatePassword',
   /** invoke: sign out + clear the persisted session. */
   signOut: 'app:signOut',
   /** invoke: { price } → open Stripe Checkout in the browser. */
   startCheckout: 'app:startCheckout',
   /** invoke: open the Stripe billing portal in the browser. */
   openBillingPortal: 'app:openBillingPortal',
+  /** invoke: returns the current subscription detail snapshot from the web API. */
+  subscriptionDetail: 'app:subscriptionDetail',
+  /** invoke: schedule cancellation at the end of the billing period. */
+  cancelSubscription: 'app:cancelSubscription',
+  /** invoke: un-schedule a pending cancellation. */
+  resumeSubscription: 'app:resumeSubscription',
   /** main→renderer push: { event } where event is 'authChanged' | 'entitlementChanged'. */
   appEvent: 'app:event',
 } as const;

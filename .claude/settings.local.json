@@ -77,7 +77,18 @@
       "Bash(vercel domains *)",
       "Bash(rm -rf smoke)",
       "Bash(mkdir -p smoke/data smoke/usbkey)",
-      "Bash(python3 smoke.py)"
+      "Bash(python3 smoke.py)",
+      "Bash(ps -eo pid,ppid,comm,args)",
+      "Bash(systemctl --user list-units)",
+      "Bash(systemctl list-units *)",
+      "Bash(journalctl -u talysman.service --since \"2 days ago\" --no-pager)",
+      "Bash(journalctl -u talysman.service --no-pager -n 30)",
+      "Bash(python3 -m json.tool)",
+      "Bash(systemctl cat *)",
+      "Bash(systemctl show *)",
+      "Bash(sudo -n grep -iE \"watchdog|heartbeat|handshake\" /var/lib/talysman/service.log)",
+      "Bash(sudo -n tail -5 /var/lib/talysman/service.log)",
+      "Read(//nix/store/n6r1kppclqgk197a2lrzc0spnpcj54j2-talysman-daemon-0.1.0/bin/**)"
     ]
   },
   "enabledPlugins": {
