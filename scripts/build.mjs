@@ -157,6 +157,24 @@ run("node", ["scripts/audit-extension.mjs"]);
 // 2. Electron bundles.
 run("pnpm", ["--filter", "@talysman/desktop", "build"]);
 
+// Windows has no Authenticode certificate yet, so electron-builder.yml's
+// forceCodeSigning is dropped for Windows when no certificate is configured: the build
+// produces an unsigned NSIS installer instead of failing. As soon as WIN_CSC_LINK (or
+// CSC_LINK) is set the flag stays on, so a misconfigured cert still fails closed rather
+// than silently shipping unsigned. macOS is never relaxed — an unsigned/un-notarized
+// mac build is hard-blocked by Gatekeeper, so it must never be produced by accident.
+const winSigningConfigured = Boolean(
+  process.env.WIN_CSC_LINK || process.env.CSC_LINK,
+);
+const allowUnsignedWin = target === "win" && !winSigningConfigured;
+if (allowUnsignedWin) {
+  console.warn(
+    "\nWARNING No Windows signing certificate (WIN_CSC_LINK/CSC_LINK unset):\n" +
+      "        building an UNSIGNED installer. Windows SmartScreen will warn\n" +
+      "        users on download and install.\n",
+  );
+}
+
 // 3. Package + NSIS installer.
 run("pnpm", [
   "exec",
@@ -166,6 +184,7 @@ run("pnpm", [
   "--config",
   "electron-builder.yml",
   `--config.electronVersion=${desktopElectronVersion()}`,
+  ...(allowUnsignedWin ? ["--config.forceCodeSigning=false"] : []),
 ]);
 
 console.log("\nOK Build complete. Installer is in dist/.");

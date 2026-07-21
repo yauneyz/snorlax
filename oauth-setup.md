@@ -4,9 +4,9 @@ Talysman uses Supabase Auth for Google account signup and sign-in. Google redire
 Supabase first; it does **not** redirect directly to Talysman's `/api/auth/callback` or
 `talysman://` URLs.
 
-Keep this authentication client separate from the existing Google Search Console OAuth client.
-The authentication client requests only basic identity information and does not need Search
-Console access.
+The authentication and Google Search Console integrations can initially share one web client.
+They can also use separate clients later if their consent-screen or deployment requirements
+diverge.
 
 ## 1. Find the production Supabase callback URL
 
@@ -99,14 +99,21 @@ Keep the client secret out of Git, browser configuration, and Electron builds.
 
 ## 6. Enable local development
 
-Add the following to the gitignored root `.credentials` file:
+Download the client JSON to the gitignored `oauth/google-web-client.json` path, then add the
+following to the gitignored root `.credentials` file:
 
 ```toml
 [google_auth]
 enabled_dev = true
 enabled_prod = false
-client_id = "<your-client-id>.apps.googleusercontent.com"
-client_secret = "<your-client-secret>"
+credentials_file = "oauth/google-web-client.json"
+```
+
+To reuse this client for the server-side Search Console flow, also set:
+
+```toml
+[google]
+oauth_credentials_file = "oauth/google-web-client.json"
 ```
 
 Generate the local configuration and restart Supabase Auth:
@@ -144,11 +151,10 @@ Then change the root `.credentials` setting to:
 [google_auth]
 enabled_dev = true
 enabled_prod = true
-client_id = "<your-local-client-id>.apps.googleusercontent.com"
-client_secret = "<your-local-client-secret>"
+credentials_file = "oauth/google-web-client.json"
 ```
 
-The `client_id` and `client_secret` in `.credentials` configure local Supabase. Production
+The configured JSON file supplies the client ID and secret to local Supabase. Production
 credentials remain in the Supabase dashboard; `enabled_prod` controls whether production web
 and desktop clients display Google authentication.
 

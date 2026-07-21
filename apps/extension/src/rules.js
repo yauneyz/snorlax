@@ -5,8 +5,9 @@
 // `buildRules(state)` and hands the result to `chrome.declarativeNetRequest.updateDynamicRules`.
 //
 // Why an extension at all: the network layer blocks by resolved destination IP, but browser
-// requests still have plaintext hostnames above TLS. DNR block rules let us enforce by hostname
-// above ECH/QUIC/VPN/connection-reuse.
+// requests still have plaintext hostnames above TLS. DNR rules let us enforce by hostname above
+// ECH/QUIC/VPN/connection-reuse. Top-level HTTP(S) navigations redirect to a fixed local blocked
+// page; all other matching requests are blocked without entering the extension process.
 
 /**
  * @typedef {{ active: boolean, mode: 'blacklist'|'whitelist'|'block-all', domains: string[] }} State
@@ -16,6 +17,36 @@
 // (allow > block) but we set explicit priorities so the intent survives any future tie-break change.
 export const BLOCK_PRIORITY = 1;
 export const ALLOW_PRIORITY = 2;
+
+const MAIN_FRAME = ['main_frame'];
+const BLOCKED_PAGE = '/blocked.html';
+
+function blockRule(id, condition) {
+  return {
+    id,
+    priority: BLOCK_PRIORITY,
+    action: { type: 'block' },
+    condition,
+  };
+}
+
+function redirectMainFrameRule(id, condition) {
+  return {
+    id,
+    priority: BLOCK_PRIORITY,
+    action: { type: 'redirect', redirect: { extensionPath: BLOCKED_PAGE } },
+    condition: { ...condition, resourceTypes: MAIN_FRAME },
+  };
+}
+
+function allowRule(id, condition) {
+  return {
+    id,
+    priority: ALLOW_PRIORITY,
+    action: { type: 'allow' },
+    condition,
+  };
+}
 
 /**
  * Normalize one policy domain into a DNR `requestDomains` entry: strip a leading `*.` wildcard,
@@ -55,11 +86,16 @@ export function normalizeDomains(domains) {
  * extension blocks nothing while unlocked. Rule IDs are stable small integers; the worker
  * remove-alls before applying, so reuse across updates is fine.
  *
- *   * blacklist  — block requests to the listed domains (+ their subdomains).
+ * DNR conditions that omit `resourceTypes` apply to every type except `main_frame`, so each policy
+ * deliberately emits a non-navigation rule plus an explicit top-level navigation rule.
+ *
+ *   * blacklist  — block requests to the listed domains (+ their subdomains), redirecting their
+ *                  top-level navigations to the local blocked page.
  *   * whitelist  — default-deny: block everything, then `allow` the listed domains at higher
- *                  priority. (Sub-resources an allowed page pulls from other domains are blocked —
- *                  same semantics as the host-layer whitelist; expand CDN siblings upstream.)
- *   * block-all  — block everything.
+ *                  priority. Disallowed top-level navigations show the local blocked page.
+ *                  (Sub-resources an allowed page pulls from other domains are blocked — same
+ *                  semantics as the host-layer whitelist; expand CDN siblings upstream.)
+ *   * block-all  — block all non-navigation requests and redirect top-level HTTP(S) navigations.
  *
  * @param {State} state
  * @returns {object[]}
@@ -71,41 +107,27 @@ export function buildRules(state) {
     case 'blacklist': {
       if (domains.length === 0) return [];
       return [
-        {
-          id: 1,
-          priority: BLOCK_PRIORITY,
-          action: { type: 'block' },
-          condition: { requestDomains: domains },
-        },
+        blockRule(1, { requestDomains: domains }),
+        redirectMainFrameRule(2, { requestDomains: domains }),
       ];
     }
     case 'whitelist': {
       const rules = [
-        {
-          id: 1,
-          priority: BLOCK_PRIORITY,
-          action: { type: 'block' },
-          condition: { urlFilter: '*' },
-        },
+        blockRule(1, { urlFilter: '*' }),
+        redirectMainFrameRule(2, { regexFilter: '^https?://' }),
       ];
       if (domains.length > 0) {
-        rules.push({
-          id: 2,
-          priority: ALLOW_PRIORITY,
-          action: { type: 'allow' },
-          condition: { requestDomains: domains },
-        });
+        rules.push(
+          allowRule(3, { requestDomains: domains }),
+          allowRule(4, { requestDomains: domains, resourceTypes: MAIN_FRAME }),
+        );
       }
       return rules;
     }
     case 'block-all':
       return [
-        {
-          id: 1,
-          priority: BLOCK_PRIORITY,
-          action: { type: 'block' },
-          condition: { urlFilter: '*' },
-        },
+        blockRule(1, { urlFilter: '*' }),
+        redirectMainFrameRule(2, { regexFilter: '^https?://' }),
       ];
     default:
       return [];

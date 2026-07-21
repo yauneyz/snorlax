@@ -30,11 +30,17 @@ service (named pipe)  ──►  talysman-natmsg.exe  ──►  extension backg
 - `src/rules.js` — **pure** `policy → DNR rule` translation (unit-tested in
   `tests/electron/unit/extension-rules.test.ts`, no `chrome.*`). Blacklist blocks the listed domains
   (+ subdomains); whitelist default-denies and allows the listed domains at higher priority;
-  block-all blocks everything; focus-off emits no rules.
+  block-all blocks everything; focus-off emits no rules. Matching top-level HTTP(S) navigations
+  redirect to the packaged `blocked.html`, while matching subresources are terminated silently.
+- `src/blocked.html` / `blocked.css` — the fixed local page shown for a blocked navigation. It
+  receives no attempted URL or domain and uses the Talysman brand mark packaged from `assets/brand/`.
 - `src/background.js` — connects to the native-messaging host `com.talysman.host`, applies rules on
   each pushed state, and on host disconnect **keeps the last ruleset** while reconnecting (so killing
   the bridge can't unblock a locked session). DNR dynamic rules persist across service-worker
   restarts, so enforcement survives the MV3 worker sleeping.
+- `src/popup.html` / `popup.js` — a read-only toolbar status surface showing the desktop connection,
+  focus state, reconnect/fail-safe state, and rule-application health. It never receives or displays
+  the user's configured domains; blocking remains controlled by the desktop app.
 - `talysman-natmsg.exe` (`native/windows/src/bin/natmsg.rs`) — bridges browser stdio ⇄ the service
   pipe, deriving `{active, mode, domains}` from `getState` + the `focusChanged`/`policyChanged`
   events.
@@ -92,11 +98,12 @@ The `HOST_NAME` (`com.talysman.host`) must match between `background.js` and
 2. **Build + load unpacked (dev):** `pnpm build:extension`, then load
    `apps/extension/dist/chrome`, `apps/extension/dist/edge`, or
    `apps/extension/dist/firefox/manifest.json`. Native messaging in Chrome/Edge will work after the
-   corresponding store IDs are wired into the service policy.
+   corresponding store IDs are wired into the service policy. Open the toolbar action to verify the
+   connection and focus status; the popup intentionally contains no controls.
 3. **Store release prep:** `pnpm release:extension`, then inspect
    `apps/extension/release/store/` and `apps/extension/release/store-submission.json`.
 4. **End-to-end:** run the service (`talysman-svc --console`), enable focus with `reddit.com`
-   blocked, and load reddit in **Firefox** — it should be blocked at the request layer even with ECH
-   on and over a reused connection. Toggle focus off → the block clears within the push latency.
+   blocked, and load reddit in **Firefox** — it should show the local Talysman blocked page even with
+   ECH on and over a reused connection. Toggle focus off → the site loads within the push latency.
 5. **VPN:** repeat step 4 with a VPN active — the extension blocks identically (it never touched the
    network path).

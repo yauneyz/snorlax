@@ -20,6 +20,7 @@ import {
   PLATFORMS,
   STABLE_INSTALLER_KEYS,
   UPDATE_METADATA_FILES,
+  aptSigningFromCredentials,
   artifactIdentity,
   buildablePlatformsForHost,
   contentTypeForFile,
@@ -127,12 +128,18 @@ function assertAwsCliAvailable() {
 }
 
 function assertAptPublishingReady() {
-  const signingKey = process.env.APT_SIGNING_KEY_ID;
-  if (!signingKey) {
+  const source = credentialsCandidates.find((candidate) =>
+    existsSync(candidate),
+  );
+  const signing = aptSigningFromCredentials(
+    source ? toml.parse(readFileSync(source, "utf8")) : null,
+  );
+  if (!signing) {
     throw new Error(
-      "APT_SIGNING_KEY_ID is required: Linux release:upload also promotes the signed APT repository.",
+      "APT_SIGNING_KEY_ID (or [apt].signing_key_id in .credentials) is required: Linux release:upload also promotes the signed APT repository.",
     );
   }
+  const signingKey = signing.keyId;
   for (const command of ["dpkg-scanpackages", "gpg"]) {
     if (spawnSync(command, ["--version"], { stdio: "ignore" }).status !== 0) {
       throw new Error(`${command} is required for a Linux production release.`);

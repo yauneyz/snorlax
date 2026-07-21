@@ -34,12 +34,22 @@ describe('buildRules — focus off', () => {
 });
 
 describe('buildRules — blacklist', () => {
-  it('blocks the listed domains via requestDomains (subdomain-aware)', () => {
+  it('blocks subresources and redirects top-level navigation for listed domains', () => {
     const rules = buildRules({ active: true, mode: 'blacklist', domains: ['reddit.com', '*.x.com'] });
-    expect(rules).toHaveLength(1);
-    expect(rules[0].action).toEqual({ type: 'block' });
-    expect(rules[0].condition).toEqual({ requestDomains: ['reddit.com', 'x.com'] });
-    expect(rules[0].priority).toBe(BLOCK_PRIORITY);
+    expect(rules).toHaveLength(2);
+    expect(rules[0]).toMatchObject({
+      priority: BLOCK_PRIORITY,
+      action: { type: 'block' },
+      condition: { requestDomains: ['reddit.com', 'x.com'] },
+    });
+    expect(rules[1]).toMatchObject({
+      priority: BLOCK_PRIORITY,
+      action: { type: 'redirect', redirect: { extensionPath: '/blocked.html' } },
+      condition: {
+        requestDomains: ['reddit.com', 'x.com'],
+        resourceTypes: ['main_frame'],
+      },
+    });
   });
   it('produces no rules when the blocklist is empty (nothing to block)', () => {
     expect(buildRules({ active: true, mode: 'blacklist', domains: [] })).toEqual([]);
@@ -47,28 +57,50 @@ describe('buildRules — blacklist', () => {
 });
 
 describe('buildRules — whitelist', () => {
-  it('default-denies all and allows the listed domains at higher priority', () => {
+  it('default-denies all resource types and allows listed domains at higher priority', () => {
     const rules = buildRules({ active: true, mode: 'whitelist', domains: ['gmail.com'] });
     const block = rules.find((r) => r.action.type === 'block')!;
-    const allow = rules.find((r) => r.action.type === 'allow')!;
+    const redirect = rules.find((r) => r.action.type === 'redirect')!;
+    const allows = rules.filter((r) => r.action.type === 'allow');
+    expect(rules).toHaveLength(4);
     expect(block.condition).toEqual({ urlFilter: '*' });
-    expect(allow.condition).toEqual({ requestDomains: ['gmail.com'] });
-    expect(allow.priority).toBeGreaterThan(block.priority);
-    expect(allow.priority).toBe(ALLOW_PRIORITY);
+    expect(redirect).toMatchObject({
+      action: { type: 'redirect', redirect: { extensionPath: '/blocked.html' } },
+      condition: { regexFilter: '^https?://', resourceTypes: ['main_frame'] },
+    });
+    expect(allows).toEqual([
+      expect.objectContaining({
+        priority: ALLOW_PRIORITY,
+        condition: { requestDomains: ['gmail.com'] },
+      }),
+      expect.objectContaining({
+        priority: ALLOW_PRIORITY,
+        condition: { requestDomains: ['gmail.com'], resourceTypes: ['main_frame'] },
+      }),
+    ]);
+    expect(ALLOW_PRIORITY).toBeGreaterThan(BLOCK_PRIORITY);
   });
-  it('with an empty allowlist blocks everything (no allow rule)', () => {
+  it('with an empty allowlist blocks subresources and redirects top-level navigation', () => {
     const rules = buildRules({ active: true, mode: 'whitelist', domains: [] });
-    expect(rules).toHaveLength(1);
+    expect(rules).toHaveLength(2);
     expect(rules[0].action).toEqual({ type: 'block' });
+    expect(rules[1].action).toEqual({
+      type: 'redirect',
+      redirect: { extensionPath: '/blocked.html' },
+    });
   });
 });
 
 describe('buildRules — block-all', () => {
-  it('blocks every request', () => {
+  it('blocks non-navigation requests and redirects top-level HTTP(S) navigation', () => {
     const rules = buildRules({ active: true, mode: 'block-all', domains: ['ignored.com'] });
-    expect(rules).toHaveLength(1);
+    expect(rules).toHaveLength(2);
     expect(rules[0].action).toEqual({ type: 'block' });
     expect(rules[0].condition).toEqual({ urlFilter: '*' });
+    expect(rules[1]).toMatchObject({
+      action: { type: 'redirect', redirect: { extensionPath: '/blocked.html' } },
+      condition: { regexFilter: '^https?://', resourceTypes: ['main_frame'] },
+    });
   });
 });
 

@@ -6,6 +6,7 @@ export function Footer() {
     <footer className="site-footer">
       <div className="site-footer__brand">© {new Date().getFullYear()} {config.app.name}</div>
       <nav className="site-footer__nav">
+        <Link href="/download">Download</Link>
         <Link href="/blog">Blog</Link>
         <Link href="/pricing">Pricing</Link>
         <Link href="/privacy">Privacy</Link>

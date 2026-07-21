@@ -1,102 +1,138 @@
 import type { Metadata } from "next";
+import Link from "next/link";
+import { DetectedPlatform } from "@/components/marketing/DetectedPlatform";
+import { PlatformIcon, type Platform } from "@/components/marketing/PlatformIcon";
 import { config } from "@/lib/config";
 
 export const metadata: Metadata = {
   title: "Download",
-  description: `Get the ${config.app.name} desktop app and browser extension.`,
+  description: `Get the ${config.app.name} desktop app and browser extension for Chrome, Edge, and Firefox.`,
   alternates: { canonical: `${config.app.url}/download` },
 };
 
-type DesktopInstaller = {
-  os: string;
+/**
+ * Placeholder listings so the page reads as finished before the stores approve us. The
+ * real URLs arrive via EXTENSION_*_STORE_URL and take precedence over these.
+ */
+const placeholderStoreUrls = {
+  chrome: "https://chromewebstore.google.com/detail/talysman/example-chrome-id",
+  edge: "https://microsoftedge.microsoft.com/addons/detail/talysman/example-edge-id",
+  firefox: "https://addons.mozilla.org/en-US/firefox/addon/talysman-example/",
+} as const;
+
+type DownloadTarget = {
+  platform: Platform;
+  name: string;
   note: string;
   href: string;
+  external?: boolean;
 };
 
-const desktopInstallers: DesktopInstaller[] = [
-  { os: "Windows", note: "Windows 10/11 · 64-bit", href: "/api/desktop/download?platform=win" },
-  { os: "macOS", note: "Apple Silicon & Intel", href: "/api/desktop/download?platform=mac" },
+const desktopInstallers: DownloadTarget[] = [
   {
-    os: "Linux",
+    platform: "windows",
+    name: "Windows",
+    note: "Windows 10/11 · 64-bit",
+    href: "/api/desktop/download?platform=win",
+  },
+  {
+    platform: "macos",
+    name: "macOS",
+    note: "Apple Silicon & Intel",
+    href: "/api/desktop/download?platform=mac",
+  },
+  {
+    platform: "linux",
+    name: "Linux",
     note: ".deb · Debian/Ubuntu · x86-64",
     href: "/api/desktop/download?platform=linux",
   },
 ];
 
-type ExtensionLink = {
-  browser: string;
-  note: string;
-  href?: string;
-  action: string;
-};
-
-const extensionLinks: ExtensionLink[] = [
+const extensions: DownloadTarget[] = [
   {
-    browser: "Chrome",
-    note: "Install from the Chrome Web Store",
-    href: config.extensionStores.chromeUrl || undefined,
-    action: "Add to Chrome",
+    platform: "chrome",
+    name: "Chrome",
+    note: "Chrome Web Store",
+    href: config.extensionStores.chromeUrl || placeholderStoreUrls.chrome,
+    external: true,
   },
   {
-    browser: "Edge",
-    note: "Install from Microsoft Edge Add-ons",
-    href: config.extensionStores.edgeUrl || undefined,
-    action: "Add to Edge",
+    platform: "edge",
+    name: "Edge",
+    note: "Microsoft Edge Add-ons",
+    href: config.extensionStores.edgeUrl || placeholderStoreUrls.edge,
+    external: true,
   },
   {
-    browser: "Firefox",
-    note: "Install from Firefox Add-ons",
-    href: config.extensionStores.firefoxUrl || undefined,
-    action: "Add to Firefox",
+    platform: "firefox",
+    name: "Firefox",
+    note: "Firefox Browser Add-ons",
+    href: config.extensionStores.firefoxUrl || placeholderStoreUrls.firefox,
+    external: true,
   },
 ];
 
+function DownloadCard({ target }: { target: DownloadTarget }) {
+  return (
+    <a
+      className="download-card"
+      href={target.href}
+      {...(target.external ? { target: "_blank", rel: "noreferrer" } : {})}
+    >
+      <span className="download-card__icon">
+        <PlatformIcon platform={target.platform} />
+      </span>
+      <h3>{target.name}</h3>
+      <span className="download-card__note">{target.note}</span>
+    </a>
+  );
+}
+
 export default function DownloadPage() {
   return (
-    <section className="pricing">
-      <h1>Download {config.app.name}</h1>
-      <p className="pricing__lede">
-        Install the desktop app, then add the browser extension. The extension is required for web
-        blocking — when the dead-man’s switch is on, browsers without it are closed during a locked
-        session.
+    <section className="download">
+      <header className="download__header">
+        <h1 className="download__headline">Download {config.app.name}</h1>
+        <p className="download__lede">
+          Install the desktop app first — it carries the privileged service that does the actual
+          enforcing. Then add the browser extension to every browser you use.
+        </p>
+      </header>
+
+      <DetectedPlatform />
+
+      <div className="download__group">
+        <div className="download__group-head">
+          <h2>Desktop app</h2>
+          <p>Holds your policy, your paired USB key, and the always-on blocking service.</p>
+        </div>
+        <div className="download-grid">
+          {desktopInstallers.map((target) => (
+            <DownloadCard key={target.platform} target={target} />
+          ))}
+        </div>
+      </div>
+
+      <div className="download__group">
+        <div className="download__group-head">
+          <h2>Browser extension</h2>
+          <p>
+            Required for web blocking. When the dead-man&apos;s switch is on, browsers without the
+            extension are closed during a locked session.
+          </p>
+        </div>
+        <div className="download-grid">
+          {extensions.map((target) => (
+            <DownloadCard key={target.platform} target={target} />
+          ))}
+        </div>
+      </div>
+
+      <p className="download__footnote">
+        Already installed? Head to <Link href="/pricing">pricing</Link> to unlock app blocking,
+        schedules, and unlimited blocked sites.
       </p>
-
-      <h2>Desktop app</h2>
-      <div className="pricing-grid">
-        {desktopInstallers.map((installer) => (
-          <div key={installer.os} className="pricing-card">
-            <h2>{installer.os}</h2>
-            <p className="pricing-card__price">{installer.note}</p>
-            <a className="landing__cta landing__cta--primary" href={installer.href}>
-              Download
-            </a>
-          </div>
-        ))}
-      </div>
-
-      <h2>Browser extension</h2>
-      <div className="pricing-grid">
-        {extensionLinks.map((ext) => (
-          <div key={ext.browser} className="pricing-card">
-            <h2>{ext.browser}</h2>
-            <p className="pricing-card__price">{ext.note}</p>
-            {ext.href ? (
-              <a
-                className="landing__cta landing__cta--primary"
-                href={ext.href}
-                target="_blank"
-                rel="noreferrer"
-              >
-                {ext.action}
-              </a>
-            ) : (
-              <span className="landing__cta landing__cta--primary" aria-disabled="true">
-                Coming soon
-              </span>
-            )}
-          </div>
-        ))}
-      </div>
     </section>
   );
 }

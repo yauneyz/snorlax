@@ -22,9 +22,12 @@ const HEARTBEAT_MS = 5000;
 
 let port = null;
 let reconnectMs = RECONNECT_MIN_MS;
+let nativeConnected = false;
+let hasReceivedState = false;
 
 // Health/diagnostic state reported in the heartbeat.
 let blockingActive = false; // last state.active the service pushed
+let blockingMode = null; // last state.mode the service pushed; never includes configured domains
 let lastApplyOk = true; // last updateDynamicRules succeeded
 let appliedRuleCount = 0; // number of dynamic rules currently applied
 
@@ -48,6 +51,8 @@ const EXTENSION_VERSION = (chrome.runtime.getManifest && chrome.runtime.getManif
 /** Replace all dynamic rules with the ones derived from `state`. */
 async function applyState(state) {
   blockingActive = !!state.active;
+  blockingMode = ['blacklist', 'whitelist', 'block-all'].includes(state.mode) ? state.mode : null;
+  hasReceivedState = true;
   let next;
   try {
     next = buildRules(state);
@@ -82,6 +87,24 @@ function currentHealth() {
   };
 }
 
+/** Read-only status exposed to the toolbar popup. Never include the configured domain list. */
+function currentPopupStatus() {
+  return {
+    connection: nativeConnected ? 'connected' : port ? 'connecting' : 'disconnected',
+    hasReceivedState,
+    focusActive: blockingActive,
+    mode: blockingMode,
+    health: currentHealth(),
+    version: EXTENSION_VERSION,
+  };
+}
+
+chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+  if (!message || message.type !== 'talysman:get-status') return undefined;
+  sendResponse(currentPopupStatus());
+  return false;
+});
+
 function connect() {
   try {
     port = chrome.runtime.connectNative(HOST_NAME);
@@ -95,6 +118,7 @@ function connect() {
     // The host sends the full state on connect and on every change.
     if (msg && msg.type === 'state') {
       reconnectMs = RECONNECT_MIN_MS; // healthy connection → reset backoff
+      nativeConnected = true;
       applyState(msg);
     }
   });
@@ -102,6 +126,7 @@ function connect() {
   port.onDisconnect.addListener(() => {
     const err = chrome.runtime.lastError;
     console.warn('[talysman] native host disconnected', err && err.message);
+    nativeConnected = false;
     port = null;
     scheduleReconnect();
   });

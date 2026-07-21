@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Talysman status</title>
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <main class="popup">
+      <header class="brand">
+        <img src="icon.png" alt="" width="36" height="36" />
+        <div>
+          <p class="eyebrow">Browser companion</p>
+          <h1>Talysman</h1>
+        </div>
+      </header>
+
+      <section class="status-card" data-tone="neutral" aria-live="polite" aria-atomic="true">
+        <div class="status-heading">
+          <span class="status-dot" aria-hidden="true"></span>
+          <div>
+            <h2 id="status-title">Connecting to Talysman</h2>
+            <p id="status-detail">Checking the desktop connection and browser protection.</p>
+          </div>
+        </div>
+
+        <dl class="status-facts">
+          <div>
+            <dt>Desktop connection</dt>
+            <dd id="connection-value">Connecting…</dd>
+          </div>
+          <div>
+            <dt>Focus protection</dt>
+            <dd id="focus-value">Checking…</dd>
+          </div>
+        </dl>
+      </section>
+
+      <p class="explanation">
+        Website rules are configured in the Talysman desktop app. This companion applies them
+        locally without reading or recording your browsing history.
+      </p>
+
+      <footer>
+        <span id="version"></span>
+        <span aria-hidden="true">·</span>
+        <span>Read-only status</span>
+      </footer>
+    </main>
+
+    <script type="module" src="popup.js"></script>
+  </body>
+</html>

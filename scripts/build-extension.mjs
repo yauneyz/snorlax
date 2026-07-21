@@ -32,7 +32,27 @@ const srcDir = resolve(extDir, "src");
 const distDir = resolve(extDir, "dist");
 // The stores render the 128px icon; take it straight from the brand kit rather than reusing the
 // desktop app's resource, which is sized for window/tray use.
-const iconPath = resolve(root, "assets/brand/generated/linux/128x128.png");
+const iconFiles = {
+  "icon-16.png": resolve(root, "assets/brand/generated/linux/16x16.png"),
+  "icon-32.png": resolve(root, "assets/brand/generated/linux/32x32.png"),
+  "icon-48.png": resolve(root, "assets/brand/generated/linux/48x48.png"),
+  "icon.png": resolve(root, "assets/brand/generated/linux/128x128.png"),
+};
+const blockedLogoPath = resolve(root, "assets/brand/source/talysman-mark.svg");
+const manifestIcons = {
+  16: "icon-16.png",
+  32: "icon-32.png",
+  48: "icon-48.png",
+  128: "icon.png",
+};
+const extensionFiles = [
+  "blocked.html",
+  "blocked.css",
+  "popup.html",
+  "popup.css",
+  "popup.js",
+  "popup-view.js",
+];
 
 // This is authored by us and remains stable across AMO versions.
 const FIREFOX_ID = "talysman@talysman.app";
@@ -60,7 +80,15 @@ function storeNeutralManifest(base) {
   delete manifest.browser_specific_settings;
   delete manifest.update_url;
   delete manifest.key;
-  manifest.icons = { 128: "icon.png" };
+  manifest.icons = manifestIcons;
+  manifest.action = {
+    ...manifest.action,
+    // Explicit action icons prevent browsers from falling back to a generic toolbar glyph.
+    default_icon: {
+      16: manifestIcons[16],
+      32: manifestIcons[32],
+    },
+  };
   return manifest;
 }
 
@@ -72,7 +100,13 @@ function stageStore(name, manifest, background) {
     JSON.stringify(manifest, null, 2) + "\n",
   );
   writeFileSync(resolve(outputDir, "background.js"), background);
-  copyFileSync(iconPath, resolve(outputDir, "icon.png"));
+  for (const [name, source] of Object.entries(iconFiles)) {
+    copyFileSync(source, resolve(outputDir, name));
+  }
+  copyFileSync(blockedLogoPath, resolve(outputDir, "blocked-logo.svg"));
+  for (const file of extensionFiles) {
+    copyFileSync(resolve(srcDir, file), resolve(outputDir, file));
+  }
   return outputDir;
 }
 

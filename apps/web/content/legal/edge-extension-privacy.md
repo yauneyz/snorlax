@@ -2,7 +2,7 @@
 title: "Talysman for Microsoft Edge Privacy Policy"
 ---
 
-_Last updated: July 1, 2026_
+_Last updated: July 21, 2026_
 
 This policy applies only to the Talysman extension distributed through Microsoft Edge Add-ons.
 The Edge extension is a local companion to the Talysman desktop application.
@@ -11,7 +11,9 @@ The Edge extension is a local companion to the Talysman desktop application.
 
 The extension receives the current focus status, blocking mode, and the domain list configured by
 the user in the locally installed Talysman desktop application. It converts that configuration
-into Microsoft Edge request-blocking rules.
+into Microsoft Edge block, allow, and redirect rules. When a top-level website navigation is
+denied, Edge redirects it to a fixed page packaged in the extension stating that Talysman blocked
+the website. The fixed page does not receive or display the attempted URL.
 
 Microsoft Edge evaluates those rules internally. The extension does not receive, read, or record
 the URLs a user visits, browsing history, page content, search terms, cookies, form data, or request
@@ -43,12 +45,17 @@ view, change, or delete that configuration in the desktop application.
 
 ## Permissions
 
-- `declarativeNetRequest` lets Microsoft Edge apply the configured block and allow rules without
-  exposing individual requests to the extension.
+- `declarativeNetRequest` lets Microsoft Edge apply the configured block, allow, and redirect rules
+  without exposing individual requests to the extension.
 - `nativeMessaging` lets the extension exchange blocking state with the locally installed
   Talysman desktop companion.
+- `<all_urls>` host access lets Edge redirect a denied top-level website navigation to the fixed
+  page packaged in the extension. Edge requires host access for declarative redirect rules. The
+  extension has no content scripts, does not use browsing-history or tab APIs, and is not notified
+  when an individual rule matches.
 
-The extension requests no website host permissions.
+The host permission is used only by browser-evaluated declarative rules. The extension does not use
+it to read page content or receive individual browsing requests.
 
 ## User controls
 

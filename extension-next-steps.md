@@ -11,7 +11,8 @@ Before opening store submissions:
 - publish `apps/web/content/legal/browser-extension-privacy.md` and
   `apps/web/content/legal/edge-extension-privacy.md` at their stable HTTPS routes;
 - prepare the common listing description from `apps/extension/STORE_SUBMISSION.md`;
-- prepare support contact/URL, screenshots, promotional images, and final extension icons;
+- prepare support contact/URL, screenshots of the real toolbar status and blocking workflow,
+  promotional images, and final extension icons;
 - write reviewer instructions explaining that Talysman is a desktop companion extension;
 - provide a downloadable test desktop installer or precise test-mode instructions;
 - make reviewer testing possible without production billing or inaccessible hardware;
@@ -42,8 +43,9 @@ unzip -l apps/extension/release/store/talysman-edge-<version>.zip
 unzip -l apps/extension/release/store/talysman-firefox-<version>.zip
 ```
 
-Each archive must show only `manifest.json`, `background.js`, and `icon.png` at its root. No store
-package should contain `key` or `update_url`.
+Each archive must show only `manifest.json`, `background.js`, the blocked-page HTML/CSS/brand mark,
+the popup HTML/CSS/JS, and the packaged 16/32/48/128px icons at its root. No store package should
+contain `key` or `update_url`.
 
 ## 3. Publish Chrome
 

@@ -470,7 +470,9 @@ command once, publish Linux and Windows from Linux, and publish macOS from a Mac
 - Both computers need S3 uploader configuration in `.credentials`, or equivalent
   `AWS_*`, `RELEASE_ARTIFACTS_BUCKET`, and `RELEASE_PUBLIC_BASE_URL` environment
   variables.
-- Linux needs the APT secret key in its GPG keyring, `APT_SIGNING_KEY_ID` exported,
+- Linux needs the APT secret key in its GPG keyring and the key identified either by
+  `[apt].signing_key_id` in `.credentials` (the normal local path) or an exported
+  `APT_SIGNING_KEY_ID` (which wins when both are set), plus
   `dpkg-scanpackages`, the Nix Rust/cargo-xwin toolchain, Wine, and Windows signing
   credentials (`WIN_CSC_LINK` and `WIN_CSC_KEY_PASSWORD`).
 - macOS needs the Developer ID certificate (`CSC_LINK` and `CSC_KEY_PASSWORD`) and
@@ -572,6 +574,21 @@ live verifier. Do not use the tag workflow and the manual workflow for the same 
 APT is not a hosted service and requires no vendor account. Talysman owns this APT
 repository inside the existing S3 bucket; its trust root is the OpenPGP key you create
 and distribute as `talysman-archive-keyring.gpg`.
+
+Create that key once with:
+
+```bash
+gpg --batch --passphrase '' --quick-generate-key \
+  "Talysman Release Signing <releases@talysman.app>" rsa4096 sign never
+gpg --list-secret-keys --keyid-format=long   # copy the 40-char fingerprint
+```
+
+Put the fingerprint in `[apt].signing_key_id` in `.credentials`. For CI, also set the
+`APT_SIGNING_KEY_ID` variable and the `APT_GPG_PRIVATE_KEY` secret from
+`gpg --export-secret-keys --armor <fingerprint> | base64 -w0`. Back the secret key and
+its revocation certificate (`~/.gnupg/openpgp-revocs.d/<fingerprint>.rev`) up offline —
+losing the key breaks `apt update` for every installed client until they manually
+install a replacement keyring.
 
 ### 8.5 Promotion and retention guarantees
 

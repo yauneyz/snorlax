@@ -2,7 +2,6 @@ import Link from "next/link";
 import { BrandLink } from "@/components/brand/BrandLink";
 import { DevBadge } from "@/components/DevBadge";
 import { AccountMenu } from "@/components/marketing/AccountMenu";
-import { config } from "@/lib/config";
 import { supabaseServer } from "@/lib/supabase/server";
 
 export async function Header() {

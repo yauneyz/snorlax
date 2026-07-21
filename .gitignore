@@ -37,6 +37,11 @@ native/common/target/
 .env.*.local
 apps/web/.env
 .vercel/
+# Downloaded Google OAuth clients (the directory documentation remains tracked).
+oauth/*.json
+
+# Supabase CLI link state (project ref, pooler URL, service versions)
+apps/web/supabase/.temp/
 
 # Logs
 *.log

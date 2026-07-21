@@ -146,11 +146,23 @@ for display so renewal state stays visible.
 
 ## 6. Going live
 
-Migrations `0004` and `0005` need to be applied to the hosted Supabase project before any of
-this works in production:
+Done as of 2026-07-21 — migrations `0001`–`0005` are applied to the hosted project
+(`lkanoehzgogtrxzycutl`) and comps work in production. This section is kept for the next time
+a migration needs to reach prod.
+
+Never assume the hosted project's schema state; ask it:
 
 ```bash
-supabase db push --workdir apps/web        # against the linked hosted project
+supabase migration list --linked --workdir apps/web
+```
+
+An earlier version of this section claimed only `0004`/`0005` needed pushing. That was wrong —
+the hosted project had Auth running but a completely empty `public` schema, so *every*
+migration was outstanding and nothing that touches a table worked in prod. Check first.
+
+```bash
+supabase db push --linked --dry-run --workdir apps/web   # confirm the list
+supabase db push --linked --workdir apps/web
 ```
 
 `0005` restates table privileges for the pre-existing tables. Recent Supabase projects stopped
@@ -158,10 +170,13 @@ granting `select`/DML on new public tables by default, which leaves RLS policies
 locally, every table returned `permission denied` before this migration. It's idempotent, so
 it's a no-op if the hosted project already has the grants.
 
-Then issue against production with `--prod`:
+Then issue against production. `pnpm comp` targets whatever `.env.local` points at, so switch
+it to prod credentials first and switch back afterward:
 
 ```bash
+pnpm --filter @talysman/web sync:env --mode=prod
 pnpm comp code --note "mom" --prod
+pnpm --filter @talysman/web sync:env          # restore dev/localhost
 ```
 
 ---

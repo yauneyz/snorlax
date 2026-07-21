@@ -20,6 +20,7 @@ import { fileURLToPath } from "node:url";
 import { gzipSync } from "node:zlib";
 import toml from "@iarna/toml";
 import {
+  aptSigningFromCredentials,
   artifactIdentity,
   hostingFromCredentials,
   publicUrlFor,
@@ -28,7 +29,6 @@ import {
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const distDir = join(root, "dist");
 const retain = 2;
-const signingKey = process.env.APT_SIGNING_KEY_ID;
 
 function commandAvailable(command) {
   return spawnSync(command, ["--version"], { stdio: "ignore" }).status === 0;
@@ -38,15 +38,20 @@ for (const command of ["aws", "dpkg-scanpackages", "gpg"]) {
   if (!commandAvailable(command))
     throw new Error(`${command} is required to publish the APT repository.`);
 }
-if (!signingKey)
-  throw new Error(
-    "APT_SIGNING_KEY_ID must identify the GPG key used to sign the repository.",
-  );
 
 const credentialsPath = [
   join(root, ".credentials"),
   resolve(root, "..", "indigo", ".credentials"),
 ].find((candidate) => existsSync(candidate));
+const credentials = credentialsPath
+  ? toml.parse(readFileSync(credentialsPath, "utf8"))
+  : null;
+const aptSigning = aptSigningFromCredentials(credentials);
+if (!aptSigning)
+  throw new Error(
+    "APT_SIGNING_KEY_ID (or [apt].signing_key_id in .credentials) must identify the GPG key used to sign the repository.",
+  );
+const signingKey = aptSigning.keyId;
 const hosting =
   process.env.RELEASE_ARTIFACTS_BUCKET && process.env.RELEASE_PUBLIC_BASE_URL
     ? {
@@ -59,10 +64,8 @@ const hosting =
         accessKeyId: process.env.AWS_ACCESS_KEY_ID,
         secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
       }
-    : credentialsPath
-      ? hostingFromCredentials(
-          toml.parse(readFileSync(credentialsPath, "utf8")),
-        )
+    : credentials
+      ? hostingFromCredentials(credentials)
       : (() => {
           throw new Error(
             "Missing .credentials or RELEASE_ARTIFACTS_BUCKET/RELEASE_PUBLIC_BASE_URL",
@@ -209,12 +212,12 @@ try {
   );
 
   const gpgArgs = ["--batch", "--yes", "--local-user", signingKey];
-  if (process.env.APT_SIGNING_KEY_PASSPHRASE) {
+  if (aptSigning.passphrase) {
     gpgArgs.push(
       "--pinentry-mode",
       "loopback",
       "--passphrase",
-      process.env.APT_SIGNING_KEY_PASSPHRASE,
+      aptSigning.passphrase,
     );
   }
   execFileSync("gpg", [

@@ -2,7 +2,7 @@
 title: "Talysman Browser Extension Privacy Policy"
 ---
 
-_Last updated: July 1, 2026_
+_Last updated: July 21, 2026_
 
 This policy applies to the Talysman extensions for Google Chrome and Mozilla Firefox. The
 extension is a local companion to the Talysman desktop application. A separate
@@ -12,7 +12,9 @@ extension is a local companion to the Talysman desktop application. A separate
 
 The extension receives the current focus status, blocking mode, and the domain list configured by
 the user in the locally installed Talysman desktop application. It converts that configuration
-into browser-managed request-blocking rules.
+into browser-managed block, allow, and redirect rules. When a top-level website navigation is
+denied, the browser redirects it to a fixed page packaged in the extension stating that Talysman
+blocked the website. The fixed page does not receive or display the attempted URL.
 
 The browser evaluates those rules internally. The extension does not receive, read, or record the
 URLs a user visits, browsing history, page content, search terms, cookies, form data, or request
@@ -46,12 +48,17 @@ change or delete that configuration in the desktop application.
 
 ## Permissions
 
-- `declarativeNetRequest` lets the browser apply the configured block and allow rules without
-  exposing individual requests to the extension.
+- `declarativeNetRequest` lets the browser apply the configured block, allow, and redirect rules
+  without exposing individual requests to the extension.
 - `nativeMessaging` lets the extension exchange blocking state with the locally installed
   Talysman desktop companion.
+- `<all_urls>` host access lets the browser redirect a denied top-level website navigation to the
+  fixed page packaged in the extension. Chrome and Firefox require host access for declarative
+  redirect rules. The extension has no content scripts, does not use browsing-history or tab APIs,
+  and is not notified when an individual rule matches.
 
-The extension requests no website host permissions.
+The host permission is used only by browser-evaluated declarative rules. The extension does not use
+it to read page content or receive individual browsing requests.
 
 ## User control
 

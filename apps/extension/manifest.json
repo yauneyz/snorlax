@@ -5,6 +5,17 @@
   "description": "Companion for Talysman desktop that applies your configured website-blocking rules in the browser.",
   "minimum_chrome_version": "105",
   "permissions": ["declarativeNetRequest", "nativeMessaging"],
+  "host_permissions": ["<all_urls>"],
+  "web_accessible_resources": [
+    {
+      "resources": ["blocked.html"],
+      "matches": ["<all_urls>"]
+    }
+  ],
+  "action": {
+    "default_title": "Talysman status",
+    "default_popup": "popup.html"
+  },
   "background": {
     "service_worker": "src/background.js",
     "type": "module"

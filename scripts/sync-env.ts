@@ -1,5 +1,6 @@
 /**
- * Reads the monorepo `.credentials` TOML file and writes environment files for both:
+ * Reads the monorepo `.credentials` TOML file (plus any referenced Google OAuth JSON) and
+ * writes environment files for both:
  *   - apps/web/.env.local, with server/web variables
  *   - .env.local, with desktop-safe public variables only
  *
@@ -135,6 +136,7 @@ const credentialsSchema = z.object({
   google: z.object({
     ga4_measurement_id: z.string().optional().default(""),
     search_console_verification: z.string().optional().default(""),
+    oauth_credentials_file: z.string().optional().default(""),
     oauth_client_id: z.string().optional().default(""),
     oauth_client_secret: z.string().optional().default(""),
   }),
@@ -142,6 +144,7 @@ const credentialsSchema = z.object({
     .object({
       enabled_dev: z.boolean().default(false),
       enabled_prod: z.boolean().default(false),
+      credentials_file: z.string().optional().default(""),
       client_id: z.string().optional().default(""),
       client_secret: z.string().optional().default(""),
     })
@@ -149,6 +152,7 @@ const credentialsSchema = z.object({
     .default({
       enabled_dev: false,
       enabled_prod: false,
+      credentials_file: "",
       client_id: "",
       client_secret: "",
     }),
@@ -157,6 +161,14 @@ const credentialsSchema = z.object({
     access_key_id: z.string().min(1),
     secret_access_key: z.string().min(1),
   }),
+  // Consumed by the release scripts (publish-apt-repo.mjs), not by any .env file.
+  apt: z
+    .object({
+      signing_key_id: z.string().optional().default(""),
+      signing_passphrase: z.string().optional().default(""),
+    })
+    .optional()
+    .default({ signing_key_id: "", signing_passphrase: "" }),
   extension_hosting: extensionHostingBlock,
   extension_stores: extensionStoresBlock,
   openai: z.object({
@@ -190,6 +202,20 @@ const credentialsSchema = z.object({
 type Credentials = z.infer<typeof credentialsSchema>;
 type Mode = "dev" | "prod";
 type VercelEnvironment = "development" | "preview" | "production";
+
+const googleOAuthClientSchema = z.object({
+  client_id: z.string().min(1),
+  client_secret: z.string().min(1),
+});
+
+const googleOAuthDownloadSchema = z
+  .object({
+    web: googleOAuthClientSchema.optional(),
+    installed: googleOAuthClientSchema.optional(),
+  })
+  .refine((value) => value.web || value.installed, {
+    message: 'expected a "web" or "installed" OAuth client',
+  });
 
 const isVercelBuild = process.env.VERCEL === "1";
 const isProductionPush = process.argv.includes("--production");
@@ -242,6 +268,73 @@ function firstExisting(paths: string[]): string | null {
   return paths.find((candidate) => fs.existsSync(candidate)) ?? null;
 }
 
+const googleOAuthFileCache = new Map<string, z.infer<typeof googleOAuthClientSchema>>();
+
+function loadGoogleOAuthFile(
+  configuredPath: string,
+  configKey: string,
+): z.infer<typeof googleOAuthClientSchema> {
+  if (path.isAbsolute(configuredPath)) {
+    console.error(`.credentials ${configKey} must be a path relative to the repository root.`);
+    process.exit(1);
+  }
+
+  const resolvedPath = path.resolve(ROOT, configuredPath);
+  const relativePath = path.relative(ROOT, resolvedPath);
+  if (
+    relativePath === ".." ||
+    relativePath.startsWith(`..${path.sep}`) ||
+    path.isAbsolute(relativePath)
+  ) {
+    console.error(`.credentials ${configKey} must stay within the repository root.`);
+    process.exit(1);
+  }
+
+  const cached = googleOAuthFileCache.get(resolvedPath);
+  if (cached) return cached;
+
+  if (!fs.existsSync(resolvedPath)) {
+    console.error(`Missing Google OAuth credentials file: ${relativePath}`);
+    process.exit(1);
+  }
+
+  try {
+    const parsed = googleOAuthDownloadSchema.parse(
+      JSON.parse(fs.readFileSync(resolvedPath, "utf8")),
+    );
+    const client = parsed.web ?? parsed.installed;
+    if (!client) throw new Error('expected a "web" or "installed" OAuth client');
+    googleOAuthFileCache.set(resolvedPath, client);
+    return client;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.error(`Invalid Google OAuth credentials file ${relativePath}: ${message}`);
+    process.exit(1);
+  }
+}
+
+function hydrateGoogleOAuthFiles(credentials: Credentials): Credentials {
+  if (credentials.google.oauth_credentials_file) {
+    const client = loadGoogleOAuthFile(
+      credentials.google.oauth_credentials_file,
+      "google.oauth_credentials_file",
+    );
+    credentials.google.oauth_client_id = client.client_id;
+    credentials.google.oauth_client_secret = client.client_secret;
+  }
+
+  if (credentials.google_auth.credentials_file) {
+    const client = loadGoogleOAuthFile(
+      credentials.google_auth.credentials_file,
+      "google_auth.credentials_file",
+    );
+    credentials.google_auth.client_id = client.client_id;
+    credentials.google_auth.client_secret = client.client_secret;
+  }
+
+  return credentials;
+}
+
 function loadCredentials(): Credentials | null {
   if (skipOnVercel && isVercelBuild && !firstExisting(CREDENTIALS_CANDIDATES)) {
     console.log("Vercel build detected; using Vercel environment variables.");
@@ -279,7 +372,7 @@ function loadCredentials(): Credentials | null {
     }
     process.exit(1);
   }
-  const credentials = result.data;
+  const credentials = hydrateGoogleOAuthFiles(result.data);
   if (
     credentials.google_auth.enabled_dev &&
     (!credentials.google_auth.client_id || !credentials.google_auth.client_secret)
@@ -414,7 +507,7 @@ function toSupabaseEnvPairs(c: Credentials): Array<[string, string]> {
 function writeEnvFile(filePath: string, pairs: Array<[string, string]>, mode: Mode) {
   const header = [
     "# GENERATED by scripts/sync-env.ts - do not edit by hand.",
-    "# Source of truth is .credentials at the monorepo root.",
+    "# Source of truth is .credentials and its configured OAuth JSON files.",
     `# mode=${mode}`,
     "",
   ];

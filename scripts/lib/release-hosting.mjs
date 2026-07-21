@@ -171,6 +171,22 @@ export function publicUrlFor(baseUrl, key) {
 }
 
 /**
+ * Resolve the APT signing identity, preferring the environment (CI sets
+ * APT_SIGNING_KEY_ID / APT_SIGNING_KEY_PASSPHRASE) and falling back to the
+ * `[apt]` section of a parsed .credentials TOML for local releases.
+ *
+ * @returns {{keyId: string, passphrase: string|undefined}|null} null when neither source is configured.
+ */
+export function aptSigningFromCredentials(credentials, env = process.env) {
+  const apt = credentials?.apt ?? {};
+  const keyId = env.APT_SIGNING_KEY_ID || apt.signing_key_id || "";
+  if (!keyId) return null;
+  const passphrase =
+    env.APT_SIGNING_KEY_PASSPHRASE || apt.signing_passphrase || "";
+  return { keyId, passphrase: passphrase || undefined };
+}
+
+/**
  * Extract and validate the hosting/upload settings from a parsed .credentials TOML.
  * Throws with a field-level message when something needed for uploads is missing.
  */
