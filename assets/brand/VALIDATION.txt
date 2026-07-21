@@ -1,0 +1,15 @@
+PASS generated/master/talysman-app-icon-1024.png: 1024x1024 RGBA
+PASS generated/web/apple-touch-icon.png: 180x180 RGBA
+PASS generated/web/icon-192.png: 192x192 RGBA
+PASS generated/web/icon-512.png: 512x512 RGBA
+PASS generated/web/icon-maskable-192.png: 192x192 RGBA
+PASS generated/web/icon-maskable-512.png: 512x512 RGBA
+PASS generated/macos/tray/TalysmanTemplate.png: 16x16 RGBA
+PASS generated/macos/tray/TalysmanTemplate@2x.png: 32x32 RGBA
+PASS generated/windows/icon.ico: 9 embedded sizes
+PASS generated/windows/tray.ico: 4 embedded sizes
+PASS generated/web/favicon.ico: 3 embedded sizes
+PASS generated/macos/icon.icns: (1024, 1024), variants=[(512, 512, 2), (512, 512, 1), (256, 256, 2), (256, 256, 1), (128, 128, 2), (128, 128, 1), (64, 64, 1), (32, 32, 2), (32, 32, 1), (16, 16, 2), (16, 16, 1)]
+PASS JSON manifests parse
+PASS source/talysman-wordmark-outlined.svg: text converted to paths
+PASS source/talysman-lockup-outlined.svg: text converted to paths

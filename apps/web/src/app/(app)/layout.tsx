@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { SignOutButton } from "@/components/app/SignOutButton";
+import { BrandLink } from "@/components/brand/BrandLink";
 import { DevBadge } from "@/components/DevBadge";
-import { config } from "@/lib/config";
 import { requireUser } from "@/lib/auth/require-user";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
@@ -10,9 +10,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     <div className="app-shell">
       <header className="app-header">
         <div className="brand-row">
-          <Link href="/app" className="app-brand">
-            {config.app.name}
-          </Link>
+          <BrandLink href="/app" />
           <DevBadge />
         </div>
         <nav className="app-nav">

@@ -127,7 +127,7 @@ fn close_windows(pid: u32) {
 /// Force-terminate the process.
 fn terminate(pid: u32) {
     unsafe {
-        match OpenProcess(PROCESS_TERMINATE, false.into(), pid) {
+        match OpenProcess(PROCESS_TERMINATE, false, pid) {
             Ok(handle) => {
                 if TerminateProcess(handle, 1).is_err() {
                     tracing::warn!("browser watchdog: TerminateProcess failed for pid {pid}");

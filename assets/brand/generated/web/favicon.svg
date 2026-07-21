@@ -1,0 +1,41 @@
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-label="Talysman app icon">
+      <title>Talysman app icon</title>
+
+    <defs>
+      <linearGradient id="silver" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0" stop-color="#f2f3f5"/>
+        <stop offset="0.48" stop-color="#c7ccd4"/>
+        <stop offset="1" stop-color="#8b9098"/>
+      </linearGradient>
+      <radialGradient id="panelGlow" cx="48%" cy="38%" r="74%">
+        <stop offset="0" stop-color="#16181b"/>
+        <stop offset="0.72" stop-color="#0e0f11"/>
+        <stop offset="1" stop-color="#08090a"/>
+      </radialGradient>
+      <filter id="softShadow" x="-20%" y="-20%" width="140%" height="150%">
+        <feDropShadow dx="0" dy="15" stdDeviation="18" flood-color="#000000" flood-opacity="0.55"/>
+      </filter>
+      <mask id="appMask" maskUnits="userSpaceOnUse" x="0" y="0" width="512" height="512">
+        <g fill="#fff">
+  <path d="M160 98 L256 42 L352 98 L322 116 L256 77 L190 116 Z"/>
+  <path d="M79 119 L226 158 L226 196 L119 168 L119 209 L158 230 L136 264 L79 232 Z"/>
+  <path d="M79 246 L119 265 L119 312 L205 352 L205 399 L79 340 Z"/>
+  <g transform="translate(512 0) scale(-1 1)">
+    <path d="M79 119 L226 158 L226 196 L119 168 L119 209 L158 230 L136 264 L79 232 Z"/>
+    <path d="M79 246 L119 265 L119 312 L205 352 L205 399 L79 340 Z"/>
+  </g>
+  <path d="M194 149 H318 V190 H278 V337 H309 V431 L256 470 L203 431 V337 H234 V190 H194 Z"/>
+</g>
+        <g fill="#000">
+  <path d="M256 239 L276 259 L256 279 L236 259 Z"/>
+  <rect x="248" y="276" width="16" height="43" rx="4"/>
+</g>
+      </mask>
+    </defs>
+
+      <rect width="1024" height="1024" rx="220" fill="url(#panelGlow)"/>
+      <rect x="16" y="16" width="992" height="992" rx="208" fill="none" stroke="#26292e" stroke-width="0"/>
+      <g transform="translate(122.88 122.88) scale(1.52000)">
+        <rect width="512" height="512" fill="url(#silver)" mask="url(#appMask)"/>
+      </g>
+    </svg>

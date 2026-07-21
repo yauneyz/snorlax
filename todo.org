@@ -1,32 +1,20 @@
 * part 1: demo
 auth
-- get dev setup working
-- dev new account
-- create account with oauth
-- dev login/logout
-- dev password reset
-- dev OAuth
-- prod new account
-- prod login/logout
-- prod password reset
-- prod Oauth
-payments
-- payment succeeds
-- cancel payment
-- resume payment
-
-- deadman switch works on windows
-- macos added to release options, installed on jessica's computer
-
-- app picker for app blocking needs improvement
-- ui sensible & sexy
+- auto-update verification
+- oauth-setup.md
 - browser extension hosting/upload
   - get a logo
   - extension screenshots
   - domain verification
-- auto-update?
-- free accounts?
-- free accounts?
+- auth-verification.md
+
+- app picker for app blocking needs improvement
+- ui sensible & sexy
+  - web app?
+- deadman switch works on windows
+- macos added to release options, installed on jessica's computer
+- comped accounts verification
+
 
 
 * Easy:

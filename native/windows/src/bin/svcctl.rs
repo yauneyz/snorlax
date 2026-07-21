@@ -63,10 +63,11 @@ fn install() -> Result<()> {
         Err(err) => return Err(err.into()),
     };
 
+    // Installation is also the repair/upgrade path. Never rotate the killswitch during an
+    // application update: generate it once, before the service first reads the store.
+    ensure_recovery_code()?;
     configure_service(&service)?;
     start_if_needed(&service)?;
-
-    gen_code()?;
     Ok(())
 }
 
@@ -205,6 +206,17 @@ fn gen_code() -> Result<()> {
     println!("  (also written to {})", path.display());
     println!("================================================================\n");
     Ok(())
+}
+
+fn ensure_recovery_code() -> Result<()> {
+    if SecureStore::load().recovery.is_some() {
+        println!(
+            "Existing Talysman recovery code preserved ({}).",
+            paths::recovery_code_file().display()
+        );
+        return Ok(());
+    }
+    gen_code()
 }
 
 /// Exit 10 if focus is active AND no paired key is present (so the NSIS uninstaller can abort).

@@ -1,7 +1,7 @@
 /**
  * App entry: single-instance lock, talysman:// protocol registration, window + tray,
  * service connection (real pipe, or in-process mock when the pipe is unavailable / dev),
- * IPC handlers, and the (stubbed) updater.
+ * IPC handlers, service version reconciliation, and guarded auto-update.
  *
  * Service selection: we try the real named-pipe service first; if it isn't reachable (e.g.
  * running `pnpm dev` on a box without the installed service, or on WSL), we transparently
@@ -16,7 +16,7 @@ import { registerIpcHandlers } from './ipc/handlers.js';
 import { PipeServiceConnection } from './service/client.js';
 import { MockServiceConnection } from './service/mockService.js';
 import type { ServiceConnection } from './service/connection.js';
-import { ensureServiceInstalled } from './service/installer.js';
+import { ensureServiceCurrent, ensureServiceInstalled } from './service/installer.js';
 import { initUpdater } from './updater.js';
 import { createTray } from './tray.js';
 import { createWindow, handleDeepLink, showMainWindow } from './window.js';
@@ -62,7 +62,8 @@ async function bootstrap(): Promise<void> {
 
   createWindow();
   createTray(service, mock);
-  initUpdater();
+  if (!mock) await ensureServiceCurrent(service);
+  initUpdater(service);
 
   // Cold start launched via a deep link (e.g. Windows protocol activation): the URL arrives
   // in argv rather than via the second-instance / open-url events.

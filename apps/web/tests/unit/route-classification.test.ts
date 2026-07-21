@@ -23,4 +23,17 @@ describe("route classification", () => {
     expect(classifyPath("/api/health")).toBe("api");
     expect(classifyPath("/_next/static/chunk.js")).toBe("asset");
   });
+
+  it("classifies brand and PWA files as assets so they load without a session", () => {
+    for (const path of [
+      "/favicon.ico",
+      "/icon.svg",
+      "/apple-icon.png",
+      "/icons/icon-192.png",
+      "/manifest.webmanifest",
+      "/og-default.png",
+    ]) {
+      expect(classifyPath(path)).toBe("asset");
+    }
+  });
 });

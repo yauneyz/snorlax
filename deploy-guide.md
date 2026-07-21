@@ -1,11 +1,12 @@
-# Talysman Web Deploy Guide
+# Talysman Deploy Guide
 
-How the web app (`apps/web`) gets configured, run locally, and deployed to production.
-Covers every moving part: Supabase (local + cloud), Vercel, Stripe, env plumbing, and the
-runbooks for day-to-day dev and prod updates.
+How the web app (`apps/web`) and desktop app (`apps/desktop` plus the native service) get
+configured, run locally, and released to production. Covers Supabase, Vercel, Stripe,
+env plumbing, signed desktop updates, the Linux APT repository, S3 release hosting, and
+the runbooks for day-to-day dev and production updates.
 
 Everything here was verified against the repo, the Supabase/Vercel CLIs, and the vendor
-docs as of 2026-07-08.
+docs as of 2026-07-20.
 
 ---
 
@@ -31,15 +32,18 @@ docs as of 2026-07-08.
 
 The runtime pieces:
 
-| Piece | Dev | Prod |
-|---|---|---|
-| Web app | `next dev` on `localhost:3000` | Vercel project **snorlax-web** (root dir `apps/web`) |
-| Database + auth | Local Supabase stack (Docker, `supabase start`) | Cloud project `lkanoehzgogtrxzycutl.supabase.co` |
-| Stripe | Test mode + `stripe listen` webhook forwarding | Live mode + dashboard webhook endpoint |
-| LLM | Local vLLM (`LLM_PROVIDER=local`) | OpenAI (`LLM_PROVIDER=openai`) |
-| App URL | `http://localhost:3000` | `https://talysman.app` |
-| Email | Inbucket (local mail catcher, port 54324) | Resend |
-| Sentry / PostHog | Disabled (placeholder values auto-detected and skipped) | Enabled when real values are in `.credentials` |
+| Piece            | Dev                                                     | Prod                                                                                                     |
+| ---------------- | ------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| Web app          | `next dev` on `localhost:3000`                          | Vercel project **snorlax-web** (root dir `apps/web`)                                                     |
+| Desktop app      | Electron dev build + mock/native service                | Signed NSIS (Windows), signed/notarized DMG + ZIP updater payload (macOS), signed APT repository (Linux) |
+| Desktop updates  | Disabled for unpackaged builds                          | Generic updater feed in S3 on Windows/macOS; APT on Linux                                                |
+| Release hosting  | None                                                    | `talysman-release-artifacts-prod` in `us-east-1`                                                         |
+| Database + auth  | Local Supabase stack (Docker, `supabase start`)         | Cloud project `lkanoehzgogtrxzycutl.supabase.co`                                                         |
+| Stripe           | Test mode + `stripe listen` webhook forwarding          | Live mode + dashboard webhook endpoint                                                                   |
+| LLM              | Local vLLM (`LLM_PROVIDER=local`)                       | OpenAI (`LLM_PROVIDER=openai`)                                                                           |
+| App URL          | `http://localhost:3000`                                 | `https://talysman.app`                                                                                   |
+| Email            | Inbucket (local mail catcher, port 54324)               | Resend                                                                                                   |
+| Sentry / PostHog | Disabled (placeholder values auto-detected and skipped) | Enabled when real values are in `.credentials`                                                           |
 
 Two things are configured **independently** of each other — this is the most important
 mental model in the whole setup:
@@ -60,19 +64,21 @@ A TOML file, gitignored, validated against a zod schema in `scripts/sync-env.ts`
 committed template is `.credentials.example`. Sections: `[app]`, `[supabase.dev]`,
 `[supabase.prod]`, `[stripe]`, `[resend]`, `[sentry]`, `[posthog]`, `[google]`, `[aws]`,
 `[extension_hosting]`, `[extension_stores]`, `[openai]`, `[local_llm]`, `[security]`.
+The desktop production env derives `UPDATE_FEED_URL` from
+`extension_hosting.public_s3_base_url` and appends `/desktop`.
 
 If validation fails, sync-env prints exactly which field is wrong and exits — so a typo
 here fails loudly at sync time, not at request time in production.
 
 ### `scripts/sync-env.ts` — the four ways it runs
 
-| Command (from `apps/web`) | What it does |
-|---|---|
-| `pnpm sync:env` | mode=dev → writes `apps/web/.env.local` (dev Supabase, local LLM) and root `.env.local` (desktop `VITE_*` vars). Runs automatically before `pnpm dev` (`predev` hook). |
-| `pnpm sync:env -- --mode=prod` | Same two files but with prod values (cloud Supabase, OpenAI, `https://talysman.app`). This is what `pnpm prod` does before starting `next dev`. |
-| `pnpm sync:env:build` | Runs before `pnpm build` (`prebuild` hook). On a Vercel build (`VERCEL=1`) with no `.credentials` present it **skips entirely** and lets Vercel's own env vars win. Locally it writes prod-mode files. |
-| `pnpm sync:env:prod` | **Upserts** every non-empty var to Vercel's *production* environment. Does not write local files. |
-| `pnpm sync:env:preview` | Upserts the same prod-mode values to Vercel's *preview* environment. Does not write local files. |
+| Command (from `apps/web`)      | What it does                                                                                                                                                                                           |
+| ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `pnpm sync:env`                | mode=dev → writes `apps/web/.env.local` (dev Supabase, local LLM) and root `.env.local` (desktop `VITE_*` vars). Runs automatically before `pnpm dev` (`predev` hook).                                 |
+| `pnpm sync:env -- --mode=prod` | Same two files but with prod values (cloud Supabase, OpenAI, `https://talysman.app`). This is what `pnpm prod` does before starting `next dev`.                                                        |
+| `pnpm sync:env:build`          | Runs before `pnpm build` (`prebuild` hook). On a Vercel build (`VERCEL=1`) with no `.credentials` present it **skips entirely** and lets Vercel's own env vars win. Locally it writes prod-mode files. |
+| `pnpm sync:env:prod`           | **Upserts** every non-empty var to Vercel's _production_ environment. Does not write local files.                                                                                                      |
+| `pnpm sync:env:preview`        | Upserts the same prod-mode values to Vercel's _preview_ environment. Does not write local files.                                                                                                       |
 
 Gotchas baked into the script (worth knowing, they will bite otherwise):
 
@@ -104,12 +110,12 @@ which zod-validates the env at module load. Consequences:
 
 ### How the app talks to Supabase (four clients)
 
-| File | Key used | Where it runs |
-|---|---|---|
-| `src/lib/supabase/browser.ts` | publishable key | Client components (RLS enforced) |
-| `src/lib/supabase/server.ts` | publishable key + user cookies | Server components / route handlers (RLS enforced as the user) |
-| `src/lib/supabase/middleware.ts` → `src/middleware.ts` | publishable key | Edge middleware; refreshes auth cookies, gates `/app/**` on login + active subscription |
-| `src/lib/supabase/admin.ts` | **secret key — bypasses RLS** | Server-only (webhook, `src/server/**`); an eslint rule blocks importing it elsewhere |
+| File                                                   | Key used                       | Where it runs                                                                           |
+| ------------------------------------------------------ | ------------------------------ | --------------------------------------------------------------------------------------- |
+| `src/lib/supabase/browser.ts`                          | publishable key                | Client components (RLS enforced)                                                        |
+| `src/lib/supabase/server.ts`                           | publishable key + user cookies | Server components / route handlers (RLS enforced as the user)                           |
+| `src/lib/supabase/middleware.ts` → `src/middleware.ts` | publishable key                | Edge middleware; refreshes auth cookies, gates `/app/**` on login + active subscription |
+| `src/lib/supabase/admin.ts`                            | **secret key — bypasses RLS**  | Server-only (webhook, `src/server/**`); an eslint rule blocks importing it elsewhere    |
 
 ---
 
@@ -135,11 +141,11 @@ its equivalents live in the Supabase dashboard (§5.2).
 
 Local service map:
 
-| Service | URL |
-|---|---|
-| API (what the app talks to) | `http://127.0.0.1:54321` |
-| Postgres | `127.0.0.1:54322` |
-| Studio (dashboard UI) | `http://127.0.0.1:54323` |
+| Service                            | URL                      |
+| ---------------------------------- | ------------------------ |
+| API (what the app talks to)        | `http://127.0.0.1:54321` |
+| Postgres                           | `127.0.0.1:54322`        |
+| Studio (dashboard UI)              | `http://127.0.0.1:54323` |
 | Inbucket (catches all auth emails) | `http://127.0.0.1:54324` |
 
 Copy the publishable/secret keys from `supabase status` into `[supabase.dev]` in
@@ -243,7 +249,7 @@ capture it as a migration file — otherwise dev and prod schemas silently drift
      - `http://localhost:3000/**` (so `pnpm prod` hybrid mode can log in)
      - optionally `https://*-zacyauney-3805s-projects.vercel.app/**` for Vercel preview
        deploys.
-2. **Auth → Providers**: email settings (confirmations are *off* locally; decide
+2. **Auth → Providers**: email settings (confirmations are _off_ locally; decide
    deliberately for prod). Enable Google here if/when desired — locally it's off in
    `config.toml`.
 3. **Auth → Email / SMTP**: default Supabase SMTP is heavily rate-limited; point it at
@@ -343,6 +349,7 @@ nameservers to Vercel. Production deploys then automatically get the domain alia
 Each of these has a dev half (already working) and a prod half (checklist):
 
 **Stripe** — when the real Talysman account clears verification:
+
 1. Create live products/prices; put the `price_...` ids in `.credentials`
    (`price_id_monthly`/`price_id_yearly` are shared between test/live in the schema —
    they must match whichever mode is active).
@@ -366,7 +373,224 @@ and `config.ts`). The Sentry auth token is build-time only (source-map upload).
 
 ---
 
-## 8. Runbooks
+## 8. Desktop releases and auto-update
+
+### 8.1 Release architecture
+
+`electron-builder.yml` produces these release targets:
+
+| Platform    | Installer/update payload                                     | Update prefix        |
+| ----------- | ------------------------------------------------------------ | -------------------- |
+| Windows x64 | Authenticode-signed NSIS `.exe`                              | `desktop/win/x64/`   |
+| macOS arm64 | Developer ID-signed/notarized `.dmg`; `.zip` for auto-update | `desktop/mac/arm64/` |
+| Linux amd64 | `.deb` in a signed APT repository                            | `apt/`               |
+
+The current GitHub-hosted `macos-latest` runner is arm64. Intel macOS, Windows arm64,
+and Linux arm64 need separate build jobs and architecture-aware website download
+routing before they are advertised.
+
+Windows/macOS updater behavior:
+
+- Packaged builds check 30 seconds after startup and every six hours.
+- Payloads download automatically, but `autoInstallOnAppQuit` is disabled.
+- A restart prompt appears only when Focus is inactive or the paired key is present.
+- If a new app detects an older privileged service, it runs the bundled controller with
+  elevation, restarts the service, and waits up to 60 seconds for the matching version.
+- Native service install/repair is idempotent and preserves the original recovery-code
+  hash/file on Windows, macOS, and Linux.
+
+Electron's updater is intentionally disabled on Linux. `apt upgrade` replaces the DEB,
+and the package hook restarts the systemd service in place.
+
+### 8.2 AWS release infrastructure
+
+Live AWS state:
+
+- Bucket: `talysman-release-artifacts-prod` (`us-east-1`).
+- Public read is limited to `app/`, `ext/`, `desktop/`, and `apt/`.
+- S3 Versioning is enabled for overwrite/delete recovery.
+- Lifecycle rule `BoundReleaseArtifactHistory` removes noncurrent versions after 14
+  days and incomplete multipart uploads after seven days.
+- GitHub OIDC role: `arn:aws:iam::318527158633:role/TalysmanGitHubRelease`.
+- The role trust is limited to `repo:yauneyz/snorlax:environment:production`; its S3
+  write/delete access is limited to `app/`, `desktop/`, and `apt/`.
+
+Reapply either configuration idempotently with an administrative ambient AWS CLI
+session:
+
+```bash
+pnpm infra:release-bucket
+pnpm infra:release-iam
+```
+
+The IAM script deliberately does not use the restricted uploader credentials from
+`.credentials`. Optional overrides are `GITHUB_RELEASE_REPOSITORY`,
+`GITHUB_RELEASE_ENVIRONMENT`, and `AWS_RELEASE_ROLE_NAME`.
+
+### 8.3 Optional GitHub CI configuration
+
+This section is only needed if releases will be built by GitHub Actions. The normal
+manual release procedure in §8.4 does not require GitHub Actions, a release tag, or the
+GitHub OIDC role. Local release hosts instead use the AWS uploader credentials from
+`.credentials` (or the equivalent `AWS_*` and `RELEASE_*` environment variables) and
+their locally configured signing credentials.
+
+Create a protected GitHub environment named exactly `production`. Configure:
+
+Repository/environment variables:
+
+- `AWS_REGION=us-east-1`
+- `AWS_RELEASE_ROLE_ARN=arn:aws:iam::318527158633:role/TalysmanGitHubRelease`
+- `RELEASE_ARTIFACTS_BUCKET=talysman-release-artifacts-prod`
+- `RELEASE_PUBLIC_BASE_URL=https://talysman-release-artifacts-prod.s3.us-east-1.amazonaws.com`
+- `APT_SIGNING_KEY_ID=<full OpenPGP fingerprint>`
+
+Secrets:
+
+- Windows: `WIN_CSC_LINK`, `WIN_CSC_KEY_PASSWORD`.
+- macOS signing: `MAC_CSC_LINK`, `MAC_CSC_KEY_PASSWORD`.
+- Apple notarization: `APPLE_API_KEY_P8`, `APPLE_API_KEY_ID`,
+  `APPLE_API_ISSUER`, `APPLE_TEAM_ID`.
+- APT: base64 `APT_GPG_PRIVATE_KEY`, plus optional
+  `APT_SIGNING_KEY_PASSPHRASE`.
+
+Never add AWS access keys to GitHub. The workflow uses OIDC. Production Windows/macOS
+builds fail closed when signing credentials are absent because `forceCodeSigning` is
+enabled.
+
+### 8.4 Publish manually from Linux and macOS
+
+This is the normal release path when GitHub CI is not being used. Run the version
+command once, publish Linux and Windows from Linux, and publish macOS from a Mac.
+
+#### Before each release
+
+- Both computers must use the same clean, committed source revision and have
+  dependencies installed with `pnpm install --frozen-lockfile`.
+- Both computers need S3 uploader configuration in `.credentials`, or equivalent
+  `AWS_*`, `RELEASE_ARTIFACTS_BUCKET`, and `RELEASE_PUBLIC_BASE_URL` environment
+  variables.
+- Linux needs the APT secret key in its GPG keyring, `APT_SIGNING_KEY_ID` exported,
+  `dpkg-scanpackages`, the Nix Rust/cargo-xwin toolchain, Wine, and Windows signing
+  credentials (`WIN_CSC_LINK` and `WIN_CSC_KEY_PASSWORD`).
+- macOS needs the Developer ID certificate (`CSC_LINK` and `CSC_KEY_PASSWORD`) and
+  Apple notarization credentials (`APPLE_API_KEY`, `APPLE_API_KEY_ID`,
+  `APPLE_API_ISSUER`, and `APPLE_TEAM_ID`). `APPLE_API_KEY` is the absolute path to the
+  App Store Connect `.p8` key.
+
+#### 1. Set and commit the version once
+
+On Linux, choose a new SemVer that is higher than every published version:
+
+```bash
+pnpm release:version -- 0.1.2
+git diff
+git add package.json apps/desktop/package.json native
+git commit -m "Release desktop v0.1.2"
+```
+
+The version command updates every app/native manifest and refreshes the Cargo lockfiles;
+it does not build, upload, change dependencies, or modify `pnpm-lock.yaml`. Push the
+normal branch commit, or otherwise copy/check out this exact commit on the Mac. Do not
+push a `v*` tag when avoiding CI because that tag starts the GitHub release workflow.
+
+#### 2. Build and upload Linux and Windows from Linux
+
+From the committed release revision on Linux:
+
+```bash
+pnpm release:both
+```
+
+Yes, `release:both` uploads. It performs these operations sequentially:
+
+1. Build Linux, upload the DEB/stable download, and publish the signed APT repository.
+2. Verify and fully promote the Linux release.
+3. Cross-build and Authenticode-sign Windows x64 through Wine.
+4. Upload and promote the Windows installer and auto-update feed.
+
+The command stops immediately if either platform fails. It does not change the version.
+The default retention is the current and previous generation; use
+`pnpm release:both -- --retain 2` only if spelling that default out is useful.
+
+#### 3. Build and upload macOS from the Mac
+
+Check out the same release commit on the Mac, then run:
+
+```bash
+pnpm install --frozen-lockfile
+pnpm release:upload -- --require mac
+```
+
+On macOS, `release:upload` builds, signs, notarizes, uploads, promotes, and verifies the
+macOS artifacts. `--require mac` is a safety assertion; it prevents an accidental run
+on the wrong host.
+
+#### 4. Verify the complete release
+
+After both computers finish successfully, run from either computer:
+
+```bash
+pnpm release:verify
+```
+
+This is read-only and checks the live Windows, macOS, Linux download, and APT state.
+Each upload command also verifies its own platform before returning, but this final
+command confirms the combined release.
+
+Both publishers are safe to rerun with the same committed version after an interrupted
+or failed upload. Do not reuse a version for different code and do not roll back by
+overwriting an existing version; fix the problem and publish a higher SemVer.
+
+#### Other manual commands
+
+For a traditional native three-machine release, run
+`pnpm release:upload -- --require <win|mac|linux>` on each matching OS. To publish only
+Windows from Linux, use `pnpm release:upload:win`. `pnpm release:apt` is available only
+to repair or republish APT metadata after a Linux build; it is not the normal release
+path.
+
+This uses `cargo-xwin` plus the `x86_64-pc-windows-msvc` Rust standard library for the
+native service and Wine for electron-builder/NSIS. Those are declared in
+`~/nixos-config/modules/home/languages/rust.nix`; apply that configuration with
+`bash ~/nixos-config/scripts/rebuild.sh`. Regular software Authenticode certificates
+are supported on Linux. EV hardware-backed certificates may need a custom
+`osslsigncode`/JSign integration or the native Windows GitHub job.
+
+Desktop release commands do not change Vercel environment variables. Web env sync and web
+deployment remain separate operations. On Linux it requires `APT_SIGNING_KEY_ID`,
+`dpkg-scanpackages`, and the corresponding secret key in the GPG keyring; it promotes
+the signed APT repository as part of the same command.
+
+#### Optional tag-triggered GitHub release
+
+If the optional configuration in §8.3 is complete, pushing a tag such as `v0.1.2`
+instead runs `.github/workflows/release-desktop.yml`. It builds each platform on its
+native GitHub runner, assumes the OIDC role, publishes all three releases, and runs the
+live verifier. Do not use the tag workflow and the manual workflow for the same release.
+
+APT is not a hosted service and requires no vendor account. Talysman owns this APT
+repository inside the existing S3 bucket; its trust root is the OpenPGP key you create
+and distribute as `talysman-archive-keyring.gpg`.
+
+### 8.5 Promotion and retention guarantees
+
+Website downloads retain stable keys under `app/`. Windows/macOS update payloads have
+versioned immutable names. The publisher uploads every referenced payload first,
+uploads `latest.yml`/`latest-mac.yml` last, verifies the public pointer and website
+alias, and only then prunes. The default is two live payload generations, so a client
+that fetched the previous metadata does not race deletion.
+
+The APT publisher uploads the new DEB and content-addressed `by-hash` indexes first,
+then promotes the signed `InRelease` pointer. It keeps current plus previous package
+and index generations. S3's 14-day noncurrent-version window is a separate recovery
+layer and is not exposed as a normal download generation.
+
+Do not roll a desktop release backward by replacing an existing version. Publish a
+higher fixed SemVer. For exact signing, installation, recovery-code, race, and failure
+tests, follow [`auto-update-verification.md`](./auto-update-verification.md).
+
+## 9. Runbooks
 
 ### Daily dev
 
@@ -388,14 +612,41 @@ pnpm release:local                  # build and install on this machine only
 This command does not sync credentials, upload artifacts, or change cloud hosting.
 Use `pnpm release:upload` for those release operations.
 
-### Ship a change to prod
+### Ship a desktop release
+
+This is the short form of the manual, no-GitHub-CI procedure in §8.4. Replace `0.1.2`
+with a new version higher than production.
+
+```bash
+# On Linux: version once, review, and commit.
+pnpm release:version -- 0.1.2
+git diff
+git add package.json apps/desktop/package.json native
+git commit -m "Release desktop v0.1.2"
+
+# Still on Linux: build and UPLOAD Linux, APT, and Windows.
+pnpm release:both
+
+# On the Mac, at that exact same commit: build and UPLOAD macOS.
+pnpm install --frozen-lockfile
+pnpm release:upload -- --require mac
+
+# From either machine, after both upload commands succeed:
+pnpm release:verify
+```
+
+`release:version` does not upload. `release:both` uploads Linux and Windows;
+`release:upload -- --require mac` uploads macOS. No release tag is needed. Desktop
+release commands do not change Vercel variables or deploy the website.
+
+### Ship a web/database change to prod
 
 ```bash
 # 1. Schema first (safe: additive migrations deploy before the code that uses them)
 cd apps/web && supabase db push
 
-# 2. Desktop artifacts + production env
-pnpm release:upload                  # syncs .credentials to Vercel before build/upload
+# 2. Production web environment
+pnpm sync:env:prod                   # upsert .credentials values to Vercel
 
 # 3. Web code
 vercel --prod                        # or `git push origin main` once Git integration is on
@@ -426,7 +677,7 @@ vercel env pull --environment=production /tmp/prod.env    # then diff against ap
 
 ---
 
-## 9. Mental model summary
+## 10. Mental model summary
 
 - **Edit exactly one file for config: `.credentials`.** Everything downstream
   (`.env.local` for web and desktop, Vercel production env) is generated from it.
@@ -445,3 +696,8 @@ vercel env pull --environment=production /tmp/prod.env    # then diff against ap
 - **Fail-fast everywhere**: sync-env validates `.credentials`; `config.ts` validates
   the runtime env. If prod is misconfigured you find out at build/boot with the exact
   variable named, not from a 3am 500.
+- **Desktop releases are immutable payloads plus mutable pointers.** Upload and verify
+  payloads first, promote metadata last, and retain the immediately previous
+  generation. Never hand-edit `latest*.yml` in S3.
+- **Linux follows the OS package manager.** APT signatures and `Acquire-By-Hash` provide
+  update integrity/atomicity; Electron auto-update remains Windows/macOS-only.

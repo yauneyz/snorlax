@@ -17,14 +17,22 @@ export const STABLE_INSTALLER_KEYS = {
   linux: "app/Talysman.deb",
 };
 
+export const UPDATE_METADATA_FILES = {
+  win: "latest.yml",
+  mac: "latest-mac.yml",
+};
+
+export const UPDATE_FEED_ROOT = "desktop";
+
 // Versioned artifact names produced by electron-builder (see electron-builder.yml):
 //   win   nsis  Talysman-Setup-<version>.exe
 //   mac   dmg   Talysman-<version>[-<arch>].dmg
 //   linux deb   Talysman-<version>-<arch>.deb (ships + installs the privileged daemon)
+const SEMVER = "\\d+\\.\\d+\\.\\d+(?:-[0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*)?";
 const ARTIFACT_PATTERNS = {
-  win: /^Talysman-Setup-\d+\.\d+\.\d+(-[0-9A-Za-z.-]+)?\.exe$/,
-  mac: /^Talysman-\d+\.\d+\.\d+(-[0-9A-Za-z.-]+)?\.dmg$/,
-  linux: /^Talysman-\d+\.\d+\.\d+(-[0-9A-Za-z.-]+)?-[0-9A-Za-z_]+\.deb$/,
+  win: new RegExp(`^Talysman-Setup-(${SEMVER})-(x64|arm64|ia32)\\.exe$`),
+  mac: new RegExp(`^Talysman-(${SEMVER})-(x64|arm64|universal)\\.dmg$`),
+  linux: new RegExp(`^Talysman-(${SEMVER})-(amd64|arm64)\\.deb$`),
 };
 
 const CONTENT_TYPES = {
@@ -105,6 +113,58 @@ export function contentTypeFor(platform) {
   return type;
 }
 
+export function contentTypeForFile(fileName) {
+  if (fileName.endsWith(".yml")) return "text/yaml; charset=utf-8";
+  if (fileName.endsWith(".zip")) return "application/zip";
+  if (fileName.endsWith(".dmg")) return CONTENT_TYPES.mac;
+  if (fileName.endsWith(".deb")) return CONTENT_TYPES.linux;
+  return "application/octet-stream";
+}
+
+export function artifactIdentity(fileName) {
+  for (const platform of PLATFORMS) {
+    const match = fileName.match(ARTIFACT_PATTERNS[platform]);
+    if (!match) continue;
+    const rawArch = match[2];
+    return {
+      platform,
+      version: match[1],
+      arch: rawArch === "amd64" ? "x64" : rawArch,
+    };
+  }
+  return null;
+}
+
+export function updateFeedPrefix(platform, arch) {
+  if (!(platform in UPDATE_METADATA_FILES)) {
+    throw new Error(`No electron-updater feed for platform: ${platform}`);
+  }
+  if (!/^[0-9A-Za-z_-]+$/.test(arch))
+    throw new Error(`Invalid architecture: ${arch}`);
+  return `${UPDATE_FEED_ROOT}/${platform}/${arch}`;
+}
+
+/** Extract relative artifact names from electron-builder's YAML without accepting remote URLs. */
+export function metadataArtifactNames(source) {
+  const names = new Set();
+  for (const line of source.split(/\r?\n/)) {
+    const match = line.match(/^\s*(?:-\s+url|path):\s*(.+?)\s*$/);
+    if (!match) continue;
+    const value = match[1].replace(/^['"]|['"]$/g, "");
+    if (
+      /^[a-z][a-z0-9+.-]*:/i.test(value) ||
+      value.includes("/") ||
+      value.includes("\\")
+    ) {
+      throw new Error(
+        `Update metadata must use a relative basename, got: ${value}`,
+      );
+    }
+    names.add(value);
+  }
+  return [...names];
+}
+
 /** Public download URL for an object key, tolerating a trailing slash on the base. */
 export function publicUrlFor(baseUrl, key) {
   return `${baseUrl.replace(/\/+$/, "")}/${key}`;
@@ -122,13 +182,18 @@ export function hostingFromCredentials(credentials) {
   if (!aws.access_key_id) missing.push("aws.access_key_id");
   if (!aws.secret_access_key) missing.push("aws.secret_access_key");
   if (!hosting.bucket) missing.push("extension_hosting.bucket");
-  if (!hosting.public_s3_base_url) missing.push("extension_hosting.public_s3_base_url");
+  if (!hosting.public_s3_base_url)
+    missing.push("extension_hosting.public_s3_base_url");
   if (missing.length > 0) {
-    throw new Error(`.credentials is missing required fields: ${missing.join(", ")}`);
+    throw new Error(
+      `.credentials is missing required fields: ${missing.join(", ")}`,
+    );
   }
   for (const value of [aws.access_key_id, aws.secret_access_key]) {
     if (value.includes("...")) {
-      throw new Error(".credentials still contains placeholder AWS keys — fill in real values.");
+      throw new Error(
+        ".credentials still contains placeholder AWS keys — fill in real values.",
+      );
     }
   }
   return {

@@ -336,6 +336,17 @@ environment/config setup that can't be done from code alone.
 
 ---
 
+## 7.5 Complimentary accounts
+
+Free lifetime Pro for friends/family is **not** a Stripe object. A grant row in
+`entitlement_grants` (service-role writes only) is unioned with the Stripe projection by the
+`active_entitlements` view, which is what `getUserEntitlement`, `requireSubscribed`, the
+middleware, and the account page all read. Issued with `pnpm comp grant <email>` or a
+single-use code redeemed at the unlisted `/redeem/<code>` page (or the desktop Account tab).
+Comped entitlements carry `status: 'comped'`, which hides the billing-portal controls.
+
+See [`comp-accounts.md`](./comp-accounts.md) for the full operator guide.
+
 ## 8. File reference
 
 **Backend (implemented):**

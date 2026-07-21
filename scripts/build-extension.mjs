@@ -30,7 +30,9 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const extDir = resolve(root, "apps/extension");
 const srcDir = resolve(extDir, "src");
 const distDir = resolve(extDir, "dist");
-const iconPath = resolve(root, "apps/desktop/resources/icon.png");
+// The stores render the 128px icon; take it straight from the brand kit rather than reusing the
+// desktop app's resource, which is sized for window/tray use.
+const iconPath = resolve(root, "assets/brand/generated/linux/128x128.png");
 
 // This is authored by us and remains stable across AMO versions.
 const FIREFOX_ID = "talysman@talysman.app";

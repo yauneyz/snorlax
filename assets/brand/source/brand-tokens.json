@@ -1,0 +1,30 @@
+{
+  "name": "Talysman",
+  "palette": {
+    "background": "#08090a",
+    "panel": "#0e0f11",
+    "panel2": "#16181b",
+    "border": "#26292e",
+    "accent": "#c7ccd4",
+    "accent_ink": "#0a0b0d",
+    "body": "#dcdee2",
+    "highlight": "#f2f3f5",
+    "midtone": "#8b9098",
+    "success": "#22c55e",
+    "danger": "#ef4444",
+    "warning": "#f59e0b"
+  },
+  "neutralRamp": [
+    "#fafafa",
+    "#f2f3f5",
+    "#dcdee2",
+    "#b8bcc4",
+    "#8b9098",
+    "#676c74",
+    "#4d5158",
+    "#3a3d43",
+    "#26292e",
+    "#17191c",
+    "#0e0f11"
+  ]
+}

@@ -1,0 +1,16 @@
+{
+  "build": {
+    "directories": {
+      "buildResources": "assets/brand/generated"
+    },
+    "mac": {
+      "icon": "assets/brand/generated/macos/icon.icns"
+    },
+    "win": {
+      "icon": "assets/brand/generated/windows/icon.ico"
+    },
+    "linux": {
+      "icon": "assets/brand/generated/linux"
+    }
+  }
+}

@@ -62,14 +62,20 @@ fn run(program: &str, args: &[&str]) -> Result<()> {
 }
 
 fn install() -> Result<()> {
+    let service_already_installed = std::path::Path::new(UNIT_PATH).exists();
     paths::ensure_data_dir().context("create Talysman data dir")?;
     dns::install_include().context("write dnsmasq include")?;
     std::fs::write(UNIT_PATH, unit_text()?).context("write systemd unit")?;
     run("systemctl", &["daemon-reload"])?;
-    // Generate the recovery code before the daemon starts, so the store it loads at boot
-    // already carries the hash.
-    gen_code()?;
-    run("systemctl", &["enable", "--now", SERVICE_NAME])?;
+    // Installation is also the package upgrade path. Preserve the original killswitch and
+    // restart an existing daemon so it begins executing the newly installed binary.
+    ensure_recovery_code()?;
+    if service_already_installed {
+        run("systemctl", &["enable", SERVICE_NAME])?;
+        run("systemctl", &["restart", SERVICE_NAME])?;
+    } else {
+        run("systemctl", &["enable", "--now", SERVICE_NAME])?;
+    }
     println!("Service '{SERVICE_NAME}' installed and started.");
     Ok(())
 }
@@ -117,6 +123,17 @@ fn gen_code() -> Result<()> {
     println!("  (also written to {})", path.display());
     println!("================================================================\n");
     Ok(())
+}
+
+fn ensure_recovery_code() -> Result<()> {
+    if SecureStore::load().recovery.is_some() {
+        println!(
+            "Existing Talysman recovery code preserved ({}).",
+            paths::recovery_code_file().display()
+        );
+        return Ok(());
+    }
+    gen_code()
 }
 
 fn guard_uninstall() -> Result<()> {

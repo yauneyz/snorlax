@@ -15,12 +15,23 @@ export function isAuthenticatedUiRoute(pathname: string): boolean {
   );
 }
 
+/**
+ * Brand/PWA files served from the app root. Next's icon file conventions and app/manifest.ts put
+ * these outside /_next, so they need an explicit pass so an unauthenticated browser can still
+ * fetch the favicon and manifest.
+ */
+const ASSET_PREFIXES = [
+  "/_next",
+  "/favicon",
+  "/og-",
+  "/icon", // /icon.svg and Next's hashed /icon-<hash> variants
+  "/icons/", // PWA icons in public/
+  "/apple-icon",
+  "/manifest.webmanifest",
+] as const;
+
 export function classifyPath(pathname: string): PathKind {
-  if (
-    pathname.startsWith("/_next") ||
-    pathname.startsWith("/favicon") ||
-    pathname.startsWith("/og-")
-  ) {
+  if (ASSET_PREFIXES.some((prefix) => pathname.startsWith(prefix))) {
     return "asset";
   }
   if (pathname.startsWith("/api")) return "api";

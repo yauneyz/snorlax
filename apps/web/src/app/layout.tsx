@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { GoogleAnalytics } from "@next/third-parties/google";
 import { Providers } from "./providers";
 import { config } from "@/lib/config";
@@ -20,9 +20,17 @@ export const metadata: Metadata = {
   twitter: {
     card: "summary_large_image",
   },
+  // favicon.ico / icon.svg / apple-icon.png are picked up from app/ by file convention; the PWA
+  // icons come from app/manifest.ts.
+  manifest: "/manifest.webmanifest",
   verification: config.google.siteVerification
     ? { google: config.google.siteVerification }
     : undefined,
+};
+
+export const viewport: Viewport = {
+  themeColor: "#08090a",
+  colorScheme: "dark",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

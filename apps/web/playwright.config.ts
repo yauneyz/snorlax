@@ -22,7 +22,14 @@ export default defineConfig({
   projects: [
     {
       name: "chromium",
-      use: { ...devices["Desktop Chrome"] },
+      use: {
+        ...devices["Desktop Chrome"],
+        // Escape hatch for machines where Playwright's bundled browsers aren't
+        // downloaded (e.g. NixOS): CHROME_PATH=$(readlink -f $(which google-chrome)).
+        ...(process.env.CHROME_PATH
+          ? { launchOptions: { executablePath: process.env.CHROME_PATH } }
+          : {}),
+      },
     },
   ],
   webServer: process.env.E2E_BASE_URL

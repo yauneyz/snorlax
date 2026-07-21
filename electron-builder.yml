@@ -1,6 +1,8 @@
 appId: com.talysman.app
 productName: Talysman
 copyright: Copyright © 2026
+forceCodeSigning: true
+electronUpdaterCompatibility: ">= 2.16"
 
 protocols:
   - name: Talysman authentication and billing callbacks
@@ -9,7 +11,9 @@ protocols:
 
 directories:
   output: dist
-  buildResources: apps/desktop/build
+  # Brand assets live in assets/brand (source SVGs + committed rasters); see its README to
+  # regenerate. Each platform below points at the pre-built icon for its own format.
+  buildResources: assets/brand/generated
 
 extraMetadata:
   main: apps/desktop/out/main/index.cjs
@@ -23,40 +27,51 @@ extraResources:
   - from: apps/desktop/resources/bin/current
     to: bin
     filter:
-      - '**/*'
+      - "**/*"
+  # Runtime brand images. `files:` only ships apps/desktop/out, so without this the tray and the
+  # window icon resolve to nothing in a packaged build. tray.ts looks them up flat under
+  # process.resourcesPath, so they land at the resources root.
+  - from: apps/desktop/resources
+    to: .
+    filter:
+      - "*.png"
 
 win:
-  signAndEditExecutable: false
   target:
     - nsis
-  # No explicit icon: electron-builder auto-generates the .ico from build/icon.png (256×256).
-  # Replace build/icon.png with real branding before shipping.
-  # Code signing (Authenticode) is required for auto-update + to avoid SmartScreen.
-  # Wired in Phase 4; leave unsigned for local dev builds.
+  icon: assets/brand/generated/windows/icon.ico
+  # Release builds fail closed when Authenticode credentials are unavailable.
 
 nsis:
+  installerIcon: assets/brand/generated/windows/icon.ico
+  uninstallerIcon: assets/brand/generated/windows/icon.ico
+  installerHeaderIcon: assets/brand/generated/windows/icon.ico
   oneClick: false
   perMachine: true # service install needs machine scope + elevation
   allowElevation: true
   allowToChangeInstallationDirectory: true
   include: native/windows/installer/nsis-include.nsh
-  artifactName: ${productName}-Setup-${version}.${ext}
+  artifactName: ${productName}-Setup-${version}-${arch}.${ext}
 
 mac:
   target:
     - dmg
+    - zip
+  icon: assets/brand/generated/macos/icon.icns
   category: public.app-category.productivity
   artifactName: ${productName}-${version}-${arch}.${ext}
-  # No hardened runtime / notarization yet: local dev builds only. Signing + notarization are
-  # required before distribution (wired in Phase 4, alongside Windows Authenticode).
-  identity: null
-  # A dmg has no install hooks; the privileged LaunchDaemon is registered on first run via
-  # `sudo talysman-svcctl install` (see native/macos/README.md).
+  hardenedRuntime: true
+  notarize: true
+  # A DMG has no install hooks; the app requests administrator approval on first run and after a
+  # service-version change, then verifies the restarted LaunchDaemon.
 
 linux:
   target:
     - deb
     - AppImage
+  # A directory of NxN.png files: electron-builder installs each into the matching
+  # hicolor icon theme size so desktop environments pick the right one.
+  icon: assets/brand/generated/linux
   syncDesktopName: true
   category: Utility
   maintainer: Talysman <support@talysman.app>
@@ -80,4 +95,8 @@ deb:
 
 publish:
   provider: generic
-  url: https://example.invalid/updates # replaced via UPDATE_FEED_URL in Phase 4
+  # scripts/build.mjs loads this public base URL from the generated production env. Platform and
+  # architecture directories prevent metadata collisions when release jobs run independently.
+  url: ${env.UPDATE_FEED_URL}/${os}/${arch}
+  # S3 supports byte ranges but not multipart ranges in one request.
+  useMultipleRangeRequest: false

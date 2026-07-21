@@ -1,31 +1,15 @@
 #!/usr/bin/env node
 /**
- * Upload desktop installers from dist/ to the public release-artifacts S3 bucket
- * and verify they are downloadable at the URLs the website redirects to.
+ * Build, publish, and verify desktop releases.
  *
- * The web app's /api/desktop/download route 302s to
- * `${extension_hosting.public_s3_base_url}/app/<stable name>`, so each versioned
- * electron-builder artifact (e.g. Talysman-0.1.0-x86_64.AppImage) is uploaded to
- * its stable key (app/Talysman.AppImage). Credentials come from the monorepo
- * `.credentials` TOML; nothing is read from the shell environment.
- *
- * The production build for this host's own platform runs first (pnpm build:<target>),
- * so a release is a single command with no separate build step. Each target must build
- * on its own OS (scripts/build.mjs enforces this), so cross-platform artifacts are only
- * uploaded when staged into dist/: a Linux box publishes its deb plus a Windows
- * installer if one is present, macOS publishes its dmg, Windows its own installer.
- *
- * Usage:
- *   node scripts/upload-release.mjs                    # sync prod env, build, upload, verify
- *   node scripts/upload-release.mjs --no-build         # upload existing dist/ artifacts only
- *   node scripts/upload-release.mjs --require linux    # fail if these platforms are not uploaded
- *   node scripts/upload-release.mjs --verify-only      # no build/upload; HEAD the public URLs
- *   node scripts/upload-release.mjs --dry-run          # print intent, no builds or writes
- *
- * Requires the `aws` CLI (uploads shell out to `aws s3 cp`).
+ * Website installers retain stable aliases under app/. Windows and macOS updater feeds use
+ * versioned, immutable artifacts under desktop/<os>/<arch>/ with the latest*.yml pointer uploaded
+ * last. Two generations are retained by default so a client holding the immediately previous
+ * metadata never races deletion during promotion.
  */
 
 import { execFileSync, spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -35,22 +19,29 @@ import {
   BUILD_SCRIPTS,
   PLATFORMS,
   STABLE_INSTALLER_KEYS,
+  UPDATE_METADATA_FILES,
+  artifactIdentity,
   buildablePlatformsForHost,
-  contentTypeFor,
+  contentTypeForFile,
   hostingFromCredentials,
+  metadataArtifactNames,
   platformsForHost,
   publicUrlFor,
   selectArtifacts,
+  updateFeedPrefix,
 } from "./lib/release-hosting.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const distDir = join(root, "dist");
-
 const args = process.argv.slice(2);
 const dryRun = args.includes("--dry-run");
 const verifyOnly = args.includes("--verify-only");
 const noBuild = args.includes("--no-build");
 const requireFlagIndex = args.indexOf("--require");
+const retainFlagIndex = args.indexOf("--retain");
+const retainedGenerations = Number(
+  retainFlagIndex === -1 ? 2 : args[retainFlagIndex + 1],
+);
 const requiredPlatforms =
   requireFlagIndex === -1
     ? []
@@ -59,204 +50,416 @@ const requiredPlatforms =
         .map((p) => p.trim())
         .filter(Boolean);
 
+if (
+  !Number.isInteger(retainedGenerations) ||
+  retainedGenerations < 1 ||
+  retainedGenerations > 5
+) {
+  throw new Error("--retain must be an integer between 1 and 5");
+}
 for (const platform of requiredPlatforms) {
-  if (!PLATFORMS.includes(platform)) {
-    console.error(`Unknown platform in --require: ${platform} (expected ${PLATFORMS.join(", ")})`);
-    process.exit(1);
-  }
+  if (!PLATFORMS.includes(platform))
+    throw new Error(`Unknown platform in --require: ${platform}`);
 }
 
-// Same lookup order as scripts/sync-env.ts.
 const credentialsCandidates = [
   join(root, ".credentials"),
   resolve(root, "..", "indigo", ".credentials"),
 ];
 
 function loadHosting() {
-  const source = credentialsCandidates.find((candidate) => existsSync(candidate));
-  if (!source) {
-    console.error(`Missing .credentials. Checked:\n${credentialsCandidates.join("\n")}`);
-    process.exit(1);
+  if (
+    process.env.RELEASE_ARTIFACTS_BUCKET &&
+    process.env.RELEASE_PUBLIC_BASE_URL
+  ) {
+    return {
+      region:
+        process.env.AWS_REGION ?? process.env.AWS_DEFAULT_REGION ?? "us-east-1",
+      bucket: process.env.RELEASE_ARTIFACTS_BUCKET,
+      publicBaseUrl: process.env.RELEASE_PUBLIC_BASE_URL,
+      accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+      secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
+    };
   }
-  try {
-    return hostingFromCredentials(toml.parse(readFileSync(source, "utf8")));
-  } catch (error) {
-    console.error(String(error instanceof Error ? error.message : error));
-    process.exit(1);
-  }
+  const source = credentialsCandidates.find((candidate) =>
+    existsSync(candidate),
+  );
+  if (!source)
+    throw new Error(
+      `Missing .credentials. Checked:\n${credentialsCandidates.join("\n")}`,
+    );
+  return hostingFromCredentials(toml.parse(readFileSync(source, "utf8")));
 }
 
-function syncProductionEnv() {
-  const syncArgs = ["run", "sync:env:prod"];
-  if (dryRun) syncArgs.push("--", "--dry-run");
+function awsEnvironment(hosting) {
+  const env = { ...process.env, AWS_DEFAULT_REGION: hosting.region };
+  if (hosting.accessKeyId) env.AWS_ACCESS_KEY_ID = hosting.accessKeyId;
+  if (hosting.secretAccessKey)
+    env.AWS_SECRET_ACCESS_KEY = hosting.secretAccessKey;
+  return env;
+}
 
-  console.log(`\n☁️  Syncing .credentials to Vercel production${dryRun ? " (dry run)" : ""}`);
-  execFileSync("pnpm", syncArgs, { cwd: root, stdio: "inherit" });
+function runAws(hosting, commandArgs, options = {}) {
+  return execFileSync("aws", commandArgs, {
+    encoding: options.capture ? "utf8" : undefined,
+    stdio: options.capture ? ["ignore", "pipe", "inherit"] : "inherit",
+    env: awsEnvironment(hosting),
+  });
 }
 
 function buildHostInstallers(platforms) {
   for (const platform of platforms) {
-    const script = BUILD_SCRIPTS[platform];
     if (dryRun) {
-      console.log(`🧪 [DRY RUN] would run pnpm ${script}`);
-      continue;
+      console.log(`[dry run] would run pnpm ${BUILD_SCRIPTS[platform]}`);
+    } else {
+      execFileSync("pnpm", ["run", BUILD_SCRIPTS[platform]], {
+        cwd: root,
+        stdio: "inherit",
+      });
     }
-    console.log(`\n🏗️  pnpm ${script}`);
-    execFileSync("pnpm", ["run", script], { cwd: root, stdio: "inherit" });
   }
 }
 
 function assertAwsCliAvailable() {
-  const result = spawnSync("aws", ["--version"], { stdio: "ignore" });
-  if (result.status !== 0) {
-    console.error("The `aws` CLI is required to upload release artifacts but was not found.");
-    process.exit(1);
+  if (spawnSync("aws", ["--version"], { stdio: "ignore" }).status !== 0) {
+    throw new Error("The aws CLI is required to publish release artifacts.");
   }
 }
 
-function upload(hosting, platform, artifact) {
-  const key = STABLE_INSTALLER_KEYS[platform];
-  const source = join(distDir, artifact.name);
-  const sizeMb = (statSync(source).size / (1024 * 1024)).toFixed(1);
-  console.log(`⬆️  ${platform}: ${artifact.name} (${sizeMb} MB) → s3://${hosting.bucket}/${key}`);
-  if (dryRun) return;
+function assertAptPublishingReady() {
+  const signingKey = process.env.APT_SIGNING_KEY_ID;
+  if (!signingKey) {
+    throw new Error(
+      "APT_SIGNING_KEY_ID is required: Linux release:upload also promotes the signed APT repository.",
+    );
+  }
+  for (const command of ["dpkg-scanpackages", "gpg"]) {
+    if (spawnSync(command, ["--version"], { stdio: "ignore" }).status !== 0) {
+      throw new Error(`${command} is required for a Linux production release.`);
+    }
+  }
+  if (
+    spawnSync("gpg", ["--batch", "--list-secret-keys", signingKey], {
+      stdio: "ignore",
+    }).status !== 0
+  ) {
+    throw new Error(
+      `APT signing key ${signingKey} is not available in the GPG secret keyring.`,
+    );
+  }
+}
 
-  execFileSync(
-    "aws",
+function publishAptRepository() {
+  console.log("promote signed APT repository");
+  execFileSync(process.execPath, [join(root, "scripts/publish-apt-repo.mjs")], {
+    cwd: root,
+    env: process.env,
+    stdio: "inherit",
+  });
+}
+
+function sha256(path) {
+  return createHash("sha256").update(readFileSync(path)).digest("hex");
+}
+
+function uploadFile(hosting, source, key, { cacheControl }) {
+  const sizeMb = (statSync(source).size / (1024 * 1024)).toFixed(1);
+  console.log(
+    `upload ${source.replace(`${distDir}/`, "")} (${sizeMb} MB) -> s3://${hosting.bucket}/${key}`,
+  );
+  if (dryRun) return;
+  runAws(hosting, [
+    "s3",
+    "cp",
+    source,
+    `s3://${hosting.bucket}/${key}`,
+    "--region",
+    hosting.region,
+    "--content-type",
+    contentTypeForFile(source),
+    "--cache-control",
+    cacheControl,
+    "--metadata",
+    `sha256=${sha256(source)}`,
+    "--checksum-algorithm",
+    "SHA256",
+    "--no-progress",
+  ]);
+}
+
+async function checkUrl(url, expectedSize = null) {
+  try {
+    const response = await fetch(url, { method: "HEAD", cache: "no-store" });
+    const contentLength = Number(response.headers.get("content-length") ?? 0);
+    return {
+      ok:
+        response.ok &&
+        (expectedSize === null || contentLength === expectedSize),
+      status: response.status,
+      contentLength,
+    };
+  } catch (error) {
+    return { ok: false, status: 0, contentLength: 0, error: String(error) };
+  }
+}
+
+async function verifyObject(hosting, key, source = null) {
+  const url = `${publicUrlFor(hosting.publicBaseUrl, key)}?verify=${Date.now()}`;
+  const expectedSize = source ? statSync(source).size : null;
+  const result = await checkUrl(url, expectedSize);
+  if (!result.ok) {
+    throw new Error(
+      `${key} failed verification (HTTP ${result.status}, ${result.contentLength} bytes)`,
+    );
+  }
+  console.log(`verified ${key} (${result.contentLength} bytes)`);
+}
+
+function metadataVersion(source) {
+  return source.match(/^version:\s*['"]?([^'"\s]+)['"]?\s*$/m)?.[1] ?? null;
+}
+
+async function publishUpdateFeed(hosting, platform, installer) {
+  const metadataName = UPDATE_METADATA_FILES[platform];
+  if (!metadataName) return null;
+  const identity = artifactIdentity(installer.name);
+  if (!identity)
+    throw new Error(`Cannot derive update identity from ${installer.name}`);
+
+  const metadataPath = join(distDir, metadataName);
+  if (!existsSync(metadataPath))
+    throw new Error(`${metadataName} was not generated for ${installer.name}`);
+  const metadata = readFileSync(metadataPath, "utf8");
+  if (metadataVersion(metadata) !== identity.version) {
+    throw new Error(`${metadataName} does not describe ${identity.version}`);
+  }
+
+  const referenced = metadataArtifactNames(metadata);
+  if (referenced.length === 0)
+    throw new Error(`${metadataName} contains no update artifacts`);
+  const artifactNames = new Set(referenced);
+  for (const name of referenced) {
+    if (existsSync(join(distDir, `${name}.blockmap`)))
+      artifactNames.add(`${name}.blockmap`);
+  }
+  for (const name of artifactNames) {
+    if (!existsSync(join(distDir, name)))
+      throw new Error(`${metadataName} references missing ${name}`);
+  }
+
+  const prefix = updateFeedPrefix(platform, identity.arch);
+  for (const name of artifactNames) {
+    uploadFile(hosting, join(distDir, name), `${prefix}/${name}`, {
+      cacheControl: "public,max-age=31536000,immutable",
+    });
+  }
+  // The mutable pointer is deliberately last.
+  uploadFile(hosting, metadataPath, `${prefix}/${metadataName}`, {
+    cacheControl: "no-cache,max-age=0,must-revalidate",
+  });
+
+  if (!dryRun) {
+    for (const name of artifactNames)
+      await verifyObject(hosting, `${prefix}/${name}`, join(distDir, name));
+    await verifyObject(hosting, `${prefix}/${metadataName}`, metadataPath);
+  }
+  return { prefix, platform, version: identity.version, metadataName };
+}
+
+function versionFromUpdateKey(key) {
+  const basename =
+    key
+      .split("/")
+      .pop()
+      ?.replace(/\.blockmap$/, "") ?? "";
+  return (
+    basename.match(
+      /^Talysman(?:-Setup)?-(\d+\.\d+\.\d+(?:-[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?)-/,
+    )?.[1] ?? null
+  );
+}
+
+function listPrefix(hosting, prefix) {
+  const output = runAws(
+    hosting,
     [
-      "s3",
-      "cp",
-      source,
-      `s3://${hosting.bucket}/${key}`,
-      "--region",
-      hosting.region,
-      "--content-type",
-      contentTypeFor(platform),
-      "--no-progress",
+      "s3api",
+      "list-objects-v2",
+      "--bucket",
+      hosting.bucket,
+      "--prefix",
+      `${prefix}/`,
+      "--output",
+      "json",
     ],
+    { capture: true },
+  );
+  return JSON.parse(output).Contents ?? [];
+}
+
+function pruneUpdateFeed(hosting, publication) {
+  if (dryRun) return;
+  const objects = listPrefix(hosting, publication.prefix);
+  const generations = new Map();
+  for (const object of objects) {
+    const version = versionFromUpdateKey(object.Key);
+    if (!version) continue;
+    const timestamp = Date.parse(object.LastModified ?? "") || 0;
+    generations.set(
+      version,
+      Math.max(generations.get(version) ?? 0, timestamp),
+    );
+  }
+  const keep = new Set(
+    [...generations.entries()]
+      .sort((a, b) =>
+        a[0] === publication.version
+          ? -1
+          : b[0] === publication.version
+            ? 1
+            : b[1] - a[1],
+      )
+      .slice(0, retainedGenerations)
+      .map(([version]) => version),
+  );
+  for (const object of objects) {
+    const version = versionFromUpdateKey(object.Key);
+    if (!version || keep.has(version)) continue;
+    console.log(
+      `prune old update artifact s3://${hosting.bucket}/${object.Key}`,
+    );
+    runAws(hosting, [
+      "s3api",
+      "delete-object",
+      "--bucket",
+      hosting.bucket,
+      "--key",
+      object.Key,
+    ]);
+  }
+  console.log(
+    `retained ${[...keep].join(", ") || publication.version} under ${publication.prefix}`,
+  );
+}
+
+function uploadStableInstaller(hosting, platform, artifact) {
+  uploadFile(
+    hosting,
+    join(distDir, artifact.name),
+    STABLE_INSTALLER_KEYS[platform],
     {
-      stdio: "inherit",
-      env: {
-        ...process.env,
-        AWS_ACCESS_KEY_ID: hosting.accessKeyId,
-        AWS_SECRET_ACCESS_KEY: hosting.secretAccessKey,
-      },
+      cacheControl: "no-cache,max-age=0,must-revalidate",
     },
   );
 }
 
-/** HEAD a public URL; returns { ok, status, contentLength }. */
-async function checkUrl(url) {
-  try {
-    const response = await fetch(url, { method: "HEAD" });
-    return {
-      ok: response.ok,
-      status: response.status,
-      contentLength: Number(response.headers.get("content-length") ?? 0),
-    };
-  } catch (error) {
-    return { ok: false, status: 0, error: String(error) };
+async function verifyStableInstallers(hosting, uploaded) {
+  for (const platform of PLATFORMS) {
+    const artifact = uploaded[platform];
+    const required = requiredPlatforms.includes(platform) || Boolean(artifact);
+    const source = artifact ? join(distDir, artifact.name) : null;
+    const result = await checkUrl(
+      `${publicUrlFor(hosting.publicBaseUrl, STABLE_INSTALLER_KEYS[platform])}?verify=${Date.now()}`,
+      source ? statSync(source).size : null,
+    );
+    if (!result.ok && required)
+      throw new Error(
+        `${platform} stable installer is unavailable (HTTP ${result.status})`,
+      );
+    console.log(
+      result.ok
+        ? `verified ${platform} stable installer`
+        : `${platform} is not published yet`,
+    );
   }
 }
 
-async function verify(hosting, uploaded) {
-  let failed = false;
-  for (const platform of PLATFORMS) {
-    const url = publicUrlFor(hosting.publicBaseUrl, STABLE_INSTALLER_KEYS[platform]);
-    const result = await checkUrl(url);
-    const required = requiredPlatforms.includes(platform) || platform in uploaded;
-
-    if (result.ok) {
-      const expectedSize = uploaded[platform]
-        ? statSync(join(distDir, uploaded[platform].name)).size
-        : null;
-      if (expectedSize !== null && result.contentLength !== expectedSize) {
-        console.error(
-          `❌ ${platform}: ${url} is live but has ${result.contentLength} bytes, expected ${expectedSize}`,
-        );
-        failed = true;
-      } else {
-        console.log(`✅ ${platform}: ${url} (HTTP ${result.status}, ${result.contentLength} bytes)`);
-      }
-    } else if (required) {
-      console.error(`❌ ${platform}: ${url} is not downloadable (HTTP ${result.status})`);
-      failed = true;
-    } else {
-      console.warn(`⚠️  ${platform}: not published yet (HTTP ${result.status}) — ${url}`);
-    }
+async function verifyExistingFeeds(hosting) {
+  const objects = listPrefix(hosting, "desktop");
+  for (const object of objects.filter((item) =>
+    Object.values(UPDATE_METADATA_FILES).some((name) =>
+      item.Key.endsWith(`/${name}`),
+    ),
+  )) {
+    await verifyObject(hosting, object.Key);
+    const response = await fetch(
+      `${publicUrlFor(hosting.publicBaseUrl, object.Key)}?verify=${Date.now()}`,
+      { cache: "no-store" },
+    );
+    const metadata = await response.text();
+    const prefix = object.Key.slice(0, object.Key.lastIndexOf("/"));
+    for (const name of metadataArtifactNames(metadata))
+      await verifyObject(hosting, `${prefix}/${name}`);
   }
-  return !failed;
 }
 
 async function main() {
   const hosting = loadHosting();
-
-  let uploaded = {};
-  if (!verifyOnly) {
-    syncProductionEnv();
-    assertAwsCliAvailable();
-
-    // Only build/publish what this host is responsible for (e.g. a mac dmg lying
-    // around in dist/ on a Linux box is stale and must not be re-released from here).
-    const hostPlatforms = platformsForHost(process.platform);
-    if (hostPlatforms.length === 0) {
-      console.error(`No release platforms configured for ${process.platform} hosts.`);
-      process.exit(1);
-    }
-    // Each target only builds on its own OS; the rest of hostPlatforms is published
-    // from artifacts staged into dist/ (e.g. a Windows installer copied to a Linux box).
-    const buildable = buildablePlatformsForHost(process.platform);
-    if (noBuild) {
-      console.log("⏭️  Skipping builds (--no-build); uploading existing dist/ artifacts");
-    } else {
-      buildHostInstallers(buildable);
-    }
-
-    const files = existsSync(distDir)
-      ? readdirSync(distDir).map((name) => ({
-          name,
-          mtimeMs: statSync(join(distDir, name)).mtimeMs,
-        }))
-      : [];
-    const artifacts = Object.fromEntries(
-      Object.entries(selectArtifacts(files)).filter(([platform]) => {
-        if (hostPlatforms.includes(platform)) return true;
-        console.warn(`⚠️  Skipping ${platform} installer: not built on ${process.platform} hosts`);
-        return false;
-      }),
-    );
-
-    // When this run did the builds, every platform it built must have produced an
-    // installer; beyond that only the explicitly required ones must be present.
-    const expected = new Set(noBuild || dryRun ? requiredPlatforms : [...buildable, ...requiredPlatforms]);
-    const missing = [...expected].filter((platform) => !(platform in artifacts));
-    if (missing.length > 0) {
-      console.error(
-        `Missing required installer(s) in dist/: ${missing.join(", ")}. ` +
-          `Run the matching pnpm build:<target> first.`,
-      );
-      process.exit(1);
-    }
-    if (Object.keys(artifacts).length === 0) {
-      console.error(`No installers found in ${distDir}. Run pnpm build:win|mac|linux first.`);
-      process.exit(1);
-    }
-
-    for (const [platform, artifact] of Object.entries(artifacts)) {
-      upload(hosting, platform, artifact);
-    }
-    uploaded = artifacts;
-  }
-
-  if (dryRun) {
-    console.log("🧪 [DRY RUN] skipping download verification");
+  assertAwsCliAvailable();
+  if (verifyOnly) {
+    await verifyStableInstallers(hosting, {});
+    await verifyExistingFeeds(hosting);
     return;
   }
 
-  console.log("\n🔎 Verifying public download URLs…");
-  const ok = await verify(hosting, uploaded);
-  if (!ok) process.exit(1);
-  console.log("🎉 Release artifacts are live.");
+  const hostPlatforms = platformsForHost(process.platform);
+  if (hostPlatforms.length === 0)
+    throw new Error(`No release platforms configured for ${process.platform}`);
+  const buildable = buildablePlatformsForHost(process.platform);
+  if (!noBuild) buildHostInstallers(buildable);
+
+  const files = existsSync(distDir)
+    ? readdirSync(distDir).map((name) => ({
+        name,
+        mtimeMs: statSync(join(distDir, name)).mtimeMs,
+      }))
+    : [];
+  const selected = selectArtifacts(files);
+  const selectedPlatforms =
+    requiredPlatforms.length > 0 ? requiredPlatforms : buildable;
+  const artifacts = Object.fromEntries(
+    Object.entries(selected).filter(([platform]) =>
+      selectedPlatforms.includes(platform),
+    ),
+  );
+  const expected = new Set(
+    noBuild || dryRun
+      ? requiredPlatforms
+      : [...buildable, ...requiredPlatforms],
+  );
+  const missing = [...expected].filter((platform) => !(platform in artifacts));
+  if (missing.length > 0)
+    throw new Error(
+      `Missing required installers in dist/: ${missing.join(", ")}`,
+    );
+  if (Object.keys(artifacts).length === 0)
+    throw new Error(`No installers found in ${distDir}`);
+
+  const publishApt = process.platform === "linux" && Boolean(artifacts.linux);
+  if (publishApt) {
+    if (dryRun)
+      console.log("[dry run] would promote the signed APT repository");
+    else assertAptPublishingReady();
+  }
+
+  const publications = [];
+  for (const [platform, artifact] of Object.entries(artifacts)) {
+    const publication = await publishUpdateFeed(hosting, platform, artifact);
+    if (publication) publications.push(publication);
+  }
+  // Linux's signed package feed is the update channel. Promote it before changing the website's
+  // stable DEB alias, so one release:upload command completes the whole Linux release.
+  if (publishApt && !dryRun) publishAptRepository();
+  for (const [platform, artifact] of Object.entries(artifacts))
+    uploadStableInstaller(hosting, platform, artifact);
+
+  if (dryRun) return;
+  await verifyStableInstallers(hosting, artifacts);
+  // Pruning happens only after both the updater pointer and website alias are verified live.
+  for (const publication of publications) pruneUpdateFeed(hosting, publication);
+  console.log(
+    "Release artifacts are live and old updater generations are bounded.",
+  );
 }
 
 await main();

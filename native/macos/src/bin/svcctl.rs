@@ -42,9 +42,9 @@ fn install() -> Result<()> {
         launchd::plist_text(&exe.to_string_lossy()),
     )
     .context("write LaunchDaemon plist")?;
-    // Generate the recovery code before the daemon starts, so the store it loads at boot
-    // already carries the hash.
-    gen_code()?;
+    // Installation is also the repair/upgrade path. Preserve the original killswitch while
+    // replacing/restarting the daemon from the newly installed application bundle.
+    ensure_recovery_code()?;
     // Reload cleanly if a previous copy is loaded; "not loaded" is fine.
     launchd::bootout();
     if !launchd::bootstrap().context("launchctl bootstrap")? {
@@ -100,6 +100,17 @@ fn gen_code() -> Result<()> {
     println!("  (also written to {})", path.display());
     println!("================================================================\n");
     Ok(())
+}
+
+fn ensure_recovery_code() -> Result<()> {
+    if SecureStore::load().recovery.is_some() {
+        println!(
+            "Existing Talysman recovery code preserved ({}).",
+            paths::recovery_code_file().display()
+        );
+        return Ok(());
+    }
+    gen_code()
 }
 
 fn guard_uninstall() -> Result<()> {

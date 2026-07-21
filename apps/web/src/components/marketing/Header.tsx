@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { BrandLink } from "@/components/brand/BrandLink";
 import { DevBadge } from "@/components/DevBadge";
 import { AccountMenu } from "@/components/marketing/AccountMenu";
 import { config } from "@/lib/config";
@@ -13,9 +14,7 @@ export async function Header() {
   return (
     <header className="site-header">
       <div className="brand-row">
-        <Link href="/" className="site-brand">
-          {config.app.name}
-        </Link>
+        <BrandLink href="/" />
         <DevBadge />
       </div>
       <nav className="site-nav">

@@ -388,7 +388,10 @@ function toDesktopEnvPairs(c: Credentials, mode: Mode): Array<[string, string]> 
     ["VITE_STRIPE_PUBLISHABLE_KEY", stripe.publishableKey ?? ""],
     ["VITE_PAYMENT_URL", appUrl],
     ["API_BASE_URL", appUrl],
-    ["UPDATE_FEED_URL", ""],
+    [
+      "UPDATE_FEED_URL",
+      `${c.extension_hosting.public_s3_base_url.replace(/\/+$/, "")}/desktop`,
+    ],
   ];
 }
 

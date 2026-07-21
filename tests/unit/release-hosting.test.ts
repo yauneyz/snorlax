@@ -7,8 +7,10 @@ import {
   PLATFORMS,
   buildablePlatformsForHost,
   STABLE_INSTALLER_KEYS,
+  artifactIdentity,
   classifyArtifact,
   contentTypeFor,
+  metadataArtifactNames,
   hostingFromCredentials,
   platformsForHost,
   publicUrlFor,
@@ -35,14 +37,13 @@ describe('release command boundaries', () => {
 
 describe('classifyArtifact', () => {
   it('recognizes electron-builder artifact names for each platform', () => {
-    expect(classifyArtifact('Talysman-Setup-0.1.0.exe')).toBe('win');
-    expect(classifyArtifact('Talysman-0.1.0.dmg')).toBe('mac');
+    expect(classifyArtifact('Talysman-Setup-0.1.0-x64.exe')).toBe('win');
     expect(classifyArtifact('Talysman-0.1.0-arm64.dmg')).toBe('mac');
     expect(classifyArtifact('Talysman-0.1.0-amd64.deb')).toBe('linux');
   });
 
   it('recognizes prerelease versions', () => {
-    expect(classifyArtifact('Talysman-Setup-1.2.3-beta.1.exe')).toBe('win');
+    expect(classifyArtifact('Talysman-Setup-1.2.3-beta.1-x64.exe')).toBe('win');
     expect(classifyArtifact('Talysman-1.2.3-beta.1-amd64.deb')).toBe('linux');
   });
 
@@ -61,12 +62,37 @@ describe('selectArtifacts', () => {
     const selected = selectArtifacts([
       { name: 'Talysman-0.1.0-amd64.deb', mtimeMs: 100 },
       { name: 'Talysman-0.2.0-amd64.deb', mtimeMs: 200 },
-      { name: 'Talysman-Setup-0.2.0.exe', mtimeMs: 150 },
+      { name: 'Talysman-Setup-0.2.0-x64.exe', mtimeMs: 150 },
       { name: 'Talysman-0.2.0-x86_64.AppImage', mtimeMs: 999 },
     ]);
     expect(selected.linux?.name).toBe('Talysman-0.2.0-amd64.deb');
-    expect(selected.win?.name).toBe('Talysman-Setup-0.2.0.exe');
+    expect(selected.win?.name).toBe('Talysman-Setup-0.2.0-x64.exe');
     expect(selected.mac).toBeUndefined();
+  });
+});
+
+describe('updater feed identity', () => {
+  it('extracts platform, version, and normalized architecture', () => {
+    expect(artifactIdentity('Talysman-Setup-1.2.3-beta.1-x64.exe')).toEqual({
+      platform: 'win',
+      version: '1.2.3-beta.1',
+      arch: 'x64',
+    });
+    expect(artifactIdentity('Talysman-1.2.3-amd64.deb')).toEqual({
+      platform: 'linux',
+      version: '1.2.3',
+      arch: 'x64',
+    });
+  });
+
+  it('extracts relative metadata artifacts and rejects remote or nested paths', () => {
+    expect(
+      metadataArtifactNames('files:\n  - url: Talysman-1.2.3-x64.zip\npath: Talysman-1.2.3-x64.zip\n'),
+    ).toEqual(['Talysman-1.2.3-x64.zip']);
+    expect(() => metadataArtifactNames('path: https://other.example/update.zip')).toThrow(
+      /relative basename/,
+    );
+    expect(() => metadataArtifactNames('path: nested/update.zip')).toThrow(/relative basename/);
   });
 });
 

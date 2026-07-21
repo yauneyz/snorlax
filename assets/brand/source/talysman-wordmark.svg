@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 220" role="img" aria-label="Talysman wordmark">
+  <title>Talysman wordmark</title>
+  <defs>
+    <linearGradient id="silverText" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#f2f3f5"/>
+      <stop offset="0.52" stop-color="#c7ccd4"/>
+      <stop offset="1" stop-color="#8b9098"/>
+    </linearGradient>
+  </defs>
+  <text x="38" y="158" fill="url(#silverText)" font-family="Inter, Arial, sans-serif" font-size="132" font-weight="400" letter-spacing="24">TALYSMAN</text>
+</svg>

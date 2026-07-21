@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useFocusStore } from './store/useFocusStore.js';
+import { TalysmanMark } from './components/TalysmanMark.js';
 import { UsbIndicator } from './components/UsbIndicator.js';
 import { Dashboard } from './pages/Dashboard.js';
 import { Blocklists } from './pages/Blocklists.js';
@@ -51,6 +52,7 @@ export default function App() {
     <div className="flex h-full">
       <aside className="flex w-56 flex-col border-r border-white/[0.06] bg-gradient-to-b from-white/[0.035] to-transparent bg-panel">
         <div className="flex items-center gap-2 px-5 py-5">
+          <TalysmanMark size={24} />
           <span className="bg-gradient-to-b from-white to-slate-300 bg-clip-text text-lg font-bold tracking-tight text-transparent">
             Talysman
           </span>

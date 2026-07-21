@@ -4,6 +4,7 @@
  * (auth/callback) and the Stripe checkout return (billing/success|cancel).
  */
 
+import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { app, BrowserWindow, shell } from 'electron';
 import {
@@ -19,6 +20,16 @@ import { parseDeepLink } from './deepLink.js';
 
 let mainWindow: BrowserWindow | null = null;
 
+/**
+ * Window icon for Linux and Windows, which read it off the window rather than the bundle (macOS
+ * uses the .icns baked in by electron-builder). Packaged builds get it from extraResources; dev
+ * falls back to the repo copy.
+ */
+function windowIcon(): string {
+  const packaged = join(process.resourcesPath ?? __dirname, 'icon.png');
+  return existsSync(packaged) ? packaged : join(__dirname, '../../resources/icon.png');
+}
+
 export function getMainWindow(): BrowserWindow | null {
   return mainWindow;
 }
@@ -30,8 +41,9 @@ export function createWindow(): BrowserWindow {
     minWidth: 880,
     minHeight: 600,
     show: false,
-    backgroundColor: '#0b0f17',
+    backgroundColor: '#08090a',
     title: 'Talysman',
+    icon: windowIcon(),
     webPreferences: {
       preload: join(__dirname, '../preload/index.cjs'),
       contextIsolation: true,
