@@ -65,25 +65,27 @@ by us and must remain stable.
    instructions.
 6. Submit for review/certification.
 7. After first Chrome and Edge items exist, record their assigned extension IDs.
-8. Wire those IDs into `native/windows/src/enforce/extension_policy.rs`.
+8. Wire those IDs into each platform's `native/{windows,linux,macos}/src/enforce/extension_policy.rs`.
 9. Build the desktop installer with the final IDs and use that installer for reviewer and clean-VM
    validation.
 
 ## Native Messaging Registration
 
-The Windows service registers only the local native-messaging host. It does not force-install or
-lock the browser extension.
+The elevated desktop installer and service register only the local native-messaging host. They do
+not force-install or lock the browser extension. Registration is system-wide on Windows, Linux,
+and macOS, and service startup repairs missing manifests.
 
 After first store publication, set:
 
 ```rust
-pub const CHROME_EXT_ID: &str = "<Chrome Web Store extension ID>";
+pub const CHROME_EXT_ID: &str = "fjohodlenndbieegdcbpblcjkncdngpb";
 pub const EDGE_EXT_ID: &str = "<Microsoft Edge Add-ons extension ID>";
 pub const FIREFOX_EXT_ID: &str = "talysman@talysman.app";
 ```
 
-Those IDs restrict which store-installed extensions may launch `com.talysman.host`. An empty
-Chrome or Edge ID means that browser cannot launch the native host.
+Keep these constants synchronized in the Windows, Linux, and macOS backends. They restrict which
+store-installed extensions may launch `com.talysman.host`. An empty Chrome or Edge ID means that
+store build cannot launch the native host.
 
 ## Routine Updates
 

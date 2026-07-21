@@ -66,6 +66,7 @@ fn install() -> Result<()> {
     // Installation is also the repair/upgrade path. Never rotate the killswitch during an
     // application update: generate it once, before the service first reads the store.
     ensure_recovery_code()?;
+    talysman::enforce::extension_policy::install();
     configure_service(&service)?;
     start_if_needed(&service)?;
     Ok(())
@@ -154,6 +155,8 @@ fn start_if_needed(service: &windows_service::service::Service) -> Result<()> {
 }
 
 fn uninstall() -> Result<()> {
+    // Clean up registration even if the Windows service was already removed or damaged.
+    talysman::enforce::extension_policy::uninstall();
     let manager = ServiceManager::local_computer(None::<&str>, ServiceManagerAccess::CONNECT)?;
     let service = manager.open_service(
         SERVICE_NAME,

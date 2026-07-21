@@ -24,6 +24,10 @@ pub async fn serve(socket_path: String, shutdown: watch::Receiver<bool>) {
     let core = Arc::new(Mutex::new(Core::new(state, store, shared.clone())));
     core.lock().await.rearm_on_boot();
 
+    // Keep browser native-messaging registration repaired across package upgrades and manual
+    // manifest deletion. The system service runs as root; registration is idempotent.
+    enforce::extension_policy::install();
+
     {
         let shared = shared.clone();
         let shutdown = shutdown.clone();

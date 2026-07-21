@@ -21,10 +21,10 @@ use crate::run::run_command;
 pub const HOST_NAME: &str = "com.talysman.host";
 
 // --- Packaging-time identities -------------------------------------------------------------------
-// Chrome and Edge assign separate IDs when their store items are first created. Leave these empty
-// until the first submissions exist, then copy the store IDs here. They are used only to restrict
-// which store extensions may launch the native host; they are not used to install extensions.
-pub const CHROME_EXT_ID: &str = "";
+// Chrome and Edge assign separate IDs when their store items are first created. Configure each ID
+// after its first submission; an empty value means that browser has not been configured yet. These
+// IDs only restrict which store extensions may launch the native host; they do not install them.
+pub const CHROME_EXT_ID: &str = "fjohodlenndbieegdcbpblcjkncdngpb";
 pub const EDGE_EXT_ID: &str = "";
 
 // Firefox uses the authored Gecko ID in manifest.json, including for AMO-listed builds.
@@ -240,9 +240,7 @@ mod tests {
 
     #[test]
     fn chromium_manifest_has_stdio_and_configured_store_origins() {
-        let m = chromium_manifest(Path::new(
-            r"C:\Program Files\Talysman\talysman-natmsg.exe",
-        ));
+        let m = chromium_manifest(Path::new(r"C:\Program Files\Talysman\talysman-natmsg.exe"));
         let v: serde_json::Value = serde_json::from_str(&m).unwrap();
         assert_eq!(v["name"], HOST_NAME);
         assert_eq!(v["type"], "stdio");

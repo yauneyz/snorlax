@@ -65,6 +65,7 @@ fn install() -> Result<()> {
     let service_already_installed = std::path::Path::new(UNIT_PATH).exists();
     paths::ensure_data_dir().context("create Talysman data dir")?;
     dns::install_include().context("write dnsmasq include")?;
+    talysman::enforce::extension_policy::install();
     std::fs::write(UNIT_PATH, unit_text()?).context("write systemd unit")?;
     run("systemctl", &["daemon-reload"])?;
     // Installation is also the package upgrade path. Preserve the original killswitch and
@@ -85,6 +86,7 @@ fn uninstall() -> Result<()> {
     let _ = run("systemctl", &["disable", "--now", SERVICE_NAME]);
     let _ = std::fs::remove_file(UNIT_PATH);
     let _ = run("systemctl", &["daemon-reload"]);
+    talysman::enforce::extension_policy::uninstall();
     talysman::enforce::teardown_network();
     dns::remove_include();
     println!("Service '{SERVICE_NAME}' removed.");

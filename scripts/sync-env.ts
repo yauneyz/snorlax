@@ -13,6 +13,12 @@ import { spawnSync } from "node:child_process";
 import toml from "@iarna/toml";
 import { z } from "zod";
 
+import {
+  desktopEnvPairs,
+  // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+  // @ts-ignore — untyped .mjs module shared with release scripts
+} from "./lib/desktop-environment.mjs";
+
 const ROOT = path.resolve(__dirname, "..");
 const WEB_DIR = path.join(ROOT, "apps", "web");
 const ROOT_ENV_OUT = path.join(ROOT, ".env.local");
@@ -463,31 +469,6 @@ function toWebEnvPairs(c: Credentials, mode: Mode): Array<[string, string]> {
   ];
 }
 
-function toDesktopEnvPairs(c: Credentials, mode: Mode): Array<[string, string]> {
-  const stripe = stripeValues(c);
-  const supabase = c.supabase[mode];
-  const appUrl = mode === "prod" ? c.app.url_prod : c.app.url_dev;
-  const appEnvironment = mode === "prod" ? "production" : "development";
-
-  return [
-    ["APP_ENV", appEnvironment],
-    ["TALYSMAN_PIPE", mode === "prod" ? "talysman" : "talysman-dev"],
-    [
-      "GOOGLE_AUTH_ENABLED",
-      String(mode === "dev" ? c.google_auth.enabled_dev : c.google_auth.enabled_prod),
-    ],
-    ["VITE_SUPABASE_URL", supabase.url],
-    ["VITE_SUPABASE_ANON_KEY", supabase.publishable_key],
-    ["VITE_STRIPE_PUBLISHABLE_KEY", stripe.publishableKey ?? ""],
-    ["VITE_PAYMENT_URL", appUrl],
-    ["API_BASE_URL", appUrl],
-    [
-      "UPDATE_FEED_URL",
-      `${c.extension_hosting.public_s3_base_url.replace(/\/+$/, "")}/desktop`,
-    ],
-  ];
-}
-
 function toSupabaseEnvPairs(c: Credentials): Array<[string, string]> {
   // The provider remains configured in config.toml so the checked-in config is stable.
   // Dummy values keep ordinary local development working when Google Auth is disabled;
@@ -626,7 +607,7 @@ function main() {
   }
 
   writeEnvFile(WEB_ENV_OUT, webPairs, mode);
-  writeEnvFile(ROOT_ENV_OUT, toDesktopEnvPairs(creds, mode), mode);
+  writeEnvFile(ROOT_ENV_OUT, desktopEnvPairs(creds, mode), mode);
   writeEnvFile(SUPABASE_ENV_OUT, toSupabaseEnvPairs(creds), mode);
 }
 

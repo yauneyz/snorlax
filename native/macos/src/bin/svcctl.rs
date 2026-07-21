@@ -36,6 +36,7 @@ fn run(program: &str, args: &[&str]) -> Result<()> {
 
 fn install() -> Result<()> {
     paths::ensure_data_dir().context("create Talysman data dir")?;
+    talysman::enforce::extension_policy::install();
     let exe = svc_exe_path()?;
     std::fs::write(
         launchd::plist_path(),
@@ -58,6 +59,7 @@ fn uninstall() -> Result<()> {
     let _ = guard_uninstall();
     launchd::bootout();
     let _ = std::fs::remove_file(launchd::plist_path());
+    talysman::enforce::extension_policy::uninstall();
     talysman::enforce::teardown_network();
     println!("Service '{SERVICE_NAME}' removed.");
     Ok(())

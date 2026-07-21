@@ -1,11 +1,11 @@
 * part 1: demo
 auth
-- chrome extension works
-- windows build works
-- Dane comped account
-  - everything live in supabase
+- password reset
 - test on windows
   - dead man works
+  - sign out/in
+  - comp verification
+- macos added to release options, installed on jessica's computer
 - web app is reasonable
 - oauth-setup.md
 - browser extension hosting/upload
@@ -19,7 +19,6 @@ auth
 - app picker for app blocking needs improvement
 - deadman switch works on windows
 
-- macos added to release options, installed on jessica's computer
 
 
 

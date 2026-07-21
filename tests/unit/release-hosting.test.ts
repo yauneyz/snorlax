@@ -18,6 +18,13 @@ import {
   // eslint-disable-next-line @typescript-eslint/ban-ts-comment
   // @ts-ignore — untyped .mjs module shared with release scripts
 } from '../../scripts/lib/release-hosting.mjs';
+import {
+  REQUIRED_PRODUCTION_DESKTOP_ENV,
+  desktopEnvPairs,
+  verifyDirectDesktopApiBaseUrl,
+  // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+  // @ts-ignore — untyped .mjs module shared with release scripts
+} from '../../scripts/lib/desktop-environment.mjs';
 
 type Platform = keyof typeof STABLE_INSTALLER_KEYS;
 const platforms = PLATFORMS as Platform[];
@@ -32,6 +39,66 @@ describe('release command boundaries', () => {
     expect(localReleaseSource).not.toContain('scripts/upload-release.mjs');
     expect(localReleaseSource).not.toContain('sync:env:prod');
     expect(localReleaseSource).not.toMatch(/execFileSync\(['"](?:aws|vercel)['"]/);
+  });
+});
+
+describe('desktop release environment', () => {
+  const credentials = {
+    app: { url_dev: 'http://localhost:3000', url_prod: 'https://www.talysman.app' },
+    supabase: {
+      dev: { url: 'http://localhost:54321', publishable_key: 'dev-anon' },
+      prod: { url: 'https://example.supabase.co', publishable_key: 'prod-anon' },
+    },
+    stripe: {
+      mode: 'live',
+      publishable_key_test: 'pk_test_example',
+      publishable_key_live: 'pk_live_example',
+    },
+    google_auth: { enabled_dev: false, enabled_prod: true },
+    extension_hosting: { public_s3_base_url: 'https://releases.example.com/' },
+  };
+
+  it('derives production-safe public desktop values from credentials', () => {
+    expect(Object.fromEntries(desktopEnvPairs(credentials, 'prod'))).toMatchObject({
+      APP_ENV: 'production',
+      TALYSMAN_PIPE: 'talysman',
+      GOOGLE_AUTH_ENABLED: 'true',
+      API_BASE_URL: 'https://www.talysman.app',
+      VITE_SUPABASE_URL: 'https://example.supabase.co',
+      VITE_SUPABASE_ANON_KEY: 'prod-anon',
+      VITE_STRIPE_PUBLISHABLE_KEY: 'pk_live_example',
+      UPDATE_FEED_URL: 'https://releases.example.com/desktop',
+    });
+  });
+
+  it('requires every endpoint needed by a packaged production desktop app', () => {
+    expect(REQUIRED_PRODUCTION_DESKTOP_ENV).toEqual([
+      'API_BASE_URL',
+      'VITE_SUPABASE_URL',
+      'VITE_SUPABASE_ANON_KEY',
+      'UPDATE_FEED_URL',
+    ]);
+  });
+
+  it('accepts a direct API origin', async () => {
+    const fetchImpl = async () =>
+      new Response('{"error":"Missing bearer token"}', { status: 401 });
+
+    await expect(
+      verifyDirectDesktopApiBaseUrl('https://www.talysman.app', fetchImpl),
+    ).resolves.toBeUndefined();
+  });
+
+  it('rejects an API origin that redirects and would drop bearer credentials', async () => {
+    const fetchImpl = async () =>
+      new Response(null, {
+        status: 308,
+        headers: { location: 'https://www.talysman.app/api/desktop/entitlement' },
+      });
+
+    await expect(
+      verifyDirectDesktopApiBaseUrl('https://talysman.app', fetchImpl),
+    ).rejects.toThrow(/cross-origin redirects strip desktop bearer tokens/);
   });
 });
 

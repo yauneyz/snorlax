@@ -15,8 +15,10 @@ blocked IPs; whitelist and block-all default-deny web egress (`80`, `443`, and Q
 
 Known follow-ups:
 
-- Add distro/browser-specific native-messaging host registration without consumer force-install
-  policy.
 - Add a DNS-layer sinkhole or dnsmasq integration if we want focusd's full dual-layer behavior.
 - Replace serial-ambiguous USB matching with udev/lsblk-backed device identity where available.
 - Extract the duplicated Rust protocol/core modules into a shared native crate once macOS arrives.
+
+The elevated installer and service startup register `com.talysman.host` in the system-wide native
+messaging locations for Chrome, Chrome for Testing, Chromium, Edge, and Firefox. This registration
+does not install or lock the browser extension.

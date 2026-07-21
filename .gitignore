@@ -55,6 +55,9 @@ Thumbs.db
 .vscode/
 *.swp
 
+# Claude Code machine-local permissions and command history
+.claude/settings.local.json
+
 # Recovery codes must never be committed
 recovery-code.txt
 .env.vercel

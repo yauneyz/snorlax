@@ -46,6 +46,9 @@ Known follow-ups:
 
 - Harden with the architecture doc's Swift NetworkExtension/EndpointSecurity design once Apple
   entitlements are in hand; this Rust daemon is the entitlement-free first cut.
-- Native-messaging host registration per browser without consumer force-install policy.
 - Extract the duplicated Rust protocol/core modules into a shared native crate (now duplicated
   three ways).
+
+The elevated installer and LaunchDaemon startup register `com.talysman.host` in the system-wide
+native messaging locations for Chrome, Chrome for Testing, Chromium, Edge, and Firefox. This
+registration does not install or lock the browser extension.

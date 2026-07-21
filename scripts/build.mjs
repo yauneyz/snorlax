@@ -14,6 +14,12 @@ import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
 import toml from "@iarna/toml";
 
+import {
+  REQUIRED_PRODUCTION_DESKTOP_ENV,
+  desktopEnvPairs,
+  verifyDirectDesktopApiBaseUrl,
+} from "./lib/desktop-environment.mjs";
+
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const args = process.argv.slice(2);
 const targetIdx = args.indexOf("--target");
@@ -69,24 +75,25 @@ function loadBuildEnvironment() {
   const mode =
     process.env.APP_ENV === "production" ? "production" : "development";
   const path = resolve(root, `.env.${mode}`);
-  if (!existsSync(path)) return;
-  for (const line of readFileSync(path, "utf8").split(/\r?\n/)) {
-    const match = line.match(/^([A-Z][A-Z0-9_]*)=(.*)$/);
-    if (match && process.env[match[1]] === undefined) {
-      process.env[match[1]] = unquoteEnvValue(match[2]);
+  if (existsSync(path)) {
+    for (const line of readFileSync(path, "utf8").split(/\r?\n/)) {
+      const match = line.match(/^([A-Z][A-Z0-9_]*)=(.*)$/);
+      if (match && process.env[match[1]] === undefined) {
+        process.env[match[1]] = unquoteEnvValue(match[2]);
+      }
     }
   }
 
-  if (!process.env.UPDATE_FEED_URL) {
-    const credentialsPath = [
-      resolve(root, ".credentials"),
-      resolve(root, "../indigo/.credentials"),
-    ].find((candidate) => existsSync(candidate));
-    if (credentialsPath) {
-      const credentials = toml.parse(readFileSync(credentialsPath, "utf8"));
-      const publicBaseUrl = credentials?.extension_hosting?.public_s3_base_url;
-      if (typeof publicBaseUrl === "string" && publicBaseUrl.length > 0) {
-        process.env.UPDATE_FEED_URL = `${publicBaseUrl.replace(/\/+$/, "")}/desktop`;
+  const credentialsPath = [
+    resolve(root, ".credentials"),
+    resolve(root, "../indigo/.credentials"),
+  ].find((candidate) => existsSync(candidate));
+  if (credentialsPath) {
+    const credentials = toml.parse(readFileSync(credentialsPath, "utf8"));
+    const credentialMode = mode === "production" ? "prod" : "dev";
+    for (const [name, value] of desktopEnvPairs(credentials, credentialMode)) {
+      if (!process.env[name] && value) {
+        process.env[name] = value;
       }
     }
   }
@@ -115,9 +122,14 @@ function validateReleaseInputs(target) {
       `Release version ${version} is inconsistent: ${mismatches.map(([path, candidate]) => `${path}=${candidate}`).join(", ")}. Run pnpm release:version -- ${version}.`,
     );
   }
-  if (process.env.APP_ENV === "production" && !process.env.UPDATE_FEED_URL) {
+  if (process.env.APP_ENV === "production") {
+    const missingEnvironment = REQUIRED_PRODUCTION_DESKTOP_ENV.filter(
+      (name) => !process.env[name],
+    );
+    if (missingEnvironment.length === 0) return;
     throw new Error(
-      "UPDATE_FEED_URL is required for a production build. Run pnpm sync:env:prod first.",
+      `Production desktop configuration is missing: ${missingEnvironment.join(", ")}. ` +
+        "Fill the public values in .env.production or configure .credentials.",
     );
   }
 }
@@ -132,6 +144,9 @@ if (!cfg) {
 
 loadBuildEnvironment();
 validateReleaseInputs(target);
+if (process.env.APP_ENV === "production") {
+  await verifyDirectDesktopApiBaseUrl(process.env.API_BASE_URL);
+}
 
 const crossWindowsFromLinux =
   cross && target === "win" && process.platform === "linux";

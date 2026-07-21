@@ -41,17 +41,15 @@ service (named pipe)  ──►  talysman-natmsg.exe  ──►  extension backg
 - `src/popup.html` / `popup.js` — a read-only toolbar status surface showing the desktop connection,
   focus state, reconnect/fail-safe state, and rule-application health. It never receives or displays
   the user's configured domains; blocking remains controlled by the desktop app.
-- `talysman-natmsg.exe` (`native/windows/src/bin/natmsg.rs`) — bridges browser stdio ⇄ the service
-  pipe, deriving `{active, mode, domains}` from `getState` + the `focusChanged`/`policyChanged`
-  events.
+- `talysman-natmsg` (`talysman-natmsg.exe` on Windows) — bridges browser stdio ⇄ the service IPC,
+  deriving `{active, mode, domains}` from `getState` plus the `focusChanged`/`policyChanged` events.
 
 ## Installation and native-host registration
 
-`enforce::extension_policy::install()` runs at service startup (persistent, **not** focus-toggled —
-the extension self-gates on `active`). It writes, in HKLM (LocalSystem-only):
-
-- Native-messaging host manifests to `%PROGRAMDATA%\Talysman\nmh\{chromium,firefox}.json` and
-  registers them under each browser's `NativeMessagingHosts\com.talysman.host`.
+`enforce::extension_policy::install()` runs during elevated installation and at service startup
+(persistent, **not** focus-toggled—the extension self-gates on `active`). Windows registers
+manifests through HKLM; Linux writes the browsers' system-wide manifest locations under `/etc` and
+`/usr/lib`; macOS writes them under `/Library`. Service startup repairs missing manifests.
 
 Users install the extension from the official browser store and retain the browser's normal
 disable/remove controls. The desktop service does not write enterprise force-install policies.
@@ -82,19 +80,21 @@ Chrome Web Store, Microsoft Edge Add-ons, and Firefox AMO sign, host, and update
 packages. The manifests contain no custom `update_url`.
 
 Firefox uses the authored ID `talysman@talysman.app`. Chrome and Edge assign separate IDs when
-their store items are created. After the first uploads, copy those IDs into `CHROME_EXT_ID` and
-`EDGE_EXT_ID` in `native/windows/src/enforce/extension_policy.rs`. The native host manifest must
-allow both Chromium store origins.
+their store items are created. Chrome is configured as `fjohodlenndbieegdcbpblcjkncdngpb`; after
+the first Edge upload, copy its assigned ID into `EDGE_EXT_ID` in each platform's
+`native/{windows,linux,macos}/src/enforce/extension_policy.rs`. The native host manifest must allow
+both Chromium store origins.
 
 The `HOST_NAME` (`com.talysman.host`) must match between `background.js` and
-`extension_policy.rs`. `talysman-natmsg.exe` is staged next to the service binaries by
-`scripts/build-native-win.mjs`. Store metadata, disclosures, and reviewer notes are maintained in
+`extension_policy.rs`. The native host is staged next to the service binaries by
+`scripts/build-native.mjs`. Store metadata, disclosures, and reviewer notes are maintained in
 `STORE_SUBMISSION.md`. The store publication checklist is maintained in `extension-next-steps.md`.
 
 ## Verify
 
-1. **Unit:** `pnpm vitest run tests/electron/unit/extension-rules.test.ts` (rule generation) and
-   `cargo test --lib extension` (native host manifests).
+1. **Unit:** `pnpm vitest run tests/electron/unit/extension-rules.test.ts` (rule generation), plus
+   `cargo test --manifest-path native/linux/Cargo.toml extension_policy` and the equivalent
+   `native/macos/Cargo.toml` command for native host manifests.
 2. **Build + load unpacked (dev):** `pnpm build:extension`, then load
    `apps/extension/dist/chrome`, `apps/extension/dist/edge`, or
    `apps/extension/dist/firefox/manifest.json`. Native messaging in Chrome/Edge will work after the

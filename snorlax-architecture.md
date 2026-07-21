@@ -992,7 +992,7 @@ talysman/
 | `src/enforce/mod.rs` | `EnforceShared` (live policy/focus state plus resolver-fed blocked/allowed IP banks); property expansion; `apply_network` toggles the firewall backstop. |
 | `src/enforce/divert.rs` | WinDivert packet engines: always-on DNS/DoT engine (NXDOMAIN injection, DoT drop, ECH/HTTPS-RR suppression, resolver-src-port exemption) plus the focus-gated DROP-flag destination-IP handle (`build_drop_filter`). |
 | `src/enforce/resolve.rs` | Warm UDP DNS resolver bound to a fixed local source port (sinkhole-exempt); resolves the expanded policy domains at startup, on policy/focus kicks, and every 5 minutes whether focus is on or off. |
-| `src/enforce/extension_policy.rs` | Force-installs the browser extension and registers the native-messaging host; clears legacy Chromium URL policy keys from older builds. |
+| `src/enforce/extension_policy.rs` | Registers the native-messaging host for the user-installed browser extension; clears legacy Chromium URL policy keys from older builds. |
 | `src/enforce/dns.rs` | Pure DNS wire helpers (parse QNAME/QTYPE, build NXDOMAIN/NODATA replies) used by the engine. |
 | `src/enforce/properties.rs` | Curated multi-domain "property group" table + blocklist expansion (sibling/CDN domains). |
 | `src/enforce/wfp.rs` | Installs/removes the persistent Windows-Firewall backstop (DoT 853, DoH resolver IPs, QUIC UDP 443) via `netsh`. |

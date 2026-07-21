@@ -58,7 +58,7 @@ contain `key` or `update_url`.
 7. Record:
 
    ```text
-   Chrome extension ID: ________________________________
+   Chrome extension ID: fjohodlenndbieegdcbpblcjkncdngpb
    Chrome listing URL:  ________________________________
    ```
 
@@ -106,15 +106,15 @@ AMO signs, hosts, and updates the extension. Do not self-host an XPI for the con
 
 ## 6. Wire Store IDs into the Desktop Service
 
-Edit `native/windows/src/enforce/extension_policy.rs`:
+Edit each platform's `native/{windows,linux,macos}/src/enforce/extension_policy.rs`:
 
 ```rust
-pub const CHROME_EXT_ID: &str = "<Chrome Web Store extension ID>";
+pub const CHROME_EXT_ID: &str = "fjohodlenndbieegdcbpblcjkncdngpb";
 pub const EDGE_EXT_ID: &str = "<Microsoft Edge Add-ons extension ID>";
 pub const FIREFOX_EXT_ID: &str = "talysman@talysman.app";
 ```
 
-The service will include those IDs in native-messaging allowlists. Run:
+The services will include those IDs in native-messaging allowlists. Run:
 
 ```bash
 cargo test --manifest-path native/windows/Cargo.toml extension_policy

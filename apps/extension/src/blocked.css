@@ -15,9 +15,7 @@ body {
 }
 
 body {
-  background:
-    radial-gradient(circle at 50% 30%, rgb(38 41 46 / 32%), transparent 42%),
-    #08090a;
+  background: #08090a;
   color: #dcdee2;
   -webkit-font-smoothing: antialiased;
 }
@@ -30,8 +28,8 @@ main {
 }
 
 .blocked-card {
-  width: min(100%, 520px);
-  padding: 30px;
+  width: min(100%, 600px);
+  padding: 38px;
   border: 1px solid #26292e;
   border-radius: 16px;
   background: rgb(14 15 17 / 94%);
