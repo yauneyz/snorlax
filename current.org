@@ -1,2 +1,44 @@
-We are working on on the UI for talysman and its accompanying website, in the /apps/web folder
+Let's work on the web site UI
 
+
+- we want to remove the Blog link for now, we don't actually have a blog yet
+- Remove the "Windows & macOS" Free plan available
+- Remove "See Pricing" button
+- Remove "Free to start section"
+
+
+- The headline is not "Willpower is a bad security model" the headline is "A distraction blocker that actually works, built for the device where your work actually happens"
+
+
+- The subtext:
+
+  "<p>Most focus apps are for your phone. What about your computer, the place you actually get work done? Talysman can block specific websites on desktop browsers and also blocks distracting apps.</p>
+
+  <p>Even better, turning it off requires a physical USB drive that you pair with the app. Turning the blocker off is easy enough that you don't have to worry about emergencies, but hard enough that you won't just do it out of habit like you already do with your other blockers.</p>
+
+  <p>Talysman is built for getting real work done</p>"
+
+  - The CTA is still "Download Talysman"
+
+
+Get rid of "What we won't claim" and "Stop negotiating with yourself" and "Built so cheating costs more than working" sections
+
+
+For the downloads page:
+- No need for "holds your policy . . ."
+- instead of just "Browser extension" it's "Make sure you also get the browser extension"
+-remove edge for now, we just have chrome and firefox
+- get rid of the "Already installed? Head . . ." section
+
+
+For pricing:
+- 10/mo 100/annual
+- Instead of "One plan . . ." it says "What is your time worth? Get it back with Talysman"
+- Add the free forever tier:
+  - 3 websites blocked
+  - prove to yourself that Talysman works for you
+- No "standard vs priority support
+- Paid tiers have:
+  - unlimited websites blocked
+  - block apps
+  - scheduled blocking

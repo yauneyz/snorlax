@@ -19,7 +19,6 @@ export async function Header() {
       <nav className="site-nav">
         <Link href="/download">Download</Link>
         <Link href="/pricing">Pricing</Link>
-        <Link href="/blog">Blog</Link>
         {user ? (
           <AccountMenu />
         ) : (

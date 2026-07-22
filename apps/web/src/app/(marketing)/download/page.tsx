@@ -1,12 +1,11 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { DetectedPlatform } from "@/components/marketing/DetectedPlatform";
 import { PlatformIcon, type Platform } from "@/components/marketing/PlatformIcon";
 import { config } from "@/lib/config";
 
 export const metadata: Metadata = {
   title: "Download",
-  description: `Get the ${config.app.name} desktop app and browser extension for Chrome, Edge, and Firefox.`,
+  description: `Get the ${config.app.name} desktop app and browser extension for Chrome and Firefox.`,
   alternates: { canonical: `${config.app.url}/download` },
 };
 
@@ -16,7 +15,6 @@ export const metadata: Metadata = {
  */
 const placeholderStoreUrls = {
   chrome: "https://chromewebstore.google.com/detail/talysman/example-chrome-id",
-  edge: "https://microsoftedge.microsoft.com/addons/detail/talysman/example-edge-id",
   firefox: "https://addons.mozilla.org/en-US/firefox/addon/talysman-example/",
 } as const;
 
@@ -55,13 +53,6 @@ const extensions: DownloadTarget[] = [
     name: "Chrome",
     note: "Chrome Web Store",
     href: config.extensionStores.chromeUrl || placeholderStoreUrls.chrome,
-    external: true,
-  },
-  {
-    platform: "edge",
-    name: "Edge",
-    note: "Microsoft Edge Add-ons",
-    href: config.extensionStores.edgeUrl || placeholderStoreUrls.edge,
     external: true,
   },
   {
@@ -105,7 +96,6 @@ export default function DownloadPage() {
       <div className="download__group">
         <div className="download__group-head">
           <h2>Desktop app</h2>
-          <p>Holds your policy, your paired USB key, and the always-on blocking service.</p>
         </div>
         <div className="download-grid">
           {desktopInstallers.map((target) => (
@@ -116,7 +106,7 @@ export default function DownloadPage() {
 
       <div className="download__group">
         <div className="download__group-head">
-          <h2>Browser extension</h2>
+          <h2>Make sure you also get the browser extension</h2>
           <p>
             Required for web blocking. When the dead-man&apos;s switch is on, browsers without the
             extension are closed during a locked session.
@@ -129,10 +119,6 @@ export default function DownloadPage() {
         </div>
       </div>
 
-      <p className="download__footnote">
-        Already installed? Head to <Link href="/pricing">pricing</Link> to unlock app blocking,
-        schedules, and unlimited blocked sites.
-      </p>
     </section>
   );
 }

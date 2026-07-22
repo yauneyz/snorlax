@@ -20,12 +20,12 @@ describe("download page", () => {
     // setup.ts provides non-empty store URLs, so no card should fall back to coming soon.
     for (const url of [
       config.extensionStores.chromeUrl,
-      config.extensionStores.edgeUrl,
       config.extensionStores.firefoxUrl,
     ]) {
       expect(url).not.toBe("");
       expect(html).toContain(`href="${url}"`);
     }
+    expect(html).not.toContain(config.extensionStores.edgeUrl);
     expect(html).not.toContain("Coming soon");
   });
 });

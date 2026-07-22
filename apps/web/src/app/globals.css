@@ -526,7 +526,7 @@ input:-webkit-autofill:focus {
 }
 
 .hero__headline {
-  font-size: clamp(2.5rem, 5.5vw + 1rem, 4.5rem);
+  font-size: clamp(2.5rem, 4vw + 0.75rem, 3.75rem);
   font-weight: 700;
   letter-spacing: -0.04em;
   line-height: 1.05;
@@ -545,6 +545,14 @@ input:-webkit-autofill:focus {
   margin: 0 auto 2.5rem;
   line-height: 1.6;
   animation: fadeUp 700ms var(--ease) 100ms both;
+}
+
+.hero__sub p {
+  margin: 0;
+}
+
+.hero__sub p + p {
+  margin-top: 1.25rem;
 }
 
 .hero__ctas {
@@ -954,6 +962,8 @@ input:-webkit-autofill:focus {
 
 .pricing-card {
   position: relative;
+  display: flex;
+  flex-direction: column;
   padding: 2rem 1.75rem;
   background: var(--bg-1);
   border: 1px solid var(--border);
@@ -1005,6 +1015,7 @@ input:-webkit-autofill:focus {
   margin: 0 0 1.75rem;
   display: flex;
   flex-direction: column;
+  flex: 1;
   gap: 0.6rem;
 }
 

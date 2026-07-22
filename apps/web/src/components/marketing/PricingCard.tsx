@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { supabaseBrowser } from "@/lib/supabase/browser";
 
 type Props = {
-  plan: "monthly" | "yearly";
+  plan: "free" | "monthly" | "yearly";
   title: string;
   priceLabel: string;
   features: string[];
@@ -16,6 +16,11 @@ export function PricingCard({ plan, title, priceLabel, features }: Props) {
   const [error, setError] = useState<string | null>(null);
 
   const onSubscribe = async () => {
+    if (plan === "free") {
+      router.push("/download");
+      return;
+    }
+
     setError(null);
     setPending(true);
     const client = supabaseBrowser();
@@ -49,7 +54,7 @@ export function PricingCard({ plan, title, priceLabel, features }: Props) {
         ))}
       </ul>
       <button type="button" className="pricing-card__cta" onClick={onSubscribe} disabled={pending}>
-        {pending ? "Loading…" : "Subscribe"}
+        {pending ? "Loading…" : plan === "free" ? "Download Talysman" : "Subscribe"}
       </button>
       {error ? <p className="pricing-card__error">{error}</p> : null}
     </article>

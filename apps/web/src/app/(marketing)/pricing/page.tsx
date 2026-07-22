@@ -12,19 +12,28 @@ export default function PricingPage() {
   return (
     <section className="pricing">
       <h1>Pricing</h1>
-      <p className="pricing__lede">One plan. Pick monthly or save with yearly.</p>
+      <p className="pricing__lede">What is your time worth? Get it back with {config.app.name}</p>
       <div className="pricing__grid">
+        <PricingCard
+          plan="free"
+          title="Free forever"
+          priceLabel="$0"
+          features={[
+            "3 websites blocked",
+            `Prove to yourself that ${config.app.name} works for you`,
+          ]}
+        />
         <PricingCard
           plan="monthly"
           title="Monthly"
           priceLabel="$10 / month"
-          features={["Full access", "Cancel anytime", "Standard support"]}
+          features={["Unlimited websites blocked", "Block apps", "Scheduled blocking"]}
         />
         <PricingCard
           plan="yearly"
-          title="Yearly"
+          title="Annual"
           priceLabel="$100 / year"
-          features={["Full access", "Two months free", "Priority support"]}
+          features={["Unlimited websites blocked", "Block apps", "Scheduled blocking"]}
         />
       </div>
     </section>

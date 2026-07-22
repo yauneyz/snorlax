@@ -1,7 +1,8 @@
 * part 1: demo
 auth
-- macos added to release options, installed on jessica's computer
 - web app is reasonable
+- Dane Installation
+- macos added to release options, installed on jessica's computer
 - password reset?
 - browser extension hosting/upload
   - firefox
