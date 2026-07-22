@@ -50,3 +50,37 @@ client_id = "env(SUPABASE_AUTH_EXTERNAL_GOOGLE_CLIENT_ID)"
 secret = "env(SUPABASE_AUTH_EXTERNAL_GOOGLE_CLIENT_SECRET)"
 redirect_uri = "http://127.0.0.1:54321/auth/v1/callback"
 skip_nonce_check = false
+
+# Production project overrides, applied with:
+#   supabase config push --project-ref lkanoehzgogtrxzycutl
+# `config push` sends the MERGED config, so every prod-sensitive setting above
+# must be restated here - anything omitted inherits the local-dev value.
+[remotes.prod]
+project_id = "lkanoehzgogtrxzycutl"
+
+[remotes.prod.auth]
+site_url = "https://www.talysman.app"
+additional_redirect_urls = [
+  "https://www.talysman.app/api/auth/callback",
+  "https://www.talysman.app/reset-password",
+  "https://talysman.app/api/auth/callback",
+  "https://talysman.app/reset-password",
+  "talysman://auth/callback",
+  "talysman://auth/reset-callback",
+]
+jwt_expiry = 3600
+enable_signup = true
+
+[remotes.prod.auth.email]
+enable_signup = true
+# Unlike local dev, production must verify ownership of the address.
+enable_confirmations = true
+
+# Client ID/secret come from oauth/google-web-client.json via the environment;
+# they are never committed. The Google client must list
+# https://lkanoehzgogtrxzycutl.supabase.co/auth/v1/callback as a redirect URI.
+[remotes.prod.auth.external.google]
+enabled = true
+client_id = "env(SUPABASE_AUTH_EXTERNAL_GOOGLE_CLIENT_ID)"
+secret = "env(SUPABASE_AUTH_EXTERNAL_GOOGLE_CLIENT_SECRET)"
+skip_nonce_check = false

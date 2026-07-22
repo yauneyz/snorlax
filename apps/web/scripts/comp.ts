@@ -5,18 +5,21 @@
  * written out-of-band with the Supabase secret key, so there is no backdoor in
  * the shipped app to secure. See migration 0004 and payments-arch.md §9.
  *
- * Usage (from apps/web, after `pnpm sync:env`):
+ * Usage (from the repository root):
  *   pnpm comp grant  <email> [--note "mom"] [--expires 2027-01-01]
  *   pnpm comp code   [--note "mom"] [--uses N] [--expires 2027-01-01]
  *   pnpm comp revoke <email>
  *   pnpm comp list
  *
- * Targets whatever Supabase project .env.local points at. Against a hosted
- * (non-localhost) project it refuses to write unless you pass --prod.
+ * Commands target production by default. Add --dev to use local Supabase.
  */
-import path from "node:path";
 import { createClient } from "@supabase/supabase-js";
 import { generateCompCode, hashCompCode } from "../src/lib/comp/code";
+import {
+  loadCompEnvironment,
+  resolveCompMode,
+  type CompEnvironment,
+} from "./comp-environment";
 
 type Args = {
   command: string;
@@ -28,6 +31,7 @@ function parseArgs(argv: string[]): Args {
   const [command = "help", ...rest] = argv;
   const positional: string[] = [];
   const flags: Record<string, string | boolean> = {};
+  const booleanFlags = new Set(["dev", "prod"]);
 
   for (let i = 0; i < rest.length; i += 1) {
     const token = rest[i];
@@ -38,6 +42,8 @@ function parseArgs(argv: string[]): Args {
     const [name, inline] = token.slice(2).split("=");
     if (inline !== undefined) {
       flags[name] = inline;
+    } else if (booleanFlags.has(name)) {
+      flags[name] = true;
     } else if (rest[i + 1] && !rest[i + 1].startsWith("--")) {
       flags[name] = rest[i + 1];
       i += 1;
@@ -49,34 +55,16 @@ function parseArgs(argv: string[]): Args {
   return { command, positional, flags };
 }
 
-function loadEnv(): void {
-  const envPath = path.resolve(__dirname, "..", ".env.local");
-  try {
-    process.loadEnvFile(envPath);
-  } catch {
-    // Already-exported env vars are fine; we validate below.
-  }
-}
-
 function die(message: string): never {
   console.error(`✗ ${message}`);
   process.exit(1);
 }
 
-function admin(allowWrite: boolean) {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.SUPABASE_SECRET_KEY;
-  if (!url || !key) {
-    die("NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SECRET_KEY are required (run `pnpm sync:env`).");
-  }
-
-  const isLocal = /localhost|127\.0\.0\.1/.test(url);
-  if (!isLocal && !allowWrite) {
-    die(`Refusing to touch ${url} without --prod.`);
-  }
-  console.log(`→ ${url}`);
-
-  return createClient(url, key, { auth: { autoRefreshToken: false, persistSession: false } });
+function admin(environment: CompEnvironment) {
+  console.log(`→ ${environment.label}: ${environment.supabaseUrl}`);
+  return createClient(environment.supabaseUrl, environment.secretKey, {
+    auth: { autoRefreshToken: false, persistSession: false },
+  });
 }
 
 function parseExpiry(value: string | boolean | undefined): string | null {
@@ -129,7 +117,7 @@ async function grant(db: Db, args: Args): Promise<void> {
   console.log(`✓ ${email} is on Pro${until ? ` until ${until}` : " for life"}.`);
 }
 
-async function code(db: Db, args: Args): Promise<void> {
+async function code(db: Db, args: Args, appUrl: string): Promise<void> {
   const plaintext = generateCompCode();
   const note = typeof args.flags.note === "string" ? args.flags.note : null;
   const uses = typeof args.flags.uses === "string" ? Number(args.flags.uses) : 1;
@@ -143,7 +131,6 @@ async function code(db: Db, args: Args): Promise<void> {
   });
   if (error) die(`Could not mint the code: ${error.message}`);
 
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://talysman.app";
   console.log(`\n  ${plaintext}\n`);
   console.log(`  ${appUrl}/redeem/${plaintext}`);
   console.log(
@@ -225,30 +212,34 @@ async function list(db: Db): Promise<void> {
 }
 
 async function main(): Promise<void> {
-  loadEnv();
   const args = parseArgs(process.argv.slice(2));
-  const write = args.command !== "list" && args.command !== "help";
   if (args.command === "help") {
     console.log(
       [
-        "pnpm comp grant  <email> [--note …] [--expires YYYY-MM-DD]  grant Pro to an existing account",
-        "pnpm comp code   [--note …] [--uses N] [--expires …]        mint a redemption code",
-        "pnpm comp revoke <email>                                    take a grant back",
-        "pnpm comp list                                              show grants and codes",
+        "pnpm comp grant  <email> [--note …] [--expires YYYY-MM-DD] [--dev]  grant Pro to an existing account",
+        "pnpm comp code   [--note …] [--uses N] [--expires …] [--dev]        mint a redemption code",
+        "pnpm comp revoke <email> [--dev]                                    take a grant back",
+        "pnpm comp list [--dev]                                              show grants and codes",
         "",
-        "Add --prod to act on a hosted Supabase project.",
+        "Production is the default. Add --dev to use local Supabase.",
       ].join("\n"),
     );
     return;
   }
 
-  const db = admin(write ? args.flags.prod === true : true);
+  let environment: CompEnvironment;
+  try {
+    environment = loadCompEnvironment(resolveCompMode(args.flags));
+  } catch (error) {
+    die(error instanceof Error ? error.message : String(error));
+  }
+  const db = admin(environment);
 
   switch (args.command) {
     case "grant":
       return grant(db, args);
     case "code":
-      return code(db, args);
+      return code(db, args, environment.appUrl);
     case "revoke":
       return revoke(db, args);
     case "list":

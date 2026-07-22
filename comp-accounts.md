@@ -21,12 +21,9 @@ so every "is this user entitled?" read — middleware, `requireSubscribed`, the 
 
 ## 2. Issuing a comp
 
-Everything runs from `apps/web` through one script. It needs `SUPABASE_SECRET_KEY`, which
-`pnpm sync:env` writes into `apps/web/.env.local`.
-
-```bash
-cd apps/web        # or use `pnpm comp …` from the repo root
-```
+Everything runs from the repository root through one script. It reads the selected Supabase
+admin credentials directly from `.credentials`: production by default, or local Supabase when
+you add `--dev`. It does not depend on or rewrite `.env.local`.
 
 ### They already have an account → grant it directly
 
@@ -65,7 +62,7 @@ it.
 | `--note "…"` | `grant`, `code` | Who it's for. Shows up in `pnpm comp list`. |
 | `--expires 2027-01-01` | `grant`, `code` | On a grant: Pro ends then. On a code: the *code* goes stale then (the grant it creates is still lifetime). |
 | `--uses N` | `code` | Multi-use code, capped at N redemptions. Default 1. |
-| `--prod` | all writes | Required to write to a hosted Supabase project. Without it the script refuses anything that isn't localhost. |
+| `--dev` | all commands | Target local Supabase. Without this flag, the command targets production. |
 
 ### Seeing what's out there
 
@@ -170,13 +167,10 @@ granting `select`/DML on new public tables by default, which leaves RLS policies
 locally, every table returned `permission denied` before this migration. It's idempotent, so
 it's a no-op if the hosted project already has the grants.
 
-Then issue against production. `pnpm comp` targets whatever `.env.local` points at, so switch
-it to prod credentials first and switch back afterward:
+Then issue against production (the default):
 
 ```bash
-pnpm --filter @talysman/web sync:env --mode=prod
-pnpm comp code --note "mom" --prod
-pnpm --filter @talysman/web sync:env          # restore dev/localhost
+pnpm comp code --note "mom"
 ```
 
 ---
@@ -186,9 +180,9 @@ pnpm --filter @talysman/web sync:env          # restore dev/localhost
 ```bash
 supabase migration up --workdir apps/web   # apply 0004/0005 locally
 pnpm --filter @talysman/web test           # unit tests, incl. tests/unit/comp-entitlement.test.ts
-pnpm comp code --note smoke                # mint, then redeem at http://localhost:3000/redeem/<code>
-pnpm comp list                             # confirm the grant landed and the code burned
-pnpm comp revoke <email>                   # confirm the account drops to Free
+pnpm comp code --note smoke --dev          # mint, then redeem at http://localhost:3000/redeem/<code>
+pnpm comp list --dev                       # confirm the grant landed and the code burned
+pnpm comp revoke <email> --dev             # confirm the account drops to Free
 ```
 
 The redemption function's own outcomes (`ok`, `already_comped`, `exhausted`, `not_found`,

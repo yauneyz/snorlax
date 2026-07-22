@@ -1,24 +1,14 @@
 * part 1: demo
 auth
-- password reset
-- test on windows
-  - dead man works
-  - sign out/in
-  - comp verification
 - macos added to release options, installed on jessica's computer
 - web app is reasonable
-- oauth-setup.md
+- password reset?
 - browser extension hosting/upload
   - firefox
     - comped account for reviewers
   - chrome
     - extension screenshots
-- auto-update verification
-- auth-verification.md
-
-- app picker for app blocking needs improvement
-- deadman switch works on windows
-
+- payments
 
 
 

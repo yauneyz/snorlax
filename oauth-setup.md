@@ -128,56 +128,87 @@ The restart is required because Supabase Auth reads provider configuration when 
 starts. `pnpm sync:env` writes the Google secret to the gitignored `apps/web/.env`; web and
 desktop clients receive only an enabled/disabled flag.
 
-## 7. Configure production Supabase
+## 7. Add the production redirect URI to the Google client
 
-In **Supabase → Authentication → Sign In / Providers → Google**:
+The desktop app and web app both complete OAuth at Supabase's hosted callback, so the
+**production** Supabase callback must be an Authorized redirect URI on the Google client — in
+addition to the local one from step 5.
 
-1. Enable Google.
-2. Paste the production Google client ID and client secret.
-3. Save the provider configuration.
-
-Under **Authentication → URL Configuration**, set the production Site URL and ensure these exact
-redirect URLs are allowed:
+In **Google Auth Platform → Clients → `Talysman Authentication`**, confirm the Authorized
+redirect URIs include:
 
 ```text
-https://<your-production-domain>/api/auth/callback
-talysman://auth/callback
-talysman://auth/reset-callback
+http://127.0.0.1:54321/auth/v1/callback
+https://lkanoehzgogtrxzycutl.supabase.co/auth/v1/callback
 ```
 
-Then change the root `.credentials` setting to:
+The second is the production project (`lkanoehzgogtrxzycutl`) callback. Without it, prod OAuth
+fails with `redirect_uri_mismatch`.
+
+> The committed `oauth/google-web-client.json` is a *download* of the client and does **not**
+> list `redirect_uris`/`javascript_origins` — those live in the Google Console, not the JSON.
+> A missing key in the file tells you nothing; verify in the Console.
+
+Also confirm the OAuth consent screen is **Published**, not in **Testing** — a Testing app only
+lets explicitly listed test users sign in to production.
+
+## 8. Configure production Supabase auth (CLI)
+
+Production auth settings (site URL, redirect allow-list, Google provider, email confirmation)
+are managed as code via the `[remotes.prod]` block in `apps/web/supabase/config.toml` and pushed
+with the Supabase CLI. This replaces clicking through the dashboard.
+
+**Why a `[remotes.prod]` block exists separately from the base config:** `supabase config push`
+sends the *merged* config, so any prod-sensitive value must be **restated** under
+`[remotes.prod]` or it inherits the local-dev value. The most important divergence is email
+confirmation — local dev keeps `enable_confirmations = false` for fast test signups, but prod
+sets it `true` so users must verify address ownership. `redirect_uri` under
+`[auth.external.google]` is local-only and is intentionally *not* restated (the management API
+has no field for it; the hosted callback is derived from the project ref).
+
+Link once (from `apps/web`), then push:
+
+```bash
+cd apps/web
+supabase link --project-ref lkanoehzgogtrxzycutl
+
+# Secrets are read straight out of the gitignored JSON, never echoed or committed.
+SUPABASE_AUTH_EXTERNAL_GOOGLE_CLIENT_ID=$(jq -r .web.client_id ../oauth/google-web-client.json) \
+SUPABASE_AUTH_EXTERNAL_GOOGLE_CLIENT_SECRET=$(jq -r .web.client_secret ../oauth/google-web-client.json) \
+supabase config push --project-ref lkanoehzgogtrxzycutl
+```
+
+This push is safe to run before the feature is enabled — nothing user-visible changes until the
+`enabled_prod` flag flips (step 9), because both web and desktop hide the Google buttons while
+the flag is false.
+
+## 9. Enable Google auth in production
+
+Flip the flag in the root `.credentials` file:
 
 ```toml
 [google_auth]
-enabled_dev = true
+enabled_dev  = true
 enabled_prod = true
 credentials_file = "oauth/google-web-client.json"
 ```
 
-The configured JSON file supplies the client ID and secret to local Supabase. Production
-credentials remain in the Supabase dashboard; `enabled_prod` controls whether production web
-and desktop clients display Google authentication.
+`enabled_prod` is the single switch that reveals Google authentication in production web and
+desktop clients. The client ID/secret are supplied to Supabase by the push in step 8; they never
+ship to clients — web and desktop receive only the enabled/disabled flag.
 
-Sync the production feature flag:
+Then propagate the flag to each client:
 
-```bash
-pnpm sync:env:prod
-```
+- **Web** — `pnpm sync:env:prod` writes `NEXT_PUBLIC_GOOGLE_AUTH_ENABLED=true` (to Vercel when
+  `VERCEL_ENV` targets prod). Redeploy the web app to pick it up.
+- **Desktop** — the flag is **baked in at build time** (`GOOGLE_AUTH_ENABLED` →
+  `__APP_CONFIG__` in `apps/desktop/electron.vite.config.ts`). Existing installs will **not**
+  pick it up. You must cut a **new desktop release** and let auto-update ship it.
 
-## 8. Verify the integration
+## 10. Verify
 
-Test both the website and a packaged desktop build:
-
-1. Sign up with a Google account that has never used Talysman.
-2. Confirm Supabase creates one `auth.users` row and one corresponding `profiles` row.
-3. Confirm the profile contains the expected email, name, and avatar.
-4. Sign out, then use Google again and confirm it reuses the same account.
-5. Start with an existing confirmed email/password account, then use Google with the same
-   verified email. Confirm Supabase links the identity without creating a duplicate profile.
-6. Cancel the Google chooser and confirm the initiating login/signup surface shows a recoverable
-   error.
-7. Test the desktop callback while Talysman is running and from a cold start.
-8. Confirm desktop logs do not contain OAuth authorization codes.
+See **`oauth-verification.md`** for the full dev + prod end-to-end verification runbook (both web
+and a packaged desktop build, account linking, cold-start deep links, and log hygiene).
 
 ## References
 
