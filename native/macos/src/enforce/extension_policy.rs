@@ -7,10 +7,12 @@ use std::io;
 use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 
+pub use talysman_common::extension_identity::{
+    CHROME_STORE_ID as CHROME_EXT_ID, EDGE_STORE_ID as EDGE_EXT_ID,
+    FIREFOX_ID as FIREFOX_EXT_ID,
+};
+
 pub const HOST_NAME: &str = "com.talysman.host";
-pub const CHROME_EXT_ID: &str = "fjohodlenndbieegdcbpblcjkncdngpb";
-pub const EDGE_EXT_ID: &str = "";
-pub const FIREFOX_EXT_ID: &str = "talysman@talysman.app";
 
 const CHROMIUM_MANIFEST_DIRS: &[&str] = &[
     "/Library/Google/Chrome/NativeMessagingHosts",
@@ -131,17 +133,24 @@ mod tests {
     use super::*;
 
     #[test]
-    fn chromium_manifest_allows_configured_store_origins() {
+    fn chromium_manifest_allows_configured_origins() {
         let manifest = chromium_manifest(Path::new(
             "/Applications/Talysman.app/Contents/Resources/bin/talysman-natmsg",
         ));
         let value: serde_json::Value = serde_json::from_str(&manifest).unwrap();
         assert_eq!(value["name"], HOST_NAME);
         assert_eq!(value["type"], "stdio");
-        assert_eq!(
-            value["allowed_origins"],
-            serde_json::json!([format!("chrome-extension://{CHROME_EXT_ID}/")])
-        );
+        let origins = value["allowed_origins"].as_array().unwrap();
+        let configured_ids: Vec<&str> = [CHROME_EXT_ID, EDGE_EXT_ID]
+            .into_iter()
+            .filter(|id| !id.is_empty())
+            .collect();
+        assert_eq!(origins.len(), configured_ids.len());
+        for id in configured_ids {
+            assert!(origins
+                .iter()
+                .any(|origin| origin == &format!("chrome-extension://{id}/")));
+        }
     }
 
     #[test]

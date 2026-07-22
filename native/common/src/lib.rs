@@ -8,3 +8,8 @@
 
 pub mod browsers;
 pub mod watchdog;
+
+/// Browser-store and sideload identities generated from `extension-identities.json`.
+pub mod extension_identity {
+    include!(concat!(env!("OUT_DIR"), "/extension_identity.rs"));
+}

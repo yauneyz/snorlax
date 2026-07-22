@@ -58,8 +58,9 @@ user-installed extension in place and pushes `active:false` so it clears its rul
 
 ## Store packages and identities
 
-`pnpm build:extension` builds three upload-ready ZIP files under `apps/extension/dist/`, plus an
-unpacked directory for each browser:
+`pnpm build:extension` builds three upload-ready ZIP files and matching unpacked directories under
+`apps/extension/dist/`. The same keyed `dist/chrome` package is used for Chrome Web Store upload and
+Chrome's **Load unpacked** button:
 
 ```text
 talysman-chrome-<version>.zip
@@ -77,13 +78,19 @@ talysman-firefox-<version>.zip
 ```
 
 Chrome Web Store, Microsoft Edge Add-ons, and Firefox AMO sign, host, and update their respective
-packages. The manifests contain no custom `update_url`.
+packages. The manifests contain no custom `update_url`. The Chrome manifest includes the Web Store
+public key so its ZIP and unpacked directory share the official item ID.
 
-Firefox uses the authored ID `talysman@talysman.app`. Chrome and Edge assign separate IDs when
-their store items are created. Chrome is configured as `fjohodlenndbieegdcbpblcjkncdngpb`; after
-the first Edge upload, copy its assigned ID into `EDGE_EXT_ID` in each platform's
-`native/{windows,linux,macos}/src/enforce/extension_policy.rs`. The native host manifest must allow
-both Chromium store origins.
+Firefox uses the authored ID `talysman@talysman.app`. Chrome and Edge assign separate IDs when their
+store items are created, before review or publication. All store IDs and Chrome's Web Store public
+key live in `native/common/extension-identities.json`; update that one file after creating a new
+store item. Chrome is currently configured as `jblidbjafmpbpednomngbbmpkihedeko`.
+
+Use `apps/extension/dist/chrome` for Load unpacked and upload
+`talysman-chrome-<version>.zip` to Chrome Web Store. They contain the same files, including the public
+key copied from the Chrome Web Store Package tab, so Chrome assigns the official item ID
+`jblidbjafmpbpednomngbbmpkihedeko` on every machine. No private key is generated, stored, or
+distributed. The normal native service allowlists that same ID.
 
 The `HOST_NAME` (`com.talysman.host`) must match between `background.js` and
 `extension_policy.rs`. The native host is staged next to the service binaries by
@@ -95,11 +102,9 @@ The `HOST_NAME` (`com.talysman.host`) must match between `background.js` and
 1. **Unit:** `pnpm vitest run tests/electron/unit/extension-rules.test.ts` (rule generation), plus
    `cargo test --manifest-path native/linux/Cargo.toml extension_policy` and the equivalent
    `native/macos/Cargo.toml` command for native host manifests.
-2. **Build + load unpacked (dev):** `pnpm build:extension`, then load
-   `apps/extension/dist/chrome`, `apps/extension/dist/edge`, or
-   `apps/extension/dist/firefox/manifest.json`. Native messaging in Chrome/Edge will work after the
-   corresponding store IDs are wired into the service policy. Open the toolbar action to verify the
-   connection and focus status; the popup intentionally contains no controls.
+2. **Build + load unpacked (dev/testers):** `pnpm build:extension`, then load
+   `apps/extension/dist/chrome` in Chrome. Open the toolbar action to verify the connection and focus
+   status; the popup intentionally contains no controls.
 3. **Store release prep:** `pnpm release:extension`, then inspect
    `apps/extension/release/store/` and `apps/extension/release/store-submission.json`.
 4. **End-to-end:** run the service (`talysman-svc --console`), enable focus with `reddit.com`

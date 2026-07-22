@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 /**
- * Build the three browser-store deliverables from the shared extension source.
+ * Build browser-store deliverables from the shared extension source.
  *
  * Output:
- *   apps/extension/dist/chrome/                         unpacked Chrome build
+ *   apps/extension/dist/chrome/                         Chrome upload + Load-unpacked build
  *   apps/extension/dist/edge/                           unpacked Edge build
  *   apps/extension/dist/firefox/                        unpacked Firefox build
  *   apps/extension/dist/talysman-chrome-<version>.zip  Chrome Web Store upload
@@ -11,9 +11,12 @@
  *   apps/extension/dist/talysman-firefox-<version>.zip Firefox AMO upload
  *
  * The stores sign, host, and update the published packages. Store update URLs and store-assigned
- * Chromium IDs therefore do not belong in these manifests. Firefox keeps its authored Gecko ID.
+ * Chromium update URLs therefore do not belong in these manifests. The Chrome package has the Web
+ * Store public manifest `key` from native/common/extension-identities.json, so its ZIP and unpacked
+ * directory both use the store ID. Firefox keeps its authored Gecko ID.
  */
 
+import crypto from "node:crypto";
 import {
   copyFileSync,
   mkdirSync,
@@ -30,6 +33,10 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const extDir = resolve(root, "apps/extension");
 const srcDir = resolve(extDir, "src");
 const distDir = resolve(extDir, "dist");
+const identitiesPath = resolve(
+  root,
+  "native/common/extension-identities.json",
+);
 // The stores render the 128px icon; take it straight from the brand kit rather than reusing the
 // desktop app's resource, which is sized for window/tray use.
 const iconFiles = {
@@ -54,8 +61,37 @@ const extensionFiles = [
   "popup-view.js",
 ];
 
-// This is authored by us and remains stable across AMO versions.
-const FIREFOX_ID = "talysman@talysman.app";
+const identities = JSON.parse(readFileSync(identitiesPath, "utf8"));
+const FIREFOX_ID = identities.firefoxId;
+
+function chromiumId(spkiDer) {
+  const hash = crypto.createHash("sha256").update(spkiDer).digest();
+  let id = "";
+  for (let i = 0; i < 16; i++) {
+    id += String.fromCharCode(97 + (hash[i] >> 4));
+    id += String.fromCharCode(97 + (hash[i] & 0x0f));
+  }
+  return id;
+}
+
+function chromeIdentity() {
+  const manifestKey = identities.chromePublicKey;
+  const expectedId = identities.chromeStoreId;
+  if (typeof manifestKey !== "string" || typeof expectedId !== "string") {
+    throw new Error(
+      `${relative(root, identitiesPath)} must define chromePublicKey and chromeStoreId`,
+    );
+  }
+  const spkiDer = Buffer.from(manifestKey, "base64");
+  crypto.createPublicKey({ key: spkiDer, type: "spki", format: "der" });
+  const actualId = chromiumId(spkiDer);
+  if (actualId !== expectedId) {
+    throw new Error(
+      `Chrome Web Store public key derives ${actualId}, but extension-identities.json declares ${expectedId}`,
+    );
+  }
+  return { manifestKey, id: actualId };
+}
 
 function bundledBackground() {
   const rules = readFileSync(resolve(srcDir, "rules.js"), "utf8").replace(
@@ -232,6 +268,12 @@ const chromiumManifest = {
   ...storeNeutralManifest(base),
   background: { service_worker: "background.js" },
 };
+const { manifestKey: chromeSideloadKey, id: chromeSideloadId } =
+  chromeIdentity();
+const chromeManifest = {
+  ...chromiumManifest,
+  key: chromeSideloadKey,
+};
 const firefoxManifest = storeNeutralManifest(base);
 delete firefoxManifest.minimum_chrome_version;
 firefoxManifest.browser_specific_settings = {
@@ -246,7 +288,7 @@ firefoxManifest.browser_specific_settings = {
 firefoxManifest.background = { scripts: ["background.js"] };
 
 const stores = [
-  { name: "chrome", manifest: chromiumManifest },
+  { name: "chrome", manifest: chromeManifest },
   { name: "edge", manifest: chromiumManifest },
   { name: "firefox", manifest: firefoxManifest },
 ];
@@ -258,6 +300,18 @@ for (const store of stores) {
   zipDirectory(unpackedDir, zipPath);
   artifacts.push({ ...store, unpackedDir, zipPath });
 }
+
+writeFileSync(
+  resolve(distDir, "ids.json"),
+  JSON.stringify(
+    {
+      chrome: chromeSideloadId,
+      firefox: FIREFOX_ID,
+    },
+    null,
+    2,
+  ) + "\n",
+);
 
 console.log("\nOK Browser store packages built:");
 for (const artifact of artifacts) {
@@ -271,7 +325,9 @@ for (const artifact of artifacts) {
     `  ${artifact.name.padEnd(7)} ${relative(root, artifact.unpackedDir)}`,
   );
 }
-console.log(`\nFirefox Gecko ID: ${FIREFOX_ID}`);
+console.log(`\nChrome ID (upload + Load unpacked): ${chromeSideloadId}`);
+console.log(`Firefox Gecko ID: ${FIREFOX_ID}`);
+console.log(`Chrome Web Store ID: ${identities.chromeStoreId}`);
 console.log(
-  "Chrome and Edge IDs are assigned by their stores after the first upload.",
+  `Edge Add-ons ID: ${identities.edgeStoreId || "not assigned yet"}`,
 );

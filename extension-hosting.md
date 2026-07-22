@@ -20,10 +20,10 @@ producing:
 
 ```text
 apps/extension/dist/
-├── chrome/                              # unpacked Chrome inspection build
+├── chrome/                              # Chrome upload + Load-unpacked build
 ├── edge/                                # unpacked Edge inspection build
 ├── firefox/                             # unpacked Firefox inspection build
-├── talysman-chrome-<version>.zip       # upload to Chrome Web Store
+├── talysman-chrome-<version>.zip       # same Chrome package, zipped for upload
 ├── talysman-edge-<version>.zip         # upload to Microsoft Edge Add-ons
 └── talysman-firefox-<version>.zip      # upload to Firefox AMO
 ```
@@ -43,14 +43,16 @@ identity notes for the submission.
 The shared source is `apps/extension/manifest.json` plus `apps/extension/src/`. The build script
 creates browser-specific manifests:
 
-- Chrome: Manifest V3 service worker, no `key`, no `update_url`.
+- Chrome: Manifest V3 service worker with the public `key` from
+  `native/common/extension-identities.json`, giving both the ZIP and unpacked directory the Chrome
+  Web Store item ID; no `update_url`.
 - Edge: Manifest V3 service worker, separate package so Edge-specific changes can diverge later,
   no `key`, no `update_url`.
 - Firefox: Manifest V3 background script, fixed Gecko ID `talysman@talysman.app`, no
   `update_url`.
 
-Chrome and Edge IDs are assigned by their stores after first upload. Firefox's Gecko ID is authored
-by us and must remain stable.
+Chrome and Edge IDs are assigned when their store items are created/uploaded, before review.
+Firefox's Gecko ID is authored by us and must remain stable.
 
 ## First Publication
 
@@ -64,8 +66,9 @@ by us and must remain stable.
 5. Complete listing copy, screenshots, icons, privacy disclosures, data-use forms, and reviewer
    instructions.
 6. Submit for review/certification.
-7. After first Chrome and Edge items exist, record their assigned extension IDs.
-8. Wire those IDs into each platform's `native/{windows,linux,macos}/src/enforce/extension_policy.rs`.
+7. After the Chrome and Edge items exist, record their assigned extension IDs in
+   `native/common/extension-identities.json`.
+8. Rebuild every native platform; their allowlists are generated from that identity file.
 9. Build the desktop installer with the final IDs and use that installer for reviewer and clean-VM
    validation.
 
@@ -75,16 +78,18 @@ The elevated desktop installer and service register only the local native-messag
 not force-install or lock the browser extension. Registration is system-wide on Windows, Linux,
 and macOS, and service startup repairs missing manifests.
 
-After first store publication, set:
+Before store review, set:
 
-```rust
-pub const CHROME_EXT_ID: &str = "fjohodlenndbieegdcbpblcjkncdngpb";
-pub const EDGE_EXT_ID: &str = "<Microsoft Edge Add-ons extension ID>";
-pub const FIREFOX_EXT_ID: &str = "talysman@talysman.app";
+```json
+{
+  "chromeStoreId": "jblidbjafmpbpednomngbbmpkihedeko",
+  "edgeStoreId": "<Microsoft Edge Add-ons extension ID>",
+  "firefoxId": "talysman@talysman.app"
+}
 ```
 
-Keep these constants synchronized in the Windows, Linux, and macOS backends. They restrict which
-store-installed extensions may launch `com.talysman.host`. An empty Chrome or Edge ID means that
+These values restrict which extensions may launch `com.talysman.host`. The Chrome Load-unpacked
+build uses the Web Store public key and therefore the same ID. An empty Chrome or Edge ID means that
 store build cannot launch the native host.
 
 ## Routine Updates

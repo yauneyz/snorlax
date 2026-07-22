@@ -16,22 +16,21 @@ use std::process::Command;
 
 use crate::paths::nmh_dir;
 use crate::run::run_command;
+pub use talysman_common::extension_identity::{
+    CHROME_STORE_ID as CHROME_EXT_ID, EDGE_STORE_ID as EDGE_EXT_ID,
+    FIREFOX_ID as FIREFOX_EXT_ID,
+};
 
 /// Native-messaging host name. MUST match `HOST_NAME` in the extension's `src/background.js`.
 pub const HOST_NAME: &str = "com.talysman.host";
 
 // --- Packaging-time identities -------------------------------------------------------------------
-// Chrome and Edge assign separate IDs when their store items are first created. Configure each ID
-// after its first submission; an empty value means that browser has not been configured yet. These
-// IDs only restrict which store extensions may launch the native host; they do not install them.
-pub const CHROME_EXT_ID: &str = "fjohodlenndbieegdcbpblcjkncdngpb";
-pub const EDGE_EXT_ID: &str = "";
-
-// Firefox uses the authored Gecko ID in manifest.json, including for AMO-listed builds.
-pub const FIREFOX_EXT_ID: &str = "talysman@talysman.app";
+// Store IDs are generated from native/common/extension-identities.json. The Chrome Load-unpacked
+// build uses the Web Store item's public key, so it has this same CHROME_EXT_ID.
 
 const LEGACY_CHROMIUM_FORCELIST_VALUE: &str =
     "cpemmokfjbiicoaocpmpdeiobnilpokc;https://talysman.app/ext/chromium/updates.xml";
+const LEGACY_SIDELOAD_EXT_ID: &str = "cpemmokfjbiicoaocpmpdeiobnilpokc";
 const LEGACY_FIREFOX_XPI_URL: &str = "https://talysman.app/ext/firefox/talysman-0.1.0.xpi";
 const LEGACY_FIREFOX_AMO_URL: &str =
     "https://addons.mozilla.org/firefox/downloads/latest/talysman@talysman.app/latest.xpi";
@@ -163,7 +162,12 @@ pub fn uninstall() {
 /// Remove only policy values known to have been written by Talysman. List-policy value names are
 /// shared with administrators, so deleting value `1` unconditionally could remove unrelated policy.
 fn remove_talysman_managed_install_policies() {
-    let chromium_values = [LEGACY_CHROMIUM_FORCELIST_VALUE, CHROME_EXT_ID, EDGE_EXT_ID];
+    let chromium_values = [
+        LEGACY_CHROMIUM_FORCELIST_VALUE,
+        CHROME_EXT_ID,
+        EDGE_EXT_ID,
+        LEGACY_SIDELOAD_EXT_ID,
+    ];
     for (_, policy_root, _, _) in CHROMIUM_BROWSERS {
         reg_delete_value_if_matches(
             &format!(r"HKLM\{policy_root}\ExtensionInstallForcelist"),

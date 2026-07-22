@@ -7,8 +7,26 @@ import { dirname, resolve } from "node:path";
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const extensionDir = resolve(root, "apps/extension");
 const distDir = resolve(extensionDir, "dist");
+const identities = readJson(
+  resolve(root, "native/common/extension-identities.json"),
+);
 const expectedPermissions = ["declarativeNetRequest", "nativeMessaging"];
 const expectedHostPermissions = ["<all_urls>"];
+const expectedFiles = [
+  "background.js",
+  "blocked-logo.svg",
+  "blocked.css",
+  "blocked.html",
+  "icon-16.png",
+  "icon-32.png",
+  "icon-48.png",
+  "icon.png",
+  "manifest.json",
+  "popup-view.js",
+  "popup.css",
+  "popup.html",
+  "popup.js",
+];
 
 function fail(message) {
   throw new Error(`Extension compliance audit failed: ${message}`);
@@ -18,7 +36,7 @@ function readJson(path) {
   return JSON.parse(readFileSync(path, "utf8"));
 }
 
-function assertMinimalManifest(manifest, store) {
+function assertMinimalManifest(manifest, store, expectedKey = null) {
   if (manifest.manifest_version !== 3) fail(`${store}: Manifest V3 is required`);
   const actual = [...(manifest.permissions ?? [])].sort();
   if (JSON.stringify(actual) !== JSON.stringify([...expectedPermissions].sort())) {
@@ -30,8 +48,15 @@ function assertMinimalManifest(manifest, store) {
   if ("optional_host_permissions" in manifest) {
     fail(`${store}: optional host permissions are not used`);
   }
-  for (const key of ["key", "update_url"]) {
-    if (key in manifest) fail(`${store}: store packages must not contain ${key}`);
+  if ("update_url" in manifest) {
+    fail(`${store}: packages must not contain update_url`);
+  }
+  if (expectedKey !== null) {
+    if (manifest.key !== expectedKey) {
+      fail(`${store}: manifest key must match extension-identities.json`);
+    }
+  } else if ("key" in manifest) {
+    fail(`${store}: package must not contain key`);
   }
   if (!manifest.description?.toLowerCase().includes("companion")) {
     fail(`${store}: description must disclose the desktop companion dependency`);
@@ -44,30 +69,23 @@ function assertMinimalManifest(manifest, store) {
 const base = readJson(resolve(extensionDir, "manifest.json"));
 assertMinimalManifest(base, "source");
 
-for (const store of ["chrome", "edge", "firefox"]) {
-  const storeDir = resolve(distDir, store);
+for (const [store, directory] of Object.entries({
+  chrome: "chrome",
+  edge: "edge",
+  firefox: "firefox",
+})) {
+  const storeDir = resolve(distDir, directory);
   const files = readdirSync(storeDir).sort();
-  const expectedFiles = [
-    "background.js",
-    "blocked-logo.svg",
-    "blocked.css",
-    "blocked.html",
-    "icon-16.png",
-    "icon-32.png",
-    "icon-48.png",
-    "icon.png",
-    "manifest.json",
-    "popup-view.js",
-    "popup.css",
-    "popup.html",
-    "popup.js",
-  ];
   if (JSON.stringify(files) !== JSON.stringify(expectedFiles)) {
     fail(`${store}: package files are ${files.join(", ")}`);
   }
 
   const manifest = readJson(resolve(storeDir, "manifest.json"));
-  assertMinimalManifest(manifest, store);
+  assertMinimalManifest(
+    manifest,
+    store,
+    store === "chrome" ? identities.chromePublicKey : null,
+  );
   const expectedActionIcons = { 16: "icon-16.png", 32: "icon-32.png" };
   if (JSON.stringify(manifest.action?.default_icon) !== JSON.stringify(expectedActionIcons)) {
     fail(`${store}: toolbar action must use the packaged Talysman icons`);
@@ -112,6 +130,11 @@ for (const store of ["chrome", "edge", "firefox"]) {
   for (const [label, pattern] of prohibitedCode) {
     if (pattern.test(packagedText)) fail(`${store}: unexpected ${label} in packaged code`);
   }
+}
+
+const generatedIds = readJson(resolve(distDir, "ids.json"));
+if (generatedIds.chrome !== identities.chromeStoreId) {
+  fail("chrome: generated ID does not match extension-identities.json");
 }
 
 console.log("OK Extension compliance audit passed");

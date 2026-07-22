@@ -6,12 +6,13 @@ Chrome was not connecting its heartbeat to the running Talysman instance for two
 reasons: Windows did not allow any Chrome extension origin, while Linux and macOS shipped the
 native host binary without registering a browser manifest.
 
-In each platform's `native/{windows,linux,macos}/src/enforce/extension_policy.rs`, the Chrome
-identity is configured while the Edge identity remains empty:
+The canonical identities are configured in `native/common/extension-identities.json`; every native
+backend compiles its allowlist from that file. The Chrome store identity is configured while the
+Edge identity remains empty:
 
-```rust
-pub const CHROME_EXT_ID: &str = "fjohodlenndbieegdcbpblcjkncdngpb";
-pub const EDGE_EXT_ID: &str = "";
+```json
+"chromeStoreId": "jblidbjafmpbpednomngbbmpkihedeko",
+"edgeStoreId": ""
 ```
 
 Before the Chrome ID was configured, the Windows-generated native-messaging manifest contained:
@@ -39,7 +40,7 @@ permitted. See the
 The configured Chrome extension ID is:
 
 ```text
-fjohodlenndbieegdcbpblcjkncdngpb
+jblidbjafmpbpednomngbbmpkihedeko
 ```
 
 ### Chrome Web Store installation
@@ -52,7 +53,7 @@ After configuring the store-assigned ID as the production `CHROME_EXT_ID`:
 
    ```json
    {
-     "allowed_origins": ["chrome-extension://fjohodlenndbieegdcbpblcjkncdngpb/"]
+     "allowed_origins": ["chrome-extension://jblidbjafmpbpednomngbbmpkihedeko/"]
    }
    ```
 
@@ -66,10 +67,9 @@ the user's Chrome profile.
 
 ### Unpacked development installation
 
-Do not use an unpacked extension's path-derived ID as the production `CHROME_EXT_ID`. Instead,
-create a stable development extension identity and include it in `allowed_origins` only for
-development builds. Production native-host manifests must continue to allow only store-assigned
-extension IDs.
+Load `apps/extension/dist/chrome`, whose checked-in Chrome Web Store public key gives it the official
+item ID `jblidbjafmpbpednomngbbmpkihedeko`. The normal native service allows that same origin, so one
+desktop installer works for Load-unpacked testing, Web Store review, and publication.
 
 This prevents a publicly reproducible development identity from being trusted by production
 Talysman installations.

@@ -7,7 +7,8 @@
  *   - Microsoft Edge Add-ons signs, hosts, and updates the Edge package.
  *   - Firefox AMO signs, hosts, and updates the Firefox package.
  *
- * Store packages must not contain custom update_url or key values.
+ * Store packages must not contain custom update_url values. Chrome includes the Web Store public
+ * key so the upload ZIP and Load-unpacked directory have the same item ID.
  */
 
 import { spawnSync } from "node:child_process";
@@ -27,7 +28,10 @@ const extDir = resolve(root, "apps/extension");
 const distDir = resolve(extDir, "dist");
 const releaseDir = resolve(extDir, "release");
 const storeDir = resolve(releaseDir, "store");
-const FIREFOX_ID = "talysman@talysman.app";
+const identities = JSON.parse(
+  readFileSync(resolve(root, "native/common/extension-identities.json"), "utf8"),
+);
+const FIREFOX_ID = identities.firefoxId;
 
 function fail(message) {
   console.error(message);
@@ -57,7 +61,13 @@ function assertFile(path) {
 
 function assertStoreManifest(store, manifest) {
   if ("update_url" in manifest) fail(`${store}: store manifest must not contain update_url`);
-  if ("key" in manifest) fail(`${store}: store manifest must not contain key`);
+  if (store === "chrome") {
+    if (manifest.key !== identities.chromePublicKey) {
+      fail("chrome: manifest key must match extension-identities.json");
+    }
+  } else if ("key" in manifest) {
+    fail(`${store}: store manifest must not contain key`);
+  }
   if (store === "firefox") {
     const geckoId = manifest.browser_specific_settings?.gecko?.id;
     if (geckoId !== FIREFOX_ID) {
@@ -118,14 +128,15 @@ function main() {
       }),
     ),
     identities: {
-      chrome: "assigned by Chrome Web Store after first upload",
-      edge: "assigned by Microsoft Edge Add-ons after first upload",
+      chrome: identities.chromeStoreId,
+      edge: identities.edgeStoreId || "not assigned yet",
       firefox: FIREFOX_ID,
     },
     releaseNotes: [
       "Upload each zip to its matching browser store.",
-      "Do not add custom update_url or key values to store manifests.",
-      "After first Chrome and Edge publication, wire the assigned IDs into native/windows/src/enforce/extension_policy.rs.",
+      "Do not add custom update_url values to store manifests.",
+      "The Chrome ZIP and dist/chrome directory are the same keyed package for upload and Load unpacked.",
+      "Store item IDs are assigned before review; record them in native/common/extension-identities.json before building the reviewer desktop installer.",
     ],
   };
   writeFileSync(
@@ -140,7 +151,8 @@ function main() {
     );
   }
   console.log(`\nFirefox Gecko ID: ${FIREFOX_ID}`);
-  console.log("Chrome and Edge IDs are assigned by their stores after first upload.");
+  console.log(`Chrome Web Store ID: ${identities.chromeStoreId}`);
+  console.log(`Edge Add-ons ID: ${identities.edgeStoreId || "not assigned yet"}`);
 }
 
 main();

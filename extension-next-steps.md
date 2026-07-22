@@ -45,7 +45,8 @@ unzip -l apps/extension/release/store/talysman-firefox-<version>.zip
 
 Each archive must show only `manifest.json`, `background.js`, the blocked-page HTML/CSS/brand mark,
 the popup HTML/CSS/JS, and the packaged 16/32/48/128px icons at its root. No store package should
-contain `key` or `update_url`.
+contain `update_url`. The Chrome package must contain the public `key` recorded in
+`native/common/extension-identities.json`; Edge and Firefox remain key-free.
 
 ## 3. Publish Chrome
 
@@ -58,7 +59,7 @@ contain `key` or `update_url`.
 7. Record:
 
    ```text
-   Chrome extension ID: fjohodlenndbieegdcbpblcjkncdngpb
+   Chrome extension ID: jblidbjafmpbpednomngbbmpkihedeko
    Chrome listing URL:  ________________________________
    ```
 
@@ -106,15 +107,18 @@ AMO signs, hosts, and updates the extension. Do not self-host an XPI for the con
 
 ## 6. Wire Store IDs into the Desktop Service
 
-Edit each platform's `native/{windows,linux,macos}/src/enforce/extension_policy.rs`:
+Edit the canonical `native/common/extension-identities.json` before building the reviewer installer:
 
-```rust
-pub const CHROME_EXT_ID: &str = "fjohodlenndbieegdcbpblcjkncdngpb";
-pub const EDGE_EXT_ID: &str = "<Microsoft Edge Add-ons extension ID>";
-pub const FIREFOX_EXT_ID: &str = "talysman@talysman.app";
+```json
+{
+  "chromeStoreId": "jblidbjafmpbpednomngbbmpkihedeko",
+  "edgeStoreId": "<Microsoft Edge Add-ons extension ID>",
+  "firefoxId": "talysman@talysman.app"
+}
 ```
 
-The services will include those IDs in native-messaging allowlists. Run:
+The store assigns its item ID before review; there is no separate reviewer ID. The services compile
+their native-messaging allowlists from this file. Run:
 
 ```bash
 cargo test --manifest-path native/windows/Cargo.toml extension_policy

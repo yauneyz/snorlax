@@ -62,6 +62,11 @@ Firefox manifest data collection declaration: `required: ["none"]`
 
 ## Reviewer instructions
 
+The Chrome Web Store assigns the item ID before review. Before supplying the desktop test build,
+confirm the dashboard Item ID and public key match `chromeStoreId` and `chromePublicKey` in
+`native/common/extension-identities.json`; the native host allowlist and keyed Load-unpacked build
+are compiled from that file. Reviewers and local testers therefore use the same Chrome identity.
+
 1. Install the current Talysman desktop test build supplied in the private reviewer notes.
 2. Install the extension from the submitted package.
 3. In Talysman, add `example.com` to the blocked-domain list and activate focus.
