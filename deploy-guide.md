@@ -524,9 +524,9 @@ pnpm install --frozen-lockfile
 pnpm release:upload -- --require mac
 ```
 
-On macOS, `release:upload` builds, signs, notarizes, uploads, promotes, and verifies the
-macOS artifacts. `--require mac` is a safety assertion; it prevents an accidental run
-on the wrong host.
+On macOS, `release:upload` builds, embeds the Safari Web Extension, signs, notarizes, uploads,
+promotes, and verifies the macOS artifacts. `--require mac` is a safety assertion; it prevents an
+accidental run on the wrong host.
 
 #### 4. Verify the complete release
 

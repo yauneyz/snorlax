@@ -60,6 +60,12 @@ Edge privacy policy URL: `https://talysman.app/edge-extension-privacy`
 
 Firefox manifest data collection declaration: `required: ["none"]`
 
+Safari privacy policy URL: `https://talysman.app/browser-extension-privacy`
+
+Safari is embedded in the signed macOS Talysman app. Its native app-extension handler connects only
+to Talysman's local Unix-domain service socket; it does not contact an Internet service. The
+absolute-path sandbox exception is limited to the production and development Talysman socket paths.
+
 ## Reviewer instructions
 
 The Chrome Web Store assigns the item ID before review. Before supplying the desktop test build,

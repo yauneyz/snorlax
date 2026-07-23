@@ -32,6 +32,7 @@ const identities = JSON.parse(
   readFileSync(resolve(root, "native/common/extension-identities.json"), "utf8"),
 );
 const FIREFOX_ID = identities.firefoxId;
+const CHROMIUM_ID_PATTERN = /^[a-p]{32}$/;
 
 function fail(message) {
   console.error(message);
@@ -77,6 +78,14 @@ function assertStoreManifest(store, manifest) {
 }
 
 function main() {
+  if (!CHROMIUM_ID_PATTERN.test(identities.edgeStoreId ?? "")) {
+    fail(
+      "Edge Add-ons ID is not configured. Upload apps/extension/dist/talysman-edge-<version>.zip " +
+        "to a draft Partner Center listing, record its 32-character ID in " +
+        "native/common/extension-identities.json, then rerun pnpm release:extension.",
+    );
+  }
+
   run("node", ["scripts/build-extension.mjs"]);
   run("node", ["scripts/audit-extension.mjs"]);
 
@@ -129,7 +138,7 @@ function main() {
     ),
     identities: {
       chrome: identities.chromeStoreId,
-      edge: identities.edgeStoreId || "not assigned yet",
+      edge: identities.edgeStoreId,
       firefox: FIREFOX_ID,
     },
     releaseNotes: [
@@ -152,7 +161,7 @@ function main() {
   }
   console.log(`\nFirefox Gecko ID: ${FIREFOX_ID}`);
   console.log(`Chrome Web Store ID: ${identities.chromeStoreId}`);
-  console.log(`Edge Add-ons ID: ${identities.edgeStoreId || "not assigned yet"}`);
+  console.log(`Edge Add-ons ID: ${identities.edgeStoreId}`);
 }
 
 main();

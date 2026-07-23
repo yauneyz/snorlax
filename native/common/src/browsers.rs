@@ -87,6 +87,14 @@ pub const BROWSERS: &[BrowserDef] = &[
         linux_process: "firefox",
         mac_bundle: "org.mozilla.firefox",
     },
+    BrowserDef {
+        key: "safari",
+        class: BrowserClass::Supported,
+        // Safari is macOS-only. Empty non-macOS identities are ignored by the lookup helpers.
+        windows_image: "",
+        linux_process: "",
+        mac_bundle: "com.apple.safari",
+    },
     // --- Known-unsupported (distinct binary, cannot host the extension) ---
     BrowserDef {
         key: "librewolf",
@@ -121,13 +129,17 @@ pub const BROWSERS: &[BrowserDef] = &[
 /// Look up a browser by Windows image name (case-insensitive).
 pub fn by_windows_image(image: &str) -> Option<&'static BrowserDef> {
     let image = image.to_ascii_lowercase();
-    BROWSERS.iter().find(|b| b.windows_image == image)
+    BROWSERS
+        .iter()
+        .find(|b| !b.windows_image.is_empty() && b.windows_image == image)
 }
 
 /// Look up a browser by Linux process name (case-insensitive).
 pub fn by_linux_process(name: &str) -> Option<&'static BrowserDef> {
     let name = name.to_ascii_lowercase();
-    BROWSERS.iter().find(|b| b.linux_process == name)
+    BROWSERS
+        .iter()
+        .find(|b| !b.linux_process.is_empty() && b.linux_process == name)
 }
 
 /// Look up a browser by macOS bundle identifier (case-insensitive). Helper bundles carry the
@@ -180,7 +192,8 @@ fn basename(path: &str) -> Option<&str> {
 fn by_nix_wrapped_comm(name: &str) -> Option<&'static BrowserDef> {
     let trimmed = name.strip_prefix('.').unwrap_or(name).to_ascii_lowercase();
     BROWSERS.iter().find(|b| {
-        trimmed.len() >= b.linux_process.len()
+        !b.linux_process.is_empty()
+            && trimmed.len() >= b.linux_process.len()
             && format!("{}-wrapped", b.linux_process).starts_with(&trimmed)
     })
 }
@@ -220,10 +233,15 @@ mod tests {
             by_mac_bundle("org.mozilla.firefox").map(|b| b.key),
             Some("firefox")
         );
+        assert_eq!(
+            by_mac_bundle("com.apple.Safari").map(|b| b.key),
+            Some("safari")
+        );
         // Prefix must respect the dot boundary — a different product sharing the leading
         // characters is not the same browser.
         assert!(by_mac_bundle("com.google.chromethingy").is_none());
-        assert!(by_mac_bundle("com.apple.safari").is_none());
+        assert!(by_windows_image("").is_none());
+        assert!(by_linux_process("").is_none());
     }
 
     #[test]

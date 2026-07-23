@@ -97,19 +97,28 @@ export function normalizeDomains(domains) {
  *                  semantics as the host-layer whitelist; expand CDN siblings upstream.)
  *   * block-all  — block all non-navigation requests and redirect top-level HTTP(S) navigations.
  *
+ * Safari's DNR implementation does not support Chromium's `requestDomains` condition. Its
+ * equivalent is one `urlFilter` rule per domain (`||example.com^`).
  * @param {State} state
+ * @param {{ safari?: boolean }} [options]
  * @returns {object[]}
  */
-export function buildRules(state) {
+export function buildRules(state, options = {}) {
   if (!state || !state.active) return [];
   const domains = normalizeDomains(state.domains);
+  const domainConditions = options.safari
+    ? domains.map((domain) => ({ urlFilter: `||${domain}^` }))
+    : domains.length > 0
+      ? [{ requestDomains: domains }]
+      : [];
   switch (state.mode) {
     case 'blacklist': {
       if (domains.length === 0) return [];
-      return [
-        blockRule(1, { requestDomains: domains }),
-        redirectMainFrameRule(2, { requestDomains: domains }),
-      ];
+      let id = 1;
+      return domainConditions.flatMap((condition) => [
+        blockRule(id++, condition),
+        redirectMainFrameRule(id++, condition),
+      ]);
     }
     case 'whitelist': {
       const rules = [
@@ -117,10 +126,13 @@ export function buildRules(state) {
         redirectMainFrameRule(2, { regexFilter: '^https?://' }),
       ];
       if (domains.length > 0) {
-        rules.push(
-          allowRule(3, { requestDomains: domains }),
-          allowRule(4, { requestDomains: domains, resourceTypes: MAIN_FRAME }),
-        );
+        let id = 3;
+        for (const condition of domainConditions) {
+          rules.push(
+            allowRule(id++, condition),
+            allowRule(id++, { ...condition, resourceTypes: MAIN_FRAME }),
+          );
+        }
       }
       return rules;
     }

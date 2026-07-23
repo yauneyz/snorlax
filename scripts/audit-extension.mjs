@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { readFileSync, readdirSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
 
@@ -132,7 +132,7 @@ for (const [store, directory] of Object.entries({
   }
 
   const background = readFileSync(resolve(storeDir, "background.js"), "utf8");
-  if (!background.includes("chrome.runtime.onStartup.addListener(connect)")) {
+  if (!background.includes("browserApi.runtime.onStartup.addListener(connect)")) {
     fail(`${store}: background must wake the native connection on browser startup`);
   }
 }
@@ -140,6 +140,62 @@ for (const [store, directory] of Object.entries({
 const generatedIds = readJson(resolve(distDir, "ids.json"));
 if (generatedIds.chrome !== identities.chromeStoreId) {
   fail("chrome: generated ID does not match extension-identities.json");
+}
+if (generatedIds.edgeDev !== identities.chromeStoreId) {
+  fail("edge-dev: generated ID must use the native host's trusted Chrome development identity");
+}
+if (generatedIds.edgeStore !== (identities.edgeStoreId || null)) {
+  fail("edge: generated store ID does not match extension-identities.json");
+}
+
+const edgeDevDir = resolve(distDir, "edge-dev");
+const edgeDevFiles = readdirSync(edgeDevDir).sort();
+if (JSON.stringify(edgeDevFiles) !== JSON.stringify(expectedFiles)) {
+  fail(`edge-dev: package files are ${edgeDevFiles.join(", ")}`);
+}
+const edgeDevManifest = readJson(resolve(edgeDevDir, "manifest.json"));
+assertMinimalManifest(edgeDevManifest, "edge-dev", identities.chromePublicKey);
+if (edgeDevManifest.background?.service_worker !== "background.js") {
+  fail("edge-dev: Chromium service worker background is required");
+}
+
+if (process.platform === "darwin") {
+  if (generatedIds.safari !== "com.talysman.app.safari") {
+    fail("safari: generated app bundle ID changed");
+  }
+  const safariDir = resolve(distDir, "safari");
+  const safariFiles = readdirSync(safariDir).sort();
+  if (JSON.stringify(safariFiles) !== JSON.stringify(expectedFiles)) {
+    fail(`safari: package files are ${safariFiles.join(", ")}`);
+  }
+  const manifest = readJson(resolve(safariDir, "manifest.json"));
+  const expectedSafariPermissions = [
+    "declarativeNetRequestWithHostAccess",
+    "nativeMessaging",
+  ];
+  if (
+    JSON.stringify([...(manifest.permissions ?? [])].sort()) !==
+    JSON.stringify(expectedSafariPermissions.sort())
+  ) {
+    fail(`safari: permissions must be exactly ${expectedSafariPermissions.join(", ")}`);
+  }
+  if (JSON.stringify(manifest.host_permissions) !== JSON.stringify(expectedHostPermissions)) {
+    fail("safari: redirect rules require <all_urls> host access");
+  }
+  if (
+    JSON.stringify(manifest.background) !==
+    JSON.stringify({ scripts: ["background.js"], persistent: false })
+  ) {
+    fail("safari: non-persistent background script is required");
+  }
+  if (
+    !existsSync(resolve(distDir, "talysman-safari-" + manifest.version + ".zip")) ||
+    !existsSync(resolve(distDir, "safari-appex/Talysman Safari Extension.appex"))
+  ) {
+    fail("safari: source ZIP or compiled app extension is missing");
+  }
+} else if (generatedIds.safari !== null) {
+  fail("safari: non-macOS builds must omit Safari artifacts");
 }
 
 console.log("OK Extension compliance audit passed");

@@ -29,7 +29,8 @@ describe('normalizeDomains', () => {
 describe('buildRules — focus off', () => {
   it('blocks nothing while unlocked', () => {
     expect(buildRules({ active: false, mode: 'block-all', domains: [] })).toEqual([]);
-    expect(buildRules(undefined as any)).toEqual([]);
+    // @ts-expect-error — verifies the runtime guard at the untyped extension boundary.
+    expect(buildRules(undefined)).toEqual([]);
   });
 });
 
@@ -111,5 +112,36 @@ describe('buildRules — unique rule ids', () => {
       const ids = rules.map((r) => r.id);
       expect(new Set(ids).size).toBe(ids.length);
     }
+  });
+});
+
+describe('buildRules — Safari compatibility', () => {
+  it('uses one supported urlFilter pair per blacklist domain', () => {
+    const rules = buildRules(
+      { active: true, mode: 'blacklist', domains: ['reddit.com', '*.x.com'] },
+      { safari: true },
+    );
+    expect(rules).toHaveLength(4);
+    expect(rules.map((rule) => rule.condition)).toEqual([
+      { urlFilter: '||reddit.com^' },
+      { urlFilter: '||reddit.com^', resourceTypes: ['main_frame'] },
+      { urlFilter: '||x.com^' },
+      { urlFilter: '||x.com^', resourceTypes: ['main_frame'] },
+    ]);
+    expect(rules.every((rule) => !('requestDomains' in rule.condition))).toBe(true);
+  });
+
+  it('uses per-domain Safari allow rules above the whitelist catch-all', () => {
+    const rules = buildRules(
+      { active: true, mode: 'whitelist', domains: ['gmail.com', 'calendar.google.com'] },
+      { safari: true },
+    );
+    expect(rules).toHaveLength(6);
+    expect(rules.slice(2).map((rule) => rule.condition)).toEqual([
+      { urlFilter: '||gmail.com^' },
+      { urlFilter: '||gmail.com^', resourceTypes: ['main_frame'] },
+      { urlFilter: '||calendar.google.com^' },
+      { urlFilter: '||calendar.google.com^', resourceTypes: ['main_frame'] },
+    ]);
   });
 });

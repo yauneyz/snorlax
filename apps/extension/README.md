@@ -17,8 +17,8 @@ because:
 - **VPNs** tunnel the wire path; the extension still sees browser URLs and blocks before the request
   leaves the browser.
 
-The extension is the request-layer blocker for Firefox and Chromium variants. We do not use
-Chromium enterprise `URLBlocklist` policy for this anymore.
+The extension is the request-layer blocker for Safari, Firefox, and Chromium variants. We do not
+use Chromium enterprise `URLBlocklist` policy for this anymore.
 
 ## How it works
 
@@ -43,6 +43,9 @@ service (named pipe)  ──►  talysman-natmsg.exe  ──►  extension backg
   the user's configured domains; blocking remains controlled by the desktop app.
 - `talysman-natmsg` (`talysman-natmsg.exe` on Windows) — bridges browser stdio ⇄ the service IPC,
   deriving `{active, mode, domains}` from `getState` plus the `focusChanged`/`policyChanged` events.
+- Safari uses the same JavaScript and DNR policy logic with Safari-compatible `urlFilter` domain
+  rules. Its `SafariWebExtensionHandler` performs short native-message synchronizations directly
+  against the macOS service socket and tags heartbeats with Safari's root process ID.
 
 ## Installation and native-host registration
 
@@ -58,15 +61,22 @@ user-installed extension in place and pushes `active:false` so it clears its rul
 
 ## Store packages and identities
 
-`pnpm build:extension` builds three upload-ready ZIP files and matching unpacked directories under
+`pnpm build:extension` builds three upload-ready ZIP files and unpacked directories under
 `apps/extension/dist/`. The same keyed `dist/chrome` package is used for Chrome Web Store upload and
-Chrome's **Load unpacked** button:
+Chrome's **Load unpacked** button. Edge has two directories: key-free `dist/edge` matches the Edge
+Add-ons upload, while keyed `dist/edge-dev` has the already-trusted Chrome development ID and is the
+directory to use with Edge's **Load unpacked** button:
 
 ```text
 talysman-chrome-<version>.zip
 talysman-edge-<version>.zip
 talysman-firefox-<version>.zip
 ```
+
+On macOS the same command additionally generates `talysman-safari-<version>.zip`, an Xcode project,
+and `dist/safari-appex/Talysman Safari Extension.appex`. Xcode's
+`safari-web-extension-packager` creates the wrapper; the committed Swift handler and entitlements
+are overlaid before `xcodebuild` compiles it. Windows and Linux omit these outputs without warning.
 
 `pnpm release:extension` rebuilds and audits those packages, then copies the store upload artifacts
 to `apps/extension/release/store/`:
@@ -86,11 +96,18 @@ store items are created, before review or publication. All store IDs and Chrome'
 key live in `native/common/extension-identities.json`; update that one file after creating a new
 store item. Chrome is currently configured as `jblidbjafmpbpednomngbbmpkihedeko`.
 
-Use `apps/extension/dist/chrome` for Load unpacked and upload
+Use `apps/extension/dist/chrome` for Chrome Load unpacked and upload
 `talysman-chrome-<version>.zip` to Chrome Web Store. They contain the same files, including the public
 key copied from the Chrome Web Store Package tab, so Chrome assigns the official item ID
 `jblidbjafmpbpednomngbbmpkihedeko` on every machine. No private key is generated, stored, or
 distributed. The normal native service allowlists that same ID.
+
+Use `apps/extension/dist/edge-dev` for Edge Load unpacked. It deliberately uses the same keyed ID as
+the Chrome development build, which is already in the native host's `allowed_origins`. Never upload
+that development directory to Edge Add-ons; upload the key-free `talysman-edge-<version>.zip`.
+Microsoft assigns that store item a separate ID. Record it as `edgeStoreId` before building a
+reviewer or production desktop installer. `pnpm release:extension` refuses to prepare a production
+store release while this trust-boundary value is missing.
 
 The `HOST_NAME` (`com.talysman.host`) must match between `background.js` and
 `extension_policy.rs`. The native host is staged next to the service binaries by
@@ -103,8 +120,10 @@ The `HOST_NAME` (`com.talysman.host`) must match between `background.js` and
    `cargo test --manifest-path native/linux/Cargo.toml extension_policy` and the equivalent
    `native/macos/Cargo.toml` command for native host manifests.
 2. **Build + load unpacked (dev/testers):** `pnpm build:extension`, then load
-   `apps/extension/dist/chrome` in Chrome. Open the toolbar action to verify the connection and focus
-   status; the popup intentionally contains no controls.
+   `apps/extension/dist/chrome` in Chrome or `apps/extension/dist/edge-dev` in Edge. Open the toolbar
+   action to verify the connection and focus status; the popup intentionally contains no controls.
+   On macOS, the same command also compiles Safari. A full `pnpm build:mac` embeds it in
+   `Talysman.app`; enable Talysman under Safari Settings > Extensions after installing the app.
 3. **Store release prep:** `pnpm release:extension`, then inspect
    `apps/extension/release/store/` and `apps/extension/release/store-submission.json`.
 4. **End-to-end:** run the service (`talysman-svc --console`), enable focus with `reddit.com`

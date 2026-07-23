@@ -20,7 +20,15 @@ Before opening store submissions:
 
 ## 2. Build Store Artifacts
 
-Run:
+If the Edge Add-ons item does not exist yet, first run:
+
+```bash
+pnpm build:extension
+```
+
+Upload `apps/extension/dist/talysman-edge-<version>.zip` to a draft Partner Center listing, copy the
+assigned 32-character extension ID into `edgeStoreId` in
+`native/common/extension-identities.json`, and then run:
 
 ```bash
 pnpm release:extension
@@ -47,6 +55,8 @@ Each archive must show only `manifest.json`, `background.js`, the blocked-page H
 the popup HTML/CSS/JS, and the packaged 16/32/48/128px icons at its root. No store package should
 contain `update_url`. The Chrome package must contain the public `key` recorded in
 `native/common/extension-identities.json`; Edge and Firefox remain key-free.
+`apps/extension/dist/edge-dev` is a separate keyed local-testing build; never upload it to Partner
+Center.
 
 ## 3. Publish Chrome
 
@@ -71,7 +81,8 @@ Chrome signs, hosts, and updates the extension. Do not self-host or repack the s
 
 1. Register the Microsoft Edge Add-ons developer account in Partner Center and complete any required
    verification.
-2. Create a new Edge extension listing.
+2. Create a new Edge extension listing. If this is the first release, use the bootstrap package from
+   `apps/extension/dist/` as described above, record its ID, and rerun `pnpm release:extension`.
 3. Upload `apps/extension/release/store/talysman-edge-<version>.zip`.
 4. Complete availability, properties, listing assets, privacy information, and testing notes.
 5. Use Hidden visibility initially unless public discovery is intended.
@@ -158,7 +169,23 @@ For each supported browser:
 Test incognito/private browsing separately and document that browser-level blocking does not apply
 there unless the user enables extension access for private browsing.
 
-## 9. Routine Release Checklist
+## 9. Validate Safari on macOS
+
+On a Mac with Xcode and the normal Developer ID/notarization credentials configured:
+
+1. run `pnpm build:extension` and confirm the Safari source ZIP, generated Xcode project, and
+   `apps/extension/dist/safari-appex/Talysman Safari Extension.appex` exist;
+2. run `pnpm build:mac` and verify `Talysman.app/Contents/PlugIns` contains the signed `.appex`;
+3. run `pluginkit -mAvvv -p com.apple.Safari.web-extension` and confirm Talysman is registered;
+4. enable Talysman in Safari Settings > Extensions and grant website access;
+5. exercise blacklist, whitelist, block-all, focus-off, service reconnect, and watchdog behavior;
+6. run `pnpm release:upload` and confirm its macOS build reports that Safari is included before the
+   signed/notarized DMG and updater ZIP are promoted.
+
+Safari packaging is intentionally skipped on Windows and Linux. Those hosts do not require Xcode
+and continue to produce only the Chrome, Edge, and Firefox extension artifacts.
+
+## 10. Routine Release Checklist
 
 For each extension release:
 

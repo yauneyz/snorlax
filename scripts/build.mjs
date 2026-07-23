@@ -165,7 +165,9 @@ run("node", [
   ...(crossWindowsFromLinux ? ["--cross"] : []),
 ]);
 
-// 1b. Browser extensions (unpacked builds + uploadable ZIPs for all three stores).
+// 1b. Browser extensions. macOS additionally generates the Safari Xcode wrapper and compiled
+// .appex; the afterPack hook embeds it before electron-builder signs the application. Other hosts
+// silently retain the Chrome/Edge/Firefox-only output.
 run("node", ["scripts/build-extension.mjs"]);
 run("node", ["scripts/audit-extension.mjs"]);
 

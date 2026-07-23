@@ -15,14 +15,20 @@
 
 import { buildRules } from './rules.js';
 
+// Prefer the callback-compatible `chrome` namespace where both aliases exist (notably Firefox).
+// Safari exposes `browser`, which is also callback-compatible for native messaging.
+const browserApi = globalThis.chrome || globalThis.browser;
 const HOST_NAME = 'com.talysman.host';
 const RECONNECT_MIN_MS = 1000;
 const RECONNECT_MAX_MS = 30000;
 const HEARTBEAT_MS = 5000;
+const SAFARI_SYNC_MS = 1000;
 const HEARTBEAT_ACK_STALE_MS = 12000;
 
 let port = null;
 let reconnectTimer = null;
+let safariSyncTimer = null;
+let safariConnected = false;
 let reconnectMs = RECONNECT_MIN_MS;
 let hasReceivedState = false;
 
@@ -46,12 +52,13 @@ function detectBrowser() {
   if (ua.includes('Edg/')) return 'edge';
   if (ua.includes('OPR/')) return 'opera';
   if (ua.includes('Vivaldi')) return 'vivaldi';
+  if (ua.includes('Safari/') && !ua.includes('Chrome/') && !ua.includes('Chromium/')) return 'safari';
   if (ua.includes('Chrome')) return 'chrome';
   return 'unknown';
 }
 
 const BROWSER = detectBrowser();
-const EXTENSION_VERSION = (chrome.runtime.getManifest && chrome.runtime.getManifest().version) || '';
+const EXTENSION_VERSION = (browserApi.runtime.getManifest && browserApi.runtime.getManifest().version) || '';
 
 console.info('[talysman] worker started', {
   workerSessionId: PROFILE_ID,
@@ -66,15 +73,15 @@ async function applyState(state) {
   hasReceivedState = true;
   let next;
   try {
-    next = buildRules(state);
+    next = buildRules(state, { safari: BROWSER === 'safari' });
   } catch (e) {
     console.error('[talysman] buildRules failed', e);
     lastApplyOk = false;
     return;
   }
   try {
-    const existing = await chrome.declarativeNetRequest.getDynamicRules();
-    await chrome.declarativeNetRequest.updateDynamicRules({
+    const existing = await browserApi.declarativeNetRequest.getDynamicRules();
+    await browserApi.declarativeNetRequest.updateDynamicRules({
       removeRuleIds: existing.map((r) => r.id),
       addRules: next,
     });
@@ -90,7 +97,7 @@ async function applyState(state) {
 
 /** Self-report whether the extension can actually enforce blocking right now. */
 function currentHealth() {
-  const permissionsOk = typeof chrome.declarativeNetRequest !== 'undefined';
+  const permissionsOk = typeof browserApi.declarativeNetRequest !== 'undefined';
   return {
     canBlock: permissionsOk && lastApplyOk,
     permissionsOk,
@@ -101,12 +108,13 @@ function currentHealth() {
 /** Read-only status exposed to the toolbar popup. Never include the configured domain list. */
 function currentPopupStatus() {
   const heartbeatAckAgeMs = lastHeartbeatAckAt === null ? null : Date.now() - lastHeartbeatAckAt;
-  const roundTripConnected = port !== null
+  const transportConnected = port !== null || safariConnected;
+  const roundTripConnected = transportConnected
     && heartbeatAckAgeMs !== null
     && heartbeatAckAgeMs <= HEARTBEAT_ACK_STALE_MS;
 
   return {
-    connection: roundTripConnected ? 'connected' : port ? 'connecting' : 'disconnected',
+    connection: roundTripConnected ? 'connected' : transportConnected ? 'connecting' : 'disconnected',
     hasReceivedState,
     focusActive: blockingActive,
     mode: blockingMode,
@@ -123,18 +131,22 @@ function currentPopupStatus() {
   };
 }
 
-chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+browserApi.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   if (!message || message.type !== 'talysman:get-status') return undefined;
   sendResponse(currentPopupStatus());
   return false;
 });
 
 function connect() {
+  if (BROWSER === 'safari') {
+    scheduleSafariSync(0);
+    return;
+  }
   if (port) return;
 
   console.info('[talysman] opening native port', { workerSessionId: PROFILE_ID });
   try {
-    port = chrome.runtime.connectNative(HOST_NAME);
+    port = browserApi.runtime.connectNative(HOST_NAME);
   } catch (e) {
     console.error('[talysman] connectNative threw', e);
     scheduleReconnect();
@@ -168,7 +180,7 @@ function connect() {
   });
 
   port.onDisconnect.addListener(() => {
-    const err = chrome.runtime.lastError;
+    const err = browserApi.runtime.lastError;
     console.warn('[talysman] native host disconnected', err && err.message);
     port = null;
     scheduleReconnect();
@@ -180,6 +192,59 @@ function connect() {
   } catch (e) {
     console.error('[talysman] hello failed', e);
   }
+}
+
+function heartbeatFrame() {
+  const sequence = ++heartbeatSequence;
+  const sentAt = Date.now();
+  lastHeartbeatSentAt = sentAt;
+  return {
+    type: 'heartbeat',
+    sequence,
+    sentAt,
+    browser: BROWSER,
+    workerSessionId: PROFILE_ID,
+    extensionVersion: EXTENSION_VERSION,
+    lockedActive: blockingActive,
+    health: currentHealth(),
+  };
+}
+
+// Safari native messaging is mediated by the containing app extension. A short request/response
+// sync is more reliable there than holding Chromium's stdio-style native port open indefinitely.
+// The Swift handler returns both the current blocking state and the heartbeat acknowledgement.
+function scheduleSafariSync(delay) {
+  if (safariSyncTimer !== null) return;
+  safariSyncTimer = setTimeout(() => {
+    safariSyncTimer = null;
+    const frame = heartbeatFrame();
+    try {
+      browserApi.runtime.sendNativeMessage(HOST_NAME, frame, (response) => {
+        const error = browserApi.runtime.lastError;
+        if (error || !response || response.type === 'error') {
+          safariConnected = false;
+          console.warn('[talysman] Safari native sync failed', error?.message || response?.message);
+          scheduleSafariSync(Math.min(reconnectMs, RECONNECT_MAX_MS));
+          reconnectMs = Math.min(reconnectMs * 2, RECONNECT_MAX_MS);
+          return;
+        }
+
+        safariConnected = true;
+        reconnectMs = RECONNECT_MIN_MS;
+        if (response.state) applyState(response.state);
+        if (response.heartbeatAck) {
+          lastHeartbeatAckAt = Date.now();
+          lastHeartbeatAckSequence = response.heartbeatAck.sequence ?? null;
+        }
+        scheduleSafariSync(SAFARI_SYNC_MS);
+      });
+    } catch (error) {
+      safariConnected = false;
+      console.warn('[talysman] Safari native sync threw', error && error.message);
+      scheduleSafariSync(Math.min(reconnectMs, RECONNECT_MAX_MS));
+      reconnectMs = Math.min(reconnectMs * 2, RECONNECT_MAX_MS);
+    }
+  }, delay);
 }
 
 function scheduleReconnect() {
@@ -196,26 +261,14 @@ function scheduleReconnect() {
 function heartbeat() {
   if (port) {
     try {
-      const sequence = ++heartbeatSequence;
-      const sentAt = Date.now();
-      lastHeartbeatSentAt = sentAt;
-      const health = currentHealth();
-      port.postMessage({
-        type: 'heartbeat',
-        sequence,
-        sentAt,
-        browser: BROWSER,
-        workerSessionId: PROFILE_ID,
-        extensionVersion: EXTENSION_VERSION,
-        lockedActive: blockingActive,
-        health,
-      });
+      const frame = heartbeatFrame();
+      port.postMessage(frame);
       console.info('[talysman] heartbeat sent', {
         workerSessionId: PROFILE_ID,
-        sequence,
-        sentAt,
+        sequence: frame.sequence,
+        sentAt: frame.sentAt,
         lockedActive: blockingActive,
-        health,
+        health: frame.health,
       });
     } catch (e) {
       console.warn('[talysman] heartbeat post failed', e && e.message);
@@ -226,8 +279,8 @@ function heartbeat() {
 
 // Register these listeners synchronously so Chrome wakes this worker when the profile starts or the
 // extension updates. Top-level connect also covers any other event that revives the worker.
-chrome.runtime.onStartup.addListener(connect);
-chrome.runtime.onInstalled.addListener(connect);
+browserApi.runtime.onStartup.addListener(connect);
+browserApi.runtime.onInstalled.addListener(connect);
 
 connect();
 heartbeat();
