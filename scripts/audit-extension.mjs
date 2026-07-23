@@ -130,6 +130,11 @@ for (const [store, directory] of Object.entries({
   for (const [label, pattern] of prohibitedCode) {
     if (pattern.test(packagedText)) fail(`${store}: unexpected ${label} in packaged code`);
   }
+
+  const background = readFileSync(resolve(storeDir, "background.js"), "utf8");
+  if (!background.includes("chrome.runtime.onStartup.addListener(connect)")) {
+    fail(`${store}: background must wake the native connection on browser startup`);
+  }
 }
 
 const generatedIds = readJson(resolve(distDir, "ids.json"));

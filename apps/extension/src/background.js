@@ -19,10 +19,11 @@ const HOST_NAME = 'com.talysman.host';
 const RECONNECT_MIN_MS = 1000;
 const RECONNECT_MAX_MS = 30000;
 const HEARTBEAT_MS = 5000;
+const HEARTBEAT_ACK_STALE_MS = 12000;
 
 let port = null;
+let reconnectTimer = null;
 let reconnectMs = RECONNECT_MIN_MS;
-let nativeConnected = false;
 let hasReceivedState = false;
 
 // Health/diagnostic state reported in the heartbeat.
@@ -30,6 +31,10 @@ let blockingActive = false; // last state.active the service pushed
 let blockingMode = null; // last state.mode the service pushed; never includes configured domains
 let lastApplyOk = true; // last updateDynamicRules succeeded
 let appliedRuleCount = 0; // number of dynamic rules currently applied
+let heartbeatSequence = 0;
+let lastHeartbeatSentAt = null;
+let lastHeartbeatAckAt = null;
+let lastHeartbeatAckSequence = null;
 
 // Stable-ish identifiers for this worker session (best-effort; the service correlates by browser
 // PID, not these).
@@ -47,6 +52,12 @@ function detectBrowser() {
 
 const BROWSER = detectBrowser();
 const EXTENSION_VERSION = (chrome.runtime.getManifest && chrome.runtime.getManifest().version) || '';
+
+console.info('[talysman] worker started', {
+  workerSessionId: PROFILE_ID,
+  browser: BROWSER,
+  extensionVersion: EXTENSION_VERSION,
+});
 
 /** Replace all dynamic rules with the ones derived from `state`. */
 async function applyState(state) {
@@ -89,13 +100,26 @@ function currentHealth() {
 
 /** Read-only status exposed to the toolbar popup. Never include the configured domain list. */
 function currentPopupStatus() {
+  const heartbeatAckAgeMs = lastHeartbeatAckAt === null ? null : Date.now() - lastHeartbeatAckAt;
+  const roundTripConnected = port !== null
+    && heartbeatAckAgeMs !== null
+    && heartbeatAckAgeMs <= HEARTBEAT_ACK_STALE_MS;
+
   return {
-    connection: nativeConnected ? 'connected' : port ? 'connecting' : 'disconnected',
+    connection: roundTripConnected ? 'connected' : port ? 'connecting' : 'disconnected',
     hasReceivedState,
     focusActive: blockingActive,
     mode: blockingMode,
     health: currentHealth(),
     version: EXTENSION_VERSION,
+    diagnostics: {
+      workerSessionId: PROFILE_ID,
+      heartbeatSequence,
+      lastHeartbeatSentAt,
+      lastHeartbeatAckAt,
+      lastHeartbeatAckSequence,
+      heartbeatAckAgeMs,
+    },
   };
 }
 
@@ -106,6 +130,9 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 });
 
 function connect() {
+  if (port) return;
+
+  console.info('[talysman] opening native port', { workerSessionId: PROFILE_ID });
   try {
     port = chrome.runtime.connectNative(HOST_NAME);
   } catch (e) {
@@ -118,15 +145,31 @@ function connect() {
     // The host sends the full state on connect and on every change.
     if (msg && msg.type === 'state') {
       reconnectMs = RECONNECT_MIN_MS; // healthy connection → reset backoff
-      nativeConnected = true;
+      console.info('[talysman] native state received', {
+        workerSessionId: PROFILE_ID,
+        active: !!msg.active,
+        mode: msg.mode,
+        domainCount: Array.isArray(msg.domains) ? msg.domains.length : 0,
+      });
       applyState(msg);
+      return;
+    }
+    if (msg && msg.type === 'heartbeatAck') {
+      lastHeartbeatAckAt = Date.now();
+      lastHeartbeatAckSequence = msg.sequence ?? null;
+      reconnectMs = RECONNECT_MIN_MS;
+      console.info('[talysman] heartbeat acknowledged', {
+        workerSessionId: PROFILE_ID,
+        sequence: msg.sequence,
+        browserPid: msg.browserPid,
+        healthy: msg.healthy,
+      });
     }
   });
 
   port.onDisconnect.addListener(() => {
     const err = chrome.runtime.lastError;
     console.warn('[talysman] native host disconnected', err && err.message);
-    nativeConnected = false;
     port = null;
     scheduleReconnect();
   });
@@ -140,22 +183,39 @@ function connect() {
 }
 
 function scheduleReconnect() {
+  if (reconnectTimer !== null) return;
   const delay = reconnectMs;
   reconnectMs = Math.min(reconnectMs * 2, RECONNECT_MAX_MS);
-  setTimeout(connect, delay);
+  reconnectTimer = setTimeout(() => {
+    reconnectTimer = null;
+    connect();
+  }, delay);
 }
 
 /** Periodic liveness heartbeat. Skips quietly when disconnected; reconnect resumes it. */
 function heartbeat() {
   if (port) {
     try {
+      const sequence = ++heartbeatSequence;
+      const sentAt = Date.now();
+      lastHeartbeatSentAt = sentAt;
+      const health = currentHealth();
       port.postMessage({
         type: 'heartbeat',
+        sequence,
+        sentAt,
         browser: BROWSER,
-        profileId: PROFILE_ID,
+        workerSessionId: PROFILE_ID,
         extensionVersion: EXTENSION_VERSION,
         lockedActive: blockingActive,
-        health: currentHealth(),
+        health,
+      });
+      console.info('[talysman] heartbeat sent', {
+        workerSessionId: PROFILE_ID,
+        sequence,
+        sentAt,
+        lockedActive: blockingActive,
+        health,
       });
     } catch (e) {
       console.warn('[talysman] heartbeat post failed', e && e.message);
@@ -164,7 +224,10 @@ function heartbeat() {
   setTimeout(heartbeat, HEARTBEAT_MS);
 }
 
-// Connect on worker start (install, browser launch, and whenever MV3 revives the worker), and start
-// the heartbeat loop. Both restart cleanly if the worker is torn down and revived.
+// Register these listeners synchronously so Chrome wakes this worker when the profile starts or the
+// extension updates. Top-level connect also covers any other event that revives the worker.
+chrome.runtime.onStartup.addListener(connect);
+chrome.runtime.onInstalled.addListener(connect);
+
 connect();
 heartbeat();

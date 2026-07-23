@@ -360,10 +360,37 @@ impl Core {
                     .and_then(|h| h.get("permissionsOk"))
                     .and_then(|v| v.as_bool())
                     .unwrap_or(false);
+                let healthy = can_block && perms_ok;
+                let browser = params.get("browser").and_then(|v| v.as_str()).unwrap_or("");
+                let worker_session = params
+                    .get("workerSessionId")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("");
+                let sequence = params.get("sequence").and_then(|v| v.as_u64()).unwrap_or(0);
+                let sent_at = params.get("sentAt").and_then(|v| v.as_u64()).unwrap_or(0);
+                let extension_version = params
+                    .get("extensionVersion")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("");
+                let locked_active = params
+                    .get("lockedActive")
+                    .and_then(|v| v.as_bool())
+                    .unwrap_or(false);
+                tracing::info!(
+                    "extension heartbeat received: browser={browser} pid={pid} worker={worker_session} sequence={sequence} sent_at={sent_at} version={extension_version} locked_active={locked_active} can_block={can_block} permissions_ok={perms_ok} healthy={healthy}"
+                );
                 if pid != 0 {
-                    self.shared.record_heartbeat(pid, can_block && perms_ok);
+                    self.shared.record_heartbeat(pid, healthy);
+                } else {
+                    tracing::warn!("extension heartbeat ignored: native host reported pid=0");
                 }
-                Ok(ok())
+                Ok(json!({
+                    "heartbeat": {
+                        "sequence": sequence,
+                        "browserPid": pid,
+                        "healthy": healthy,
+                    }
+                }))
             }
             "listRemovableDrives" => {
                 let drives: Vec<Value> = usb::list_removable_drives()

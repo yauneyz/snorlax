@@ -34,8 +34,8 @@ pub struct EnforceShared {
     /// Browser handshake dead-man's switch on/off (opt-in setting, see model::Settings). The
     /// watchdog only acts while this is true and focus is active.
     handshake_enabled: AtomicBool,
-    /// Latest heartbeat per browser root PID, fed by the `extHeartbeat` RPC and read by the
-    /// browser watchdog. Absence of a fresh entry is what the watchdog treats as failure.
+    /// Latest heartbeat per browser process PID, fed by the `extHeartbeat` RPC. The watchdog maps
+    /// child-process PIDs to their browser root before evaluating liveness.
     heartbeats: Mutex<HashMap<u32, Heartbeat>>,
 }
 

@@ -16,7 +16,7 @@ use sysinfo::System;
 use tokio::sync::broadcast;
 
 use talysman_common::browsers::by_windows_image;
-use talysman_common::watchdog::{roots, Action, ScannedProc, Watchdog};
+use talysman_common::watchdog::{heartbeats_by_root, roots, Action, ScannedProc, Watchdog};
 
 use crate::enforce::EnforceShared;
 
@@ -63,14 +63,29 @@ pub async fn run_browser_watchdog(
                     .collect();
 
                 let roots = roots(&scan);
-                let live: HashSet<u32> = roots.iter().map(|r| r.pid).collect();
+                let live: HashSet<u32> = scan.iter().map(|process| process.pid).collect();
                 shared.retain_heartbeats(&live);
-                let heartbeats = shared.heartbeats_snapshot();
+                let raw_heartbeats = shared.heartbeats_snapshot();
+                let heartbeats = heartbeats_by_root(&scan, &raw_heartbeats);
 
-                for action in wd.tick(Instant::now(), &roots, &heartbeats) {
+                let now = Instant::now();
+                for action in wd.tick(now, &roots, &heartbeats) {
                     match action {
                         Action::Warn { pid, browser } => {
-                            tracing::warn!("browser watchdog: warning {browser} (pid {pid})");
+                            let known_heartbeats: Vec<String> = heartbeats
+                                .iter()
+                                .map(|(heartbeat_pid, heartbeat)| {
+                                    format!(
+                                        "pid={heartbeat_pid},healthy={},age_ms={}",
+                                        heartbeat.healthy,
+                                        now.duration_since(heartbeat.last_seen).as_millis()
+                                    )
+                                })
+                                .collect();
+                            tracing::warn!(
+                                "browser watchdog: warning {browser} (pid {pid}); known heartbeats: [{}]",
+                                known_heartbeats.join("; ")
+                            );
                             let _ = events.send(json!({
                                 "kind": "event",
                                 "event": "browserWatchdogWarning",

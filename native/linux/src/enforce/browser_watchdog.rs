@@ -16,7 +16,7 @@ use sysinfo::{Pid, Signal, System};
 use tokio::sync::broadcast;
 
 use talysman_common::browsers::by_linux_process_identity;
-use talysman_common::watchdog::{roots, Action, ScannedProc, Watchdog};
+use talysman_common::watchdog::{heartbeats_by_root, roots, Action, ScannedProc, Watchdog};
 
 use crate::enforce::EnforceShared;
 
@@ -58,9 +58,10 @@ pub async fn run_browser_watchdog(
                     .collect();
 
                 let roots = roots(&scan);
-                let live: HashSet<u32> = roots.iter().map(|r| r.pid).collect();
+                let live: HashSet<u32> = scan.iter().map(|process| process.pid).collect();
                 shared.retain_heartbeats(&live);
-                let heartbeats = shared.heartbeats_snapshot();
+                let raw_heartbeats = shared.heartbeats_snapshot();
+                let heartbeats = heartbeats_by_root(&scan, &raw_heartbeats);
 
                 for action in wd.tick(Instant::now(), &roots, &heartbeats) {
                     match action {

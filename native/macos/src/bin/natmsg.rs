@@ -71,12 +71,24 @@ fn heartbeat_request(frame: &Value, browser_pid: u32) -> Value {
         "params": {
             "browserPid": browser_pid,
             "browser": frame.get("browser").and_then(|v| v.as_str()).unwrap_or(""),
-            "profileId": frame.get("profileId").cloned().unwrap_or(Value::Null),
+            "workerSessionId": frame.get("workerSessionId").cloned().unwrap_or(Value::Null),
+            "sequence": frame.get("sequence").cloned().unwrap_or(Value::Null),
+            "sentAt": frame.get("sentAt").cloned().unwrap_or(Value::Null),
             "extensionVersion": frame.get("extensionVersion").cloned().unwrap_or(Value::Null),
             "lockedActive": frame.get("lockedActive").cloned().unwrap_or(Value::Null),
             "health": frame.get("health").cloned().unwrap_or_else(|| json!({})),
         }
     })
+}
+
+fn heartbeat_ack(response: &Value) -> Option<Value> {
+    let heartbeat = response.pointer("/result/heartbeat")?;
+    Some(json!({
+        "type": "heartbeatAck",
+        "sequence": heartbeat.get("sequence").cloned().unwrap_or(Value::Null),
+        "browserPid": heartbeat.get("browserPid").cloned().unwrap_or(Value::Null),
+        "healthy": heartbeat.get("healthy").cloned().unwrap_or(Value::Null),
+    }))
 }
 
 #[tokio::main]
@@ -167,7 +179,7 @@ async fn pump_socket(
                 };
                 let mut changed = false;
                 match v.get("kind").and_then(|k| k.as_str()) {
-                    // Only the getState response (id 1) carries the snapshot; ignore heartbeat acks.
+                    // Only the getState response (id 1) carries the blocking snapshot.
                     Some("response")
                         if v.get("ok").and_then(|o| o.as_bool()) == Some(true)
                             && v.get("id").and_then(|i| i.as_i64()) == Some(GET_STATE_ID) =>
@@ -180,6 +192,13 @@ async fn pump_socket(
                                 parse_policy(policy, &mut b);
                             }
                             changed = true;
+                        }
+                    }
+                    Some("response")
+                        if v.get("ok").and_then(|o| o.as_bool()) == Some(true) =>
+                    {
+                        if let Some(ack) = heartbeat_ack(&v) {
+                            let _ = out_tx.send(ack);
                         }
                     }
                     Some("event") => match v.get("event").and_then(|e| e.as_str()) {

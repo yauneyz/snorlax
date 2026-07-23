@@ -119,6 +119,46 @@ pub fn roots(scan: &[ScannedProc]) -> Vec<BrowserProc> {
         .collect()
 }
 
+/// Re-key heartbeats reported by browser child processes to the root process the watchdog guards.
+/// Native-messaging hosts are not guaranteed to be launched by the browser root; Chromium commonly
+/// launches them from one of its child processes.
+pub fn heartbeats_by_root(
+    scan: &[ScannedProc],
+    heartbeats: &HashMap<u32, Heartbeat>,
+) -> HashMap<u32, Heartbeat> {
+    let by_pid: HashMap<u32, &ScannedProc> = scan.iter().map(|p| (p.pid, p)).collect();
+    let mut mapped = HashMap::new();
+
+    for (&heartbeat_pid, heartbeat) in heartbeats {
+        let Some(mut current) = by_pid.get(&heartbeat_pid).copied() else {
+            continue;
+        };
+        let key = current.key.clone();
+        let mut seen = HashSet::from([current.pid]);
+
+        while let Some(parent_pid) = current.parent {
+            let Some(parent) = by_pid.get(&parent_pid).copied() else {
+                break;
+            };
+            if parent.key != key || !seen.insert(parent.pid) {
+                break;
+            }
+            current = parent;
+        }
+
+        mapped
+            .entry(current.pid)
+            .and_modify(|existing: &mut Heartbeat| {
+                if heartbeat.last_seen > existing.last_seen {
+                    *existing = heartbeat.clone();
+                }
+            })
+            .or_insert_with(|| heartbeat.clone());
+    }
+
+    mapped
+}
+
 /// Holds per-PID escalation state across ticks.
 pub struct Watchdog {
     cfg: Config,
@@ -281,6 +321,31 @@ mod tests {
         assert_eq!(roots.len(), 2);
         assert_eq!(roots[0].pid, 100);
         assert_eq!(roots[1].pid, 200);
+    }
+
+    #[test]
+    fn child_process_heartbeat_is_mapped_to_browser_root() {
+        let scan = vec![
+            scanned(37132, Some(1), BrowserClass::Supported, "chrome"),
+            scanned(14152, Some(37132), BrowserClass::Supported, "chrome"),
+        ];
+        let now = Instant::now();
+        let heartbeats = HashMap::from([(
+            14152,
+            Heartbeat {
+                last_seen: now,
+                healthy: true,
+            },
+        )]);
+
+        let mapped = heartbeats_by_root(&scan, &heartbeats);
+        assert!(!mapped.contains_key(&14152));
+        assert!(mapped
+            .get(&37132)
+            .is_some_and(|heartbeat| { heartbeat.healthy && heartbeat.last_seen == now }));
+        assert!(Watchdog::default()
+            .tick(now, &roots(&scan), &mapped)
+            .is_empty());
     }
 
     #[test]

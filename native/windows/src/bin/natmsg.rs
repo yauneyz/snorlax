@@ -8,14 +8,15 @@
 //!       { "type": "state", "active": bool, "mode": "blacklist"|"whitelist"|"block-all",
 //!         "domains": [..] }
 //!   - extension → service: liveness heartbeats (`{type:"heartbeat", ...}`) are relayed to the
-//!     service as `extHeartbeat` RPCs, tagged with this host's **parent PID** — the browser instance
-//!     the extension runs in — so the watchdog can correlate (and, if needed, target) that process.
+//!     service as `extHeartbeat` RPCs, tagged with the browser's **root PID** — resolved from this
+//!     host's startup ancestry — so the watchdog can correlate and, if needed, target that process.
 //!
 //! It tracks state from the initial `getState` plus the service's pushed `focusChanged` /
 //! `policyChanged` events. When the extension's port closes, the browser closes our stdin → we exit.
 //! When the pipe drops we reconnect; the extension keeps its last ruleset meanwhile (so killing this
 //! bridge can't unblock a locked session).
 
+use std::collections::{HashMap, HashSet};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
@@ -27,6 +28,7 @@ use tokio::net::windows::named_pipe::ClientOptions;
 use tokio::sync::{mpsc, Mutex};
 
 use talysman::constants::{pipe_path, PIPE_BASE_DEV, PIPE_BASE_PROD};
+use talysman_common::browsers::by_windows_image;
 
 use windows::Win32::Foundation::CloseHandle;
 use windows::Win32::System::Diagnostics::ToolHelp::{
@@ -73,9 +75,44 @@ fn parse_policy(policy: &Value, b: &mut Blocking) {
     }
 }
 
-/// The PID of the process that launched us — the browser. Walk the process snapshot to find our own
-/// entry's parent PID.
-fn parent_pid() -> u32 {
+#[derive(Debug)]
+struct ProcessEntry {
+    parent: u32,
+    image: String,
+}
+
+fn browser_root_from_snapshot(me: u32, processes: &HashMap<u32, ProcessEntry>) -> u32 {
+    let Some(immediate_parent) = processes.get(&me).map(|entry| entry.parent) else {
+        return 0;
+    };
+    let mut current_pid = immediate_parent;
+    let mut browser_pid = immediate_parent;
+    let mut browser_key: Option<String> = None;
+    let mut seen = HashSet::new();
+
+    while current_pid != 0 && seen.insert(current_pid) {
+        let Some(entry) = processes.get(&current_pid) else {
+            break;
+        };
+        if let Some(browser) = by_windows_image(&entry.image) {
+            match browser_key.as_deref() {
+                None => {
+                    browser_key = Some(browser.key.to_string());
+                    browser_pid = current_pid;
+                }
+                Some(key) if key == browser.key => browser_pid = current_pid,
+                Some(_) => break,
+            }
+        }
+        current_pid = entry.parent;
+    }
+
+    browser_pid
+}
+
+/// Resolve the browser's root PID while Chrome's short-lived native-host launcher and its ancestry
+/// are still present in the process table.
+fn browser_root_pid() -> u32 {
     unsafe {
         let me = GetCurrentProcessId();
         let Ok(snap) = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0) else {
@@ -85,20 +122,28 @@ fn parent_pid() -> u32 {
             dwSize: std::mem::size_of::<PROCESSENTRY32W>() as u32,
             ..Default::default()
         };
-        let mut ppid = 0u32;
+        let mut processes = HashMap::new();
         if Process32FirstW(snap, &mut entry).is_ok() {
             loop {
-                if entry.th32ProcessID == me {
-                    ppid = entry.th32ParentProcessID;
-                    break;
-                }
+                let image_len = entry
+                    .szExeFile
+                    .iter()
+                    .position(|character| *character == 0)
+                    .unwrap_or(entry.szExeFile.len());
+                processes.insert(
+                    entry.th32ProcessID,
+                    ProcessEntry {
+                        parent: entry.th32ParentProcessID,
+                        image: String::from_utf16_lossy(&entry.szExeFile[..image_len]),
+                    },
+                );
                 if Process32NextW(snap, &mut entry).is_err() {
                     break;
                 }
             }
         }
         let _ = CloseHandle(snap);
-        ppid
+        browser_root_from_snapshot(me, &processes)
     }
 }
 
@@ -111,7 +156,9 @@ fn heartbeat_request(frame: &Value, browser_pid: u32) -> Value {
         "params": {
             "browserPid": browser_pid,
             "browser": frame.get("browser").and_then(|v| v.as_str()).unwrap_or(""),
-            "profileId": frame.get("profileId").cloned().unwrap_or(Value::Null),
+            "workerSessionId": frame.get("workerSessionId").cloned().unwrap_or(Value::Null),
+            "sequence": frame.get("sequence").cloned().unwrap_or(Value::Null),
+            "sentAt": frame.get("sentAt").cloned().unwrap_or(Value::Null),
             "extensionVersion": frame.get("extensionVersion").cloned().unwrap_or(Value::Null),
             "lockedActive": frame.get("lockedActive").cloned().unwrap_or(Value::Null),
             "health": frame.get("health").cloned().unwrap_or_else(|| json!({})),
@@ -119,9 +166,19 @@ fn heartbeat_request(frame: &Value, browser_pid: u32) -> Value {
     })
 }
 
+fn heartbeat_ack(response: &Value) -> Option<Value> {
+    let heartbeat = response.pointer("/result/heartbeat")?;
+    Some(json!({
+        "type": "heartbeatAck",
+        "sequence": heartbeat.get("sequence").cloned().unwrap_or(Value::Null),
+        "browserPid": heartbeat.get("browserPid").cloned().unwrap_or(Value::Null),
+        "healthy": heartbeat.get("healthy").cloned().unwrap_or(Value::Null),
+    }))
+}
+
 #[tokio::main]
 async fn main() {
-    let browser_pid = parent_pid();
+    let browser_pid = browser_root_pid();
 
     // Single writer task owns stdout so pipe-loop pushes and stdin-triggered resends never interleave.
     let (out_tx, mut out_rx) = mpsc::unbounded_channel::<Value>();
@@ -175,6 +232,30 @@ async fn main() {
     // Never returns; the process exits when the extension closes our stdin (see the stdin task).
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn process(parent: u32, image: &str) -> ProcessEntry {
+        ProcessEntry {
+            parent,
+            image: image.to_string(),
+        }
+    }
+
+    #[test]
+    fn resolves_short_lived_chrome_launcher_to_browser_root() {
+        let processes = HashMap::from([
+            (900, process(14152, "talysman-natmsg.exe")),
+            (14152, process(37132, "chrome.exe")),
+            (37132, process(1200, "chrome.exe")),
+            (1200, process(0, "explorer.exe")),
+        ]);
+
+        assert_eq!(browser_root_from_snapshot(900, &processes), 37132);
+    }
+}
+
 /// Connect to the service (prod pipe, then dev) and stream state until the pipe drops.
 async fn pump_pipe(
     out_tx: &mpsc::UnboundedSender<Value>,
@@ -214,7 +295,7 @@ async fn pump_pipe(
                 };
                 let mut changed = false;
                 match v.get("kind").and_then(|k| k.as_str()) {
-                    // Only the getState response (id 1) carries the snapshot; ignore heartbeat acks.
+                    // Only the getState response (id 1) carries the blocking snapshot.
                     Some("response")
                         if v.get("ok").and_then(|o| o.as_bool()) == Some(true)
                             && v.get("id").and_then(|i| i.as_i64()) == Some(GET_STATE_ID) =>
@@ -227,6 +308,13 @@ async fn pump_pipe(
                                 parse_policy(policy, &mut b);
                             }
                             changed = true;
+                        }
+                    }
+                    Some("response")
+                        if v.get("ok").and_then(|o| o.as_bool()) == Some(true) =>
+                    {
+                        if let Some(ack) = heartbeat_ack(&v) {
+                            let _ = out_tx.send(ack);
                         }
                     }
                     Some("event") => match v.get("event").and_then(|e| e.as_str()) {
