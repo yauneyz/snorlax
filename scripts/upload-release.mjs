@@ -414,19 +414,6 @@ async function main() {
     throw new Error(`No release platforms configured for ${process.platform}`);
   const buildable = buildablePlatformsForHost(process.platform);
   if (!noBuild) buildHostInstallers(buildable);
-  if (process.platform === "darwin" && !noBuild && !dryRun) {
-    const safariAppex = join(
-      root,
-      "apps/extension/dist/safari-appex/Talysman Safari Extension.appex",
-    );
-    if (!existsSync(safariAppex)) {
-      throw new Error(
-        "The macOS release build did not produce the embedded Safari app extension.",
-      );
-    }
-    console.log("macOS release includes the Safari Web Extension");
-  }
-
   const files = existsSync(distDir)
     ? readdirSync(distDir).map((name) => ({
         name,

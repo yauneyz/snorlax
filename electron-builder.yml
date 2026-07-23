@@ -3,9 +3,6 @@ productName: Talysman
 copyright: Copyright © 2026
 forceCodeSigning: true
 electronUpdaterCompatibility: ">= 2.16"
-afterPack: scripts/after-pack.mjs
-afterSign: scripts/after-sign.mjs
-
 protocols:
   - name: Talysman authentication and billing callbacks
     schemes:

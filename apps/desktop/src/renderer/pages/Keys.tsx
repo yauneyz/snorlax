@@ -91,7 +91,7 @@ export function Keys() {
 
         {selectedDrive?.serialAmbiguous && (
           <p className="mb-3 text-xs text-amber-400">
-            ⚠ This drive can't be uniquely identified by serial; presence will rely on the key file.
+            ⚠ This drive has no stable identifier, so Talysman must store a fallback marker on it.
           </p>
         )}
 
@@ -113,7 +113,7 @@ export function Keys() {
           {pairedKeys.map((k) => (
             <li key={k.id} className="flex items-center justify-between rounded-lg bg-panel2 px-3 py-2">
               <span className="text-sm text-slate-200">
-                {k.label} {k.serialAmbiguous && <Badge tone="neutral">file-only</Badge>}
+                {k.label} {k.serialAmbiguous && <Badge tone="neutral">file fallback</Badge>}
                 <span className="ml-2 text-xs text-slate-500">paired {formatTime(k.pairedAt)}</span>
               </span>
               <button

@@ -1,10 +1,10 @@
 //! Removable-drive discovery and paired-key presence for macOS.
 //!
-//! v1 uses the `.talysman/key.bin` secret as the durable proof. External volumes appear under
-//! /Volumes; the boot volume's entry there is a symlink to /, so symlinks are skipped. The
-//! per-volume UUID from `diskutil info` serves as the device-identity signal (the equivalent of
-//! the Windows volume serial); it is cached per mount point because presence polls every 3s and
-//! diskutil is not free.
+//! External volumes appear under /Volumes; the boot volume's entry there is a symlink to /, so
+//! symlinks are skipped. The per-volume UUID from `diskutil info` is the primary identity signal
+//! (the equivalent of the Windows volume serial); `.talysman/key.bin` is used only when no UUID
+//! is available. UUIDs are cached per mount point because presence polls every 3s and diskutil is
+//! not free.
 
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
@@ -137,15 +137,16 @@ pub fn read_key_file(drive_root: &str) -> Option<Vec<u8>> {
 }
 
 fn drive_satisfies(drive: &DriveInfo, key: &KeySecret) -> bool {
-    let Some(secret) = read_key_file(&drive.mount_point) else {
-        return false;
-    };
-    if !pairing::verify_secret(&secret, &key.secret) {
-        return false;
-    }
     match &key.volume_serial {
         Some(expected) => drive.serial.as_deref() == Some(expected.as_str()),
-        None => true,
+        None => {
+            let (Some(secret), Some(stored)) =
+                (read_key_file(&drive.mount_point), key.secret.as_ref())
+            else {
+                return false;
+            };
+            pairing::verify_secret(&secret, stored)
+        }
     }
 }
 
@@ -227,7 +228,7 @@ mod tests {
         let mut store = SecureStore::default();
         store.keys.push(KeySecret {
             id: "key-1".into(),
-            secret: pairing::hash_secret(&secret),
+            secret: Some(pairing::hash_secret(&secret)),
             volume_serial: None,
         });
         assert_eq!(present_key_ids_at(&store, &[vol.clone()]), vec!["key-1"]);
@@ -244,18 +245,24 @@ mod tests {
         let root = temp_root("serial");
         let vol = root.join("KEYSTICK");
         std::fs::create_dir(&vol).unwrap();
-        let secret = pairing::generate_secret();
-        write_key_file(&vol.to_string_lossy(), &secret).unwrap();
-
-        let mut store = SecureStore::default();
-        store.keys.push(KeySecret {
+        let key = KeySecret {
             id: "key-1".into(),
-            secret: pairing::hash_secret(&secret),
+            secret: None,
             volume_serial: Some("12345678-ABCD-4EF0-9876-543210FEDCBA".into()),
-        });
-        // The test host has no diskutil, so the drive reports no UUID and cannot satisfy a
-        // serial-pinned key.
-        assert!(present_key_ids_at(&store, &[vol.clone()]).is_empty());
+        };
+        let matching = DriveInfo {
+            id: "matching".into(),
+            label: "matching".into(),
+            mount_point: vol.to_string_lossy().into(),
+            serial: Some("12345678-ABCD-4EF0-9876-543210FEDCBA".into()),
+            serial_ambiguous: false,
+        };
+        let different = DriveInfo {
+            serial: Some("different".into()),
+            ..matching.clone()
+        };
+        assert!(drive_satisfies(&matching, &key));
+        assert!(!drive_satisfies(&different, &key));
 
         let _ = std::fs::remove_dir_all(&root);
     }

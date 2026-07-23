@@ -21,9 +21,9 @@ NDJSON-RPC protocol as the Electron app, but swaps the platform edges:
 - App/browser identity: the CFBundleIdentifier of the innermost enclosing `.app` bundle, read
   from `Contents/Info.plist`. Helper bundles (`com.google.Chrome.helper`) prefix-match their
   browser, so the watchdog collapses them into the browser root as on other platforms.
-- USB keys: `.talysman/key.bin` on volumes under `/Volumes` (symlinks skipped — the boot
-  volume's entry is one), with the `diskutil info` "Volume UUID" as the device-identity signal
-  (cached per mount point).
+- USB keys: volumes under `/Volumes` (symlinks skipped — the boot volume's entry is one), using
+  the `diskutil info` "Volume UUID" as the primary identity signal (cached per mount point).
+  `.talysman/key.bin` is written only when a volume exposes no stable UUID.
 - State: `/Library/Application Support/Talysman` (override with `TALYSMAN_DATA_DIR`).
 
 ## Developing on Linux

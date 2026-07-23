@@ -26,7 +26,7 @@ export interface Drive {
   mountPoint?: string;
   /** USB device serial, if the device reports one. */
   serial?: string;
-  /** True when no unique serial is available (presence falls back to the key file). */
+  /** True when no stable identifier is available (presence falls back to a marker file). */
   serialAmbiguous: boolean;
 }
 
@@ -34,7 +34,7 @@ export interface Drive {
 export interface PairedKey {
   id: string;
   label: string;
-  /** True if this key was paired without a reliable hardware serial. */
+  /** True if this key was paired using the marker-file fallback. */
   serialAmbiguous: boolean;
   pairedAt: number; // epoch ms
 }
