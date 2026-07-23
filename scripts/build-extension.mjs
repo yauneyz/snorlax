@@ -7,8 +7,6 @@
  *   apps/extension/dist/edge/                           Edge Add-ons upload + unpacked inspection
  *   apps/extension/dist/edge-dev/                       stable-ID Edge Load-unpacked build
  *   apps/extension/dist/firefox/                        unpacked Firefox build
- *   apps/extension/dist/safari/                         Safari source package (macOS only)
- *   apps/extension/dist/safari-appex/                   compiled Safari app extension (macOS only)
  *   apps/extension/dist/talysman-chrome-<version>.zip  Chrome Web Store upload
  *   apps/extension/dist/talysman-edge-<version>.zip    Edge Add-ons upload
  *   apps/extension/dist/talysman-firefox-<version>.zip Firefox AMO upload
@@ -20,10 +18,8 @@
  */
 
 import crypto from "node:crypto";
-import { execFileSync } from "node:child_process";
 import {
   copyFileSync,
-  cpSync,
   mkdirSync,
   readFileSync,
   readdirSync,
@@ -68,7 +64,6 @@ const extensionFiles = [
 
 const identities = JSON.parse(readFileSync(identitiesPath, "utf8"));
 const FIREFOX_ID = identities.firefoxId;
-const SAFARI_APP_BUNDLE_ID = "com.talysman.app.safari";
 
 function chromiumId(spkiDer) {
   const hash = crypto.createHash("sha256").update(spkiDer).digest();
@@ -162,114 +157,6 @@ function listFiles(dir, base = dir) {
       files.push({ path, name: relative(base, path).replace(/\\/g, "/") });
   }
   return files;
-}
-
-function findDirectories(dir, predicate) {
-  const matches = [];
-  for (const name of readdirSync(dir)) {
-    const path = resolve(dir, name);
-    const stat = statSync(path);
-    if (!stat.isDirectory()) continue;
-    if (predicate(path, name)) matches.push(path);
-    matches.push(...findDirectories(path, predicate));
-  }
-  return matches;
-}
-
-function run(command, args) {
-  console.log(`\n> ${command} ${args.join(" ")}`);
-  execFileSync(command, args, { cwd: root, stdio: "inherit" });
-}
-
-function buildSafariAppExtension(safariSourceDir) {
-  const projectDir = resolve(distDir, "safari-xcode");
-  const productsDir = resolve(distDir, "safari-products");
-  const objectsDir = resolve(distDir, "safari-objects");
-  run("xcrun", [
-    "safari-web-extension-packager",
-    safariSourceDir,
-    "--project-location",
-    projectDir,
-    "--app-name",
-    "Talysman Safari",
-    "--bundle-identifier",
-    SAFARI_APP_BUNDLE_ID,
-    "--swift",
-  ]);
-
-  const generatedFiles = listFiles(projectDir);
-  const handler = generatedFiles.find(({ name }) =>
-    name.endsWith("SafariWebExtensionHandler.swift"),
-  );
-  if (!handler) {
-    throw new Error("Safari packager did not generate SafariWebExtensionHandler.swift");
-  }
-  copyFileSync(
-    resolve(extDir, "safari/SafariWebExtensionHandler.swift"),
-    handler.path,
-  );
-
-  const entitlementCandidates = generatedFiles.filter(({ name }) =>
-    name.endsWith(".entitlements"),
-  );
-  const entitlements =
-    entitlementCandidates.find(({ path }) =>
-      /(?:^|[\\/])[^\\/]*extension[^\\/]*(?:[\\/]|$)/i.test(
-        relative(projectDir, path),
-      ),
-    ) ??
-    (entitlementCandidates.length === 1 ? entitlementCandidates[0] : null);
-  if (entitlements) {
-    copyFileSync(
-      resolve(extDir, "safari/SafariExtension.entitlements"),
-      entitlements.path,
-    );
-  } else {
-    console.warn(
-      "Safari packager generated no extension entitlements file; the final electron-builder " +
-        "afterSign hook will still apply the committed Safari entitlements.",
-    );
-  }
-
-  const projects = findDirectories(projectDir, (_path, name) =>
-    name.endsWith(".xcodeproj"),
-  );
-  if (projects.length !== 1) {
-    throw new Error(
-      `Expected one generated Safari Xcode project, found ${projects.length}`,
-    );
-  }
-  run("xcodebuild", [
-    "-project",
-    projects[0],
-    "-configuration",
-    "Release",
-    "-alltargets",
-    `SYMROOT=${productsDir}`,
-    `OBJROOT=${objectsDir}`,
-    "CODE_SIGNING_ALLOWED=NO",
-    "build",
-  ]);
-
-  const appexBundles = findDirectories(productsDir, (_path, name) =>
-    name.endsWith(".appex"),
-  ).sort((left, right) => left.length - right.length);
-  if (appexBundles.length === 0) {
-    throw new Error("The Safari Xcode build did not produce an .appex");
-  }
-  // Xcode may also copy the same extension under the generated container .app. Prefer the
-  // standalone product at the shallowest path; electron-builder supplies the real container.
-  const compiledAppex =
-    appexBundles.find((path) =>
-      relative(productsDir, path)
-        .split(/[\\/]/)
-        .every((component) => !component.endsWith(".app")),
-    ) ?? appexBundles[0];
-  const appexDir = resolve(distDir, "safari-appex");
-  mkdirSync(appexDir, { recursive: true });
-  const stagedAppex = resolve(appexDir, "Talysman Safari Extension.appex");
-  cpSync(compiledAppex, stagedAppex, { recursive: true });
-  return stagedAppex;
 }
 
 const crcTable = (() => {
@@ -401,18 +288,6 @@ firefoxManifest.browser_specific_settings = {
 };
 firefoxManifest.background = { scripts: ["background.js"] };
 
-const safariManifest = storeNeutralManifest(base);
-delete safariManifest.minimum_chrome_version;
-safariManifest.permissions = safariManifest.permissions.map((permission) =>
-  permission === "declarativeNetRequest"
-    ? "declarativeNetRequestWithHostAccess"
-    : permission,
-);
-safariManifest.background = {
-  scripts: ["background.js"],
-  persistent: false,
-};
-
 const stores = [
   { name: "chrome", manifest: chromeManifest },
   { name: "edge", manifest: chromiumManifest },
@@ -434,17 +309,6 @@ for (const store of stores) {
   artifacts.push({ ...store, unpackedDir, zipPath });
 }
 
-let safariArtifact = null;
-let safariAppex = null;
-if (process.platform === "darwin") {
-  const unpackedDir = stageStore("safari", safariManifest, background);
-  const zipPath = resolve(distDir, `talysman-safari-${version}.zip`);
-  zipDirectory(unpackedDir, zipPath);
-  safariArtifact = { name: "safari", unpackedDir, zipPath };
-  artifacts.push(safariArtifact);
-  safariAppex = buildSafariAppExtension(unpackedDir);
-}
-
 writeFileSync(
   resolve(distDir, "ids.json"),
   JSON.stringify(
@@ -453,7 +317,7 @@ writeFileSync(
       edgeDev: chromeSideloadId,
       edgeStore: identities.edgeStoreId || null,
       firefox: FIREFOX_ID,
-      safari: process.platform === "darwin" ? SAFARI_APP_BUNDLE_ID : null,
+      safari: null,
     },
     null,
     2,
@@ -478,10 +342,6 @@ console.log(
 console.log(`\nChrome ID (upload + Load unpacked): ${chromeSideloadId}`);
 console.log(`Edge development ID: ${chromeSideloadId}`);
 console.log(`Firefox Gecko ID: ${FIREFOX_ID}`);
-if (safariArtifact) {
-  console.log(`Safari app bundle ID: ${SAFARI_APP_BUNDLE_ID}`);
-  console.log(`Safari app extension: ${relative(root, safariAppex)}`);
-}
 console.log(`Chrome Web Store ID: ${identities.chromeStoreId}`);
 console.log(
   `Edge Add-ons ID: ${identities.edgeStoreId || "not assigned yet"}`,

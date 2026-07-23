@@ -357,23 +357,19 @@ know which OS they're on.
 
 ### 5.1 What "a paired key" is
 
-We bind to two things for defense in depth:
+We use the simplest stable identity the platform exposes:
 
-1. **Device identity** — the `(VID, PID, serialNumber)` tuple of the USB device. This is
-   what we poll/enumerate to answer "is the key plugged in right now?" cheaply.
-2. **A secret key file** — at pairing time we generate a random 256-bit secret, write it to
-   a file on the drive (e.g. `/.talysman/key.bin`), and store a salted hash of the secret
-   in the service's secure store. This is a second factor: it defeats someone who merely
-   spoofs a serial number, and it lets us detect cloned drives.
+1. **Device or volume identity** — a USB serial or stable volume UUID/serial. This is the
+   normal pairing and presence mechanism and requires no write to the drive.
+2. **A fallback marker file** — only when the OS/device exposes no usable stable identifier,
+   pairing writes a random secret to `/.talysman/key.bin` and stores its salted hash.
 
-Storing the device identity is what makes presence detection fast and what stops the trivial
-"copy the key file to any stick" attack. The key file stops the "fake the serial" attack.
-Either alone is weaker; together they're solid for the product's purpose.
+The marker is a compatibility mechanism, not an enforcement factor. Talysman assumes users are
+not intentionally cloning or spoofing their own paired identifier.
 
 > **Caveat to bake into the UX:** some cheap USB sticks report no serial, or a duplicated
-> serial shared across a whole production batch. During pairing we detect this and warn the
-> user ("this drive can't be uniquely identified; presence will rely on the key file only"),
-> and we fall back to volume serial + key file.
+> serial shared across a whole production batch. During pairing we detect a missing identifier
+> and warn the user that presence will rely on the marker file.
 
 You can **pair as many keys as you like** — `pairedKeys` is a set. Any one present unlocks.
 
@@ -381,9 +377,8 @@ You can **pair as many keys as you like** — `pairedKeys` is a set. Any one pre
 
 1. User opens **Keys** page, clicks "Pair a new key," inserts a drive.
 2. UI asks the service to enumerate removable drives; user picks one.
-3. Service (privileged): reads `(VID, PID, serial)` + volume serial; generates a random
-   secret; writes `key.bin` to the drive; stores `{ id, label, serialHash, secretHash }`
-   in the secure store (DPAPI-encrypted on Windows / Keychain on macOS).
+3. Service reads the best stable identifier and stores it. Only if none is available does it
+   generate a random secret, write `key.bin`, and store the secret hash.
 4. UI confirms; the new key appears in the list.
 
 ### 5.3 Presence detection (event-driven, with polling fallback)
@@ -439,7 +434,7 @@ need a real OS IPC channel between them.
 | `enableFocus` | `{ reason }` | ok | turn blocking on |
 | `disableFocus` | `{ }` | ok \| `KEY_REQUIRED` | **service re-checks USB presence itself** |
 | `listRemovableDrives` | – | `Drive[]` | for the pairing picker |
-| `pairKey` | `{ driveId, label }` | `PairedKey` | writes key file, stores identity |
+| `pairKey` | `{ driveId, label }` | `PairedKey` | stores identity; writes fallback marker only if needed |
 | `unpairKey` | `{ keyId }` | ok \| `KEY_REQUIRED` | removing a key is itself key-gated |
 | `getKeyPresence` | – | `{ present, keyId? }` | one-shot read of indicator state |
 | `ping` | – | `{ version }` | health/version check for updater |

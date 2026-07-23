@@ -1,6 +1,8 @@
 import { readdir, readFile } from 'node:fs/promises';
+import { execFile } from 'node:child_process';
 import { basename, extname, join } from 'node:path';
 import { homedir, platform } from 'node:os';
+import { promisify } from 'node:util';
 import type { AppRef } from '@talysman/shared';
 import type { AppPickerItem } from '../shared/appPicker.js';
 
@@ -11,6 +13,8 @@ interface DesktopEntry {
   hidden?: string;
   noDisplay?: string;
 }
+
+const execFileAsync = promisify(execFile);
 
 export function parseDesktopEntry(content: string): DesktopEntry {
   const entry: DesktopEntry = {};
@@ -157,12 +161,34 @@ async function collectFiles(root: string, extension: string): Promise<string[]> 
   return out;
 }
 
-async function listLinuxInstalledApps(): Promise<AppPickerItem[]> {
-  const roots = [
-    '/usr/share/applications',
-    '/usr/local/share/applications',
-    join(homedir(), '.local/share/applications'),
+export function linuxApplicationRoots(
+  home = homedir(),
+  env: NodeJS.ProcessEnv = process.env,
+): string[] {
+  const xdgDataHome = env.XDG_DATA_HOME || join(home, '.local/share');
+  const xdgDataDirs = (env.XDG_DATA_DIRS || '/usr/local/share:/usr/share')
+    .split(':')
+    .filter(Boolean);
+
+  return [
+    ...new Set([
+      join(xdgDataHome, 'applications'),
+      ...xdgDataDirs.map((root) => join(root, 'applications')),
+      // Snap does not always add its desktop-entry directory to XDG_DATA_DIRS.
+      '/var/lib/snapd/desktop/applications',
+      // NixOS applications may come from the active system, user, or default Nix profile.
+      // Desktop sessions usually expose these via XDG_DATA_DIRS, but apps launched outside
+      // that session (including Electron development builds) do not necessarily inherit it.
+      '/run/current-system/sw/share/applications',
+      join(home, '.nix-profile/share/applications'),
+      env.USER ? join('/etc/profiles/per-user', env.USER, 'share/applications') : '',
+      '/nix/var/nix/profiles/default/share/applications',
+    ].filter(Boolean)),
   ];
+}
+
+async function listLinuxInstalledApps(): Promise<AppPickerItem[]> {
+  const roots = linuxApplicationRoots();
   const files = (await Promise.all(roots.map((root) => collectFiles(root, '.desktop')))).flat();
   const items: AppPickerItem[] = [];
 
@@ -172,6 +198,90 @@ async function listLinuxInstalledApps(): Promise<AppPickerItem[]> {
       if (item) items.push(item);
     } catch {
       // Ignore unreadable or malformed desktop entries.
+    }
+  }
+
+  return sortAndDedupe(items);
+}
+
+function plistString(content: string, key: string): string | null {
+  const escapedKey = key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const match = new RegExp(
+    `<key>\\s*${escapedKey}\\s*</key>\\s*<string>([\\s\\S]*?)</string>`,
+  ).exec(content);
+  if (!match?.[1]) return null;
+  return match[1]
+    .replaceAll('&amp;', '&')
+    .replaceAll('&lt;', '<')
+    .replaceAll('&gt;', '>')
+    .replaceAll('&quot;', '"')
+    .replaceAll('&apos;', "'")
+    .trim() || null;
+}
+
+export function macPickerItemFromInfoPlist(
+  content: string,
+  appPath: string,
+): AppPickerItem | null {
+  const macBundleId = plistString(content, 'CFBundleIdentifier');
+  if (!macBundleId) return null;
+  const label =
+    plistString(content, 'CFBundleDisplayName') ||
+    plistString(content, 'CFBundleName') ||
+    basename(appPath, '.app');
+
+  return {
+    id: `mac:${macBundleId}`,
+    label,
+    source: 'macos-application-bundle',
+    app: { label, macBundleId },
+  };
+}
+
+async function collectMacAppBundles(root: string): Promise<string[]> {
+  let entries;
+  try {
+    entries = await readdir(root, { withFileTypes: true });
+  } catch {
+    return [];
+  }
+
+  const bundles: string[] = [];
+  for (const entry of entries) {
+    if (!entry.isDirectory()) continue;
+    const path = join(root, entry.name);
+    if (entry.name.toLowerCase().endsWith('.app')) {
+      bundles.push(path);
+    } else {
+      bundles.push(...(await collectMacAppBundles(path)));
+    }
+  }
+  return bundles;
+}
+
+async function listMacInstalledApps(): Promise<AppPickerItem[]> {
+  const roots = [
+    '/Applications',
+    '/System/Applications',
+    join(homedir(), 'Applications'),
+  ];
+  const bundles = (await Promise.all(roots.map(collectMacAppBundles))).flat();
+  const items: AppPickerItem[] = [];
+
+  for (const bundle of bundles) {
+    const infoPlist = join(bundle, 'Contents/Info.plist');
+    try {
+      // Info.plist is commonly a binary plist. plutil is part of macOS and gives us
+      // one consistent XML representation without adding a main-process dependency.
+      const { stdout } = await execFileAsync(
+        '/usr/bin/plutil',
+        ['-convert', 'xml1', '-o', '-', infoPlist],
+        { maxBuffer: 1024 * 1024 },
+      );
+      const item = macPickerItemFromInfoPlist(stdout, bundle);
+      if (item) items.push(item);
+    } catch {
+      // Skip damaged, inaccessible, or non-standard bundles.
     }
   }
 
@@ -218,6 +328,8 @@ export async function listInstalledApps(): Promise<AppPickerItem[]> {
       return listWindowsInstalledApps();
     case 'linux':
       return listLinuxInstalledApps();
+    case 'darwin':
+      return listMacInstalledApps();
     default:
       return [];
   }

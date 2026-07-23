@@ -14,12 +14,13 @@ use serde::{Deserialize, Serialize};
 use crate::pairing::SaltedHash;
 use crate::paths;
 
-/// One paired key's secret material (hashes only) + device-identity hint.
+/// One paired key's stable device identity, with an optional file fallback.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct KeySecret {
     pub id: String,
-    /// Salted hash of the 256-bit secret stored in key.bin on the drive.
-    pub secret: SaltedHash,
+    /// Present only when the drive exposed no stable identifier.
+    #[serde(default)]
+    pub secret: Option<SaltedHash>,
     /// Volume serial number (hex) captured at pairing, used as a device-identity signal.
     /// None when the drive reported no usable serial (presence relies on key.bin alone).
     #[serde(default)]

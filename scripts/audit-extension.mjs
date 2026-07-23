@@ -161,43 +161,13 @@ if (edgeDevManifest.background?.service_worker !== "background.js") {
   fail("edge-dev: Chromium service worker background is required");
 }
 
-if (process.platform === "darwin") {
-  if (generatedIds.safari !== "com.talysman.app.safari") {
-    fail("safari: generated app bundle ID changed");
+if (generatedIds.safari !== null) {
+  fail("safari: builds must omit Safari while support is disabled");
+}
+for (const path of ["safari", "safari-appex", "safari-xcode"]) {
+  if (existsSync(resolve(distDir, path))) {
+    fail(`safari: disabled build produced ${path}`);
   }
-  const safariDir = resolve(distDir, "safari");
-  const safariFiles = readdirSync(safariDir).sort();
-  if (JSON.stringify(safariFiles) !== JSON.stringify(expectedFiles)) {
-    fail(`safari: package files are ${safariFiles.join(", ")}`);
-  }
-  const manifest = readJson(resolve(safariDir, "manifest.json"));
-  const expectedSafariPermissions = [
-    "declarativeNetRequestWithHostAccess",
-    "nativeMessaging",
-  ];
-  if (
-    JSON.stringify([...(manifest.permissions ?? [])].sort()) !==
-    JSON.stringify(expectedSafariPermissions.sort())
-  ) {
-    fail(`safari: permissions must be exactly ${expectedSafariPermissions.join(", ")}`);
-  }
-  if (JSON.stringify(manifest.host_permissions) !== JSON.stringify(expectedHostPermissions)) {
-    fail("safari: redirect rules require <all_urls> host access");
-  }
-  if (
-    JSON.stringify(manifest.background) !==
-    JSON.stringify({ scripts: ["background.js"], persistent: false })
-  ) {
-    fail("safari: non-persistent background script is required");
-  }
-  if (
-    !existsSync(resolve(distDir, "talysman-safari-" + manifest.version + ".zip")) ||
-    !existsSync(resolve(distDir, "safari-appex/Talysman Safari Extension.appex"))
-  ) {
-    fail("safari: source ZIP or compiled app extension is missing");
-  }
-} else if (generatedIds.safari !== null) {
-  fail("safari: non-macOS builds must omit Safari artifacts");
 }
 
 console.log("OK Extension compliance audit passed");

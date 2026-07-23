@@ -1,7 +1,7 @@
 //! Removable-drive discovery and paired-key presence for Linux.
 //!
-//! v1 uses the `.talysman/key.bin` secret as the durable proof. Linux volume serial discovery is
-//! distro/filesystem-specific, so keys are marked serial-ambiguous until we add udev/lsblk probing.
+//! Linux volume serial discovery is distro/filesystem-specific, so v1 uses
+//! `.talysman/key.bin` as a fallback until udev/lsblk identity probing is added.
 
 use std::path::{Path, PathBuf};
 
@@ -100,15 +100,16 @@ pub fn read_key_file(drive_root: &str) -> Option<Vec<u8>> {
 }
 
 fn drive_satisfies(drive: &DriveInfo, key: &KeySecret) -> bool {
-    let Some(secret) = read_key_file(&drive.mount_point) else {
-        return false;
-    };
-    if !pairing::verify_secret(&secret, &key.secret) {
-        return false;
-    }
     match &key.volume_serial {
         Some(expected) => drive.serial.as_deref() == Some(expected.as_str()),
-        None => true,
+        None => {
+            let (Some(secret), Some(stored)) =
+                (read_key_file(&drive.mount_point), key.secret.as_ref())
+            else {
+                return false;
+            };
+            pairing::verify_secret(&secret, stored)
+        }
     }
 }
 

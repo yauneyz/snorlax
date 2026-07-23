@@ -213,9 +213,20 @@ impl Core {
                 RpcError::new(err::BAD_REQUEST, "Drive not found or no longer connected.")
             })?;
 
-        let secret = pairing::generate_secret();
-        usb::write_key_file(&drive.mount_point, &secret)
-            .map_err(|e| RpcError::new(err::INTERNAL, format!("Could not write key file: {e}")))?;
+        // A stable volume UUID is sufficient for this product. Only write a marker file when
+        // macOS cannot provide an identifier at all.
+        let secret = if drive.serial.is_none() {
+            let secret = pairing::generate_secret();
+            usb::write_key_file(&drive.mount_point, &secret).map_err(|e| {
+                RpcError::new(
+                    err::INTERNAL,
+                    format!("Drive has no stable identifier and the fallback key file could not be written: {e}"),
+                )
+            })?;
+            Some(pairing::hash_secret(&secret))
+        } else {
+            None
+        };
 
         let id = format!("key-{}", random_id());
         let label = if label.is_empty() {
@@ -226,7 +237,7 @@ impl Core {
 
         self.store.keys.push(KeySecret {
             id: id.clone(),
-            secret: pairing::hash_secret(&secret),
+            secret,
             volume_serial: drive.serial.clone(),
         });
 

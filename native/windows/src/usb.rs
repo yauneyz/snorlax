@@ -1,10 +1,8 @@
 //! Removable-drive enumeration + paired-key presence detection (architecture §5).
 //!
-//! v1 identifies a key by (volume serial number + the key.bin secret on the drive). The
-//! volume serial is the device-identity signal that stops the trivial "copy key.bin to any
-//! stick" attack; the key.bin secret stops serial spoofing. Reading the USB (VID,PID,serial)
-//! via SetupAPI is the documented hardening upgrade — volume serial is the architecture's
-//! sanctioned fallback and needs far less FFI.
+//! v1 identifies a key by its volume serial number. `.talysman/key.bin` is used only when a
+//! volume exposes no serial. Reading USB (VID,PID,serial) via SetupAPI is a possible identity
+//! upgrade; volume serial needs far less FFI and is sufficient for the product's trust model.
 //!
 //! Presence is recomputed by polling (~3s, in core.rs). A WM_DEVICECHANGE event window is a
 //! latency optimization left as a TODO.
@@ -108,18 +106,18 @@ pub fn read_key_file(drive_root: &str) -> Option<Vec<u8>> {
     std::fs::read(key_file_path(drive_root)).ok()
 }
 
-/// Does a currently-connected drive satisfy this paired key? Requires the key.bin secret to
-/// verify AND (when a serial was captured at pairing) the volume serial to match.
+/// Match by stable identifier when available; use key.bin only as the no-identifier fallback.
 fn drive_satisfies(drive: &DriveInfo, key: &KeySecret) -> bool {
-    let Some(secret) = read_key_file(&drive.mount_point) else {
-        return false;
-    };
-    if !pairing::verify_secret(&secret, &key.secret) {
-        return false;
-    }
     match &key.volume_serial {
         Some(expected) => drive.serial.as_deref() == Some(expected.as_str()),
-        None => true, // paired without a usable serial — key file alone
+        None => {
+            let (Some(secret), Some(stored)) =
+                (read_key_file(&drive.mount_point), key.secret.as_ref())
+            else {
+                return false;
+            };
+            pairing::verify_secret(&secret, stored)
+        }
     }
 }
 
