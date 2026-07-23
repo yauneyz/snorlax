@@ -17,7 +17,7 @@ export interface BrowserHealth {
 
 export interface Settings {
   /**
-   * The browser handshake "dead-man's switch". When on, a supported browser open during a locked
+   * The browser handshake "strict mode". When on, a supported browser open during a locked
    * focus session must keep proving the extension is alive (heartbeats) or the service closes it;
    * unsupported browsers are closed outright. Default off. Turning it **off** is key-gated.
    */

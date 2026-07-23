@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseMiddleware } from "@/lib/supabase/middleware";
-import { classifyPath } from "@/lib/auth/route-classification";
+import { classifyPath, isPasswordRecoveryPath } from "@/lib/auth/route-classification";
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
@@ -43,12 +43,16 @@ export async function middleware(request: NextRequest) {
   }
 
   if (kind === "auth") {
-    if (user) return redirectTo("/app");
+    // A valid recovery code creates a session before the user sets the new password. Do not
+    // redirect that session away from the form it still needs to complete.
+    if (user && !isPasswordRecoveryPath(pathname)) return redirectTo("/app");
     return response();
   }
 
   // marketing: only `/` reroutes logged-in users; keep /pricing, /blog, etc. browsable.
-  if (pathname === "/" && user) {
+  // Leave a root-level auth callback in place long enough for the browser client to consume it.
+  // This matters when a recovery link is opened while another session cookie still exists.
+  if (pathname === "/" && user && !request.nextUrl.searchParams.has("code")) {
     return redirectTo(subscribed ? "/app" : "/pricing");
   }
 

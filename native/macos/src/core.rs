@@ -129,12 +129,19 @@ impl Core {
         );
     }
 
-    fn enable_focus(&mut self, source: FocusSource) {
+    fn enable_focus(&mut self, source: FocusSource) -> Result<(), RpcError> {
         if self.state.focus_active {
-            return;
+            return Ok(());
+        }
+        if self.state.paired_keys.is_empty() {
+            return Err(RpcError::new(
+                err::NO_PAIRED_KEY,
+                "Pair a key before turning on focus.",
+            ));
         }
         self.set_focus(true, source);
         tracing::info!("focus enabled ({:?})", source);
+        Ok(())
     }
 
     /// The guarded disable path. `bypass` is only set by the recovery killswitch.
@@ -159,7 +166,18 @@ impl Core {
         Ok(())
     }
 
-    fn set_policy(&mut self, policy: Policy) {
+    /// Tightening the policy is always free. Relaxing it — unblocking a site or app, or a mode
+    /// change that frees traffic — requires the paired key.
+    fn set_policy(&mut self, policy: Policy) -> Result<(), RpcError> {
+        if !crate::policy_match::is_at_least_as_restrictive(&self.state.policy, &policy) {
+            self.recompute_presence();
+            if !self.key_present {
+                return Err(RpcError::new(
+                    err::KEY_REQUIRED,
+                    "Insert your paired key to relax the blocklist.",
+                ));
+            }
+        }
         self.state.policy = policy.clone();
         self.shared.set_policy(policy.clone());
         // Policy edits change the resolver target list even while focus is off. Kick a one-shot
@@ -167,11 +185,25 @@ impl Core {
         kick_resolver(self.shared.clone());
         self.persist();
         self.emit("policyChanged", json!({ "policy": policy }));
+        Ok(())
     }
 
-    fn set_schedule(&mut self, schedule: Schedule) {
+    /// Tightening the schedule is always free. Relaxing it — dropping a covered minute or
+    /// unlocking a locked one — requires the paired key; with the key present the user may edit
+    /// any window, including one that is currently active.
+    fn set_schedule(&mut self, schedule: Schedule) -> Result<(), RpcError> {
+        if !schedule::is_at_least_as_restrictive(&self.state.schedule, &schedule) {
+            self.recompute_presence();
+            if !self.key_present {
+                return Err(RpcError::new(
+                    err::KEY_REQUIRED,
+                    "Insert your paired key to relax the schedule.",
+                ));
+            }
+        }
         self.state.schedule = schedule;
         self.persist();
+        Ok(())
     }
 
     /// Toggle the browser handshake dead-man's switch. Enabling is free; **disabling** is gated
@@ -243,6 +275,15 @@ impl Core {
     }
 
     fn unpair_key(&mut self, key_id: &str) -> Result<(), RpcError> {
+        if !self.state.paired_keys.iter().any(|key| key.id == key_id) {
+            return Err(RpcError::new(err::BAD_REQUEST, "Paired key not found."));
+        }
+        if self.state.paired_keys.len() == 1 {
+            return Err(RpcError::new(
+                err::LAST_PAIRED_KEY,
+                "Pair another key before removing your last key.",
+            ));
+        }
         // Removing a key is itself key-gated (architecture §6).
         self.recompute_presence();
         if !self.key_present {
@@ -286,7 +327,10 @@ impl Core {
         // Restore the persisted handshake setting into the shared enforcement state.
         self.shared
             .set_handshake_enabled(self.state.settings.browser_handshake_enabled);
-        if self.state.focus_active {
+        if self.state.focus_active && self.state.paired_keys.is_empty() {
+            tracing::warn!("clearing persisted focus state because no key is paired");
+            self.set_focus(false, FocusSource::Boot);
+        } else if self.state.focus_active {
             self.shared.set_active(true);
             enforce::apply_network(true);
             kick_resolver(self.shared.clone());
@@ -299,7 +343,7 @@ impl Core {
     /// the schedule itself turned on (never a user-initiated focus session).
     pub fn schedule_tick(&mut self) {
         let eval = schedule::evaluate_now(&self.state.schedule);
-        if eval.active && !self.state.focus_active {
+        if eval.active && !self.state.focus_active && !self.state.paired_keys.is_empty() {
             self.set_focus(true, FocusSource::Schedule);
             if let Some(id) = eval.window_id {
                 self.emit("scheduleFired", json!({ "windowId": id, "active": true }));
@@ -324,7 +368,7 @@ impl Core {
                 Ok(json!({ "present": self.key_present, "keyId": self.present_key_id }))
             }
             "enableFocus" => {
-                self.enable_focus(FocusSource::User);
+                self.enable_focus(FocusSource::User)?;
                 Ok(ok())
             }
             "disableFocus" => {
@@ -333,12 +377,12 @@ impl Core {
             }
             "setPolicy" => {
                 let policy: Policy = parse_field(params, "policy")?;
-                self.set_policy(policy);
+                self.set_policy(policy)?;
                 Ok(ok())
             }
             "setSchedule" => {
                 let schedule: Schedule = parse_field(params, "schedule")?;
-                self.set_schedule(schedule);
+                self.set_schedule(schedule)?;
                 Ok(ok())
             }
             "setBrowserHandshake" => {

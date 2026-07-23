@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { classifyPath, isAuthenticatedUiRoute } from "@/lib/auth/route-classification";
+import {
+  classifyPath,
+  isAuthenticatedUiRoute,
+  isPasswordRecoveryPath,
+} from "@/lib/auth/route-classification";
 
 describe("route classification", () => {
   it("classifies authenticated UI routes from the shared route list", () => {
@@ -14,10 +18,17 @@ describe("route classification", () => {
     expect(isAuthenticatedUiRoute("/accounting")).toBe(false);
   });
 
+  it("keeps only the password recovery auth surface reachable after session creation", () => {
+    expect(isPasswordRecoveryPath("/reset-password")).toBe(true);
+    expect(isPasswordRecoveryPath("/login")).toBe(false);
+    expect(isPasswordRecoveryPath("/reset-password/other")).toBe(false);
+  });
+
   it("classifies public, auth, app, api, and asset routes", () => {
     expect(classifyPath("/")).toBe("marketing");
     expect(classifyPath("/pricing")).toBe("marketing");
     expect(classifyPath("/login")).toBe("auth");
+    expect(classifyPath("/auth/recovery")).toBe("auth");
     expect(classifyPath("/app")).toBe("app");
     expect(classifyPath("/account")).toBe("app");
     expect(classifyPath("/api/health")).toBe("api");

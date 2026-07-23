@@ -5,9 +5,18 @@ export const AUTH_PATHS = [
   "/signup",
   "/forgot-password",
   "/reset-password",
+  "/auth/recovery",
 ] as const;
 
 export const AUTHENTICATED_UI_PATHS = ["/app", "/account"] as const;
+
+/**
+ * Password recovery establishes an authenticated session before the user chooses their new
+ * password. Keep this auth surface reachable after that session has been created.
+ */
+export function isPasswordRecoveryPath(pathname: string): boolean {
+  return pathname === "/reset-password";
+}
 
 export function isAuthenticatedUiRoute(pathname: string): boolean {
   return AUTHENTICATED_UI_PATHS.some(

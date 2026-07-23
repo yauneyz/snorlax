@@ -1,8 +1,8 @@
 /**
  * In-process fake service implementing the full protocol (architecture §16, category-1).
  * Used by `pnpm dev` (so the UI fully works without the native service / on WSL) and by the
- * e2e tests. It is the behavioural reference for the disable gate: it refuses `disableFocus`
- * unless a (simulated) key is present and no locked window is active.
+ * e2e tests. It is the behavioural reference for the focus gates: focus requires a paired key
+ * to enable, and disabling requires a (simulated) key to be present with no locked window.
  *
  * Dev affordance: `devToggleKey()` flips the simulated USB key so you can exercise the
  * red/green indicator and the key-required path without real hardware.
@@ -92,7 +92,7 @@ export class MockServiceConnection implements ServiceConnection {
   /** Dev-only: simulate plugging/unplugging the paired key. */
   devToggleKey(): boolean {
     const firstKey = this.state.pairedKeys[0];
-    this.keyPresent = !this.keyPresent;
+    this.keyPresent = Boolean(firstKey) && !this.keyPresent;
     this.presentKeyId = this.keyPresent ? firstKey?.id : undefined;
     this.emit('keyPresenceChanged', { present: this.keyPresent, keyId: this.presentKeyId });
     return this.keyPresent;
@@ -122,6 +122,9 @@ export class MockServiceConnection implements ServiceConnection {
       }
 
       case 'enableFocus': {
+        if (this.state.pairedKeys.length === 0) {
+          throw err(ErrorCode.NO_PAIRED_KEY, 'Pair a key before turning on focus.');
+        }
         this.state.focusActive = true;
         this.state.focusSource = 'user';
         this.emit('focusChanged', { active: true, source: 'user' });
@@ -172,9 +175,20 @@ export class MockServiceConnection implements ServiceConnection {
       }
 
       case 'unpairKey': {
-        if (!this.keyPresent) throw err(ErrorCode.KEY_REQUIRED, 'Insert your key to remove a key.');
         const { keyId } = params as Params<'unpairKey'>;
+        if (!this.state.pairedKeys.some((key) => key.id === keyId)) {
+          throw err(ErrorCode.BAD_REQUEST, 'Paired key not found.');
+        }
+        if (this.state.pairedKeys.length === 1) {
+          throw err(ErrorCode.LAST_PAIRED_KEY, 'Pair another key before removing your last key.');
+        }
+        if (!this.keyPresent) throw err(ErrorCode.KEY_REQUIRED, 'Insert your key to remove a key.');
         this.state.pairedKeys = this.state.pairedKeys.filter((k) => k.id !== keyId);
+        if (this.presentKeyId === keyId) {
+          this.keyPresent = false;
+          this.presentKeyId = undefined;
+          this.emit('keyPresenceChanged', { present: false });
+        }
         return OK;
       }
 

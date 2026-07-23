@@ -122,7 +122,9 @@ EXTENSION_EDGE_STORE_URL
 EXTENSION_FIREFOX_STORE_URL
 ```
 
-Leave a URL empty until the listing exists; the download page will show that browser as coming soon.
+Leave a URL empty until the listing exists. Before launch, verify the download page does not expose
+its development placeholder link; the current page implementation must be changed to render a
+non-clickable “coming soon” state for an empty store URL.
 
 ## Validation
 

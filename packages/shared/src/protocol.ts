@@ -67,7 +67,7 @@ export interface RequestMap {
   setPolicy: { params: { policy: Policy }; result: Ok };
   setSchedule: { params: { schedule: Schedule }; result: Ok };
   /**
-   * Toggle the browser handshake dead-man's switch. Enabling is free; **disabling** is gated
+   * Toggle the browser handshake strict mode. Enabling is free; **disabling** is gated
    * exactly like `disableFocus` (the service re-checks USB presence) and may fail KEY_REQUIRED /
    * LOCKED.
    */
@@ -88,12 +88,13 @@ export interface RequestMap {
     };
     result: Ok;
   };
+  /** Requires at least one paired key; may fail NO_PAIRED_KEY. */
   enableFocus: { params: { reason?: string }; result: Ok };
   /** Service re-checks USB presence itself; may fail KEY_REQUIRED / LOCKED. */
   disableFocus: { params: Record<string, never>; result: Ok };
   listRemovableDrives: { params: void; result: { drives: Drive[] } };
   pairKey: { params: { driveId: string; label: string }; result: { key: PairedKey } };
-  /** Removing a key is itself key-gated. */
+  /** Removing a key is itself key-gated and may not remove the final paired key. */
   unpairKey: { params: { keyId: string }; result: Ok };
   getKeyPresence: { params: void; result: { present: boolean; keyId?: string } };
   ping: { params: void; result: { version: string; protocolVersion: number } };

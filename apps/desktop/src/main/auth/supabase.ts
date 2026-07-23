@@ -183,7 +183,11 @@ export async function signUpWithPassword(
   }
 }
 
-/** Email a password-reset link that returns via `talysman://auth/reset-callback`. */
+/**
+ * Email a password-reset link. Production's recovery template completes on the hosted web
+ * recovery surface so it works across devices; the deep-link redirect remains compatible with
+ * the default/local template and already-issued emails.
+ */
 export async function sendPasswordReset(email: string): Promise<{ ok: boolean; message?: string }> {
   try {
     const { error } = await getClient().auth.resetPasswordForEmail(email, {

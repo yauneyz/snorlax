@@ -5,8 +5,9 @@ configured, run locally, and released to production. Covers Supabase, Vercel, St
 env plumbing, signed desktop updates, the Linux APT repository, S3 release hosting, and
 the runbooks for day-to-day dev and production updates.
 
-Everything here was verified against the repo, the Supabase/Vercel CLIs, and the vendor
-docs as of 2026-07-20.
+Commands and repository paths here are maintained with the code. Infrastructure state is
+intentionally not snapshotted: use the verification commands in §4 to inspect the live services
+before a deployment.
 
 ---
 
@@ -96,8 +97,9 @@ Gotchas baked into the script (worth knowing, they will bite otherwise):
 
 ### `apps/web/src/lib/config.ts` — runtime validation
 
-No module reads `process.env` directly; everything imports the typed `config` object,
-which zod-validates the env at module load. Consequences:
+Application modules normally import the typed `config` object, which zod-validates the env at
+module load. Bootstrap files that Next.js must statically analyze and the small OAuth/encryption
+key helpers read their literal `process.env` keys directly. Consequences:
 
 - A missing required var crashes the server **at startup/build**, not on the first
   request that happens to need it. If a Vercel build fails with "Invalid … env config",
@@ -114,7 +116,7 @@ which zod-validates the env at module load. Consequences:
 | ------------------------------------------------------ | ------------------------------ | --------------------------------------------------------------------------------------- |
 | `src/lib/supabase/browser.ts`                          | publishable key                | Client components (RLS enforced)                                                        |
 | `src/lib/supabase/server.ts`                           | publishable key + user cookies | Server components / route handlers (RLS enforced as the user)                           |
-| `src/lib/supabase/middleware.ts` → `src/middleware.ts` | publishable key                | Edge middleware; refreshes auth cookies, gates `/app/**` on login + active subscription |
+| `src/lib/supabase/middleware.ts` → `src/middleware.ts` | publishable key                | Node middleware; refreshes auth cookies, gates `/app/**` on login + active subscription |
 | `src/lib/supabase/admin.ts`                            | **secret key — bypasses RLS**  | Server-only (webhook, `src/server/**`); an eslint rule blocks importing it elsewhere    |
 
 ---
@@ -194,27 +196,28 @@ reproduce the schema from scratch, which is exactly what `db push` will do to pr
 
 ---
 
-## 4. What exists in prod right now (as of 2026-07-08)
+## 4. Verify the live production state
 
-Snapshot so the rest of the guide has context:
+Do not rely on a checked-in snapshot for deploy status, environment variables, migration history,
+or DNS. Check the live systems immediately before changing them:
 
-- **Vercel**: project `snorlax-web` (team `zacyauney-3805s-projects`), Root Directory
-  `apps/web`, Build Command `pnpm build`, Install Command
-  `pnpm install --filter @talysman/web... --frozen-lockfile`, Node 24. Linked from the
-  repo root via `.vercel/project.json`. **Not connected to the GitHub repo** — all
-  deploys so far were CLI-initiated. All 5 production deploys are currently in Error
-  state (being handled separately).
-- **Vercel env (production)**: only the Supabase-integration-injected vars exist
-  (`POSTGRES_*`, `SUPABASE_*`, `NEXT_PUBLIC_SUPABASE_*`). Everything else the app
-  requires (Stripe, Resend, security keys, app URL…) has **not** been pushed yet —
-  `config.ts` will fail the build/boot until it is (§6.3).
-- **Supabase cloud**: project `lkanoehzgogtrxzycutl`. The local CLI is **not logged in
-  and not linked**, so migrations have not been pushed via the CLI from this machine.
-- **Domain**: `talysman.app` is added to the Vercel team (registrar/DNS external) but
-  needs to be attached to the project and DNS pointed (§6.5).
-- **`.credentials`**: `[supabase.dev]`, `[supabase.prod]`, Google, AWS, security keys
-  look real; `[resend]` and `[sentry]` still hold example values; Stripe is in test
-  mode pointing at the "Talysman sandbox" account.
+```bash
+vercel whoami
+vercel project inspect
+vercel env ls production
+
+cd apps/web
+supabase migration list
+```
+
+Also verify the production and health URLs directly:
+
+```bash
+curl -I https://talysman.app
+curl https://talysman.app/api/health
+```
+
+The remaining sections describe the intended configuration and the commands used to establish it.
 
 ---
 

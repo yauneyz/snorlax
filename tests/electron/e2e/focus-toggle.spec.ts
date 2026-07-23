@@ -1,13 +1,13 @@
 /**
  * E2E scaffold: drives the real Electron app (against the in-process mock service) and
- * verifies the focus toggle + key-required disable gate. Requires @playwright/test +
+ * verifies the paired-key enable gate + key-presence disable gate. Requires @playwright/test +
  * playwright-electron to be installed (see README.md). Kept out of the vitest `pnpm test`
  * run so the unit suite stays dependency-light.
  */
 import { test, expect, _electron as electron } from '@playwright/test';
 import { resolve } from 'node:path';
 
-test('enable focus, then disabling without a key is blocked', async () => {
+test('focus requires a paired key and disabling requires it to be connected', async () => {
   const app = await electron.launch({
     args: [resolve(__dirname, '../../../apps/desktop/out/main/index.cjs')],
   });
@@ -21,11 +21,21 @@ test('enable focus, then disabling without a key is blocked', async () => {
     const info = await win.evaluate(() => window.api.appInfo());
     expect(info.usingMock).toBe(true);
 
-    await win.getByRole('button', { name: 'Turn on focus' }).click();
+    const enableButton = win.getByRole('button', { name: 'Turn on focus' });
+    await expect(enableButton).toBeDisabled();
+    await expect(win.getByText('pair a key to turn on focus')).toBeVisible();
+
+    await win.getByRole('button', { name: 'Keys' }).click();
+    await win.getByRole('button', { name: 'Pair this drive' }).click();
+    await expect(win.getByRole('button', { name: 'unpair' })).toBeDisabled();
+    await expect(win.getByText('Pair another key before removing your last key.')).toBeVisible();
+
+    await win.getByRole('button', { name: 'Dashboard' }).click();
+    await enableButton.click();
     await expect(win.getByText('FOCUSED')).toBeVisible();
 
-    await win.getByRole('button', { name: 'Turn off focus' }).click();
-    await expect(win.getByText('Insert your paired key')).toBeVisible();
+    await expect(win.getByRole('button', { name: 'Turn off focus' })).toBeDisabled();
+    await expect(win.getByText('insert key to turn off focus')).toBeVisible();
   } finally {
     await app.close();
   }

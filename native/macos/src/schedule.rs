@@ -82,6 +82,26 @@ pub fn evaluate_at(schedule: &Schedule, day: &str, minute: u32) -> ScheduleEvalu
     eval
 }
 
+/// Whether `next` enforces at least as much as `prev` at every minute of the week: it never drops
+/// a covered (focus-forced) minute and never unlocks a locked one. Equal or stricter schedules
+/// return true; any relaxation returns false. Window policy references are not compared here —
+/// coverage and locking are the schedule's own contribution to enforcement.
+pub fn is_at_least_as_restrictive(prev: &Schedule, next: &Schedule) -> bool {
+    for day in WEEKDAYS {
+        for minute in 0..24 * 60 {
+            let p = evaluate_at(prev, day, minute);
+            if !p.active {
+                continue;
+            }
+            let n = evaluate_at(next, day, minute);
+            if !n.active || (p.locked && !n.locked) {
+                return false;
+            }
+        }
+    }
+    true
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

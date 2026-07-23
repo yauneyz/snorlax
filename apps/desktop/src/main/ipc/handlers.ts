@@ -155,8 +155,30 @@ async function applyCurrentPlanLimits(service: ServiceConnection): Promise<void>
   const policy = constrainPolicyToLimits(state.policy, limits);
   const schedule = constrainScheduleToLimits(state.schedule, limits);
 
-  await service.request('setPolicy', { policy });
-  await service.request('setSchedule', { schedule });
+  // Trimming policy/schedule to plan limits can relax them (free clears all schedule windows and
+  // caps the blocklist). The service gates any loosening behind the USB key, so these may be
+  // refused — in which case the stricter state stays until the user unlocks. That's the intended
+  // fail-safe, so swallow the gate errors instead of failing the whole sync.
+  await applyConstrainedState(service, 'setPolicy', { policy }, 'policy');
+  await applyConstrainedState(service, 'setSchedule', { schedule }, 'schedule');
+}
+
+/** Apply a plan-limit-constrained update, tolerating the service's key gate on any relaxation. */
+async function applyConstrainedState(
+  service: ServiceConnection,
+  method: 'setPolicy' | 'setSchedule',
+  params: Params<'setPolicy'> | Params<'setSchedule'>,
+  label: string,
+): Promise<void> {
+  try {
+    await service.request(method, params as Params<typeof method>);
+  } catch (e) {
+    if (isServiceError(e) && (e.code === 'KEY_REQUIRED' || e.code === 'LOCKED')) {
+      logger.info(`[plan-limits] ${label} kept stricter than plan limits until unlocked`);
+    } else {
+      throw e;
+    }
+  }
 }
 
 export async function registerIpcHandlers(ctx: HandlerContext): Promise<void> {

@@ -48,11 +48,11 @@
       "result": { "ok": true },
       "$comment": "Relayed by talysman-natmsg from the extension. Fire-and-forget; feeds the watchdog. browserPid is the host's parent process (the browser instance)."
     },
-    "enableFocus": { "params": { "reason": "string?" }, "result": { "ok": true } },
+    "enableFocus": { "params": { "reason": "string?" }, "result": { "ok": true }, "errors": ["NO_PAIRED_KEY"] },
     "disableFocus": { "params": {}, "result": { "ok": true }, "errors": ["KEY_REQUIRED", "LOCKED"] },
     "listRemovableDrives": { "params": null, "result": { "drives": "Drive[]" } },
     "pairKey": { "params": { "driveId": "string", "label": "string" }, "result": { "key": "PairedKey" } },
-    "unpairKey": { "params": { "keyId": "string" }, "result": { "ok": true }, "errors": ["KEY_REQUIRED"] },
+    "unpairKey": { "params": { "keyId": "string" }, "result": { "ok": true }, "errors": ["KEY_REQUIRED", "LAST_PAIRED_KEY"] },
     "recover": {
       "params": { "code": "string" },
       "result": { "ok": true },
@@ -69,5 +69,5 @@
     "browserWatchdogWarning": { "browser": "string", "pid": "number" },
     "browserWatchdogKilled": { "browser": "string", "pid": "number" }
   },
-  "errorCodes": ["KEY_REQUIRED", "LOCKED", "BAD_RECOVERY_CODE", "BAD_REQUEST", "INTERNAL"]
+  "errorCodes": ["KEY_REQUIRED", "NO_PAIRED_KEY", "LAST_PAIRED_KEY", "LOCKED", "BAD_RECOVERY_CODE", "BAD_REQUEST", "INTERNAL"]
 }

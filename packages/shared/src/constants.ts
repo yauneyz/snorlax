@@ -38,6 +38,10 @@ export const PIPE_BASE_DEV = 'talysman-dev';
 export const ErrorCode = {
   /** Disable refused: no paired USB key physically present right now. */
   KEY_REQUIRED: 'KEY_REQUIRED',
+  /** Enable refused: no USB key has been paired yet. */
+  NO_PAIRED_KEY: 'NO_PAIRED_KEY',
+  /** Unpair refused: the requested key is the only paired key. */
+  LAST_PAIRED_KEY: 'LAST_PAIRED_KEY',
   /** Disable refused: a `locked` schedule window is currently active. */
   LOCKED: 'LOCKED',
   /** Recovery code did not match. */

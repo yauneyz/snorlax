@@ -91,7 +91,7 @@ export function Settings() {
           </p>
           <div className="flex items-center justify-between gap-3">
             <span className="font-medium text-slate-200">
-              Dead-man’s switch:{' '}
+              Strict mode:{' '}
               <Badge tone={handshakeEnabled ? 'ok' : 'neutral'}>{handshakeEnabled ? 'On' : 'Off'}</Badge>
             </span>
             <Button

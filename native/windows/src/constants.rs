@@ -20,6 +20,8 @@ pub fn pipe_path(base: &str) -> String {
 /// Error codes mirrored from constants.ts ErrorCode.
 pub mod err {
     pub const KEY_REQUIRED: &str = "KEY_REQUIRED";
+    pub const NO_PAIRED_KEY: &str = "NO_PAIRED_KEY";
+    pub const LAST_PAIRED_KEY: &str = "LAST_PAIRED_KEY";
     pub const LOCKED: &str = "LOCKED";
     pub const BAD_RECOVERY_CODE: &str = "BAD_RECOVERY_CODE";
     pub const BAD_REQUEST: &str = "BAD_REQUEST";

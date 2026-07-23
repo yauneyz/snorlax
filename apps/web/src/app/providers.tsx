@@ -7,6 +7,7 @@ import posthog from "posthog-js";
 import { PostHogProvider } from "posthog-js/react";
 import { config } from "@/lib/config";
 import { captureException } from "@/lib/sentry";
+import { recoveryRedirectForAuthEvent } from "@/lib/auth/recovery";
 import { supabaseBrowser } from "@/lib/supabase/browser";
 
 function makeQueryClient() {
@@ -39,6 +40,14 @@ function SupabaseAuthSync() {
     const {
       data: { subscription },
     } = client.auth.onAuthStateChange((event, session) => {
+      const recoveryRedirect = recoveryRedirectForAuthEvent(event);
+      if (recoveryRedirect && window.location.pathname !== recoveryRedirect) {
+        // Supabase falls back to its Site URL when a requested redirect is absent or rejected.
+        // The client still exchanges the root-level ?code, so send that recovery session to the
+        // password form instead of leaving the user on the marketing homepage.
+        window.location.replace(recoveryRedirect);
+        return;
+      }
       if (event === "SIGNED_IN" && session?.user) {
         if (config.posthog.key) {
           posthog.identify(session.user.id, { email: session.user.email });

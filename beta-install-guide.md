@@ -18,15 +18,31 @@ blocking, so it needs to be in place first.
    - **Windows** — Windows 10/11, 64-bit
    - **macOS** — Apple Silicon or Intel
    - **Linux** — `.deb` (Debian/Ubuntu, x86-64)
-3. Run the installer you downloaded and follow the prompts.
+3. Run the installer you downloaded and follow the prompts. If you downloaded the
+   macOS beta, follow the steps below.
 
-**If your OS shows a security warning** (we're still finishing app-store signing):
+**Windows beta:** SmartScreen may say "Windows protected your PC." Click **More info →
+Run anyway**.
 
-- **Windows** — SmartScreen may say "Windows protected your PC." Click **More info →
-  Run anyway**.
-- **macOS** — if it says the app "can't be opened," go to **System Settings → Privacy
-  & Security**, scroll down, and click **Open Anyway**. (Or right-click the app →
-  **Open**.)
+### macOS beta (`.dmg`)
+
+The beta DMG is not yet notarized by Apple, so macOS will block the first launch. These
+steps bypass a macOS security protection; only continue if you downloaded the DMG from
+`talysman.app/download` or from the beta link we sent you.
+
+1. Open the downloaded `.dmg`.
+2. Drag **Talysman** into the **Applications** folder, then eject the Talysman disk
+   image.
+3. Open **Applications** and double-click **Talysman**. macOS will show a warning that
+   it can't verify the developer or check the app for malicious software. Click **Done**
+   or **Cancel**. You must attempt to open the app once before the next option appears.
+4. Open **Apple menu → System Settings → Privacy & Security** and scroll down to the
+   **Security** section.
+5. Find the message that Talysman was blocked and click **Open Anyway**. This option is
+   available for about an hour after the blocked launch attempt.
+6. Authenticate when prompted, then confirm **Open**.
+
+macOS saves Talysman as an exception, so future launches work normally.
 
 Open Talysman once it's installed and leave it running.
 

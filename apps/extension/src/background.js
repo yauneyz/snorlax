@@ -5,7 +5,7 @@
 // into declarativeNetRequest dynamic rules. DNR dynamic rules persist across service-worker
 // restarts, so enforcement survives the worker sleeping; we only touch them when state changes.
 //
-// Liveness handshake (dead-man's switch): while connected, the extension sends the service a
+// Liveness handshake (strict mode): while connected, the extension sends the service a
 // periodic heartbeat reporting that it can actually block. The native service closes any supported
 // browser that stops proving the extension is alive during a locked session, so this heartbeat is
 // what keeps the browser usable. The open native-messaging port also keeps the MV3 worker alive.

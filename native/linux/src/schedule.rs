@@ -81,3 +81,86 @@ pub fn evaluate_at(schedule: &Schedule, day: &str, minute: u32) -> ScheduleEvalu
     }
     eval
 }
+
+/// Whether `next` enforces at least as much as `prev` at every minute of the week: it never drops
+/// a covered (focus-forced) minute and never unlocks a locked one. Equal or stricter schedules
+/// return true; any relaxation returns false. Window policy references are not compared here —
+/// coverage and locking are the schedule's own contribution to enforcement.
+pub fn is_at_least_as_restrictive(prev: &Schedule, next: &Schedule) -> bool {
+    for day in WEEKDAYS {
+        for minute in 0..24 * 60 {
+            let p = evaluate_at(prev, day, minute);
+            if !p.active {
+                continue;
+            }
+            let n = evaluate_at(next, day, minute);
+            if !n.active || (p.locked && !n.locked) {
+                return false;
+            }
+        }
+    }
+    true
+}
+
+#[cfg(test)]
+mod restrictiveness_tests {
+    use super::*;
+    use crate::model::ScheduleWindow;
+
+    fn win(id: &str, start: &str, end: &str, locked: bool) -> ScheduleWindow {
+        ScheduleWindow {
+            id: id.into(),
+            days: vec!["mon".into(), "tue".into(), "wed".into(), "thu".into(), "fri".into()],
+            start: start.into(),
+            end: end.into(),
+            policy_id: None,
+            locked,
+        }
+    }
+
+    fn sched(windows: Vec<ScheduleWindow>) -> Schedule {
+        Schedule { windows }
+    }
+
+    #[test]
+    fn identical_is_allowed() {
+        let s = sched(vec![win("w1", "09:00", "17:00", true)]);
+        assert!(is_at_least_as_restrictive(&s, &s.clone()));
+    }
+
+    #[test]
+    fn adding_coverage_is_allowed() {
+        let prev = sched(vec![]);
+        let next = sched(vec![win("w1", "09:00", "17:00", false)]);
+        assert!(is_at_least_as_restrictive(&prev, &next));
+    }
+
+    #[test]
+    fn removing_coverage_is_blocked() {
+        let prev = sched(vec![win("w1", "09:00", "17:00", false)]);
+        let next = sched(vec![]);
+        assert!(!is_at_least_as_restrictive(&prev, &next));
+    }
+
+    #[test]
+    fn shrinking_a_window_is_blocked() {
+        let prev = sched(vec![win("w1", "09:00", "17:00", false)]);
+        let next = sched(vec![win("w1", "10:00", "17:00", false)]);
+        assert!(!is_at_least_as_restrictive(&prev, &next));
+    }
+
+    #[test]
+    fn expanding_a_window_is_allowed() {
+        let prev = sched(vec![win("w1", "10:00", "17:00", false)]);
+        let next = sched(vec![win("w1", "09:00", "18:00", false)]);
+        assert!(is_at_least_as_restrictive(&prev, &next));
+    }
+
+    #[test]
+    fn unlocking_is_blocked_locking_is_allowed() {
+        let locked = sched(vec![win("w1", "09:00", "17:00", true)]);
+        let unlocked = sched(vec![win("w1", "09:00", "17:00", false)]);
+        assert!(!is_at_least_as_restrictive(&locked, &unlocked));
+        assert!(is_at_least_as_restrictive(&unlocked, &locked));
+    }
+}

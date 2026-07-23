@@ -1,7 +1,7 @@
 //! Pure domain/app matching used by the DNS sinkhole and the app blocker. Mirrors the intent
 //! of packages/core/src/policyNormalize.ts matching (wildcards are a leading "*.").
 
-use crate::model::{Mode, Policy};
+use crate::model::{AppRef, Mode, Policy};
 
 /// Does `host` match `pattern`? `pattern` may be exact ("youtube.com") or a leading wildcard
 /// ("*.reddit.com" matches reddit.com and any subdomain).
@@ -23,6 +23,56 @@ pub fn is_host_blocked(policy: &Policy, host: &str) -> bool {
         Mode::Whitelist => !listed,
         Mode::BlockAll => true,
     }
+}
+
+/// A dot-less host that matches no realistic domain pattern (only an exact-equality pattern for
+/// this exact string could match it). It stands in for the "matches nothing listed" class when
+/// comparing block coverage.
+const NO_MATCH_SENTINEL: &str = "talysmannomatchsentinelhost";
+
+fn norm_app_field(value: &Option<String>) -> Option<String> {
+    value
+        .as_deref()
+        .map(|v| v.trim().trim_end_matches(".exe").to_ascii_lowercase())
+        .filter(|v| !v.is_empty())
+}
+
+/// Do two app references identify the same executable (ignoring the human label)?
+fn same_app(a: &AppRef, b: &AppRef) -> bool {
+    norm_app_field(&a.linux_process_name) == norm_app_field(&b.linux_process_name)
+        && norm_app_field(&a.windows_image_name) == norm_app_field(&b.windows_image_name)
+        && norm_app_field(&a.mac_bundle_id) == norm_app_field(&b.mac_bundle_id)
+}
+
+/// Whether `next` blocks at least everything `prev` blocked. Domains: every host `prev` sinkholes,
+/// `next` must sinkhole too — checked over the base of each listed pattern plus a non-matching
+/// sentinel, which is a sound and complete witness set for `is_host_blocked`. Apps: `next` must
+/// still block every app `prev` blocked. Equal or stricter policies return true; any relaxation
+/// (unblocking a site or app, or a mode change that frees traffic) returns false.
+pub fn is_at_least_as_restrictive(prev: &Policy, next: &Policy) -> bool {
+    let mut hosts: Vec<String> = Vec::new();
+    for pattern in prev.domains.iter().chain(next.domains.iter()) {
+        let base = pattern
+            .trim()
+            .trim_start_matches("*.")
+            .trim_end_matches('.')
+            .to_ascii_lowercase();
+        if !base.is_empty() {
+            hosts.push(base);
+        }
+    }
+    hosts.push(NO_MATCH_SENTINEL.to_string());
+
+    for host in &hosts {
+        if is_host_blocked(prev, host) && !is_host_blocked(next, host) {
+            return false;
+        }
+    }
+
+    prev
+        .apps
+        .iter()
+        .all(|app| next.apps.iter().any(|candidate| same_app(candidate, app)))
 }
 
 /// Hostnames a future DNS sinkhole should refuse while focus is active, independent of the user's
@@ -98,6 +148,80 @@ pub fn is_app_blocked(policy: &Policy, image_name: &str) -> bool {
             })
             .unwrap_or(false)
     })
+}
+
+#[cfg(test)]
+mod restrictiveness_tests {
+    use super::*;
+    use crate::model::{AppRef, Mode, Policy};
+
+    fn domains(mode: Mode, list: &[&str]) -> Policy {
+        Policy {
+            mode,
+            domains: list.iter().map(|s| (*s).into()).collect(),
+            apps: vec![],
+        }
+    }
+
+    fn app(name: &str) -> AppRef {
+        AppRef {
+            windows_image_name: Some(format!("{name}.exe")),
+            linux_process_name: Some(name.into()),
+            mac_bundle_id: None,
+            label: name.into(),
+        }
+    }
+
+    #[test]
+    fn identical_is_allowed() {
+        let p = domains(Mode::Blacklist, &["youtube.com", "reddit.com"]);
+        assert!(is_at_least_as_restrictive(&p, &p.clone()));
+    }
+
+    #[test]
+    fn blacklist_add_is_free_remove_is_gated() {
+        let prev = domains(Mode::Blacklist, &["youtube.com"]);
+        let added = domains(Mode::Blacklist, &["youtube.com", "reddit.com"]);
+        let removed = domains(Mode::Blacklist, &[]);
+        assert!(is_at_least_as_restrictive(&prev, &added));
+        assert!(!is_at_least_as_restrictive(&prev, &removed));
+    }
+
+    #[test]
+    fn blacklist_narrowing_wildcard_is_gated() {
+        // *.reddit.com blocks every subdomain; old.reddit.com frees www.reddit.com etc.
+        let prev = domains(Mode::Blacklist, &["*.reddit.com"]);
+        let next = domains(Mode::Blacklist, &["old.reddit.com"]);
+        assert!(!is_at_least_as_restrictive(&prev, &next));
+    }
+
+    #[test]
+    fn whitelist_add_is_permissive_remove_is_restrictive() {
+        // Whitelist: listed hosts are the *only* allowed ones. Adding an entry frees traffic.
+        let prev = domains(Mode::Whitelist, &["work.com"]);
+        let widened = domains(Mode::Whitelist, &["work.com", "fun.com"]);
+        let narrowed = domains(Mode::Whitelist, &[]);
+        assert!(!is_at_least_as_restrictive(&prev, &widened));
+        assert!(is_at_least_as_restrictive(&prev, &narrowed));
+    }
+
+    #[test]
+    fn block_all_is_the_ceiling() {
+        let block_all = domains(Mode::BlockAll, &[]);
+        let blacklist = domains(Mode::Blacklist, &["youtube.com"]);
+        // Anything -> block-all only tightens; block-all -> anything looser is gated.
+        assert!(is_at_least_as_restrictive(&blacklist, &block_all));
+        assert!(!is_at_least_as_restrictive(&block_all, &blacklist));
+    }
+
+    #[test]
+    fn removing_a_blocked_app_is_gated() {
+        let prev = Policy { apps: vec![app("chrome"), app("slack")], ..Policy::default() };
+        let kept = Policy { apps: vec![app("chrome"), app("slack"), app("discord")], ..Policy::default() };
+        let removed = Policy { apps: vec![app("chrome")], ..Policy::default() };
+        assert!(is_at_least_as_restrictive(&prev, &kept));
+        assert!(!is_at_least_as_restrictive(&prev, &removed));
+    }
 }
 
 #[cfg(test)]

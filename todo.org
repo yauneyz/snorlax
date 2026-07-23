@@ -1,16 +1,13 @@
 * part 1: demo
 auth
+- Jessica gift?
+- password reset?
+- payments
 - web app is reasonable
 - Dane Installation
-- macos added to release options, installed on jessica's computer
-- password reset?
-- browser extension hosting/upload
-  - firefox
-    - comped account for reviewers
-  - chrome
-    - extension screenshots
-- payments
+- bug hunting
 
+- extension links & durable ID for chrome
 
 
 * Easy:

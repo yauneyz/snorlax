@@ -55,6 +55,8 @@ export function Keys() {
       setError(
         code === ErrorCode.KEY_REQUIRED
           ? 'Removing a key is itself key-gated — insert a paired key first.'
+          : code === ErrorCode.LAST_PAIRED_KEY
+            ? 'Pair another key before removing your last key.'
           : (e as Error).message,
       );
     }
@@ -114,12 +116,19 @@ export function Keys() {
                 {k.label} {k.serialAmbiguous && <Badge tone="neutral">file-only</Badge>}
                 <span className="ml-2 text-xs text-slate-500">paired {formatTime(k.pairedAt)}</span>
               </span>
-              <button onClick={() => unpair(k.id)} className="text-xs text-red-400 hover:underline">
+              <button
+                onClick={() => unpair(k.id)}
+                disabled={pairedKeys.length === 1}
+                className="text-xs text-red-400 hover:underline disabled:cursor-not-allowed disabled:text-slate-500 disabled:no-underline"
+              >
                 unpair
               </button>
             </li>
           ))}
           {pairedKeys.length === 0 && <p className="text-sm text-slate-500">No keys paired yet.</p>}
+          {pairedKeys.length === 1 && (
+            <p className="text-sm text-slate-500">Pair another key before removing your last key.</p>
+          )}
         </ul>
       </Card>
     </div>
