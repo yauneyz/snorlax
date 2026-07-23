@@ -103,18 +103,20 @@ Edge signs, hosts, and updates the extension. Do not self-host or repack the Edg
 1. Register an addons.mozilla.org developer account.
 2. Create a Firefox AMO extension listing.
 3. Upload `apps/extension/release/store/talysman-firefox-<version>.zip`.
-4. Confirm AMO recognizes the authored ID `talysman@talysman.app`.
+4. Confirm AMO recognizes the authored ID `talysman-firefox@talysman.app`.
 5. Supply listing metadata, privacy information, reviewer instructions, and source/build
    instructions as requested by AMO.
 6. Submit for review and publish after approval.
 7. Record:
 
    ```text
-   Firefox Gecko ID:    talysman@talysman.app
+   Firefox Gecko ID:    talysman-firefox@talysman.app
    Firefox listing URL: ________________________________
    ```
 
 AMO signs, hosts, and updates the extension. Do not self-host an XPI for the consumer install path.
+Do not delete the AMO listing to correct a draft; AMO permanently retires IDs belonging to deleted
+submissions. Keep the listing and upload a new version.
 
 ## 6. Wire Store IDs into the Desktop Service
 
@@ -124,7 +126,7 @@ Edit the canonical `native/common/extension-identities.json` before building the
 {
   "chromeStoreId": "jblidbjafmpbpednomngbbmpkihedeko",
   "edgeStoreId": "<Microsoft Edge Add-ons extension ID>",
-  "firefoxId": "talysman@talysman.app"
+  "firefoxId": "talysman-firefox@talysman.app"
 }
 ```
 

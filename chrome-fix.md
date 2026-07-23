@@ -25,7 +25,7 @@ Before the Chrome ID was configured, the Windows-generated native-messaging mani
 
 Chrome rejects `chrome.runtime.connectNative("com.talysman.host")` before the extension can send
 its initial `hello` message or any heartbeat. Firefox connects because it has a fixed authored ID,
-`talysman@talysman.app`, which is already present in `allowed_extensions`.
+`talysman-firefox@talysman.app`, which is already present in `allowed_extensions`.
 
 Linux and macOS previously had empty `extension_policy::install()` implementations, so Chrome
 reported that the host was not found. Their elevated installers and service startup now write the

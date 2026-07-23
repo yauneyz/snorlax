@@ -48,7 +48,7 @@ creates browser-specific manifests:
   Web Store item ID; no `update_url`.
 - Edge: Manifest V3 service worker, separate package so Edge-specific changes can diverge later,
   no `key`, no `update_url`.
-- Firefox: Manifest V3 background script, fixed Gecko ID `talysman@talysman.app`, no
+- Firefox: Manifest V3 background script, fixed Gecko ID `talysman-firefox@talysman.app`, no
   `update_url`.
 
 Chrome and Edge IDs are assigned when their store items are created/uploaded, before review.
@@ -84,13 +84,17 @@ Before store review, set:
 {
   "chromeStoreId": "jblidbjafmpbpednomngbbmpkihedeko",
   "edgeStoreId": "<Microsoft Edge Add-ons extension ID>",
-  "firefoxId": "talysman@talysman.app"
+  "firefoxId": "talysman-firefox@talysman.app"
 }
 ```
 
 These values restrict which extensions may launch `com.talysman.host`. The Chrome Load-unpacked
 build uses the Web Store public key and therefore the same ID. An empty Chrome or Edge ID means that
 store build cannot launch the native host.
+
+AMO permanently retires an add-on ID when its submission is deleted. Keep the listing when a draft
+needs correction and upload a new version instead. The retired ID `talysman@talysman.app` must not
+be used for a new submission.
 
 ## Routine Updates
 

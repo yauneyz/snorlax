@@ -100,7 +100,9 @@ for (const [store, directory] of Object.entries({
   }
   if (store === "firefox") {
     const gecko = manifest.browser_specific_settings?.gecko;
-    if (gecko?.id !== "talysman@talysman.app") fail("firefox: Gecko ID changed");
+    if (gecko?.id !== identities.firefoxId) {
+      fail(`firefox: expected Gecko ID ${identities.firefoxId}, got ${gecko?.id ?? "(missing)"}`);
+    }
     if (JSON.stringify(gecko?.data_collection_permissions?.required) !== '["none"]') {
       fail('firefox: data_collection_permissions.required must be ["none"]');
     }

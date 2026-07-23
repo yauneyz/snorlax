@@ -91,10 +91,11 @@ Chrome Web Store, Microsoft Edge Add-ons, and Firefox AMO sign, host, and update
 packages. The manifests contain no custom `update_url`. The Chrome manifest includes the Web Store
 public key so its ZIP and unpacked directory share the official item ID.
 
-Firefox uses the authored ID `talysman@talysman.app`. Chrome and Edge assign separate IDs when their
-store items are created, before review or publication. All store IDs and Chrome's Web Store public
-key live in `native/common/extension-identities.json`; update that one file after creating a new
-store item. Chrome is currently configured as `jblidbjafmpbpednomngbbmpkihedeko`.
+Firefox uses the authored ID `talysman-firefox@talysman.app`. Chrome and Edge assign separate IDs
+when their store items are created, before review or publication. All store IDs and Chrome's Web
+Store public key live in `native/common/extension-identities.json`; update that one file after
+creating a new store item. Chrome is currently configured as
+`jblidbjafmpbpednomngbbmpkihedeko`.
 
 Use `apps/extension/dist/chrome` for Chrome Load unpacked and upload
 `talysman-chrome-<version>.zip` to Chrome Web Store. They contain the same files, including the public
