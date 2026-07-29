@@ -11,9 +11,10 @@ const extensionHostingEnv = {
   EXTENSION_ARTIFACTS_REGION: "us-east-1",
   EXTENSION_PUBLIC_S3_BASE_URL:
     "https://talysman-extension-artifacts-prod.s3.us-east-1.amazonaws.com",
-  EXTENSION_CHROME_STORE_URL: "https://chromewebstore.google.com/detail/talysman",
+  EXTENSION_CHROME_STORE_URL:
+    "https://chromewebstore.google.com/detail/talysman/jblidbjafmpbpednomngbbmpkihedeko",
   EXTENSION_EDGE_STORE_URL: "https://microsoftedge.microsoft.com/addons/detail/talysman",
-  EXTENSION_FIREFOX_STORE_URL: "https://addons.mozilla.org/firefox/addon/talysman/",
+  EXTENSION_FIREFOX_STORE_URL: "https://addons.mozilla.org/en-US/firefox/addon/talysman/",
 };
 
 describe("config schemas", () => {

@@ -10,12 +10,12 @@ export const metadata: Metadata = {
 };
 
 /**
- * Placeholder listings so the page reads as finished before the stores approve us. The
- * real URLs arrive via EXTENSION_*_STORE_URL and take precedence over these.
+ * Published listings are the defaults; deployment config can override them if a listing moves.
  */
-const placeholderStoreUrls = {
-  chrome: "https://chromewebstore.google.com/detail/talysman/example-chrome-id",
-  firefox: "https://addons.mozilla.org/en-US/firefox/addon/talysman-example/",
+const storeUrls = {
+  chrome:
+    "https://chromewebstore.google.com/detail/talysman/jblidbjafmpbpednomngbbmpkihedeko",
+  firefox: "https://addons.mozilla.org/en-US/firefox/addon/talysman/",
 } as const;
 
 type DownloadTarget = {
@@ -52,14 +52,14 @@ const extensions: DownloadTarget[] = [
     platform: "chrome",
     name: "Chrome",
     note: "Chrome Web Store",
-    href: config.extensionStores.chromeUrl || placeholderStoreUrls.chrome,
+    href: config.extensionStores.chromeUrl || storeUrls.chrome,
     external: true,
   },
   {
     platform: "firefox",
     name: "Firefox",
     note: "Firefox Browser Add-ons",
-    href: config.extensionStores.firefoxUrl || placeholderStoreUrls.firefox,
+    href: config.extensionStores.firefoxUrl || storeUrls.firefox,
     external: true,
   },
 ];

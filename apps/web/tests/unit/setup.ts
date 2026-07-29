@@ -16,9 +16,11 @@ process.env.EXTENSION_ARTIFACTS_BUCKET ??= "talysman-extension-artifacts-prod";
 process.env.EXTENSION_ARTIFACTS_REGION ??= "us-east-1";
 process.env.EXTENSION_PUBLIC_S3_BASE_URL ??=
   "https://talysman-extension-artifacts-prod.s3.us-east-1.amazonaws.com";
-process.env.EXTENSION_CHROME_STORE_URL ??= "https://chromewebstore.google.com/detail/talysman";
+process.env.EXTENSION_CHROME_STORE_URL ??=
+  "https://chromewebstore.google.com/detail/talysman/jblidbjafmpbpednomngbbmpkihedeko";
 process.env.EXTENSION_EDGE_STORE_URL ??= "https://microsoftedge.microsoft.com/addons/detail/talysman";
-process.env.EXTENSION_FIREFOX_STORE_URL ??= "https://addons.mozilla.org/firefox/addon/talysman/";
+process.env.EXTENSION_FIREFOX_STORE_URL ??=
+  "https://addons.mozilla.org/en-US/firefox/addon/talysman/";
 process.env.OPENAI_API_KEY ??= "sk_test_xxx";
 process.env.TOKEN_ENCRYPTION_KEY ??= "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
 process.env.OAUTH_STATE_SECRET ??= "test-oauth-state-secret-at-least-32-chars";

@@ -1,6 +1,5 @@
 * part 1: demo
 auth
-- Jessica gift?
 - password reset?
 - payments
 - web app is reasonable
