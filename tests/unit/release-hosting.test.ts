@@ -30,15 +30,21 @@ type Platform = keyof typeof STABLE_INSTALLER_KEYS;
 const platforms = PLATFORMS as Platform[];
 
 describe('release command boundaries', () => {
-  it('keeps release:local free of cloud publishing operations', () => {
-    const localReleaseSource = readFileSync(
-      resolve(__dirname, '../../scripts/release-local.mjs'),
-      'utf8',
-    );
+  const localReleaseSource = readFileSync(
+    resolve(__dirname, '../../scripts/release-local.mjs'),
+    'utf8',
+  );
 
+  it('keeps release:local free of cloud publishing operations', () => {
     expect(localReleaseSource).not.toContain('scripts/upload-release.mjs');
     expect(localReleaseSource).not.toContain('sync:env:prod');
     expect(localReleaseSource).not.toMatch(/execFileSync\(['"](?:aws|vercel)['"]/);
+  });
+
+  it('pins daemon input updates to committed HEAD through the host-agnostic source link', () => {
+    expect(localReleaseSource).toContain("capture('git', ['rev-parse', 'HEAD'])");
+    expect(localReleaseSource).toContain("join(homedir(), '.snorlax-src')");
+    expect(localReleaseSource).toContain("'--override-input'");
   });
 });
 

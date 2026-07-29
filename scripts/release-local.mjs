@@ -9,8 +9,8 @@
  *
  * The privileged daemon is NOT shipped via this AppImage on NixOS — it is built from
  * native/linux by pkgs/snorlax-daemon and started by a declarative systemd unit. So we
- * also re-lock the `snorlax` flake input (`nix flake update snorlax`) so the next
- * `rebuild` rebuilds the daemon from current committed source. This step does not run
+ * also re-lock the `snorlax` flake input from this checkout so the next `rebuild`
+ * rebuilds the daemon from current committed source. This step does not run
  * nixos-rebuild — run your usual `rebuild` afterward to activate both.
  *
  * This command is strictly local-to-NixOS. It never syncs credentials, uploads
@@ -237,15 +237,35 @@ function installIntoNixStore(version) {
  * Skipped by --dry-run and --no-daemon-sync.
  */
 function syncDaemonInput() {
+  // Pin HEAD explicitly so local notes/build artifacts do not turn the lock into
+  // a dirty, non-reproducible input.
+  const revision = capture('git', ['rev-parse', 'HEAD']);
+  const inputUrl = `git+file://${join(homedir(), '.snorlax-src')}?rev=${revision}`;
   if (dryRun) {
-    console.log('🧪 [DRY RUN] would run: nix flake update snorlax --allow-dirty-locks (in ~/nixos-config)');
+    console.log(
+      `🧪 [DRY RUN] would re-lock snorlax from ${inputUrl} (in ~/nixos-config)`,
+    );
     return;
   }
   if (!existsSync(nixosConfigDir)) {
     console.log(`⏭️  ${nixosConfigDir} not found — skipping daemon flake-input sync`);
     return;
   }
-  run('nix', ['flake', 'update', 'snorlax', '--allow-dirty-locks'], { cwd: nixosConfigDir });
+  // Keep the lock host-agnostic: the NixOS flake normalizes this symlink-backed
+  // input with builtins.fetchGit before modules and packages consume it.
+  run(
+    'nix',
+    [
+      'flake',
+      'update',
+      'snorlax',
+      '--allow-dirty-locks',
+      '--override-input',
+      'snorlax',
+      inputUrl,
+    ],
+    { cwd: nixosConfigDir },
+  );
   console.log('🔗 Re-locked snorlax daemon input — run `rebuild` to activate the new daemon');
 }
 
