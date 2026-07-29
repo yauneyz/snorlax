@@ -50,6 +50,8 @@ export const devToggleKey = () => window.api.devToggleKey();
 export const entitlement = () => window.api.entitlement();
 export const devSetEntitlementPlan = (plan: SubscriptionPlan) =>
   window.api.devSetEntitlementPlan(plan);
+export const setLocalEntitlementEnabled = (enabled: boolean) =>
+  window.api.setLocalEntitlementEnabled(enabled);
 
 export const authStatus = () => window.api.authStatus();
 export const signInGoogle = () => window.api.signInGoogle();

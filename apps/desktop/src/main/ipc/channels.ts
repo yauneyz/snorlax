@@ -11,9 +11,11 @@ export const Channels = {
   entitlement: 'app:entitlement',
   /** invoke: dev-only - override the simulated subscription plan. */
   devSetEntitlementPlan: 'app:devSetEntitlementPlan',
+  /** invoke: release:local-only — temporarily enable/disable the signed local entitlement. */
+  setLocalEntitlementEnabled: 'app:setLocalEntitlementEnabled',
   /** invoke: open a URL in the external browser. */
   openExternal: 'app:openExternal',
-  /** invoke: returns { appEnv, usingMock, serviceConnected }. */
+  /** invoke: returns build, local-entitlement, and service status. */
   appInfo: 'app:info',
   /** invoke: returns installed apps discovered on the local OS. */
   listInstalledApps: 'app:listInstalledApps',

@@ -16,6 +16,7 @@ const Channels = {
   devToggleKey: 'app:devToggleKey',
   entitlement: 'app:entitlement',
   devSetEntitlementPlan: 'app:devSetEntitlementPlan',
+  setLocalEntitlementEnabled: 'app:setLocalEntitlementEnabled',
   openExternal: 'app:openExternal',
   appInfo: 'app:info',
   listInstalledApps: 'app:listInstalledApps',
@@ -86,8 +87,13 @@ const api = {
     return () => ipcRenderer.removeListener(Channels.serviceEvent, listener);
   },
 
-  appInfo: (): Promise<{ appEnv: string; usingMock: boolean; serviceConnected: boolean }> =>
-    ipcRenderer.invoke(Channels.appInfo),
+  appInfo: (): Promise<{
+    appEnv: string;
+    isLocalRelease: boolean;
+    localEntitlementEnabled: boolean;
+    usingMock: boolean;
+    serviceConnected: boolean;
+  }> => ipcRenderer.invoke(Channels.appInfo),
 
   listInstalledApps: (): Promise<AppPickerItem[]> =>
     ipcRenderer.invoke(Channels.listInstalledApps),
@@ -107,6 +113,16 @@ const api = {
     plan: SubscriptionPlan,
   ): Promise<{ ok: boolean; entitlement?: EntitlementInfo; message?: string }> =>
     ipcRenderer.invoke(Channels.devSetEntitlementPlan, plan),
+
+  /** release:local-only: temporarily bypass the signed local Pro entitlement. */
+  setLocalEntitlementEnabled: (
+    enabled: boolean,
+  ): Promise<{
+    ok: boolean;
+    enabled?: boolean;
+    entitlement?: EntitlementInfo;
+    message?: string;
+  }> => ipcRenderer.invoke(Channels.setLocalEntitlementEnabled, enabled),
 
   // --- auth ---
   authStatus: (): Promise<AuthStatusInfo> => ipcRenderer.invoke(Channels.authStatus),

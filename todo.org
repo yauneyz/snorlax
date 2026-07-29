@@ -1,15 +1,10 @@
 * part 1: demo
-auth
-- password reset?
 - payments
 - web app is reasonable
-- Dane Installation
-- bug hunting
+- Dane Installation, dad installation
 
 - affiliate program
-
-- extension links & durable ID for chrome
-
+- make first content
 
 * Easy:
 Start the evidence sheet

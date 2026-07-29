@@ -6,6 +6,8 @@ import { cx } from '../lib/utils.js';
 
 export function Settings() {
   const appEnv = useFocusStore((s) => s.appEnv);
+  const isLocalRelease = useFocusStore((s) => s.isLocalRelease);
+  const localEntitlementEnabled = useFocusStore((s) => s.localEntitlementEnabled);
   const usingMock = useFocusStore((s) => s.usingMock);
   const serviceVersion = useFocusStore((s) => s.serviceVersion);
   const entitlementLoaded = useFocusStore((s) => s.entitlementLoaded);
@@ -13,11 +15,14 @@ export function Settings() {
   const entitlementActive = useFocusStore((s) => s.entitlementActive);
   const entitlementSource = useFocusStore((s) => s.entitlementSource);
   const setDevSubscriptionPlan = useFocusStore((s) => s.setDevSubscriptionPlan);
+  const setLocalEntitlementEnabled = useFocusStore((s) => s.setLocalEntitlementEnabled);
   const handshakeEnabled = useFocusStore((s) => s.settings.browserHandshakeEnabled);
   const keyPresent = useFocusStore((s) => s.keyPresent);
   const setBrowserHandshake = useFocusStore((s) => s.setBrowserHandshake);
   const [planBusy, setPlanBusy] = useState(false);
   const [planError, setPlanError] = useState<string | null>(null);
+  const [localEntitlementBusy, setLocalEntitlementBusy] = useState(false);
+  const [localEntitlementError, setLocalEntitlementError] = useState<string | null>(null);
   const [handshakeBusy, setHandshakeBusy] = useState(false);
   const [handshakeError, setHandshakeError] = useState<string | null>(null);
 
@@ -54,6 +59,18 @@ export function Settings() {
     }
   }
 
+  async function toggleLocalEntitlement() {
+    setLocalEntitlementBusy(true);
+    setLocalEntitlementError(null);
+    try {
+      await setLocalEntitlementEnabled(!localEntitlementEnabled);
+    } catch (e) {
+      setLocalEntitlementError((e as Error).message);
+    } finally {
+      setLocalEntitlementBusy(false);
+    }
+  }
+
   return (
     <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
       <Card>
@@ -78,6 +95,38 @@ export function Settings() {
           </div>
         </div>
       </Card>
+
+      {isLocalRelease && (
+        <Card>
+          <CardTitle hint="Only available in builds produced by pnpm release:local.">
+            Local release testing
+          </CardTitle>
+          <div className="flex flex-col gap-3 text-sm text-slate-300">
+            <p className="text-slate-400">
+              Temporarily bypass the free local Pro entitlement to test the plan your signed-in
+              account would normally receive. Local Pro turns back on when Talysman restarts.
+            </p>
+            <div className="flex items-center justify-between gap-3">
+              <span className="font-medium text-slate-200">
+                Free local Pro:{' '}
+                <Badge tone={localEntitlementEnabled ? 'ok' : 'neutral'}>
+                  {localEntitlementEnabled ? 'On' : 'Off'}
+                </Badge>
+              </span>
+              <Button
+                variant={localEntitlementEnabled ? 'ghost' : 'primary'}
+                disabled={localEntitlementBusy || !entitlementLoaded}
+                onClick={() => toggleLocalEntitlement()}
+              >
+                {localEntitlementEnabled ? 'Temporarily disable' : 'Re-enable free Pro'}
+              </Button>
+            </div>
+            {localEntitlementError && (
+              <p className="text-sm text-amber-300">{localEntitlementError}</p>
+            )}
+          </div>
+        </Card>
+      )}
 
       <Card>
         <CardTitle hint="Closes browsers that can't prove the blocking extension is alive during a locked session.">

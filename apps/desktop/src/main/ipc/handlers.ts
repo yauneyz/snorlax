@@ -13,7 +13,9 @@ import { isServiceError, type ServiceConnection } from '../service/connection.js
 import type { MockServiceConnection } from '../service/mockService.js';
 import {
   getEntitlement,
+  isLocalEntitlementEnabled,
   setDevEntitlementPlan,
+  setLocalEntitlementEnabled,
 } from '../auth/subscription.js';
 import {
   getAuthStatus,
@@ -171,7 +173,7 @@ async function applyConstrainedState(
   label: string,
 ): Promise<void> {
   try {
-    await service.request(method, params as Params<typeof method>);
+    await service.request(method, params);
   } catch (e) {
     if (isServiceError(e) && (e.code === 'KEY_REQUIRED' || e.code === 'LOCKED')) {
       logger.info(`[plan-limits] ${label} kept stricter than plan limits until unlocked`);
@@ -233,6 +235,8 @@ export async function registerIpcHandlers(ctx: HandlerContext): Promise<void> {
 
   ipcMain.handle(Channels.appInfo, () => ({
     appEnv: config.appEnv,
+    isLocalRelease: config.isLocalRelease,
+    localEntitlementEnabled: config.isLocalRelease && isLocalEntitlementEnabled(),
     usingMock: Boolean(mock),
     serviceConnected: service.connected,
   }));
@@ -263,6 +267,21 @@ export async function registerIpcHandlers(ctx: HandlerContext): Promise<void> {
     const entitlement = await setDevEntitlementPlan(plan);
     await applyCurrentPlanLimits(service);
     return { ok: true, entitlement };
+  });
+
+  ipcMain.handle(Channels.setLocalEntitlementEnabled, async (_e, enabled: boolean) => {
+    if (!config.isLocalRelease) {
+      return { ok: false, message: 'Only available in release:local builds.' };
+    }
+    if (typeof enabled !== 'boolean') {
+      return { ok: false, message: 'Expected an enabled state.' };
+    }
+
+    setLocalEntitlementEnabled(enabled);
+    const entitlement = await getEntitlement();
+    await applyCurrentPlanLimits(service);
+    broadcastAppEvent('entitlementChanged');
+    return { ok: true, enabled, entitlement };
   });
 
   // --- auth ---

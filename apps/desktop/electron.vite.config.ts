@@ -24,6 +24,7 @@ export default defineConfig(({ mode }) => {
     VITE_SUPABASE_URL: envValue('VITE_SUPABASE_URL') ?? '',
     VITE_SUPABASE_ANON_KEY: envValue('VITE_SUPABASE_ANON_KEY') ?? '',
     LOCAL_ENTITLEMENT_PUBLIC_KEY: envValue('LOCAL_ENTITLEMENT_PUBLIC_KEY') ?? '',
+    LOCAL_RELEASE_BUILD: envValue('LOCAL_RELEASE_BUILD') === 'true',
   };
 
   const alias = {

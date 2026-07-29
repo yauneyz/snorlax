@@ -37,6 +37,9 @@ const ENTITLEMENT_CACHE_FILE = 'entitlement-cache.json';
 const SIGNED_OUT: Entitlement = entitlementForPlan('free', 'server');
 
 let cachedDevEntitlement: Entitlement | undefined;
+// A local release starts with its signed license enabled on every app launch. Keeping this
+// override in memory makes the Free-plan test mode deliberately temporary.
+let localEntitlementEnabled = true;
 
 function isSubscriptionPlan(value: unknown): value is SubscriptionPlan {
   return value === 'free' || value === 'pro';
@@ -117,7 +120,7 @@ async function localEntitlementFiles(): Promise<string[]> {
 }
 
 async function loadLocalEntitlement(): Promise<Entitlement | undefined> {
-  if (!config.localEntitlementPublicKey) return undefined;
+  if (!config.localEntitlementPublicKey || !localEntitlementEnabled) return undefined;
 
   for (const file of await localEntitlementFiles()) {
     let raw: string;
@@ -139,6 +142,14 @@ async function loadLocalEntitlement(): Promise<Entitlement | undefined> {
 }
 
 // --- public API ---------------------------------------------------------------------------
+
+export function isLocalEntitlementEnabled(): boolean {
+  return localEntitlementEnabled;
+}
+
+export function setLocalEntitlementEnabled(enabled: boolean): void {
+  localEntitlementEnabled = enabled;
+}
 
 export async function getEntitlement(): Promise<Entitlement> {
   // Dev override short-circuits the network in non-production builds.

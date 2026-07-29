@@ -253,6 +253,7 @@ const version = packageVersion();
 console.log(`🏷️  snorlax local release: v${version}${dryRun ? ' (dry run)' : ''}`);
 const localEntitlementKey = ensureLocalEntitlementKey();
 process.env.LOCAL_ENTITLEMENT_PUBLIC_KEY = localEntitlementKey.publicKey;
+process.env.LOCAL_RELEASE_BUILD = 'true';
 console.log('🔏 Embedding local entitlement public key for release-local builds');
 buildAppImage();
 writeLocalEntitlementLicense(localEntitlementKey.privateKey, version);

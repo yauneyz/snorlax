@@ -20,6 +20,8 @@ export interface MainConfig {
   supabaseAnonKey: string;
   /** Optional base64 SPKI Ed25519 public key for signed offline local entitlements. */
   localEntitlementPublicKey: string;
+  /** True only for builds produced by `pnpm release:local`. */
+  isLocalRelease: boolean;
 }
 
 function build(): MainConfig {
@@ -35,6 +37,7 @@ function build(): MainConfig {
           VITE_SUPABASE_URL: process.env.VITE_SUPABASE_URL ?? '',
           VITE_SUPABASE_ANON_KEY: process.env.VITE_SUPABASE_ANON_KEY ?? '',
           LOCAL_ENTITLEMENT_PUBLIC_KEY: process.env.LOCAL_ENTITLEMENT_PUBLIC_KEY ?? '',
+          LOCAL_RELEASE_BUILD: process.env.LOCAL_RELEASE_BUILD === 'true',
         };
 
   const appEnv = injected.APP_ENV;
@@ -53,6 +56,7 @@ function build(): MainConfig {
     supabaseUrl: injected.VITE_SUPABASE_URL,
     supabaseAnonKey: injected.VITE_SUPABASE_ANON_KEY,
     localEntitlementPublicKey: injected.LOCAL_ENTITLEMENT_PUBLIC_KEY,
+    isLocalRelease: injected.LOCAL_RELEASE_BUILD,
   };
 }
 

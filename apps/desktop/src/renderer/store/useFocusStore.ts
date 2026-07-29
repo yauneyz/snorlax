@@ -15,6 +15,7 @@ import {
   onAppEvent,
   onEvent,
   request,
+  setLocalEntitlementEnabled,
   subscriptionDetail,
   type SubscriptionDetailInfo,
   type SubscriptionPlan,
@@ -25,6 +26,8 @@ interface FocusStore {
   ready: boolean;
   usingMock: boolean;
   appEnv: string;
+  isLocalRelease: boolean;
+  localEntitlementEnabled: boolean;
   signedIn: boolean;
   email?: string;
   /** True while a password-recovery session awaits a new password (reset deep link). */
@@ -59,6 +62,7 @@ interface FocusStore {
   refreshEntitlement: () => Promise<void>;
   refreshSubscriptionDetail: () => Promise<void>;
   setDevSubscriptionPlan: (plan: SubscriptionPlan) => Promise<void>;
+  setLocalEntitlementEnabled: (enabled: boolean) => Promise<void>;
   setBrowserHandshake: (enabled: boolean) => Promise<void>;
   clearWatchdogWarning: () => void;
   setError: (e?: { code: string; message: string }) => void;
@@ -69,6 +73,8 @@ export const useFocusStore = create<FocusStore>((set, get) => ({
   ready: false,
   usingMock: false,
   appEnv: 'development',
+  isLocalRelease: false,
+  localEntitlementEnabled: false,
   signedIn: false,
   email: undefined,
   passwordRecovery: false,
@@ -152,6 +158,22 @@ export const useFocusStore = create<FocusStore>((set, get) => ({
     await get().refresh();
   },
 
+  setLocalEntitlementEnabled: async (enabled) => {
+    const res = await setLocalEntitlementEnabled(enabled);
+    if (!res.ok || typeof res.enabled !== 'boolean' || !res.entitlement) {
+      throw new Error(res.message ?? 'Unable to update the local Pro entitlement.');
+    }
+
+    set({
+      localEntitlementEnabled: res.enabled,
+      subscriptionPlan: res.entitlement.plan,
+      entitlementActive: res.entitlement.active,
+      entitlementSource: res.entitlement.source,
+      productLimits: limitsForPlan(res.entitlement.plan),
+    });
+    await get().refresh();
+  },
+
   setBrowserHandshake: async (enabled) => {
     await request('setBrowserHandshake', { enabled });
     // The service emits settingsChanged; optimistically reflect it so the toggle feels instant.
@@ -165,7 +187,12 @@ export const useFocusStore = create<FocusStore>((set, get) => ({
 
   init: async () => {
     const info = await appInfo();
-    set({ usingMock: info.usingMock, appEnv: info.appEnv });
+    set({
+      usingMock: info.usingMock,
+      appEnv: info.appEnv,
+      isLocalRelease: info.isLocalRelease,
+      localEntitlementEnabled: info.localEntitlementEnabled,
+    });
     await get().refreshAuth();
     await get().refreshEntitlement();
     void get().refreshSubscriptionDetail();

@@ -5,7 +5,8 @@ and the **Next.js web backend** (`apps/web`), and what is required to make it
 production-ready.
 
 > Companion to [`snorlax-architecture.md`](./snorlax-architecture.md). This document is
-> scoped to auth + billing only.
+> scoped to auth + billing only. For the hands-on test plan and go-live checklist, see
+> [`payments-verification.md`](./payments-verification.md).
 
 ---
 
@@ -79,7 +80,7 @@ backend.
 - **Guards:**
   - `lib/auth/require-user.ts` — RSC/route guard, redirects to `/login` if unauthenticated.
   - `lib/auth/require-subscribed.ts` — additionally redirects to `/pricing` if the user has
-    no active subscription (reads the `active_subscriptions` view).
+    no active entitlement (reads the `active_entitlements` view — paid subs ∪ comp grants).
   - `lib/auth/require-bearer-user.ts` — **the desktop's entry point.** Extracts
     `Authorization: Bearer <token>` and validates it with
     `supabaseAdmin().auth.getUser(token)`.
@@ -135,8 +136,9 @@ key; the secret key, webhook secret, and price IDs are server-only.
 - **`syncSubscription`** — upserts a Stripe subscription into the `subscriptions` table
   (status, price, period dates, trial, cancellation). `resolveUserId` derives the user from
   subscription metadata → customer metadata → `profiles.stripe_customer_id` lookup.
-- **`getUserEntitlement`** — reads the `active_subscriptions` view and returns an
-  `Entitlement`. `pro` if an active/trialing subscription exists, else `free`. It stamps
+- **`getUserEntitlement`** — reads the `active_entitlements` view and returns an
+  `Entitlement`. `pro` if an active/trialing subscription **or** a comp grant exists, else
+  `free` (a paid sub is reported over a coexisting comp so billing UI stays accurate). It stamps
   `fetchedAt` and `cacheUntil` (default TTL **5 min**) so the client can cache and survive
   brief offline periods.
 
@@ -183,9 +185,12 @@ authoritative sync.**
 - **`subscriptions`** — PK = Stripe subscription id; `user_id`, `status` (enum), `price_id`,
   `quantity`, `cancel_at_period_end`, period/trial/cancel timestamps. RLS: owner read-only;
   **only the service role (webhook) writes.**
-- **`active_subscriptions`** (view) — subscriptions that are `trialing`/`active` and not yet
-  past `current_period_end`. This is the single read used for entitlement.
-- **`stripe_events`** — processed webhook event ids (dedup).
+- **`active_subscriptions`** (view, migration `0001`) — subscriptions that are
+  `trialing`/`active` and not yet past `current_period_end`.
+- **`active_entitlements`** (view, migration `0004`) — `active_subscriptions` **unioned with
+  active comp grants** (`source` = `subscription` | `grant`). This is the single read used
+  for entitlement (`getUserEntitlement`, `require-subscribed`); see §7.5.
+- **`stripe_events`** — processed webhook event ids (dedup, migration `0003`).
 
 ### 3.6 Environment variables
 
@@ -271,7 +276,7 @@ independent of whether the user's browser completed the redirect.
 ### 5.4 Entitlement refresh
 
 1. Main `GET /api/desktop/entitlement` with the bearer token.
-2. `getUserEntitlement` reads `active_subscriptions` and returns
+2. `getUserEntitlement` reads `active_entitlements` and returns
    `{ active, plan, source: 'server', status?, currentPeriodEnd?, fetchedAt, cacheUntil }`.
 3. Main caches it to disk and the renderer applies plan limits. Offline → last-known cache is
    served with `source: 'offline'`.
@@ -297,6 +302,11 @@ independent of whether the user's browser completed the redirect.
 
 The desktop↔backend wiring is done (§2–§5). What's left is go-live hardening and
 environment/config setup that can't be done from code alone.
+
+> **The step-by-step test plan + go-live checklist lives in
+> [`payments-verification.md`](./payments-verification.md)** (Phase A test-mode → Phase B
+> live → Phase C first real signup). The summary below is the architectural rationale; that
+> doc is the actionable runbook.
 
 ### A. Stripe + Supabase go-live config
 
