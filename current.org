@@ -35,6 +35,8 @@ For pricing:
 - 10/mo 100/annual
 - Instead of "One plan . . ." it says "What is your time worth? Get it back with Talysman"
 - Add the free forever tier:
+
+
   - 3 websites blocked
   - prove to yourself that Talysman works for you
 - No "standard vs priority support
