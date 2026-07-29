@@ -7,16 +7,20 @@
  * ~/nixos-config/pkgs/snorlax/release.nix so the next `nixos-rebuild` picks up the
  * new version. pkgs/snorlax/default.nix wraps that AppImage via appimageTools.
  *
+ * The privileged daemon is NOT shipped via this AppImage on NixOS — it is built from
+ * native/linux by pkgs/snorlax-daemon and started by a declarative systemd unit. So we
+ * also re-lock the `snorlax` flake input (`nix flake update snorlax`) so the next
+ * `rebuild` rebuilds the daemon from current committed source. This step does not run
+ * nixos-rebuild — run your usual `rebuild` afterward to activate both.
+ *
  * This command is strictly local-to-NixOS. It never syncs credentials, uploads
  * artifacts, or otherwise changes cloud hosting. Use `pnpm release:upload` for the
  * public release chain.
  *
  * Usage:
- *   pnpm run release:local             # prod build + local install + stage release.nix
- *   pnpm run release:local --dry-run   # build, but skip local nix-store/git/config writes
- *
- * Note: the privileged daemon is NOT shipped via this AppImage on NixOS — it is built
- * from native/linux by pkgs/snorlax-daemon and started by a declarative systemd unit.
+ *   pnpm run release:local                   # prod build + local install + re-lock daemon input
+ *   pnpm run release:local --dry-run         # build, but skip nix-store/git/config writes + lock
+ *   pnpm run release:local --no-daemon-sync  # skip the snorlax flake-input re-lock
  */
 
 import { execFileSync, spawnSync } from 'node:child_process';
@@ -37,9 +41,11 @@ import { fileURLToPath } from 'node:url';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const distDir = join(root, 'dist');
-const nixSnorlaxDir = join(homedir(), 'nixos-config/pkgs/snorlax');
+const nixosConfigDir = join(homedir(), 'nixos-config');
+const nixSnorlaxDir = join(nixosConfigDir, 'pkgs/snorlax');
 const stableAppImage = join(distDir, 'snorlax.AppImage');
 const dryRun = process.argv.slice(2).includes('--dry-run');
+const noDaemonSync = process.argv.slice(2).includes('--no-daemon-sync');
 const localConfigDir = join(process.env.XDG_CONFIG_HOME ?? join(homedir(), '.config'), 'talysman');
 const localKeyDir = join(localConfigDir, 'keys');
 const localPrivateKeyPath = join(localKeyDir, 'local-entitlement-ed25519-private.pem');
@@ -213,6 +219,36 @@ function installIntoNixStore(version) {
   console.log(`✅ Nix flake sees snorlax ${visible} — run 'rebuild' to activate`);
 }
 
+/**
+ * Re-lock the `snorlax` flake input in ~/nixos-config so the NixOS daemon
+ * (pkgs/snorlax-daemon → talysman-svc + talysman-natmsg) is rebuilt from the current
+ * committed source on the next `rebuild`. Without this, native changes never reach the
+ * daemon: `release:local` only rebuilds the AppImage, and a plain rebuild keeps reusing
+ * the locked input.
+ *
+ * This does NOT run nixos-rebuild — it only updates the lock. Run your usual `rebuild`
+ * afterward to activate.
+ *
+ * `--allow-dirty-locks` is the override that lets this proceed when the snorlax tree is
+ * dirty (e.g. the .org notes): nix would otherwise refuse to write the lock. It still
+ * locks to the committed HEAD, so the lock stays reproducible — meaning uncommitted
+ * *native* changes won't take effect until committed.
+ *
+ * Skipped by --dry-run and --no-daemon-sync.
+ */
+function syncDaemonInput() {
+  if (dryRun) {
+    console.log('🧪 [DRY RUN] would run: nix flake update snorlax --allow-dirty-locks (in ~/nixos-config)');
+    return;
+  }
+  if (!existsSync(nixosConfigDir)) {
+    console.log(`⏭️  ${nixosConfigDir} not found — skipping daemon flake-input sync`);
+    return;
+  }
+  run('nix', ['flake', 'update', 'snorlax', '--allow-dirty-locks'], { cwd: nixosConfigDir });
+  console.log('🔗 Re-locked snorlax daemon input — run `rebuild` to activate the new daemon');
+}
+
 const version = packageVersion();
 console.log(`🏷️  snorlax local release: v${version}${dryRun ? ' (dry run)' : ''}`);
 const localEntitlementKey = ensureLocalEntitlementKey();
@@ -221,4 +257,9 @@ console.log('🔏 Embedding local entitlement public key for release-local build
 buildAppImage();
 writeLocalEntitlementLicense(localEntitlementKey.privateKey, version);
 installIntoNixStore(version);
-console.log('\n🎉 Done.');
+if (noDaemonSync) {
+  console.log('\n⏭️  --no-daemon-sync: skipped snorlax flake-input re-lock (daemon unchanged)');
+} else {
+  syncDaemonInput();
+}
+console.log('\n🎉 Done. Run `rebuild` to activate the new AppImage and daemon.');
