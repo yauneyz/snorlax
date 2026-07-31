@@ -46,14 +46,29 @@ The runtime pieces:
 | Email            | Inbucket (local mail catcher, port 54324)               | Resend                                                                                                   |
 | Sentry / PostHog | Disabled (placeholder values auto-detected and skipped) | Enabled when real values are in `.credentials`                                                           |
 
-Two things are configured **independently** of each other — this is the most important
+Two things vary, and only one of them is yours to pick — this is the most important
 mental model in the whole setup:
 
 1. **Mode (`dev`/`prod`)** — picked when you run `sync-env`; selects which Supabase
    project, app URL, and LLM provider get written to `.env.local`.
-2. **Stripe mode (`test`/`live`)** — set by `[stripe].mode` inside `.credentials`;
-   selects which Stripe keys get exported regardless of dev/prod mode. So you can (and
-   normally do) run "prod" mode locally with Stripe still in test mode.
+2. **Stripe mode (`test`/`live`)** — **derived, never configured.** There is no switch in
+   `.credentials`; `scripts/lib/stripe-mode.mjs` maps the target to the key set:
+
+   | Target                                                     | Stripe |
+   | ---------------------------------------------------------- | ------ |
+   | local dev, `pnpm web:prod`, the desktop `.env.local`        | test   |
+   | Vercel **preview** (`pnpm sync:env:preview`)                | test   |
+   | Vercel **production** (`pnpm sync:env:prod`)                | live   |
+   | `pnpm build:{win,linux,mac}` with `APP_ENV=production`, `pnpm release:upload` | live |
+   | `pnpm release:local`                                        | test   |
+
+   So "prod infrastructure with test Stripe" is still the normal local state — you just
+   can't get it wrong by forgetting to flip a toggle, and you can't accidentally ship a
+   sandbox build either. The shipping paths additionally refuse to run when the `_live`
+   values in `.credentials` are missing or aren't live values (`release:upload` checks
+   this even with `--no-build`, so staged artifacts can't sneak past). To publish anyway
+   while the live configuration is incomplete, set `ALLOW_TEST_STRIPE_RELEASE=true` and
+   the block downgrades to a loud warning.
 
 ---
 
@@ -331,8 +346,9 @@ vercel --prod                       # deploy
 curl https://talysman.app/api/health   # liveness (once domain is attached; else use the deployment URL)
 ```
 
-Then click through login → pricing → checkout with a Stripe test card (while
-`[stripe].mode = "test"`), and watch webhook deliveries in the Stripe dashboard.
+Then click through login → pricing → checkout. Note that `vercel --prod` deploys with the
+**live** keys pushed by `sync:env:prod` — use a preview deployment (`sync:env:preview`) or
+localhost for test-card runs.
 
 ### 6.5 Domain
 
@@ -355,14 +371,15 @@ Each of these has a dev half (already working) and a prod half (checklist):
 
 1. Create live products/prices; put the `price_...` ids in `.credentials` under
    `price_id_monthly_live`/`price_id_yearly_live` (the `_test` pair holds the sandbox
-   ids). `[stripe].mode` selects which pair — plus which key set — gets exported.
+   ids). The target selects which pair — plus which key set — gets exported.
    _(Live prices already created 2026-07-31: `price_1TzAu9RN4BfSLyzwX2MG5YIo` monthly,
    `price_1TzAuARN4BfSLyzw88zxlrAI` yearly.)_
 2. Dashboard → Webhooks → add endpoint `https://talysman.app/api/stripe/webhook`
    (subscribe to the checkout + customer.subscription events the handler processes);
    copy its `whsec_...` into `webhook_secret_live`.
-3. Fill `publishable_key_live`/`secret_key_live`, flip `[stripe].mode = "live"`,
-   re-push env (§6.3), redeploy.
+3. Fill `publishable_key_live`/`secret_key_live`, re-push env (§6.3), redeploy. There is
+   no mode to flip — `sync:env:prod` exports the live set because it targets production,
+   and refuses to run at all while any `_live` value is missing.
 
 **Google OAuth** (Search Console connections) — in the GCP console for the existing
 OAuth client, add `https://talysman.app/api/connections/google/callback` as an
@@ -712,9 +729,9 @@ vercel env pull --environment=production /tmp/prod.env    # then diff against ap
   `db push`. Dashboard SQL edits require a follow-up `db pull`.
 - **Env changes require a redeploy; `NEXT_PUBLIC_*` changes require a rebuild** (which
   a redeploy does). Nothing applies retroactively to a running deployment.
-- **Two independent switches**: sync-env mode (which infra) and `[stripe].mode` (which
-  Stripe keys). "Prod mode with test Stripe" is the normal state until the live Stripe
-  account is ready.
+- **One switch, one derivation**: you pick sync-env mode (which infra); Stripe mode
+  follows the target automatically (live only for Vercel production and published
+  installers). "Prod infra with test Stripe" is still the normal local state.
 - **Fail-fast everywhere**: sync-env validates `.credentials`; `config.ts` validates
   the runtime env. If prod is misconfigured you find out at build/boot with the exact
   variable named, not from a 3am 500.

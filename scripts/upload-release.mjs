@@ -16,6 +16,11 @@ import { fileURLToPath } from "node:url";
 import toml from "@iarna/toml";
 
 import {
+  assertLiveStripeRelease,
+  desktopStripeReleaseIssues,
+  liveStripeCredentialIssues,
+} from "./lib/stripe-mode.mjs";
+import {
   BUILD_SCRIPTS,
   PLATFORMS,
   STABLE_INSTALLER_KEYS,
@@ -90,6 +95,19 @@ function loadHosting() {
       `Missing .credentials. Checked:\n${credentialsCandidates.join("\n")}`,
     );
   return hostingFromCredentials(toml.parse(readFileSync(source, "utf8")));
+}
+
+/**
+ * Publishing is a production target, so it needs a complete live Stripe configuration.
+ * Installers built here are already gated by scripts/build.mjs; this also covers
+ * --no-build uploads of artifacts staged earlier.
+ */
+function assertLiveStripeForPublish() {
+  const source = credentialsCandidates.find((candidate) => existsSync(candidate));
+  const issues = source
+    ? liveStripeCredentialIssues(toml.parse(readFileSync(source, "utf8")).stripe ?? {})
+    : desktopStripeReleaseIssues(process.env);
+  assertLiveStripeRelease(issues, { surface: "published desktop release artifacts" });
 }
 
 function awsEnvironment(hosting) {
@@ -408,6 +426,8 @@ async function main() {
     await verifyExistingFeeds(hosting);
     return;
   }
+
+  assertLiveStripeForPublish();
 
   const hostPlatforms = platformsForHost(process.platform);
   if (hostPlatforms.length === 0)

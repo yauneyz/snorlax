@@ -49,7 +49,7 @@ Most "bugs" during verification are one of these misconfigured. Auth mechanics l
 | Stripe client | `apps/web/src/lib/stripe/client.ts` | Lazily builds the SDK from `config.stripe.secretKey`. |
 | Web routes (cookie auth) | `apps/web/src/app/api/stripe/{checkout,checkout/success,portal,webhook}/route.ts` | Browser-driven checkout/portal + the authoritative webhook. |
 | Desktop routes (bearer auth) | `apps/web/src/app/api/desktop/{checkout,checkout/success,checkout/cancel,portal,subscription,subscription/cancel,subscription/resume,entitlement}/route.ts` | Same logic, `requireBearerUser`, redirects to `talysman://` deep links. |
-| Config gate | `apps/web/src/lib/config.ts` | Zod-validates `STRIPE_*` at module load. Fails fast on a missing/blank key. `STRIPE_MODE` ∈ `test`\|`live`. |
+| Config gate | `apps/web/src/lib/config.ts` | Zod-validates `STRIPE_*` at module load. Fails fast on a missing/blank key, or when the keys disagree with `STRIPE_MODE` (∈ `test`\|`live`, derived by `scripts/lib/stripe-mode.mjs`). |
 | Product contract | `packages/product/src/index.ts` | `CHECKOUT_PRICES = ['monthly','yearly']`, entitlement + free-tier limits (≤5 domains, no apps, no schedule). |
 
 ### 1.2 Data
@@ -100,10 +100,12 @@ never commit secrets.**
 - [ ] Copy `.credentials.example` → `.credentials`; fill `[supabase.dev]` / `[supabase.prod]`
       (url, publishable_key, secret_key, project_ref).
 - [ ] Fill `[stripe]`: `price_id_{monthly,yearly}_test` **and** `_live`, test **and** live
-      keys, and both webhook secrets. `mode` picks which key + price set gets exported.
+      keys, and both webhook secrets. There is no `mode` field — the target picks which
+      key + price set gets exported (`scripts/lib/stripe-mode.mjs`).
 - [ ] Fill `[resend]` (`api_key`, `from`) — the webhook's transactional emails need it.
 - [ ] `pnpm sync:env` writes `apps/web/.env.local` (server secrets) and root `.env.local`
-      (desktop-safe **public** vars only). `--mode=prod` selects cloud/live values.
+      (desktop-safe **public** vars only). `--mode=prod` selects cloud infrastructure;
+      Stripe stays on test for anything written to a local file.
 - [ ] Confirm `API_BASE_URL` in the generated root `.env.local` points at the Next.js
       origin (auto-derived from `[app].url_dev` / `url_prod`) — this is the web origin the
       desktop calls for `/api/desktop/*`.
@@ -288,8 +290,9 @@ To exercise the *real* webhook delivery path (not the CLI listener) before live:
 ## 4. Phase B — Go live (live mode)
 
 Live mode is a **repeat of Phase A against the real account with a real card**, plus the
-one-time account/config work below. Nothing about the code changes — only env values and
-`STRIPE_MODE=live`.
+one-time account/config work below. Nothing about the code changes, and there is no mode to
+flip: `STRIPE_MODE=live` is derived from the production target, so filling the `_live`
+values in `.credentials` and pushing to production is the whole switch.
 
 ### 4.A Activate & verify the real Stripe account (blocking)
 
@@ -322,9 +325,11 @@ one-time account/config work below. Nothing about the code changes — only env 
 
 ### 4.E Fill live env & deploy
 
-Update `.credentials` `[stripe]`: `mode = "live"`, `secret_key_live`, `publishable_key_live`,
+Update `.credentials` `[stripe]`: `secret_key_live`, `publishable_key_live`,
 `webhook_secret_live` (the **live** `price_id_monthly_live` / `price_id_yearly_live` are
-already filled). `sync:env` fails fast if any live value is missing. Then:
+already filled). There is no mode to flip — `sync:env:prod` exports the live set because it
+targets production, and refuses to push at all if any live value is missing or isn't
+actually a live value (`scripts/lib/stripe-mode.mjs`). Then:
 
 ```sh
 pnpm sync:env:prod       # pushes production env to Vercel (never commit .env.local)
@@ -344,6 +349,12 @@ Supabase prod keys, `RESEND_API_KEY`. Deploy `talysman.app` to production.
 - Production desktop config: `API_BASE_URL=https://talysman.app`, prod
   `VITE_SUPABASE_URL`/`ANON_KEY`, `pk_live_...`. Confirm **no** `sk_*` / `whsec_` ships in
   the bundle (`__APP_CONFIG__` carries only public keys). Worth a CI grep.
+- `build:{win,linux,mac}` with `APP_ENV=production` resolves Stripe to live automatically
+  and refuses to run unless the baked `VITE_STRIPE_PUBLISHABLE_KEY` really is a `pk_live_`
+  key; `release:upload` re-checks before publishing, including with `--no-build`.
+  `release:local` builds as `APP_ENV=production` but stays on test (it sets
+  `LOCAL_RELEASE_BUILD=true`); `ALLOW_TEST_STRIPE_RELEASE=true` is the deliberate override
+  for publishing before the live configuration is complete.
 
 ### 4.G Desktop packaging & billing deep links
 

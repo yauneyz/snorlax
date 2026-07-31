@@ -1,3 +1,9 @@
+- auto update verification
+- prod payments verification
+- notarization
+
+
+
 * part 1: demo
 - payments
 - web app is reasonable

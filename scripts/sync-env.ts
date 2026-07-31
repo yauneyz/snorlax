@@ -18,6 +18,13 @@ import {
   // eslint-disable-next-line @typescript-eslint/ban-ts-comment
   // @ts-ignore — untyped .mjs module shared with release scripts
 } from "./lib/desktop-environment.mjs";
+import {
+  liveStripeCredentialIssues,
+  stripeModeForTarget,
+  stripeReleaseFailure,
+  // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+  // @ts-ignore — untyped .mjs module shared with release scripts
+} from "./lib/stripe-mode.mjs";
 
 const ROOT = path.resolve(__dirname, "..");
 const WEB_DIR = path.join(ROOT, "apps", "web");
@@ -113,8 +120,9 @@ const credentialsSchema = z.object({
     dev: supabaseBlock,
     prod: supabaseBlock,
   }),
+  // No `mode` here on purpose: which key set gets exported is derived from the push
+  // target (see stripeMode above), so it cannot drift out of sync with the deployment.
   stripe: z.object({
-    mode: z.enum(["test", "live"]),
     publishable_key_test: z.string().min(1),
     secret_key_test: z.string().min(1),
     webhook_secret_test: z.string().min(1),
@@ -209,6 +217,7 @@ const credentialsSchema = z.object({
 
 type Credentials = z.infer<typeof credentialsSchema>;
 type Mode = "dev" | "prod";
+type StripeMode = "test" | "live";
 type VercelEnvironment = "development" | "preview" | "production";
 
 const googleOAuthClientSchema = z.object({
@@ -261,6 +270,15 @@ function resolveVercelEnvironment(): VercelEnvironment | null {
 }
 
 const vercelEnvironment = resolveVercelEnvironment();
+
+/**
+ * Stripe mode follows the push target, not the dev/prod mode: only the Vercel production
+ * environment charges real cards. Preview runs on production Supabase but must stay on
+ * test Stripe, and so must the .env.local files this script writes for local runs —
+ * `pnpm web:prod` is prod infrastructure on a laptop, not a customer-facing deployment.
+ */
+const stripeTarget = vercelEnvironment ?? "development";
+const stripeMode: StripeMode = stripeModeForTarget(stripeTarget);
 
 function resolveMode(): Mode {
   if (vercelEnvironment === "production" || process.argv.includes("--prod")) return "prod";
@@ -393,22 +411,19 @@ function loadCredentials(): Credentials | null {
   return credentials;
 }
 
-function stripeValues(c: Credentials) {
+function stripeValues(c: Credentials, stripeMode: StripeMode) {
+  const live = stripeMode === "live";
   return {
-    publishableKey:
-      c.stripe.mode === "live" ? c.stripe.publishable_key_live : c.stripe.publishable_key_test,
-    secretKey: c.stripe.mode === "live" ? c.stripe.secret_key_live : c.stripe.secret_key_test,
-    webhookSecret:
-      c.stripe.mode === "live" ? c.stripe.webhook_secret_live : c.stripe.webhook_secret_test,
-    priceMonthly:
-      c.stripe.mode === "live" ? c.stripe.price_id_monthly_live : c.stripe.price_id_monthly_test,
-    priceYearly:
-      c.stripe.mode === "live" ? c.stripe.price_id_yearly_live : c.stripe.price_id_yearly_test,
+    publishableKey: live ? c.stripe.publishable_key_live : c.stripe.publishable_key_test,
+    secretKey: live ? c.stripe.secret_key_live : c.stripe.secret_key_test,
+    webhookSecret: live ? c.stripe.webhook_secret_live : c.stripe.webhook_secret_test,
+    priceMonthly: live ? c.stripe.price_id_monthly_live : c.stripe.price_id_monthly_test,
+    priceYearly: live ? c.stripe.price_id_yearly_live : c.stripe.price_id_yearly_test,
   };
 }
 
 function toWebEnvPairs(c: Credentials, mode: Mode): Array<[string, string]> {
-  const stripe = stripeValues(c);
+  const stripe = stripeValues(c, stripeMode);
   const supabase = c.supabase[mode];
   const appUrl = mode === "prod" ? c.app.url_prod : c.app.url_dev;
   const appEnvironment = mode === "prod" ? "production" : "development";
@@ -428,7 +443,7 @@ function toWebEnvPairs(c: Credentials, mode: Mode): Array<[string, string]> {
     ["SUPABASE_SECRET_KEY", supabase.secret_key],
     ["SUPABASE_PROJECT_REF", supabase.project_ref],
 
-    ["STRIPE_MODE", c.stripe.mode],
+    ["STRIPE_MODE", stripeMode],
     ["NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY", stripe.publishableKey ?? ""],
     ["STRIPE_SECRET_KEY", stripe.secretKey ?? ""],
     ["STRIPE_WEBHOOK_SECRET", stripe.webhookSecret ?? ""],
@@ -606,20 +621,14 @@ function main() {
     process.exit(1);
   }
 
-  if (creds.stripe.mode === "live") {
-    const missing = (
-      [
-        ["secret_key_live", creds.stripe.secret_key_live],
-        ["publishable_key_live", creds.stripe.publishable_key_live],
-        ["webhook_secret_live", creds.stripe.webhook_secret_live],
-        ["price_id_monthly_live", creds.stripe.price_id_monthly_live],
-        ["price_id_yearly_live", creds.stripe.price_id_yearly_live],
-      ] as const
-    )
-      .filter(([, value]) => !value)
-      .map(([name]) => name);
-    if (missing.length > 0) {
-      console.error(`stripe.mode="live" but missing: ${missing.join(", ")}`);
+  // The production web deployment is the one target that charges real cards, so it is the
+  // one that has to have a complete live configuration.
+  if (stripeMode === "live") {
+    const failure = stripeReleaseFailure(liveStripeCredentialIssues(creds.stripe), {
+      surface: "the production web deployment",
+    });
+    if (failure) {
+      console.error(failure);
       process.exit(1);
     }
   }

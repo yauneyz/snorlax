@@ -88,6 +88,13 @@ const serverSchemaBase = publicSchema.extend({
   OAUTH_STATE_SECRET: z.string().min(32),
 });
 
+/** "test" | "live" for a prefixed Stripe key; null for placeholders we shouldn't judge. */
+function stripeKeyMode(key: string): "test" | "live" | null {
+  if (/^(?:pk|sk|rk)_live_/.test(key)) return "live";
+  if (/^(?:pk|sk|rk)_test_/.test(key)) return "test";
+  return null;
+}
+
 const serverSchema = serverSchemaBase.superRefine((value, ctx) => {
   if (value.LLM_PROVIDER === "openai" && value.OPENAI_API_KEY.length === 0) {
     ctx.addIssue({
@@ -95,6 +102,19 @@ const serverSchema = serverSchemaBase.superRefine((value, ctx) => {
       path: ["OPENAI_API_KEY"],
       message: "OPENAI_API_KEY is required when LLM_PROVIDER is openai.",
     });
+  }
+
+  // Backstop for keys edited straight into the hosting dashboard rather than synced from
+  // .credentials: a deployment that says "live" but holds test keys takes no real money.
+  for (const key of ["STRIPE_SECRET_KEY", "NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY"] as const) {
+    const keyMode = stripeKeyMode(value[key]);
+    if (keyMode && keyMode !== value.STRIPE_MODE) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: [key],
+        message: `is a ${keyMode}-mode key but STRIPE_MODE is "${value.STRIPE_MODE}".`,
+      });
+    }
   }
 });
 

@@ -9,6 +9,9 @@ export default {
         panel2: '#16181b',
         border: '#26292e',
         ok: '#22c55e',
+        // The focus-active signal colour. Deliberately distinct from `ok`, which stays
+        // green for generic "this is fine" states (sign-in, entitlement, native service).
+        focus: '#ec4899',
         danger: '#ef4444',
         // Silver, not indigo. `accentInk` is the dark text that sits on top of it.
         accent: '#c7ccd4',

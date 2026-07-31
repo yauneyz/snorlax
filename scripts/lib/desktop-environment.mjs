@@ -1,18 +1,26 @@
+import { stripeModeForTarget } from "./stripe-mode.mjs";
+
 /**
  * Public, build-time desktop configuration derived from the credentials source of truth.
  * Keep this list shared by env sync and release builds so packaged apps cannot silently
  * lose their Supabase/API configuration.
+ *
+ * `stripeTarget` decides live vs test keys and defaults to the safe answer: only a build
+ * that says it is the published production installer gets live ones. `dev`/`prod` cannot
+ * decide this on their own — `release:local` and a local `--mode=prod` sync are both prod
+ * infrastructure that must stay on test Stripe.
+ *
+ * @returns {Array<[string, string]>}
  */
-export function desktopEnvPairs(credentials, mode) {
+export function desktopEnvPairs(credentials, mode, { stripeTarget = "development" } = {}) {
   if (mode !== "dev" && mode !== "prod") {
     throw new Error(`Unsupported desktop environment mode: ${mode}`);
   }
 
   const stripe = credentials.stripe;
+  const stripeMode = stripeModeForTarget(stripeTarget);
   const stripePublishableKey =
-    stripe.mode === "live"
-      ? stripe.publishable_key_live
-      : stripe.publishable_key_test;
+    stripeMode === "live" ? stripe.publishable_key_live : stripe.publishable_key_test;
   const supabase = credentials.supabase[mode];
   const appUrl = mode === "prod" ? credentials.app.url_prod : credentials.app.url_dev;
 
@@ -29,7 +37,10 @@ export function desktopEnvPairs(credentials, mode) {
     ],
     ["VITE_SUPABASE_URL", supabase.url],
     ["VITE_SUPABASE_ANON_KEY", supabase.publishable_key],
-    ["VITE_STRIPE_PUBLISHABLE_KEY", stripePublishableKey ?? ""],
+    // Not consumed by the app — it is what scripts/build.mjs checks to keep test-mode
+    // Stripe configuration out of published installers (scripts/lib/stripe-mode.mjs).
+    ["STRIPE_MODE", stripeMode],
+    ["VITE_STRIPE_PUBLISHABLE_KEY", String(stripePublishableKey ?? "")],
     ["VITE_PAYMENT_URL", appUrl],
     ["API_BASE_URL", appUrl],
     [

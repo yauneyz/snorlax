@@ -63,6 +63,48 @@ describe("config schemas", () => {
     expect(r.success).toBe(true);
   });
 
+  it("rejects Stripe keys that disagree with STRIPE_MODE", () => {
+    const base = {
+      NEXT_PUBLIC_APP_URL: "http://localhost:3000",
+      NEXT_PUBLIC_APP_NAME: "x",
+      NEXT_PUBLIC_SUPABASE_URL: "http://localhost:54321",
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: "sb_publishable_test",
+      SUPABASE_SECRET_KEY: "sb_secret_test",
+      STRIPE_WEBHOOK_SECRET: "whsec",
+      STRIPE_PRICE_MONTHLY: "price_m",
+      STRIPE_PRICE_YEARLY: "price_y",
+      RESEND_API_KEY: "re",
+      RESEND_FROM: "a@b.com",
+      OPENAI_API_KEY: "sk_test_xxx",
+      ...extensionHostingEnv,
+      ...securityEnv,
+    };
+
+    const liveModeWithTestKeys = serverSchema.safeParse({
+      ...base,
+      STRIPE_MODE: "live",
+      NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: "pk_test_xxx",
+      STRIPE_SECRET_KEY: "sk_test_xxx",
+    });
+    expect(liveModeWithTestKeys.success).toBe(false);
+
+    const testModeWithLiveSecret = serverSchema.safeParse({
+      ...base,
+      STRIPE_MODE: "test",
+      NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: "pk_test_xxx",
+      STRIPE_SECRET_KEY: "rk_live_xxx",
+    });
+    expect(testModeWithLiveSecret.success).toBe(false);
+
+    const consistentLive = serverSchema.safeParse({
+      ...base,
+      STRIPE_MODE: "live",
+      NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: "pk_live_xxx",
+      STRIPE_SECRET_KEY: "rk_live_xxx",
+    });
+    expect(consistentLive.success).toBe(true);
+  });
+
   it("normalizes copied Supabase service URLs to the project origin", () => {
     const r = publicSchema.safeParse({
       NEXT_PUBLIC_APP_URL: "http://localhost:3000",

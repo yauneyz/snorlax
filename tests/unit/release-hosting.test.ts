@@ -56,7 +56,6 @@ describe('desktop release environment', () => {
       prod: { url: 'https://example.supabase.co', publishable_key: 'prod-anon' },
     },
     stripe: {
-      mode: 'live',
       publishable_key_test: 'pk_test_example',
       publishable_key_live: 'pk_live_example',
     },
@@ -65,15 +64,29 @@ describe('desktop release environment', () => {
   };
 
   it('derives production-safe public desktop values from credentials', () => {
-    expect(Object.fromEntries(desktopEnvPairs(credentials, 'prod'))).toMatchObject({
+    expect(
+      Object.fromEntries(desktopEnvPairs(credentials, 'prod', { stripeTarget: 'production' })),
+    ).toMatchObject({
       APP_ENV: 'production',
       TALYSMAN_PIPE: 'talysman',
       GOOGLE_AUTH_ENABLED: 'true',
       API_BASE_URL: 'https://www.talysman.app',
       VITE_SUPABASE_URL: 'https://example.supabase.co',
       VITE_SUPABASE_ANON_KEY: 'prod-anon',
+      STRIPE_MODE: 'live',
       VITE_STRIPE_PUBLISHABLE_KEY: 'pk_live_example',
       UPDATE_FEED_URL: 'https://releases.example.com/desktop',
+    });
+  });
+
+  it('keeps prod infrastructure on test Stripe unless the build is the published one', () => {
+    // release:local and `sync:env --mode=prod` both take this path: prod Supabase and prod
+    // API, test Stripe. Only a build that declares itself the production target gets live.
+    expect(Object.fromEntries(desktopEnvPairs(credentials, 'prod'))).toMatchObject({
+      APP_ENV: 'production',
+      API_BASE_URL: 'https://www.talysman.app',
+      STRIPE_MODE: 'test',
+      VITE_STRIPE_PUBLISHABLE_KEY: 'pk_test_example',
     });
   });
 

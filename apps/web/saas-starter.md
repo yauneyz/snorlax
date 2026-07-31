@@ -176,7 +176,8 @@ secret_key          = "sb_secret_..."    # server-only
 project_ref         = "xxxxx"            # for CLI
 
 [stripe]
-mode                    = "test"         # test | live — switches which keys are exported
+# No mode field: which key set is exported is derived from the target (live only for the
+# Vercel production deployment and published desktop installers).
 publishable_key_test    = "pk_test_..."
 secret_key_test         = "sk_test_..."
 webhook_secret_test     = "whsec_..."
@@ -185,8 +186,8 @@ secret_key_live         = "sk_live_..."
 webhook_secret_live     = "whsec_..."
 price_id_monthly_test   = "price_..."
 price_id_yearly_test    = "price_..."
-price_id_monthly_live   = "price_..."    # required when mode = "live"
-price_id_yearly_live    = "price_..."    # required when mode = "live"
+price_id_monthly_live   = "price_..."    # required to ship to production
+price_id_yearly_live    = "price_..."    # required to ship to production
 portal_configuration_id = "bpc_..."      # optional; else Stripe uses default
 
 [resend]
@@ -214,7 +215,8 @@ oauth_client_secret         = "GOCSPX-..."
 
 - Parses `.credentials` with `@iarna/toml`.
 - Validates shape with Zod — missing required keys fail loudly with exact path.
-- Picks Stripe keys based on `stripe.mode` (test vs live).
+- Picks Stripe keys from the push target (live only for Vercel production), not from a
+  field in `.credentials` — see `scripts/lib/stripe-mode.mjs`.
 - Writes `.env.local` with the canonical names Next.js/Supabase/Stripe expect:
   - `NEXT_PUBLIC_APP_URL`, `NEXT_PUBLIC_APP_NAME`, `APP_ENVIRONMENT`
   - `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SECRET_KEY`

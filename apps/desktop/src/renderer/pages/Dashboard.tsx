@@ -35,7 +35,7 @@ export function Dashboard() {
           <CardTitle>Status</CardTitle>
           <div className="flex flex-col gap-2 text-sm text-slate-300">
             <div>
-              Focus: <Badge tone={focusActive ? 'ok' : 'neutral'}>{focusActive ? 'active' : 'off'}</Badge>
+              Focus: <Badge tone={focusActive ? 'focus' : 'neutral'}>{focusActive ? 'active' : 'off'}</Badge>
             </div>
             <div>Schedule windows: {schedule.windows.length}</div>
           </div>

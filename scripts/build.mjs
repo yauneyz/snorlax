@@ -19,12 +19,18 @@ import {
   desktopEnvPairs,
   verifyDirectDesktopApiBaseUrl,
 } from "./lib/desktop-environment.mjs";
+import {
+  assertLiveStripeRelease,
+  desktopStripeReleaseIssues,
+} from "./lib/stripe-mode.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const args = process.argv.slice(2);
 const targetIdx = args.indexOf("--target");
 const target = targetIdx !== -1 ? args[targetIdx + 1] : "win";
 const cross = args.includes("--cross");
+// Set by scripts/release-local.mjs: a production build that stays on this NixOS host.
+const isLocalRelease = process.env.LOCAL_RELEASE_BUILD === "true";
 
 const TARGETS = {
   win: { hostPlatform: "win32", builderFlag: "--win", nativeTarget: "win" },
@@ -91,7 +97,12 @@ function loadBuildEnvironment() {
   if (credentialsPath) {
     const credentials = toml.parse(readFileSync(credentialsPath, "utf8"));
     const credentialMode = mode === "production" ? "prod" : "dev";
-    for (const [name, value] of desktopEnvPairs(credentials, credentialMode)) {
+    // Only a production build that will actually be published gets live Stripe keys.
+    const stripeTarget =
+      credentialMode === "prod" && !isLocalRelease ? "production" : "development";
+    for (const [name, value] of desktopEnvPairs(credentials, credentialMode, {
+      stripeTarget,
+    })) {
       if (!process.env[name] && value) {
         process.env[name] = value;
       }
@@ -122,16 +133,29 @@ function validateReleaseInputs(target) {
       `Release version ${version} is inconsistent: ${mismatches.map(([path, candidate]) => `${path}=${candidate}`).join(", ")}. Run pnpm release:version -- ${version}.`,
     );
   }
-  if (process.env.APP_ENV === "production") {
-    const missingEnvironment = REQUIRED_PRODUCTION_DESKTOP_ENV.filter(
-      (name) => !process.env[name],
-    );
-    if (missingEnvironment.length === 0) return;
+  if (process.env.APP_ENV !== "production") return;
+
+  const missingEnvironment = REQUIRED_PRODUCTION_DESKTOP_ENV.filter(
+    (name) => !process.env[name],
+  );
+  if (missingEnvironment.length > 0) {
     throw new Error(
       `Production desktop configuration is missing: ${missingEnvironment.join(", ")}. ` +
         "Fill the public values in .env.production or configure .credentials.",
     );
   }
+
+  // A published installer must point at live Stripe. release:local is the one production
+  // build that never leaves this machine, so it stays on test.
+  if (isLocalRelease) {
+    console.log(
+      `\nrelease:local build — Stripe stays in ${process.env.STRIPE_MODE ?? "test"} mode (nothing is published).`,
+    );
+    return;
+  }
+  assertLiveStripeRelease(desktopStripeReleaseIssues(process.env), {
+    surface: `the published ${target} desktop installer`,
+  });
 }
 
 const cfg = TARGETS[target];
