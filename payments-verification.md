@@ -99,8 +99,8 @@ never commit secrets.**
 
 - [ ] Copy `.credentials.example` → `.credentials`; fill `[supabase.dev]` / `[supabase.prod]`
       (url, publishable_key, secret_key, project_ref).
-- [ ] Fill `[stripe]`: `price_id_monthly`, `price_id_yearly`, test **and** live keys, and
-      both webhook secrets. `mode` picks which key set gets exported.
+- [ ] Fill `[stripe]`: `price_id_{monthly,yearly}_test` **and** `_live`, test **and** live
+      keys, and both webhook secrets. `mode` picks which key + price set gets exported.
 - [ ] Fill `[resend]` (`api_key`, `from`) — the webhook's transactional emails need it.
 - [ ] `pnpm sync:env` writes `apps/web/.env.local` (server secrets) and root `.env.local`
       (desktop-safe **public** vars only). `--mode=prod` selects cloud/live values.
@@ -323,7 +323,8 @@ one-time account/config work below. Nothing about the code changes — only env 
 ### 4.E Fill live env & deploy
 
 Update `.credentials` `[stripe]`: `mode = "live"`, `secret_key_live`, `publishable_key_live`,
-`webhook_secret_live`, and the **live** `price_id_monthly` / `price_id_yearly`. Then:
+`webhook_secret_live` (the **live** `price_id_monthly_live` / `price_id_yearly_live` are
+already filled). `sync:env` fails fast if any live value is missing. Then:
 
 ```sh
 pnpm sync:env:prod       # pushes production env to Vercel (never commit .env.local)

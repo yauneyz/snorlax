@@ -121,8 +121,10 @@ const credentialsSchema = z.object({
     publishable_key_live: z.string().min(1).optional().or(z.literal("")),
     secret_key_live: z.string().min(1).optional().or(z.literal("")),
     webhook_secret_live: z.string().min(1).optional().or(z.literal("")),
-    price_id_monthly: z.string().min(1),
-    price_id_yearly: z.string().min(1),
+    price_id_monthly_test: z.string().min(1),
+    price_id_yearly_test: z.string().min(1),
+    price_id_monthly_live: z.string().optional().default(""),
+    price_id_yearly_live: z.string().optional().default(""),
     portal_configuration_id: z.string().optional().default(""),
   }),
   resend: z.object({
@@ -398,6 +400,10 @@ function stripeValues(c: Credentials) {
     secretKey: c.stripe.mode === "live" ? c.stripe.secret_key_live : c.stripe.secret_key_test,
     webhookSecret:
       c.stripe.mode === "live" ? c.stripe.webhook_secret_live : c.stripe.webhook_secret_test,
+    priceMonthly:
+      c.stripe.mode === "live" ? c.stripe.price_id_monthly_live : c.stripe.price_id_monthly_test,
+    priceYearly:
+      c.stripe.mode === "live" ? c.stripe.price_id_yearly_live : c.stripe.price_id_yearly_test,
   };
 }
 
@@ -426,8 +432,8 @@ function toWebEnvPairs(c: Credentials, mode: Mode): Array<[string, string]> {
     ["NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY", stripe.publishableKey ?? ""],
     ["STRIPE_SECRET_KEY", stripe.secretKey ?? ""],
     ["STRIPE_WEBHOOK_SECRET", stripe.webhookSecret ?? ""],
-    ["STRIPE_PRICE_MONTHLY", c.stripe.price_id_monthly],
-    ["STRIPE_PRICE_YEARLY", c.stripe.price_id_yearly],
+    ["STRIPE_PRICE_MONTHLY", stripe.priceMonthly ?? ""],
+    ["STRIPE_PRICE_YEARLY", stripe.priceYearly ?? ""],
     ["STRIPE_PORTAL_CONFIG_ID", c.stripe.portal_configuration_id ?? ""],
 
     ["RESEND_API_KEY", c.resend.api_key],
@@ -600,13 +606,39 @@ function main() {
     process.exit(1);
   }
 
+  if (creds.stripe.mode === "live") {
+    const missing = (
+      [
+        ["secret_key_live", creds.stripe.secret_key_live],
+        ["publishable_key_live", creds.stripe.publishable_key_live],
+        ["webhook_secret_live", creds.stripe.webhook_secret_live],
+        ["price_id_monthly_live", creds.stripe.price_id_monthly_live],
+        ["price_id_yearly_live", creds.stripe.price_id_yearly_live],
+      ] as const
+    )
+      .filter(([, value]) => !value)
+      .map(([name]) => name);
+    if (missing.length > 0) {
+      console.error(`stripe.mode="live" but missing: ${missing.join(", ")}`);
+      process.exit(1);
+    }
+  }
+
   const webPairs = toWebEnvPairs(creds, mode);
   if (vercelEnvironment) {
     pushToVercel(webPairs, vercelEnvironment);
     return;
   }
 
-  writeEnvFile(WEB_ENV_OUT, webPairs, mode);
+  // The webhook integration test (tests/integration/stripe-webhook-cli.test.ts) drives the
+  // real Stripe CLI against test mode and looks for STRIPE_CLI_API_KEY. It is always the
+  // test-mode secret key regardless of `mode`, and stays local-only (never pushed to Vercel).
+  const localWebPairs: Array<[string, string]> = [
+    ...webPairs,
+    ["STRIPE_CLI_API_KEY", creds.stripe.secret_key_test],
+  ];
+
+  writeEnvFile(WEB_ENV_OUT, localWebPairs, mode);
   writeEnvFile(ROOT_ENV_OUT, desktopEnvPairs(creds, mode), mode);
   writeEnvFile(SUPABASE_ENV_OUT, toSupabaseEnvPairs(creds), mode);
 }

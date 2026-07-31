@@ -353,9 +353,11 @@ Each of these has a dev half (already working) and a prod half (checklist):
 
 **Stripe** — when the real Talysman account clears verification:
 
-1. Create live products/prices; put the `price_...` ids in `.credentials`
-   (`price_id_monthly`/`price_id_yearly` are shared between test/live in the schema —
-   they must match whichever mode is active).
+1. Create live products/prices; put the `price_...` ids in `.credentials` under
+   `price_id_monthly_live`/`price_id_yearly_live` (the `_test` pair holds the sandbox
+   ids). `[stripe].mode` selects which pair — plus which key set — gets exported.
+   _(Live prices already created 2026-07-31: `price_1TzAu9RN4BfSLyzwX2MG5YIo` monthly,
+   `price_1TzAuARN4BfSLyzw88zxlrAI` yearly.)_
 2. Dashboard → Webhooks → add endpoint `https://talysman.app/api/stripe/webhook`
    (subscribe to the checkout + customer.subscription events the handler processes);
    copy its `whsec_...` into `webhook_secret_live`.

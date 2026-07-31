@@ -183,8 +183,10 @@ webhook_secret_test     = "whsec_..."
 publishable_key_live    = "pk_live_..."
 secret_key_live         = "sk_live_..."
 webhook_secret_live     = "whsec_..."
-price_id_monthly        = "price_..."
-price_id_yearly         = "price_..."
+price_id_monthly_test   = "price_..."
+price_id_yearly_test    = "price_..."
+price_id_monthly_live   = "price_..."    # required when mode = "live"
+price_id_yearly_live    = "price_..."    # required when mode = "live"
 portal_configuration_id = "bpc_..."      # optional; else Stripe uses default
 
 [resend]
