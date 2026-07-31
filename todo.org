@@ -1,4 +1,3 @@
-- auto update verification
 - prod payments verification
 - notarization
 
