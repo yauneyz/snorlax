@@ -1,7 +1,9 @@
 import Stripe from 'stripe';
 import {
   checkoutPriceSchema,
+  ENTITLEMENT_GRACE_PERIOD_MS,
   entitlementForPlan,
+  isWithinEntitlementGracePeriod,
   type CheckoutPrice,
   type Entitlement,
   type SubscriptionDetail,
@@ -48,6 +50,21 @@ interface ActiveEntitlementRow {
   source?: 'subscription' | 'grant';
   status?: string;
   current_period_end?: string | null;
+}
+
+const UNCERTAIN_SUBSCRIPTION_STATUSES = [
+  'trialing',
+  'active',
+  'past_due',
+  'incomplete',
+  'unpaid',
+  'paused',
+] as const;
+
+interface UncertainSubscriptionRow {
+  status: string;
+  current_period_end: string;
+  updated_at: string;
 }
 
 export class NoStripeCustomerError extends Error {
@@ -244,7 +261,34 @@ export async function getUserEntitlement(args: {
     cacheUntil: new Date(now.getTime() + cacheTtlMs).toISOString(),
   };
 
-  if (!entitled) return entitlementForPlan('free', 'server', timing);
+  if (!entitled) {
+    // A payment problem or stale webhook projection is uncertain, not proof that the
+    // customer is free. Keep Pro for the same bounded period used by desktop offline
+    // access, anchored to the last billing update so repeated reads cannot extend it.
+    const { data: uncertainData, error: uncertainError } = await db
+      .from('subscriptions')
+      .select('status,current_period_end,updated_at')
+      .eq('user_id', userId)
+      .in('status', UNCERTAIN_SUBSCRIPTION_STATUSES)
+      .order('updated_at', { ascending: false })
+      .limit(1);
+    if (uncertainError) {
+      throw new Error(`Failed to load uncertain subscription: ${uncertainError.message}`);
+    }
+    const uncertain = ((uncertainData ?? []) as UncertainSubscriptionRow[])[0];
+    if (uncertain && isWithinEntitlementGracePeriod(uncertain.updated_at, now)) {
+      return entitlementForPlan('pro', 'server', {
+        status: uncertain.status,
+        currentPeriodEnd: uncertain.current_period_end,
+        fetchedAt: uncertain.updated_at,
+        cacheUntil: new Date(
+          Date.parse(uncertain.updated_at) + ENTITLEMENT_GRACE_PERIOD_MS,
+        ).toISOString(),
+      });
+    }
+
+    return entitlementForPlan('free', 'server', timing);
+  }
 
   return entitlementForPlan('pro', 'server', {
     status: entitled.status,
@@ -272,7 +316,7 @@ export async function hasActiveCompGrant(args: {
 }
 
 /** Statuses that count as a "current" subscription for display and cancel/resume. */
-const CURRENT_SUBSCRIPTION_STATUSES = ['trialing', 'active', 'past_due'] as const;
+const CURRENT_SUBSCRIPTION_STATUSES = UNCERTAIN_SUBSCRIPTION_STATUSES;
 
 interface CurrentSubscriptionRow {
   id: string;
@@ -281,6 +325,7 @@ interface CurrentSubscriptionRow {
   cancel_at_period_end: boolean;
   current_period_end: string;
   canceled_at: string | null;
+  updated_at: string;
 }
 
 async function findCurrentSubscription(
@@ -289,7 +334,7 @@ async function findCurrentSubscription(
 ): Promise<CurrentSubscriptionRow | null> {
   const { data, error } = await db
     .from('subscriptions')
-    .select('id,status,price_id,cancel_at_period_end,current_period_end,canceled_at')
+    .select('id,status,price_id,cancel_at_period_end,current_period_end,canceled_at,updated_at')
     .eq('user_id', userId)
     .in('status', CURRENT_SUBSCRIPTION_STATUSES)
     .order('current_period_end', { ascending: false })
@@ -303,8 +348,9 @@ export async function getSubscriptionDetail(args: {
   db: SupabaseTableClient;
   config: Pick<BillingConfig, 'priceMonthly' | 'priceYearly'>;
   userId: string;
+  now?: Date;
 }): Promise<SubscriptionDetail> {
-  const { db, config, userId } = args;
+  const { db, config, userId, now = new Date() } = args;
   const sub = await findCurrentSubscription(db, userId);
   if (!sub) {
     // Comped accounts have no Stripe customer, so `hasSubscription` stays false
@@ -316,11 +362,22 @@ export async function getSubscriptionDetail(args: {
       : { hasSubscription: false, plan: 'free' };
   }
 
+  const periodEndMs = Date.parse(sub.current_period_end);
+  const paidPeriodIsCurrent =
+    (sub.status === 'active' || sub.status === 'trialing') &&
+    Number.isFinite(periodEndMs) &&
+    periodEndMs > now.getTime();
+  const withinVerificationGrace = isWithinEntitlementGracePeriod(sub.updated_at, now);
+
   return {
     hasSubscription: true,
-    plan: 'pro',
+    plan: paidPeriodIsCurrent || withinVerificationGrace ? 'pro' : 'free',
     status: sub.status,
-    price: sub.price_id === config.priceYearly ? 'yearly' : 'monthly',
+    ...(sub.price_id === config.priceYearly
+      ? { price: 'yearly' as const }
+      : sub.price_id === config.priceMonthly
+        ? { price: 'monthly' as const }
+        : {}),
     cancelAtPeriodEnd: sub.cancel_at_period_end,
     currentPeriodEnd: sub.current_period_end,
     canceledAt: sub.canceled_at,
@@ -346,6 +403,33 @@ export async function setCancelAtPeriodEnd(args: {
     cancel_at_period_end: cancel,
   });
   await syncSubscription({ db, subscription: updated });
+}
+
+/**
+ * Immediately end a current paid subscription. Complimentary-code redemption uses this
+ * transition because the new grant replaces paid access at once.
+ */
+export async function cancelCurrentSubscription(args: {
+  db: SupabaseTableClient;
+  stripe: Stripe;
+  userId: string;
+}): Promise<boolean> {
+  const { db, stripe, userId } = args;
+  const sub = await findCurrentSubscription(db, userId);
+  if (!sub) return false;
+
+  let canceled: Stripe.Subscription;
+  try {
+    canceled = await stripe.subscriptions.cancel(sub.id);
+  } catch (cancelError) {
+    // A prior attempt may have reached Stripe but failed before its local sync. Retrieve
+    // the authoritative state so redemption retries and concurrent requests converge.
+    const current = await stripe.subscriptions.retrieve(sub.id);
+    if (current.status !== 'canceled') throw cancelError;
+    canceled = current;
+  }
+  await syncSubscription({ db, subscription: canceled });
+  return true;
 }
 
 async function resolveUserId(

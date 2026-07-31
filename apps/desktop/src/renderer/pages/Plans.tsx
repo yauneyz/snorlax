@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { FREE_BLOCKED_SITE_LIMIT } from '@talysman/product';
 import { Badge, Button, Card, CardTitle } from '../components/ui/index.js';
 import { useFocusStore } from '../store/useFocusStore.js';
 import { startCheckout, type CheckoutPrice } from '../lib/bridge.js';
@@ -49,7 +50,7 @@ export function Plans() {
           {entitlementLoaded && subscriptionPlan === 'free' && <Badge tone="neutral">current</Badge>}
         </div>
         <div className="flex flex-col gap-2 text-sm text-slate-300">
-          <div>5 blocked websites</div>
+          <div>{FREE_BLOCKED_SITE_LIMIT} blocked websites</div>
           <div>Blacklist mode</div>
           <div>Block-all internet mode</div>
           <div>Manual focus toggle</div>
@@ -69,29 +70,39 @@ export function Plans() {
           <div>Whitelist mode</div>
           <div>All future Pro features by default</div>
         </div>
-        {isDev ? (
-          <Button onClick={devUpgrade} disabled={busy || !entitlementLoaded || subscriptionPlan === 'pro'}>
-            Upgrade to Pro (dev)
+        <div className="flex flex-wrap gap-2">
+          <Button
+            onClick={() => checkout('monthly')}
+            disabled={busy || !entitlementLoaded || subscriptionPlan === 'pro' || !signedIn}
+          >
+            Upgrade — Monthly
           </Button>
-        ) : (
-          <div className="flex flex-wrap gap-2">
-            <Button
-              onClick={() => checkout('monthly')}
-              disabled={busy || !entitlementLoaded || subscriptionPlan === 'pro' || !signedIn}
-            >
-              Upgrade — Monthly
-            </Button>
+          <Button
+            variant="ghost"
+            onClick={() => checkout('yearly')}
+            disabled={busy || !entitlementLoaded || subscriptionPlan === 'pro' || !signedIn}
+          >
+            Upgrade — Yearly
+          </Button>
+        </div>
+        {!signedIn && (
+          <p className="mt-3 text-sm text-slate-400">Sign in on the Account page to upgrade.</p>
+        )}
+        {/* Dev builds keep the real checkout above so the payment rails and signup flow stay
+            exercisable; this shortcut is the escape hatch for when you just need Pro on. */}
+        {isDev && (
+          <div className="mt-5 border-t border-white/10 pt-4">
             <Button
               variant="ghost"
-              onClick={() => checkout('yearly')}
-              disabled={busy || !entitlementLoaded || subscriptionPlan === 'pro' || !signedIn}
+              onClick={devUpgrade}
+              disabled={busy || !entitlementLoaded || subscriptionPlan === 'pro'}
             >
-              Upgrade — Yearly
+              Force Pro (dev)
             </Button>
+            <p className="mt-2 text-xs text-slate-500">
+              Flips the local entitlement without touching Stripe.
+            </p>
           </div>
-        )}
-        {!isDev && !signedIn && (
-          <p className="mt-3 text-sm text-slate-400">Sign in on the Account page to upgrade.</p>
         )}
         {message && <p className="mt-3 text-sm text-slate-400">{message}</p>}
       </Card>

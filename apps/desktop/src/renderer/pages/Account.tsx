@@ -211,7 +211,7 @@ export function Account({ onUpgrade }: { onUpgrade: () => void }) {
   return (
     <div className="grid grid-cols-1 gap-6">
       <Card>
-        <CardTitle hint="Sign in to sync your subscription across devices.">Account</CardTitle>
+        <CardTitle>Account</CardTitle>
         <div className="flex flex-col gap-2 text-sm text-slate-300">
           <div className="flex items-center gap-2">
             Status:{' '}
@@ -232,6 +232,9 @@ export function Account({ onUpgrade }: { onUpgrade: () => void }) {
               <span className="text-slate-400">
                 · billed {detail.price === 'yearly' ? 'yearly' : 'monthly'}
               </span>
+            )}
+            {signedIn && detail?.hasSubscription && !detail.price && (
+              <span className="text-slate-400">· billing plan unavailable</span>
             )}
             {signedIn && detail?.status === 'comped' && (
               <span className="text-slate-400">· complimentary</span>

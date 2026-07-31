@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { FREE_BLOCKED_SITE_LIMIT } from "@talysman/product";
 import { PricingCard } from "@/components/marketing/PricingCard";
 import { config } from "@/lib/config";
 
@@ -19,7 +20,7 @@ export default function PricingPage() {
           title="Free forever"
           priceLabel="$0"
           features={[
-            "3 websites blocked",
+            `${FREE_BLOCKED_SITE_LIMIT} websites blocked`,
             `Prove to yourself that ${config.app.name} works for you`,
           ]}
         />

@@ -1,5 +1,6 @@
 import "server-only";
 import { hashCompCode, looksLikeCompCode } from "@/lib/comp/code";
+import { cancelPaidSubscriptionForComp } from "@/lib/stripe/subscription";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 
 /**
@@ -20,6 +21,7 @@ export type RedeemOutcome =
 
 export interface RedeemResult {
   outcome: RedeemOutcome;
+  subscriptionCanceled?: boolean;
   /** User-facing copy. Deliberately identical for every failure mode that would
    *  otherwise confirm whether a guessed code exists. */
   message: string;
@@ -90,5 +92,15 @@ export async function redeemCompCode(args: {
   if (error) throw new Error(`Failed to redeem code: ${error.message}`);
 
   const outcome = (data ?? "not_found") as RedeemOutcome;
+  if (outcome === "ok" || outcome === "already_comped") {
+    const subscriptionCanceled = await cancelPaidSubscriptionForComp(userId);
+    if (subscriptionCanceled) {
+      return {
+        outcome,
+        subscriptionCanceled: true,
+        message: "You're on complimentary Pro. Your paid subscription has been canceled.",
+      };
+    }
+  }
   return { outcome, message: MESSAGES[outcome] ?? MESSAGES.not_found };
 }

@@ -3,6 +3,7 @@ import type { Policy, Schedule } from '@talysman/shared';
 import {
   constrainPolicyToLimits,
   constrainScheduleToLimits,
+  FREE_BLOCKED_SITE_LIMIT,
   limitsForPlan,
   validatePolicyForLimits,
   validateScheduleForLimits,
@@ -29,7 +30,7 @@ describe('product limits', () => {
     expect(constrainScheduleToLimits(schedule, limits)).toBe(schedule);
   });
 
-  it('limits Free to 5 websites, 0 apps, and no schedule', () => {
+  it(`limits Free to ${FREE_BLOCKED_SITE_LIMIT} websites, 0 apps, and no schedule`, () => {
     const limits = limitsForPlan('free');
 
     expect(validatePolicyForLimits(policy, limits).map((v) => v.field)).toEqual([
@@ -41,7 +42,7 @@ describe('product limits', () => {
 
     expect(constrainPolicyToLimits(policy, limits)).toEqual({
       mode: 'blacklist',
-      domains: ['one.com', 'two.com', 'three.com', 'four.com', 'five.com'],
+      domains: policy.domains.slice(0, FREE_BLOCKED_SITE_LIMIT),
       apps: [],
     });
     expect(constrainScheduleToLimits(schedule, limits)).toEqual({ windows: [] });

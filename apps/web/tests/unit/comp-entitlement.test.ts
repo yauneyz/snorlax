@@ -74,6 +74,48 @@ describe("getUserEntitlement with complimentary grants", () => {
       currentPeriodEnd: subRow.current_period_end,
     });
   });
+
+  it("keeps an uncertain payment status on Pro for one month from its billing update", async () => {
+    const updatedAt = "2026-07-01T00:00:00.000Z";
+    const entitlement = await getUserEntitlement({
+      db: fakeDb({
+        active_entitlements: [],
+        subscriptions: [
+          {
+            status: "past_due",
+            current_period_end: "2026-07-10T00:00:00.000Z",
+            updated_at: updatedAt,
+          },
+        ],
+      }),
+      userId: "u1",
+      now: new Date("2026-07-30T00:00:00.000Z"),
+    });
+    expect(entitlement).toMatchObject({
+      active: true,
+      plan: "pro",
+      status: "past_due",
+      fetchedAt: updatedAt,
+    });
+  });
+
+  it("requires verification after an uncertain payment status exceeds one month", async () => {
+    const entitlement = await getUserEntitlement({
+      db: fakeDb({
+        active_entitlements: [],
+        subscriptions: [
+          {
+            status: "unpaid",
+            current_period_end: "2026-06-10T00:00:00.000Z",
+            updated_at: "2026-06-01T00:00:00.000Z",
+          },
+        ],
+      }),
+      userId: "u1",
+      now: new Date("2026-07-02T00:00:00.000Z"),
+    });
+    expect(entitlement).toMatchObject({ active: false, plan: "free", source: "server" });
+  });
 });
 
 describe("getSubscriptionDetail for comped accounts", () => {

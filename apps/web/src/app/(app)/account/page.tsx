@@ -1,7 +1,13 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { cookies } from "next/headers";
 import { ManageBillingButton } from "@/components/app/ManageBillingButton";
+import {
+  ENTITLEMENT_GRACE_COOKIE,
+  entitlementGraceCookieIsValid,
+} from "@/lib/auth/entitlement-grace";
 import { requireUser } from "@/lib/auth/require-user";
+import { getSubscriptionDetailForUser } from "@/lib/stripe/subscription";
 import { supabaseServer } from "@/lib/supabase/server";
 import type { ProfileRow } from "@/lib/supabase/types";
 
@@ -13,24 +19,36 @@ export const metadata: Metadata = {
 export default async function AccountPage() {
   const user = await requireUser();
   const supabase = await supabaseServer();
-  const [{ data: profile }, { data: subscriptions }, { data: grants }] = await Promise.all([
+  const [{ data: profile }, detailResult] = await Promise.all([
     supabase
       .from("profiles")
       .select("full_name,email,avatar_url")
       .eq("id", user.id)
       .single<Pick<ProfileRow, "full_name" | "email" | "avatar_url">>(),
-    supabase.from("active_subscriptions").select("*").eq("user_id", user.id).limit(1),
-    // Comped accounts (see migration 0004) have no Stripe customer, so the
-    // billing portal would throw for them — show the plan, hide the button.
-    supabase
-      .from("active_entitlements")
-      .select("current_period_end")
-      .eq("user_id", user.id)
-      .eq("source", "grant")
-      .limit(1),
+    getSubscriptionDetailForUser(user.id)
+      .then((detail) => ({ detail, unavailable: false as const }))
+      .catch(() => ({ detail: undefined, unavailable: true as const })),
   ]);
-  const subscription = subscriptions?.[0];
-  const grant = grants?.[0];
+  const detail = detailResult.detail;
+  const graceCookie = detailResult.unavailable
+    ? (await cookies()).get(ENTITLEMENT_GRACE_COOKIE)?.value
+    : undefined;
+  const unavailableAccessIsInGrace =
+    detailResult.unavailable &&
+    (graceCookie === undefined || entitlementGraceCookieIsValid(graceCookie, user.id));
+  const planLabel = detail
+    ? detail.status === "comped"
+      ? "Pro (complimentary)"
+      : detail.hasSubscription
+        ? detail.plan === "pro"
+          ? detail.price
+            ? `Pro (${detail.price === "yearly" ? "annual" : "monthly"})`
+            : "Pro (billing plan unavailable)"
+          : "Free (payment verification required)"
+        : "Free"
+    : unavailableAccessIsInGrace
+      ? "Pro (verification pending)"
+      : "Plan unavailable (verification required)";
 
   return (
     <section className="account">
@@ -41,28 +59,24 @@ export default async function AccountPage() {
         <dt>Email</dt>
         <dd>{profile?.email ?? user.email}</dd>
         <dt>Plan</dt>
-        <dd>
-          {subscription
-            ? subscription.price_id
-            : grant
-              ? "Pro (complimentary)"
-              : "Not subscribed"}
-        </dd>
-        {subscription ? (
+        <dd>{planLabel}</dd>
+        {detail?.hasSubscription && detail.currentPeriodEnd ? (
           <>
-            <dt>Renews</dt>
-            <dd>{new Date(subscription.current_period_end).toLocaleDateString()}</dd>
+            <dt>{detail.cancelAtPeriodEnd ? "Cancels" : "Renews"}</dt>
+            <dd>{new Date(detail.currentPeriodEnd).toLocaleDateString()}</dd>
           </>
-        ) : grant?.current_period_end ? (
+        ) : null}
+        {detail?.status &&
+        !["active", "trialing", "comped"].includes(detail.status) ? (
           <>
-            <dt>Ends</dt>
-            <dd>{new Date(grant.current_period_end).toLocaleDateString()}</dd>
+            <dt>Billing status</dt>
+            <dd>{detail.status.replaceAll("_", " ")}</dd>
           </>
         ) : null}
       </dl>
-      {subscription ? (
+      {detail?.hasSubscription ? (
         <ManageBillingButton />
-      ) : grant ? null : (
+      ) : detailResult.unavailable || detail?.status === "comped" ? null : (
         <Link href="/pricing" className="account__subscribe">
           Upgrade to Pro
         </Link>

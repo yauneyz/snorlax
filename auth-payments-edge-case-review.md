@@ -3,6 +3,9 @@
 Reviewed 2026-07-31 against the working tree based on commit `6536df5` (including
 pre-existing uncommitted work).
 
+Resolution update, 2026-07-31: findings 5, 7, 8, and 10 were fixed. Their original
+numbering is retained so follow-up discussion can continue to refer to the summary table.
+
 ## Scope and method
 
 This was a static review of the web, desktop, Supabase, and Stripe state transitions:
@@ -14,13 +17,14 @@ This was a static review of the web, desktop, Supabase, and Stripe state transit
 - paid, complimentary, cached/offline, and free entitlements;
 - the conditions that show account, checkout, billing, and redemption controls.
 
-The findings below describe reachable states from the current code. They do not assume a
-Stripe or Supabase misconfiguration unless the finding explicitly says so.
+Unresolved findings below describe reachable states from the current code; resolved
+sections retain the original scenario followed by its implemented resolution. They do not
+assume a Stripe or Supabase misconfiguration unless the finding explicitly says so.
 
-Focused baseline suites passed during the review:
+Focused suites passed after the resolution update:
 
-- desktop signup-result and offline-entitlement tests: 9/9;
-- web route-classification, recovery-route, and subscription-detail tests: 16/16.
+- monorepo unit tests: 104/104;
+- web unit tests: 80/80.
 
 Those suites validate the intended components in isolation. They do not currently cover
 the cross-account cache sequence, confirmation-required web signup, duplicate-checkout
@@ -41,12 +45,12 @@ I found three high-priority edge cases and several medium/low-priority UX incons
 | High     | Checkout has no server-side "already subscribed" guard                          | Active, past-due, or complimentary users can create overlapping subscriptions                 |
 | High     | Desktop offline entitlement cache is not scoped to a user                       | A second signed-in account can inherit the previous account's cached Pro access while offline |
 | Medium   | Signed-in users cannot consume the hosted recovery link                         | Reset email can redirect an already signed-in browser away before token verification          |
-| Medium   | Web billing reads collapse errors and non-active statuses into "not subscribed" | Outages and payment problems can expose the wrong plan/checkout controls                      |
+| Resolved | Web billing reads collapse errors and non-active statuses into "not subscribed" | Web and desktop now share a bounded one-month verification-grace policy                       |
 | Medium   | Desktop shows Manage billing for free users and while detail is loading         | The button either errors or opens an empty portal                                             |
-| Medium   | Paid users can redeem a complimentary code without billing changing             | The code is consumed, the paid subscription continues, and the grant is mostly invisible      |
-| Medium   | Web account copy does not represent cancellation or price cleanly               | Raw Stripe price IDs and a false "Renews" label can be shown                                  |
+| Resolved | Paid users can redeem a complimentary code without billing changing             | Redemption now immediately cancels any current paid subscription                              |
+| Resolved | Web account copy does not represent cancellation or price cleanly               | Typed plan/cancellation copy is used and unknown price IDs remain unknown                      |
 | Low      | Signed-in marketing header still shows Get started                              | It redirects through signup and commonly lands back where the user started                    |
-| Low      | Free-plan allowance differs between pricing and enforcement                     | Web promises 3 blocked sites while the product and desktop allow 5                            |
+| Resolved | Free-plan allowance differs between pricing and enforcement                     | One shared product constant now sets all surfaces to 3 blocked sites                           |
 
 ## Findings
 
@@ -197,9 +201,9 @@ Allow the token-confirmation route through even when a normal session cookie exi
 the password form, carry explicit server-verified recovery state (or show an invalid-link
 state) rather than treating every visitor as ready to reset.
 
-### 5. Medium — web read failures and non-active billing states look like a free account
+### 5. Resolved — billing uncertainty receives a bounded verification grace
 
-Several web reads discard the Supabase error:
+The original implementation discarded errors from several web reads:
 
 - middleware initializes `subscribed = false` and uses only `data`;
 - `requireSubscribed` uses only `rows`;
@@ -224,12 +228,18 @@ complimentary and gets no portal control on the web.
 - Account ignores all three query errors and reads only active subscriptions:
   `apps/web/src/app/(app)/account/page.tsx:16-33`.
 
-**Recommendation**
+**Resolution**
 
-Represent `loading`, `unavailable`, `free`, `paid-current`, `payment-action-required`,
-and `complimentary` separately. Fail closed for protected product features, but do not
-fail _into a sales CTA_. Use the billing-detail service for Account rather than querying
-the narrow entitlement view directly.
+- The one-month verification period is now a shared product policy used by desktop
+  offline access and web billing uncertainty.
+- Recoverable billing states (`past_due`, `unpaid`, `paused`, `incomplete`, and stale
+  `active`/`trialing` projections) retain Pro for at most one month from their last
+  billing update. Repeated reads do not restart that period.
+- Web reads use a signed, user-scoped verification cookie during database outages. A
+  confirmed free or terminal subscription state clears it.
+- Account uses the broader typed billing-detail projection. Read failures show
+  verification pending without exposing an upgrade CTA, and payment-problem states keep
+  the billing portal available.
 
 ### 6. Medium — desktop shows Manage billing when there is nothing to manage
 
@@ -258,7 +268,7 @@ Show Manage billing only when detail has loaded and either `hasSubscription` is 
 the server explicitly reports a manageable Stripe customer. Show a neutral loading/error
 state while detail is unknown.
 
-### 7. Medium — a paid user can consume a complimentary code and keep paying
+### 7. Resolved — complimentary redemption stops paid renewal
 
 Desktop shows Redeem a code to every signed-in user, including an active paid Pro user.
 The redemption function checks only for an existing active grant, not for a paid
@@ -282,14 +292,15 @@ it.
 - The entitlement reader deliberately prefers a paid subscription when both exist:
   `packages/billing-server/src/index.ts:236-253`.
 
-**Recommendation**
+**Resolution**
 
-Choose and document a transition policy. Common options are to reject redemption while a
-paid subscription exists, schedule the grant to begin after cancellation, or clearly
-warn that redemption does not cancel billing. Apply the symmetric policy when a comped
-user attempts paid checkout.
+After a valid code is redeemed, any current paid subscription is canceled immediately;
+the complimentary grant replaces its access. The response explicitly tells the user
+that the paid subscription was canceled. If Stripe cancellation fails after the
+transactional code redemption, retrying redemption also retries the cancellation because
+`already_comped` follows the same billing transition.
 
-### 8. Medium — web Account mislabels valid subscription state
+### 8. Resolved — account surfaces preserve billing state and unknown prices
 
 For an active subscription, the Plan field displays the raw Stripe `price_id`, not
 "Monthly" or "Annual." It always labels `current_period_end` as "Renews," even when
@@ -306,10 +317,12 @@ unknown price id is silently classified as monthly.
 - Unknown-price fallback:
   `packages/billing-server/src/index.ts:319-326`.
 
-**Recommendation**
+**Resolution**
 
-Render Account from the typed subscription-detail projection, preserve an `unknown`
-price case, and use `cancelAtPeriodEnd` to choose Renew/Cancel copy.
+Web Account now renders from the typed subscription-detail projection, maps known price
+IDs to monthly/annual copy, and uses `cancelAtPeriodEnd` to choose Renew/Cancel. Unknown
+price IDs remain absent from the projection instead of silently becoming monthly; web
+and desktop show neutral "billing plan unavailable" copy.
 
 ### 9. Low — signed-in marketing navigation still shows Get started
 
@@ -330,11 +343,11 @@ like a button that reloads the user's current page through two unrelated routes.
 Make the CTA session-aware: Dashboard for entitled users, Choose a plan or Download for
 free users, and no redundant CTA when already on its destination.
 
-### 10. Low — free-plan copy disagrees with enforcement
+### 10. Resolved — free-plan copy and enforcement share one limit
 
-Web pricing promises "3 websites blocked," while desktop Plans and the product limit
-enforce 5. This can make a free user believe they received an unexplained upgrade or make
-pricing look stale.
+Originally, web pricing promised "3 websites blocked," while desktop Plans and the product
+limit enforced 5. This could make a free user believe they received an unexplained upgrade
+or make pricing look stale.
 
 **Evidence**
 
@@ -342,9 +355,10 @@ pricing look stale.
 - Product enforcement: `packages/product/src/index.ts:71-80`.
 - Desktop Plans: `apps/desktop/src/renderer/pages/Plans.tsx:46-56`.
 
-**Recommendation**
+**Resolution**
 
-Use one exported product-copy/limits source for both surfaces.
+`FREE_BLOCKED_SITE_LIMIT` is exported from the shared product package with the value
+`3`. Product enforcement plus web and desktop plan copy all consume that constant.
 
 ## Lower-confidence edge worth a targeted test
 
@@ -385,8 +399,10 @@ Relevant code:
 1. Scope the desktop offline cache to the authenticated user.
 2. Add a server-side checkout eligibility policy and use it on every surface.
 3. Fix confirmation-required web signup and preserve the intended continuation.
-4. Replace web Account's direct active-view reads with the shared billing-detail
+4. **Done:** replace web Account's direct active-view reads with the shared billing-detail
    projection; distinguish read errors from free state.
 5. Fix hosted recovery routing for already signed-in browsers.
-6. Tighten desktop billing-button visibility and decide the paid/comp transition policy.
-7. Clean up the remaining account/header/pricing copy.
+6. Tighten desktop billing-button visibility. **Done:** paid/comp redemption now cancels
+   the paid subscription.
+7. Clean up the remaining account/header copy. **Done:** pricing and enforcement now share
+   the three-site limit.

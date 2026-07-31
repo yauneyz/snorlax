@@ -1,5 +1,6 @@
 import "server-only";
 import {
+  cancelCurrentSubscription,
   getSubscriptionDetail,
   setCancelAtPeriodEnd,
   NoActiveSubscriptionError,
@@ -27,5 +28,18 @@ export async function setSubscriptionCancelAtPeriodEnd(userId: string, cancel: b
     stripe: getStripe(),
     userId,
     cancel,
+  });
+}
+
+/**
+ * Stop future paid renewals after complimentary access is granted. Returning false is
+ * the normal no-paid-subscription case; every other failure is surfaced so redemption
+ * can be retried until Stripe and the local projection agree.
+ */
+export async function cancelPaidSubscriptionForComp(userId: string): Promise<boolean> {
+  return cancelCurrentSubscription({
+    db: supabaseAdmin(),
+    stripe: getStripe(),
+    userId,
   });
 }

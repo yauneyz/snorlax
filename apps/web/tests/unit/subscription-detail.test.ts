@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import {
+  cancelCurrentSubscription,
   getSubscriptionDetail,
   setCancelAtPeriodEnd,
   NoActiveSubscriptionError,
@@ -15,6 +16,7 @@ const subRow = {
   cancel_at_period_end: false,
   current_period_end: "2026-08-01T00:00:00.000Z",
   canceled_at: null,
+  updated_at: "2026-07-01T00:00:00.000Z",
 };
 
 // Chainable fake of the supabase query builder: every filter returns the builder,
@@ -67,13 +69,23 @@ beforeEach(() => {
 
 describe("getSubscriptionDetail", () => {
   it("returns a free plan with no subscription row", async () => {
-    const detail = await getSubscriptionDetail({ db: fakeDb(), config, userId: "user-123" });
+    const detail = await getSubscriptionDetail({
+      db: fakeDb(),
+      config,
+      userId: "user-123",
+      now: new Date("2026-07-15T00:00:00.000Z"),
+    });
     expect(detail).toEqual({ hasSubscription: false, plan: "free" });
   });
 
   it("maps a monthly subscription row", async () => {
     rows = [subRow];
-    const detail = await getSubscriptionDetail({ db: fakeDb(), config, userId: "user-123" });
+    const detail = await getSubscriptionDetail({
+      db: fakeDb(),
+      config,
+      userId: "user-123",
+      now: new Date("2026-07-15T00:00:00.000Z"),
+    });
     expect(detail).toEqual({
       hasSubscription: true,
       plan: "pro",
@@ -87,8 +99,24 @@ describe("getSubscriptionDetail", () => {
 
   it("maps the yearly price id to the yearly price", async () => {
     rows = [{ ...subRow, price_id: "price_y" }];
-    const detail = await getSubscriptionDetail({ db: fakeDb(), config, userId: "user-123" });
+    const detail = await getSubscriptionDetail({
+      db: fakeDb(),
+      config,
+      userId: "user-123",
+      now: new Date("2026-07-15T00:00:00.000Z"),
+    });
     expect(detail.price).toBe("yearly");
+  });
+
+  it("does not silently call an unknown Stripe price monthly", async () => {
+    rows = [{ ...subRow, price_id: "price_retired" }];
+    const detail = await getSubscriptionDetail({
+      db: fakeDb(),
+      config,
+      userId: "user-123",
+      now: new Date("2026-07-15T00:00:00.000Z"),
+    });
+    expect(detail.price).toBeUndefined();
   });
 
   it("surfaces cancel-at-period-end and past_due status", async () => {
@@ -96,6 +124,17 @@ describe("getSubscriptionDetail", () => {
     const detail = await getSubscriptionDetail({ db: fakeDb(), config, userId: "user-123" });
     expect(detail.status).toBe("past_due");
     expect(detail.cancelAtPeriodEnd).toBe(true);
+  });
+
+  it("shows that Pro access needs verification after payment grace expires", async () => {
+    rows = [{ ...subRow, status: "unpaid", updated_at: "2026-06-01T00:00:00.000Z" }];
+    const detail = await getSubscriptionDetail({
+      db: fakeDb(),
+      config,
+      userId: "user-123",
+      now: new Date("2026-07-02T00:00:00.000Z"),
+    });
+    expect(detail).toMatchObject({ hasSubscription: true, plan: "free", status: "unpaid" });
   });
 });
 
@@ -132,5 +171,53 @@ describe("setCancelAtPeriodEnd", () => {
     expect(update).toHaveBeenCalledWith("sub_123", { cancel_at_period_end: false });
     const [row] = upsertMock.mock.calls[0] as unknown as [Record<string, unknown>];
     expect(row.cancel_at_period_end).toBe(false);
+  });
+});
+
+describe("cancelCurrentSubscription", () => {
+  it("immediately cancels and syncs a paid subscription", async () => {
+    rows = [subRow];
+    const cancel = vi.fn(async () =>
+      fakeStripeSub({ status: "canceled", cancel_at_period_end: false }),
+    );
+    const stripe = { subscriptions: { cancel } } as unknown as Stripe;
+
+    await expect(
+      cancelCurrentSubscription({ db: fakeDb(), stripe, userId: "user-123" }),
+    ).resolves.toBe(true);
+
+    expect(cancel).toHaveBeenCalledWith("sub_123");
+    expect(upsertMock).toHaveBeenCalledTimes(1);
+    const [row] = upsertMock.mock.calls[0] as unknown as [Record<string, unknown>];
+    expect(row.status).toBe("canceled");
+  });
+
+  it("is a no-op when there is no paid subscription", async () => {
+    const cancel = vi.fn();
+    const stripe = { subscriptions: { cancel } } as unknown as Stripe;
+
+    await expect(
+      cancelCurrentSubscription({ db: fakeDb(), stripe, userId: "user-123" }),
+    ).resolves.toBe(false);
+    expect(cancel).not.toHaveBeenCalled();
+  });
+
+  it("recovers when Stripe was already canceled before the local sync", async () => {
+    rows = [subRow];
+    const canceled = fakeStripeSub({ status: "canceled", cancel_at_period_end: false });
+    const stripe = {
+      subscriptions: {
+        cancel: vi.fn(async () => {
+          throw new Error("already canceled");
+        }),
+        retrieve: vi.fn(async () => canceled),
+      },
+    } as unknown as Stripe;
+
+    await expect(
+      cancelCurrentSubscription({ db: fakeDb(), stripe, userId: "user-123" }),
+    ).resolves.toBe(true);
+    expect(stripe.subscriptions.retrieve).toHaveBeenCalledWith("sub_123");
+    expect(upsertMock).toHaveBeenCalledTimes(1);
   });
 });

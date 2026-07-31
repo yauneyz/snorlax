@@ -13,9 +13,9 @@ life, Stripe's analytics count a $0 subscriber as *churned*, and the subscriptio
 with fake billing cycles. Worse, "lifetime" has no Stripe primitive at all.
 
 Instead a comp is a row in `entitlement_grants`, written only by the service role. Stripe
-never hears about it. The `active_entitlements` view unions grants with live subscriptions,
-so every "is this user entitled?" read — middleware, `requireSubscribed`, the account page,
-`getUserEntitlement` — answers correctly without knowing which kind it found.
+never hears about it. The `active_entitlements` view unions grants with live subscriptions;
+the shared entitlement reader combines that view with the bounded payment-verification
+policy so web and desktop reach the same access decision.
 
 ---
 
@@ -54,6 +54,11 @@ If they already have the desktop app, they can instead open **Account → Redeem
 paste the bare code. Same endpoint, same result. The link stays a plain text link until
 clicked and folds away when they leave the tab — nobody who wasn't sent a code will notice
 it.
+
+If the recipient already has a current paid subscription, successful redemption immediately
+cancels it in Stripe. The complimentary grant replaces the paid access, and the redemption
+message confirms the cancellation. A retry after a transient Stripe failure retries the
+cancellation without consuming another code use.
 
 ### Flags
 
@@ -106,7 +111,8 @@ so opening the portal would throw `NoStripeCustomerError`.
 
 Under the hood the entitlement carries `status: "comped"`, which is what those surfaces key
 off. A comped user who later subscribes for real keeps both rows; the paid subscription wins
-for display so renewal state stays visible.
+for display so renewal state stays visible. In the other direction, redeeming a comp while
+paid immediately cancels the paid row in Stripe.
 
 ---
 

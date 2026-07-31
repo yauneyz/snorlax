@@ -3,6 +3,8 @@ import type { Mode, Policy, Schedule } from '@talysman/shared';
 
 export const SUBSCRIPTION_PLANS = ['free', 'pro'] as const;
 export const CHECKOUT_PRICES = ['monthly', 'yearly'] as const;
+export const FREE_BLOCKED_SITE_LIMIT = 3;
+export const ENTITLEMENT_GRACE_PERIOD_MS = 30 * 24 * 60 * 60 * 1000;
 
 export const subscriptionPlanSchema = z.enum(SUBSCRIPTION_PLANS);
 export const checkoutPriceSchema = z.enum(CHECKOUT_PRICES);
@@ -71,13 +73,34 @@ export interface LimitViolation {
 const FREE_LIMITS: ProductLimits = {
   policy: {
     modes: ['blacklist', 'block-all'],
-    maxDomains: 5,
+    maxDomains: FREE_BLOCKED_SITE_LIMIT,
     maxApps: 0,
   },
   schedule: {
     enabled: false,
   },
 };
+
+// Allow ordinary clock drift, but do not let a bad/future timestamp extend a lease.
+const ENTITLEMENT_CLOCK_SKEW_MS = 5 * 60 * 1000;
+
+/**
+ * Whether a prior verification may still be trusted under the product's grace policy.
+ * Desktop offline access and web billing uncertainty both use this policy.
+ */
+export function isWithinEntitlementGracePeriod(
+  verifiedAt: string | undefined,
+  now: Date = new Date(),
+): boolean {
+  if (!verifiedAt) return false;
+
+  const verifiedAtMs = Date.parse(verifiedAt);
+  const nowMs = now.getTime();
+  if (!Number.isFinite(verifiedAtMs) || !Number.isFinite(nowMs)) return false;
+
+  const ageMs = nowMs - verifiedAtMs;
+  return ageMs >= -ENTITLEMENT_CLOCK_SKEW_MS && ageMs <= ENTITLEMENT_GRACE_PERIOD_MS;
+}
 
 export function entitlementForPlan(
   plan: SubscriptionPlan,

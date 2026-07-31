@@ -226,6 +226,9 @@ The renderer shows plan-gated UI based on an `Entitlement` that now comes from t
     **30 days** (`source: 'offline'`). After that lease expires, the app falls back to Free
     until it can reach the server again. (Focus enforcement is independent — native service
     + USB-key gate — so entitlement remains feature gating only.)
+  - **Billing uncertainty:** recoverable payment states use that same shared 30-day policy,
+    anchored to the last billing update. Web read outages use a signed, user-scoped lease;
+    a confirmed free or terminal state clears it.
   - In **development**: still reads/writes `dev-entitlement.json` (default `pro`) so gated UI
     can be exercised without a subscription (Settings/Plans dev switch).
   - The desktop now imports the canonical `Entitlement` / `entitlementSchema` /
@@ -239,7 +242,8 @@ The renderer shows plan-gated UI based on an `Entitlement` that now comes from t
     (dev-only); and an `app:event` push (`authChanged` / `entitlementChanged`) so renderers
     re-pull after sign-in/out and billing deep-link returns.
   - Free-tier limits are enforced at the IPC boundary on `setPolicy` / `setSchedule`
-    (blacklist/block-all only, ≤ 5 domains, no apps, no scheduling).
+    (blacklist/block-all only, ≤ 3 domains, no apps, no scheduling). The value comes from
+    `FREE_BLOCKED_SITE_LIMIT` in the shared product package.
 - **Canonical contract** (`packages/product/src/index.ts`): `entitlementSchema`
   (`active`, `plan`, `source`, optional `status`/`currentPeriodEnd`/`fetchedAt`/`cacheUntil`),
   `limitsForPlan`, and the validation/constraint helpers — shared by client and server. The
@@ -342,6 +346,7 @@ environment/config setup that can't be done from code alone.
   from env + docs.
 - **Sign-in:** both Google browser-OAuth (PKCE) and in-app email/password.
 - **Offline:** keep the last server-verified entitlement for **30 days while signed in**;
+  apply the same bounded policy to web read outages and recoverable payment states, then
   reconnect after that to verify billing state again.
 
 ---
@@ -353,7 +358,9 @@ Free lifetime Pro for friends/family is **not** a Stripe object. A grant row in
 `active_entitlements` view, which is what `getUserEntitlement`, `requireSubscribed`, the
 middleware, and the account page all read. Issued with `pnpm comp grant <email>` or a
 single-use code redeemed at the unlisted `/redeem/<code>` page (or the desktop Account tab).
-Comped entitlements carry `status: 'comped'`, which hides the billing-portal controls.
+Comped entitlements carry `status: 'comped'`, which hides the billing-portal controls. If a
+paid user redeems a code, the current Stripe subscription is canceled immediately and the
+grant replaces it.
 
 See [`comp-accounts.md`](./comp-accounts.md) for the full operator guide.
 
