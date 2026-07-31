@@ -38,7 +38,7 @@ function AuthLink({ onClick, children }: { onClick: () => void; children: React.
   );
 }
 
-export function Account() {
+export function Account({ onUpgrade }: { onUpgrade: () => void }) {
   const signedIn = useFocusStore((s) => s.signedIn);
   const email = useFocusStore((s) => s.email);
   const passwordRecovery = useFocusStore((s) => s.passwordRecovery);
@@ -257,8 +257,7 @@ export function Account() {
         {signedIn ? (
           <>
           <div className="mt-4 flex flex-wrap gap-2">
-            {/* Comped accounts have no Stripe customer — the portal would error. */}
-            {detail?.status !== 'comped' && (
+            {detail?.hasSubscription ? (
               <Button
                 variant="ghost"
                 disabled={busy}
@@ -266,7 +265,11 @@ export function Account() {
               >
                 Manage billing
               </Button>
-            )}
+            ) : detail && detail.status !== 'comped' ? (
+              <Button disabled={busy} onClick={onUpgrade}>
+                Upgrade to Pro
+              </Button>
+            ) : null}
             {detail?.hasSubscription &&
               (detail.cancelAtPeriodEnd ? (
                 <Button

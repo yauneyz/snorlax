@@ -6,7 +6,6 @@
 import type {
   ActiveEntitlementRow,
   CompCodeRow,
-  ConnectionRow,
   EntitlementGrantRow,
   ProfileRow,
   StripeEventRow,
@@ -27,13 +26,6 @@ export type Database = {
         Insert: Omit<SubscriptionRow, "created_at" | "updated_at"> &
           Partial<Pick<SubscriptionRow, "created_at" | "updated_at">>;
         Update: Partial<SubscriptionRow>;
-        Relationships: [];
-      };
-      connections: {
-        Row: ConnectionRow;
-        Insert: Omit<ConnectionRow, "id" | "created_at" | "updated_at"> &
-          Partial<Pick<ConnectionRow, "id" | "created_at" | "updated_at">>;
-        Update: Partial<ConnectionRow>;
         Relationships: [];
       };
       entitlement_grants: {
@@ -75,7 +67,6 @@ export type Database = {
     };
     Enums: {
       subscription_status: SubscriptionRow["status"];
-      connection_kind: ConnectionRow["kind"];
     };
     CompositeTypes: Record<string, never>;
   };

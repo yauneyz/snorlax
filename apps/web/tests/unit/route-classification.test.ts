@@ -8,7 +8,6 @@ import {
 describe("route classification", () => {
   it("classifies authenticated UI routes from the shared route list", () => {
     expect(isAuthenticatedUiRoute("/app")).toBe(true);
-    expect(isAuthenticatedUiRoute("/app/data-sources/gsc")).toBe(true);
     expect(isAuthenticatedUiRoute("/account")).toBe(true);
     expect(isAuthenticatedUiRoute("/account/billing")).toBe(true);
   });

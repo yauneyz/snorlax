@@ -19,7 +19,6 @@ const NAV: { route: Route; label: string }[] = [
   { route: 'schedule', label: 'Schedule' },
   { route: 'keys', label: 'Keys' },
   { route: 'account', label: 'Account' },
-  { route: 'plans', label: 'Plans' },
   { route: 'settings', label: 'Settings' },
 ];
 
@@ -112,7 +111,7 @@ export default function App() {
             {route === 'blocklists' && <Blocklists onUpgrade={() => setRoute('plans')} />}
             {route === 'schedule' && <SchedulePage onUpgrade={() => setRoute('plans')} />}
             {route === 'keys' && <Keys />}
-            {route === 'account' && <Account />}
+            {route === 'account' && <Account onUpgrade={() => setRoute('plans')} />}
             {route === 'plans' && <Plans />}
             {route === 'settings' && <Settings />}
           </>

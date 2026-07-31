@@ -21,18 +21,18 @@ describe("blog frontmatter schema", () => {
 });
 
 describe("blog content pipeline", () => {
-  it("listPosts returns at least the example post", async () => {
+  it("listPosts returns at least the intro post", async () => {
     const posts = await listPosts();
     expect(posts.length).toBeGreaterThanOrEqual(1);
     const slugs = posts.map((p) => p.frontmatter.slug);
-    expect(slugs).toContain("hello-world");
+    expect(slugs).toContain("introducing-talysman");
   });
 
   it("excerpts are plain text, not raw markdown", async () => {
     const posts = await listPosts();
-    const hello = posts.find((p) => p.frontmatter.slug === "hello-world")!;
-    expect(hello.excerpt.length).toBeGreaterThan(0);
-    expect(hello.excerpt).not.toMatch(/[#*[\]]|```/);
+    const intro = posts.find((p) => p.frontmatter.slug === "introducing-talysman")!;
+    expect(intro.excerpt.length).toBeGreaterThan(0);
+    expect(intro.excerpt).not.toMatch(/[#*[\]]|```/);
   });
 
   it("getPost returns null for unknown slug", async () => {
@@ -40,8 +40,8 @@ describe("blog content pipeline", () => {
     expect(p).toBeNull();
   });
 
-  it("getPost renders HTML for hello-world", async () => {
-    const p = await getPost("hello-world");
+  it("getPost renders HTML for the intro post", async () => {
+    const p = await getPost("introducing-talysman");
     expect(p).not.toBeNull();
     // The page renders the frontmatter title as <h1>; body headings start at <h2>.
     expect(p!.html).toContain("<h2>");

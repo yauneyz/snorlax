@@ -64,7 +64,7 @@ export default async function AccountPage() {
         <ManageBillingButton />
       ) : grant ? null : (
         <Link href="/pricing" className="account__subscribe">
-          Choose a plan
+          Upgrade to Pro
         </Link>
       )}
     </section>

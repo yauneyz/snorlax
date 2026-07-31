@@ -62,8 +62,8 @@ export async function middleware(request: NextRequest) {
 export const config = {
   runtime: "nodejs",
   matcher: [
-    // Everything except Next internals, the webhook (raw body), and OAuth
-    // callbacks (must run before auth state exists).
-    "/((?!_next/static|_next/image|favicon.ico|og-default.png|api/stripe/webhook|api/auth/callback|api/connections/google/callback).*)",
+    // Everything except Next internals, the webhook (raw body), and the auth
+    // callback (must run before auth state exists).
+    "/((?!_next/static|_next/image|favicon.ico|og-default.png|api/stripe/webhook|api/auth/callback).*)",
   ],
 };
