@@ -44,7 +44,7 @@ export function Button({ variant = 'primary', className, ...props }: ButtonProps
 export function Badge({ children, tone = 'neutral' }: { children: React.ReactNode; tone?: 'ok' | 'focus' | 'danger' | 'neutral' }) {
   const tones = {
     ok: 'bg-green-500/15 text-green-400 border-green-500/30',
-    focus: 'bg-pink-500/15 text-pink-400 border-pink-500/30',
+    focus: 'bg-focus/15 text-focus-bright border-focus/30',
     danger: 'bg-red-500/15 text-red-400 border-red-500/30',
     neutral: 'bg-white/[0.06] text-slate-300 border-white/[0.10]',
   };

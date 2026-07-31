@@ -48,7 +48,7 @@ export function FocusToggle() {
         className={cx(
           'relative flex h-44 w-44 items-center justify-center rounded-full border-4 text-xl font-bold tracking-wide backdrop-blur-sm transition duration-200',
           focusActive
-            ? 'border-focus bg-pink-500/10 text-pink-300 shadow-[0_0_40px_rgba(236,72,153,0.25)]'
+            ? 'border-focus bg-focus/10 text-focus-bright shadow-[0_0_40px_rgba(212,175,55,0.25)]'
             : 'border-white/[0.10] bg-white/[0.04] text-slate-300 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] hover:border-white/25 hover:bg-white/[0.07] hover:text-white',
           toggleUnavailable && 'cursor-not-allowed opacity-60',
         )}

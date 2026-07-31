@@ -11,7 +11,10 @@ export default {
         ok: '#22c55e',
         // The focus-active signal colour. Deliberately distinct from `ok`, which stays
         // green for generic "this is fine" states (sign-in, entitlement, native service).
-        focus: '#ec4899',
+        focus: {
+          DEFAULT: '#d4af37',
+          bright: '#f0d875',
+        },
         danger: '#ef4444',
         // Silver, not indigo. `accentInk` is the dark text that sits on top of it.
         accent: '#c7ccd4',

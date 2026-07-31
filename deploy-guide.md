@@ -502,21 +502,35 @@ command once, publish Linux and Windows from Linux, and publish macOS from a Mac
   `APPLE_API_ISSUER`, and `APPLE_TEAM_ID`). `APPLE_API_KEY` is the absolute path to the
   App Store Connect `.p8` key.
 
-#### 1. Set and commit the version once
+#### 1. Bump and commit the version once
 
-On Linux, choose a new SemVer that is higher than every published version:
+On Linux, first confirm that the checked-in version is the version currently published;
+a bump is relative to the repository, not the remote release feed. Then use one of
+SemVer's three stable release types:
 
 ```bash
-pnpm release:version -- 0.1.2
+npm run release:bump -- patch   # 0.1.0 -> 0.1.1: backward-compatible bug fixes
+# npm run release:bump -- minor # 0.1.0 -> 0.2.0: backward-compatible features
+# npm run release:bump -- major # 0.1.0 -> 1.0.0: breaking changes
 git diff
 git add package.json apps/desktop/package.json native
-git commit -m "Release desktop v0.1.2"
+RELEASE_VERSION=$(node -p "require('./package.json').version")
+git commit -m "Release desktop v${RELEASE_VERSION}"
 ```
 
-The version command updates every app/native manifest and refreshes the Cargo lockfiles;
-it does not build, upload, change dependencies, or modify `pnpm-lock.yaml`. Push the
-normal branch commit, or otherwise copy/check out this exact commit on the Mac. Do not
-push a `v*` tag when avoiding CI because that tag starts the GitHub release workflow.
+Use exactly one of `patch`, `minor`, or `major` (without angle brackets). The bump command
+reads the current root version, calculates the next version, updates every app/native
+manifest, and refreshes the Cargo lockfiles. It does not create a Git commit or tag,
+build, upload, change dependencies, or modify `pnpm-lock.yaml`. The older
+`pnpm release:version -- <exact-semver>` command remains available for an exceptional
+explicit version or prerelease. Push the normal branch commit, or otherwise copy/check
+out this exact commit on the Mac. Do not push a `v*` tag when avoiding CI because that
+tag starts the GitHub release workflow.
+
+SemVer defines `patch` as backward-compatible fixes, `minor` as backward-compatible
+functionality, and `major` as incompatible API changes. While the project remains below
+`1.0.0`, SemVer considers its public API unstable, so a `0.x` minor release may still
+contain breaking changes.
 
 #### 2. Build and upload Linux and Windows from Linux
 
@@ -653,15 +667,16 @@ Use `pnpm release:upload` for those release operations.
 
 ### Ship a desktop release
 
-This is the short form of the manual, no-GitHub-CI procedure in §8.4. Replace `0.1.2`
-with a new version higher than production.
+This is the short form of the manual, no-GitHub-CI procedure in §8.4. Choose the
+appropriate SemVer release type: `patch`, `minor`, or `major`.
 
 ```bash
 # On Linux: version once, review, and commit.
-pnpm release:version -- 0.1.2
+npm run release:bump -- patch
 git diff
 git add package.json apps/desktop/package.json native
-git commit -m "Release desktop v0.1.2"
+RELEASE_VERSION=$(node -p "require('./package.json').version")
+git commit -m "Release desktop v${RELEASE_VERSION}"
 
 # Still on Linux: build and UPLOAD Linux, APT, and Windows.
 pnpm release:both
@@ -674,7 +689,7 @@ pnpm release:upload -- --require mac
 pnpm release:verify
 ```
 
-`release:version` does not upload. `release:both` uploads Linux and Windows;
+`release:bump` does not upload. `release:both` uploads Linux and Windows;
 `release:upload -- --require mac` uploads macOS. No release tag is needed. Desktop
 release commands do not change Vercel variables or deploy the website.
 

@@ -7,9 +7,43 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const version = process.argv.slice(2).find((arg) => arg !== "--");
-if (!version || !/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/.test(version)) {
-  console.error("Usage: pnpm release:version -- <semver>");
+const requestedVersion = process.argv.slice(2).find((arg) => arg !== "--");
+const releaseTypes = new Set(["major", "minor", "patch"]);
+
+function currentVersion() {
+  return JSON.parse(readFileSync(resolve(root, "package.json"), "utf8")).version;
+}
+
+function incrementVersion(version, releaseType) {
+  const match = /^(\d+)\.(\d+)\.(\d+)$/.exec(version);
+  if (!match) {
+    throw new Error(
+      `Cannot ${releaseType}-bump non-stable version ${version}; set the next version explicitly instead.`,
+    );
+  }
+
+  let [, major, minor, patch] = match.map(Number);
+  if (releaseType === "major") [major, minor, patch] = [major + 1, 0, 0];
+  if (releaseType === "minor") [minor, patch] = [minor + 1, 0];
+  if (releaseType === "patch") patch += 1;
+  return `${major}.${minor}.${patch}`;
+}
+
+if (!requestedVersion) {
+  console.error(
+    "Usage: npm run release:bump -- <major|minor|patch>\n   or: pnpm release:version -- <semver>",
+  );
+  process.exit(2);
+}
+
+const version = releaseTypes.has(requestedVersion)
+  ? incrementVersion(currentVersion(), requestedVersion)
+  : requestedVersion;
+
+if (!/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/.test(version)) {
+  console.error(
+    "Usage: npm run release:bump -- <major|minor|patch>\n   or: pnpm release:version -- <semver>",
+  );
   process.exit(2);
 }
 
