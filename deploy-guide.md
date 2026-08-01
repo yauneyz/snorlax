@@ -502,6 +502,22 @@ command once, publish Linux and Windows from Linux, and publish macOS from a Mac
   `APPLE_API_ISSUER`, and `APPLE_TEAM_ID`). `APPLE_API_KEY` is the absolute path to the
   App Store Connect `.p8` key.
 
+For a local macOS release, `release:upload` automatically uses the ignored
+`local-credentials/apple/talysman-developer-id.p12` file when `CSC_LINK` is unset. Put the
+remaining local values in the existing ignored `.credentials` file:
+
+```toml
+[apple]
+certificate_password = "the password used when exporting the p12"
+keychain_profile = "talysman-notary"
+```
+
+Environment variables take precedence over `.credentials`, which keeps the GitHub Actions
+secret contract unchanged. Local releases can alternatively use the App Store Connect API-key or
+Apple-ID variables supported by electron-builder. `release:upload` validates the signing inputs
+and requires one complete notarization authentication method before starting a macOS build, so
+electron-builder cannot silently skip notarization.
+
 #### 1. Bump and commit the version once
 
 On Linux, first confirm that the checked-in version is the version currently published;
