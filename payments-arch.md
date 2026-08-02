@@ -242,8 +242,9 @@ The renderer shows plan-gated UI based on an `Entitlement` that now comes from t
     (dev-only); and an `app:event` push (`authChanged` / `entitlementChanged`) so renderers
     re-pull after sign-in/out and billing deep-link returns.
   - Free-tier limits are enforced at the IPC boundary on `setPolicy` / `setSchedule`
-    (blacklist/block-all only, ≤ 3 domains, no apps, no scheduling). The value comes from
-    `FREE_BLOCKED_SITE_LIMIT` in the shared product package.
+    (all website modes, ≤ 5 domains in blacklist mode, unlimited domains in whitelist mode,
+    no apps, and no scheduling). The blacklist value comes from `FREE_BLOCKED_SITE_LIMIT` in
+    the shared product package; block-all remains free.
 - **Canonical contract** (`packages/product/src/index.ts`): `entitlementSchema`
   (`active`, `plan`, `source`, optional `status`/`currentPeriodEnd`/`fetchedAt`/`cacheUntil`),
   `limitsForPlan`, and the validation/constraint helpers — shared by client and server. The

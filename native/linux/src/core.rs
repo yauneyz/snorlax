@@ -10,7 +10,9 @@ use tokio::sync::broadcast;
 
 use crate::constants::{err, PROTOCOL_VERSION, SERVICE_VERSION};
 use crate::enforce::{self, EnforceShared};
-use crate::model::{FocusSource, PairedKey, Policy, Schedule, ServiceState};
+use crate::model::{
+    FocusSource, PairedKey, Policy, Profile, Schedule, ServiceState, MAX_PROFILE_NAME_LENGTH,
+};
 use crate::pairing;
 use crate::schedule;
 use crate::secure_store::{KeySecret, SecureStore};
@@ -75,7 +77,9 @@ impl Core {
             service_version: SERVICE_VERSION.to_string(),
             focus_active: self.state.focus_active,
             focus_source: self.state.focus_source,
-            policy: self.state.policy.clone(),
+            profiles: self.state.profiles.clone(),
+            active_profile_id: self.state.active_profile_id.clone(),
+            policy: self.state.active_policy(),
             schedule: self.state.schedule.clone(),
             settings: self.state.settings.clone(),
             paired_keys: self.state.paired_keys.clone(),
@@ -166,40 +170,207 @@ impl Core {
         Ok(())
     }
 
-    /// Tightening the policy is always free. Relaxing it — unblocking a site or app, or a mode
-    /// change that frees traffic — requires the paired key.
-    fn set_policy(&mut self, policy: Policy) -> Result<(), RpcError> {
-        if !crate::policy_match::is_at_least_as_restrictive(&self.state.policy, &policy) {
-            self.recompute_presence();
-            if !self.key_present {
-                return Err(RpcError::new(
-                    err::KEY_REQUIRED,
-                    "Insert your paired key to relax the blocklist.",
-                ));
-            }
+    /// Re-check USB presence and fail with KEY_REQUIRED when no paired key is plugged in.
+    fn require_key(&mut self, message: &str) -> Result<(), RpcError> {
+        self.recompute_presence();
+        if !self.key_present {
+            return Err(RpcError::new(err::KEY_REQUIRED, message));
         }
-        self.state.policy = policy.clone();
+        Ok(())
+    }
+
+    /// Push the active profile's policy into the enforcement layer and announce it. Enforcement
+    /// only ever sees this flat, already-resolved policy — it knows nothing about profiles.
+    fn apply_active_policy(&mut self) {
+        let policy = self.state.active_policy();
         self.shared.set_policy(policy.clone());
         // Policy edits change the resolver target list even while focus is off. Kick a one-shot
         // refresh now so the IP bank is warm before the next session.
         kick_resolver(self.shared.clone());
-        self.persist();
         self.emit("policyChanged", json!({ "policy": policy }));
+    }
+
+    fn emit_profiles(&self) {
+        self.emit(
+            "profilesChanged",
+            json!({
+                "profiles": self.state.profiles,
+                "activeProfileId": self.state.active_profile_id,
+            }),
+        );
+    }
+
+    /// Edit the **active** profile's policy — the flat shorthand the blocklist editor uses.
+    fn set_policy(&mut self, policy: Policy) -> Result<(), RpcError> {
+        let mut profile = self.state.active_profile().clone();
+        profile.policy = policy;
+        self.set_profile(profile)
+    }
+
+    /// Create or replace a profile. Tightening is always free. Relaxing — unblocking a site or
+    /// app, or a mode change that frees traffic — requires the paired key even when the profile
+    /// is not the active one: a locked schedule window may switch to it later, so pre-loosening
+    /// a dormant profile has to cost the same as loosening the live one.
+    fn set_profile(&mut self, profile: Profile) -> Result<(), RpcError> {
+        if profile.id.trim().is_empty() {
+            return Err(RpcError::new(err::BAD_REQUEST, "Profile id cannot be empty."));
+        }
+        let name = profile.name.trim().to_string();
+        if name.is_empty() {
+            return Err(RpcError::new(
+                err::BAD_REQUEST,
+                "Profile name cannot be empty.",
+            ));
+        }
+        if name.chars().count() > MAX_PROFILE_NAME_LENGTH {
+            return Err(RpcError::new(
+                err::BAD_REQUEST,
+                format!("Profile names are limited to {MAX_PROFILE_NAME_LENGTH} characters."),
+            ));
+        }
+
+        let existing = self.state.profiles.iter().position(|p| p.id == profile.id);
+        if let Some(idx) = existing {
+            let prev = self.state.profiles[idx].policy.clone();
+            if !crate::policy_match::is_at_least_as_restrictive(&prev, &profile.policy) {
+                self.require_key("Insert your paired key to relax the blocklist.")?;
+            }
+        }
+
+        let is_active = profile.id == self.state.active_profile_id;
+        let profile = Profile { name, ..profile };
+        match existing {
+            Some(idx) => self.state.profiles[idx] = profile,
+            None => self.state.profiles.push(profile),
+        }
+        self.persist();
+        self.emit_profiles();
+        if is_active {
+            self.apply_active_policy();
+        }
         Ok(())
     }
 
-    /// Tightening the schedule is always free. Relaxing it — dropping a covered minute or
-    /// unlocking a locked one — requires the paired key; with the key present the user may edit
-    /// any window, including one that is currently active.
-    fn set_schedule(&mut self, schedule: Schedule) -> Result<(), RpcError> {
-        if !schedule::is_at_least_as_restrictive(&self.state.schedule, &schedule) {
-            self.recompute_presence();
-            if !self.key_present {
+    /// Remove a profile. Key-gated when it is active or a schedule window points at it — both
+    /// cases drop enforcement the user had already committed to.
+    fn delete_profile(&mut self, profile_id: &str) -> Result<(), RpcError> {
+        let Some(idx) = self.state.profiles.iter().position(|p| p.id == profile_id) else {
+            return Err(RpcError::new(err::BAD_REQUEST, "Profile not found."));
+        };
+        if self.state.profiles.len() == 1 {
+            return Err(RpcError::new(
+                err::LAST_PROFILE,
+                "Keep at least one blocking profile.",
+            ));
+        }
+
+        let is_active = self.state.active_profile_id == profile_id;
+        let scheduled = self
+            .state
+            .schedule
+            .windows
+            .iter()
+            .any(|w| w.profile_id.as_deref() == Some(profile_id));
+        if is_active || scheduled {
+            if self.schedule_locked() {
                 return Err(RpcError::new(
-                    err::KEY_REQUIRED,
-                    "Insert your paired key to relax the schedule.",
+                    err::LOCKED,
+                    "A locked schedule window is active.",
                 ));
             }
+            self.require_key("Insert your paired key to delete this profile.")?;
+        }
+
+        self.state.profiles.remove(idx);
+        // Windows that pointed at the deleted profile fall back to whatever is active when they
+        // fire, rather than silently enforcing nothing.
+        for w in &mut self.state.schedule.windows {
+            if w.profile_id.as_deref() == Some(profile_id) {
+                w.profile_id = None;
+            }
+        }
+        if is_active {
+            self.state.active_profile_id = self.state.profiles[0].id.clone();
+        }
+        self.persist();
+        self.emit_profiles();
+        if is_active {
+            self.apply_active_policy();
+        }
+        tracing::info!("profile {profile_id} deleted");
+        Ok(())
+    }
+
+    /// Switch which profile focus enforces. Refused outright inside a locked window. Otherwise
+    /// key-gated only when the switch *loosens* what is blocked and something is (or could soon
+    /// be) enforcing it — focus on now, or a locked window that will inherit the active profile.
+    fn set_active_profile(&mut self, profile_id: &str) -> Result<(), RpcError> {
+        let Some(next) = self
+            .state
+            .profiles
+            .iter()
+            .find(|p| p.id == profile_id)
+            .map(|p| p.policy.clone())
+        else {
+            return Err(RpcError::new(err::BAD_REQUEST, "Profile not found."));
+        };
+        if self.state.active_profile_id == profile_id {
+            return Ok(());
+        }
+        if self.schedule_locked() {
+            return Err(RpcError::new(
+                err::LOCKED,
+                "A locked schedule window is active.",
+            ));
+        }
+
+        let relaxes = !crate::policy_match::is_at_least_as_restrictive(
+            &self.state.active_policy(),
+            &next,
+        );
+        let enforcing =
+            self.state.focus_active || self.state.schedule.windows.iter().any(|w| w.locked);
+        if relaxes && enforcing {
+            self.require_key("Insert your paired key to switch to a less restrictive profile.")?;
+        }
+
+        self.switch_active_profile(profile_id.to_string());
+        Ok(())
+    }
+
+    /// Point enforcement at `profile_id` and push the new policy down. Callers gate first.
+    fn switch_active_profile(&mut self, profile_id: String) {
+        if self.state.active_profile_id == profile_id {
+            return;
+        }
+        self.state.active_profile_id = profile_id;
+        self.persist();
+        self.emit_profiles();
+        self.apply_active_policy();
+        tracing::info!("active profile is now {}", self.state.active_profile_id);
+    }
+
+    /// Tightening the schedule is always free. Relaxing it — dropping a covered minute, unlocking
+    /// a locked one, or repointing a window at a laxer blocking profile — requires the paired key;
+    /// with the key present the user may edit any window, including one that is currently active.
+    fn set_schedule(&mut self, schedule: Schedule) -> Result<(), RpcError> {
+        for w in &schedule.windows {
+            if let Some(id) = &w.profile_id {
+                if !self.state.profiles.iter().any(|p| p.id == *id) {
+                    return Err(RpcError::new(
+                        err::BAD_REQUEST,
+                        format!("Unknown blocking profile: {id}"),
+                    ));
+                }
+            }
+        }
+        if !schedule::is_at_least_as_restrictive(
+            &self.state.schedule,
+            &schedule,
+            &self.state.profiles,
+            &self.state.active_profile_id,
+        ) {
+            self.require_key("Insert your paired key to relax the schedule.")?;
         }
         self.state.schedule = schedule;
         self.persist();
@@ -336,6 +507,9 @@ impl Core {
         // Restore the persisted handshake setting into the shared enforcement state.
         self.shared
             .set_handshake_enabled(self.state.settings.browser_handshake_enabled);
+        // The active profile may have arrived from a state-file migration; make sure enforcement
+        // is holding its policy and not a stale one.
+        self.shared.set_policy(self.state.active_policy());
         if self.state.focus_active && self.state.paired_keys.is_empty() {
             tracing::warn!("clearing persisted focus state because no key is paired");
             self.set_focus(false, FocusSource::Boot);
@@ -348,10 +522,21 @@ impl Core {
         self.recompute_presence();
     }
 
-    /// Evaluate the schedule and flip focus at window boundaries. Only auto-disables focus that
-    /// the schedule itself turned on (never a user-initiated focus session).
+    /// Evaluate the schedule and flip focus at window boundaries, switching to the blocking
+    /// profile the covering window names. Only auto-disables focus that the schedule itself
+    /// turned on (never a user-initiated focus session).
     pub fn schedule_tick(&mut self) {
         let eval = schedule::evaluate_now(&self.state.schedule);
+        // A covering window that names a profile switches enforcement to it, even mid-session —
+        // this is what "schedule by profile" means. The switch is not key-gated: it is the user's
+        // earlier, already-gated decision replaying on time.
+        if eval.active {
+            if let Some(id) = eval.profile_id.clone() {
+                if self.state.profiles.iter().any(|p| p.id == id) {
+                    self.switch_active_profile(id);
+                }
+            }
+        }
         if eval.active && !self.state.focus_active && !self.state.paired_keys.is_empty() {
             self.set_focus(true, FocusSource::Schedule);
             if let Some(id) = eval.window_id {
@@ -387,6 +572,21 @@ impl Core {
             "setPolicy" => {
                 let policy: Policy = parse_field(params, "policy")?;
                 self.set_policy(policy)?;
+                Ok(ok())
+            }
+            "setProfile" => {
+                let profile: Profile = parse_field(params, "profile")?;
+                self.set_profile(profile)?;
+                Ok(ok())
+            }
+            "deleteProfile" => {
+                let profile_id = str_field(params, "profileId")?;
+                self.delete_profile(&profile_id)?;
+                Ok(ok())
+            }
+            "setActiveProfile" => {
+                let profile_id = str_field(params, "profileId")?;
+                self.set_active_profile(&profile_id)?;
                 Ok(ok())
             }
             "setSchedule" => {

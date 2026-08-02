@@ -67,4 +67,24 @@ describe('evaluateSchedule', () => {
     expect(r.locked).toBe(true);
     expect(r.windowId).toBe('b');
   });
+
+  it('reports the profile the covering window switches to', () => {
+    const s: Schedule = { windows: [win({ profileId: 'deep' })] };
+    expect(evaluateSchedule(s, at(1, 10)).profileId).toBe('deep');
+  });
+
+  it('leaves the profile undefined when the window names none', () => {
+    const s: Schedule = { windows: [win()] };
+    expect(evaluateSchedule(s, at(1, 10)).profileId).toBeUndefined();
+  });
+
+  it('prefers the locked window’s profile when windows overlap', () => {
+    const s: Schedule = {
+      windows: [
+        win({ id: 'a', profileId: 'lax' }),
+        win({ id: 'b', locked: true, profileId: 'strict' }),
+      ],
+    };
+    expect(evaluateSchedule(s, at(1, 10)).profileId).toBe('strict');
+  });
 });

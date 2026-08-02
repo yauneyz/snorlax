@@ -1,15 +1,22 @@
 import React, { useMemo, useState } from 'react';
-import type { AppRef, Mode, Policy } from '@talysman/shared';
+import type { AppRef, Mode, Policy, Profile } from '@talysman/shared';
+import {
+  EMPTY_POLICY,
+  MAX_PROFILE_NAME_LENGTH,
+  nextProfileColor,
+  resolveActiveProfile,
+} from '@talysman/shared';
 import { siblingsFor } from '@talysman/core/browser';
 import { listInstalledApps, request } from '../lib/bridge.js';
 import { useFocusStore } from '../store/useFocusStore.js';
-import { Badge, Button, Card, CardTitle, Input } from '../components/ui/index.js';
+import { Badge, Button, Card, CardTitle, Input, ProfileDot } from '../components/ui/index.js';
 import { cx } from '../lib/utils.js';
 import type { AppPickerItem } from '../../shared/appPicker.js';
 import {
   allowedPolicyModes,
   maxPolicyApps,
   maxPolicyDomains,
+  maxProfiles,
 } from '../../shared/productLimits.js';
 
 const MODES: { value: Mode; label: string; hint: string }[] = [
@@ -26,6 +33,15 @@ function appKey(app: AppRef): string {
   ].join('|');
 }
 
+/** One-line description of what a profile blocks, for the profile rail. */
+function profileSummary(profile: Profile): string {
+  const { mode, domains, apps } = profile.policy;
+  if (mode === 'block-all') return 'blocks everything';
+  const noun = mode === 'whitelist' ? 'allowed' : 'blocked';
+  const sites = `${domains.length} ${noun} site${domains.length === 1 ? '' : 's'}`;
+  return apps.length > 0 ? `${sites} · ${apps.length} app${apps.length === 1 ? '' : 's'}` : sites;
+}
+
 function appBadges(app: AppRef) {
   return (
     <>
@@ -37,9 +53,13 @@ function appBadges(app: AppRef) {
 }
 
 export function Blocklists({ onUpgrade }: { onUpgrade: () => void }) {
-  const policy = useFocusStore((s) => s.policy);
+  const profiles = useFocusStore((s) => s.profiles);
+  const activeProfileId = useFocusStore((s) => s.activeProfileId);
   const productLimits = useFocusStore((s) => s.productLimits);
   const refresh = useFocusStore((s) => s.refresh);
+  // Which profile the editor is pointed at. `null` keeps it tracking whatever focus is
+  // enforcing, so a scheduled profile switch carries the editor with it.
+  const [selectedId, setSelectedId] = useState<string | null>(null);
   const [domain, setDomain] = useState('');
   const [appName, setAppName] = useState('');
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -49,8 +69,15 @@ export function Blocklists({ onUpgrade }: { onUpgrade: () => void }) {
   const [pickerQuery, setPickerQuery] = useState('');
   const [selectedApps, setSelectedApps] = useState<Set<string>>(() => new Set());
   const [error, setError] = useState<string | null>(null);
+
+  const selected = resolveActiveProfile(profiles, selectedId ?? activeProfileId);
+  const policy = selected?.policy ?? EMPTY_POLICY;
+  const isActive = selected?.id === activeProfileId;
+  const profileLimit = maxProfiles(productLimits);
+  const profileLimitReached = profileLimit !== null && profiles.length >= profileLimit;
+
   const allowedModes = allowedPolicyModes(productLimits);
-  const maxDomains = maxPolicyDomains(productLimits);
+  const maxDomains = maxPolicyDomains(productLimits, policy.mode);
   const maxApps = maxPolicyApps(productLimits);
   const domainLimitReached = maxDomains !== null && policy.domains.length >= maxDomains;
   const appBlockingLocked = maxApps === 0;
@@ -77,20 +104,66 @@ export function Blocklists({ onUpgrade }: { onUpgrade: () => void }) {
     });
   }, [pickerItems, pickerQuery]);
 
-  async function save(next: Policy) {
+  /** Every edit on this page writes one whole profile; the service derives the rest. */
+  async function saveProfile(next: Profile): Promise<boolean> {
     setError(null);
     try {
-      await request('setPolicy', { policy: next });
+      await request('setProfile', { profile: next });
+      await refresh();
+      return true;
+    } catch (e) {
+      setError((e as Error).message);
+      return false;
+    }
+  }
+
+  async function save(next: Policy) {
+    if (!selected) return;
+    await saveProfile({ ...selected, policy: next });
+  }
+
+  async function addProfile() {
+    if (profileLimitReached) return onUpgrade();
+    const profile: Profile = {
+      id: `profile-${Date.now().toString(36)}`,
+      name: `Profile ${profiles.length + 1}`,
+      color: nextProfileColor(profiles),
+      policy: EMPTY_POLICY,
+    };
+    if (await saveProfile(profile)) setSelectedId(profile.id);
+  }
+
+  async function renameProfile(name: string) {
+    const trimmed = name.trim();
+    if (!selected || !trimmed || trimmed === selected.name) return;
+    await saveProfile({ ...selected, name: trimmed });
+  }
+
+  async function runProfileRequest(run: () => Promise<unknown>) {
+    setError(null);
+    try {
+      await run();
       await refresh();
     } catch (e) {
       setError((e as Error).message);
     }
   }
 
+  const deleteProfile = (profileId: string) =>
+    runProfileRequest(async () => {
+      await request('deleteProfile', { profileId });
+      if (selectedId === profileId) setSelectedId(null);
+    });
+
+  const activateProfile = (profileId: string) =>
+    runProfileRequest(() => request('setActiveProfile', { profileId }));
+
   const setMode = (mode: Mode) => save({ ...policy, mode });
   const addDomain = () => {
     if (!domain.trim()) return;
-    if (domainLimitReached) return setError(`Free supports up to ${maxDomains} blocked websites.`);
+    if (domainLimitReached) {
+      return setError(`Free supports up to ${maxDomains} blocked websites in blacklist mode.`);
+    }
     void save({ ...policy, domains: [...policy.domains, domain.trim()] });
     setDomain('');
   };
@@ -152,133 +225,215 @@ export function Blocklists({ onUpgrade }: { onUpgrade: () => void }) {
   }
 
   return (
-    <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-      <Card className="lg:col-span-2">
-        <CardTitle hint="How the service decides what to block.">Mode</CardTitle>
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-          {MODES.map((m) => {
-            const locked = Boolean(allowedModes && !allowedModes.includes(m.value));
-            return (
+    <div className="flex flex-col gap-6 lg:flex-row lg:items-start">
+      <Card className="lg:w-72 lg:shrink-0">
+        <div className="mb-3 flex items-start justify-between gap-3">
+          <CardTitle hint="Focus enforces one profile at a time; the schedule can switch it.">
+            Profiles
+          </CardTitle>
+          {profileLimitReached && <Badge tone="neutral">Pro</Badge>}
+        </div>
+        <ul className="mb-3 flex flex-col gap-2">
+          {profiles.map((p) => (
+            <li key={p.id}>
               <button
-                key={m.value}
-                onClick={() => (locked ? onUpgrade() : setMode(m.value))}
-                aria-disabled={locked}
+                onClick={() => setSelectedId(p.id)}
                 className={cx(
-                  'rounded-lg border p-4 text-left transition',
-                  policy.mode === m.value
-                    ? 'border-white/25 bg-white/[0.07] shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]'
+                  'w-full rounded-lg border p-3 text-left transition',
+                  p.id === selected?.id
+                    ? 'border-white/25 bg-white/[0.07]'
                     : 'border-white/[0.07] bg-white/[0.02] hover:border-white/[0.14] hover:bg-white/[0.05]',
-                  locked && 'opacity-65',
                 )}
               >
-                <div className="flex items-center justify-between gap-2">
-                  <span className="font-semibold text-white">{m.label}</span>
-                  {locked && <Badge tone="neutral">Pro</Badge>}
-                </div>
-                <div className="mt-1 text-xs text-slate-400">{m.hint}</div>
+                <span className="flex items-center gap-2">
+                  <ProfileDot color={p.color} />
+                  <span className="min-w-0 flex-1 truncate text-sm font-medium text-slate-100">
+                    {p.name}
+                  </span>
+                  {p.id === activeProfileId && <Badge tone="ok">active</Badge>}
+                </span>
+                <span className="mt-1 block text-xs text-slate-500">{profileSummary(p)}</span>
               </button>
-            );
-          })}
-        </div>
-      </Card>
-
-      <Card>
-        <CardTitle hint='Wildcards allowed as a leading "*." (e.g. *.reddit.com).'>Blocked domains</CardTitle>
-        <div className="mb-3 flex gap-2">
-          <Input
-            value={domain}
-            onChange={(e) => setDomain(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && addDomain()}
-            placeholder="youtube.com"
-            disabled={domainLimitReached}
-          />
-          <Button onClick={addDomain} disabled={domainLimitReached}>
-            Add
-          </Button>
-        </div>
-        {maxDomains !== null && (
-          <p className="mb-3 text-xs text-slate-500">
-            {policy.domains.length}/{maxDomains} websites
+            </li>
+          ))}
+        </ul>
+        <Button variant="ghost" onClick={addProfile} className="w-full">
+          {profileLimitReached ? 'Upgrade for more profiles' : 'New profile'}
+        </Button>
+        {profileLimit !== null && (
+          <p className="mt-3 text-xs text-slate-500">
+            {profiles.length}/{profileLimit} profiles
           </p>
         )}
-        <ul className="flex flex-col gap-2">
-          {policy.domains.map((d) => {
-            const siblings = siblingsFor(d);
-            return (
-              <li key={d} className="rounded-lg bg-panel2 px-3 py-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-slate-200">{d}</span>
-                  <button onClick={() => removeDomain(d)} className="text-xs text-red-400 hover:underline">
-                    remove
-                  </button>
-                </div>
-                {siblings.length > 0 && (
-                  <p className="mt-1 text-xs text-slate-500">also blocks: {siblings.join(', ')}</p>
-                )}
-              </li>
-            );
-          })}
-          {policy.domains.length === 0 && <p className="text-sm text-slate-500">No domains yet.</p>}
-        </ul>
       </Card>
 
-      <Card>
-        <div className="mb-3 flex items-start justify-between gap-3">
-          <CardTitle hint="Matched by executable name on Windows (e.g. chrome.exe).">
-            Blocked apps
+      <div className="grid min-w-0 flex-1 grid-cols-1 gap-6 lg:grid-cols-2">
+        <Card className="lg:col-span-2">
+          <CardTitle hint="Renaming or editing a profile never changes which one is enforced.">
+            Profile
           </CardTitle>
-          {appBlockingLocked && <Badge tone="neutral">Pro</Badge>}
-        </div>
-        {appBlockingLocked ? (
-          <div>
-            <div className="mb-3 flex gap-2">
-              <Input value="" placeholder="chrome.exe" disabled />
-              <Button disabled>Add</Button>
-            </div>
-            <Button variant="ghost" onClick={onUpgrade}>
-              Upgrade for app blocking
+          <div className="flex flex-wrap items-center gap-3">
+            <ProfileDot color={selected?.color ?? '#4fd6c0'} className="h-3.5 w-3.5" />
+            <Input
+              key={selected?.id}
+              defaultValue={selected?.name ?? ''}
+              maxLength={MAX_PROFILE_NAME_LENGTH}
+              onBlur={(e) => void renameProfile(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
+              placeholder="Profile name"
+              className="w-56"
+              aria-label="Profile name"
+            />
+            {isActive ? (
+              <Badge tone="ok">enforced by focus</Badge>
+            ) : (
+              <Button variant="ghost" onClick={() => selected && void activateProfile(selected.id)}>
+                Use this profile
+              </Button>
+            )}
+            {profiles.length > 1 && (
+              <button
+                onClick={() => selected && void deleteProfile(selected.id)}
+                className="ml-auto text-xs text-red-400 hover:underline"
+              >
+                delete profile
+              </button>
+            )}
+          </div>
+        </Card>
+
+        <Card className="lg:col-span-2">
+          <CardTitle hint="How the service decides what to block.">Mode</CardTitle>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+            {MODES.map((m) => {
+              const locked = Boolean(allowedModes && !allowedModes.includes(m.value));
+              return (
+                <button
+                  key={m.value}
+                  onClick={() => (locked ? onUpgrade() : setMode(m.value))}
+                  aria-disabled={locked}
+                  className={cx(
+                    'rounded-lg border p-4 text-left transition',
+                    policy.mode === m.value
+                      ? 'border-white/25 bg-white/[0.07] shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]'
+                      : 'border-white/[0.07] bg-white/[0.02] hover:border-white/[0.14] hover:bg-white/[0.05]',
+                    locked && 'opacity-65',
+                  )}
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="font-semibold text-white">{m.label}</span>
+                    {locked && <Badge tone="neutral">Pro</Badge>}
+                  </div>
+                  <div className="mt-1 text-xs text-slate-400">{m.hint}</div>
+                </button>
+              );
+            })}
+          </div>
+        </Card>
+
+        <Card>
+          <CardTitle hint='Wildcards allowed as a leading "*." (e.g. *.reddit.com).'>
+            {policy.mode === 'whitelist' ? 'Allowed domains' : 'Blocked domains'}
+          </CardTitle>
+          <div className="mb-3 flex gap-2">
+            <Input
+              value={domain}
+              onChange={(e) => setDomain(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && addDomain()}
+              placeholder="youtube.com"
+              disabled={domainLimitReached}
+            />
+            <Button onClick={addDomain} disabled={domainLimitReached}>
+              Add
             </Button>
           </div>
-        ) : (
-          <>
-            <div className="mb-3 flex gap-2">
-              <Button onClick={openAppPicker} disabled={appLimitReached}>
-                Choose apps
-              </Button>
-            </div>
-            <div className="mb-3 flex gap-2">
-              <Input
-                value={appName}
-                onChange={(e) => setAppName(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && addApp()}
-                placeholder="Manual entry, e.g. chrome.exe or chrome"
-                disabled={appLimitReached}
-              />
-              <Button onClick={addApp} disabled={appLimitReached}>
-                Add
-              </Button>
-            </div>
-            {maxApps !== null && (
-              <p className="mb-3 text-xs text-slate-500">
-                {policy.apps.length}/{maxApps} apps
-              </p>
-            )}
-            <ul className="flex flex-col gap-2">
-              {policy.apps.map((a) => (
-                <li key={appKey(a)} className="flex items-center justify-between gap-3 rounded-lg bg-panel2 px-3 py-2">
-                  <span className="flex flex-wrap items-center gap-2 text-sm text-slate-200">
-                    {a.label} {appBadges(a)}
-                  </span>
-                  <button onClick={() => removeApp(a)} className="text-xs text-red-400 hover:underline">
-                    remove
-                  </button>
+          {maxDomains !== null && (
+            <p className="mb-3 text-xs text-slate-500">
+              {policy.domains.length}/{maxDomains} websites
+            </p>
+          )}
+          <ul className="flex flex-col gap-2">
+            {policy.domains.map((d) => {
+              const siblings = siblingsFor(d);
+              return (
+                <li key={d} className="rounded-lg bg-panel2 px-3 py-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-slate-200">{d}</span>
+                    <button onClick={() => removeDomain(d)} className="text-xs text-red-400 hover:underline">
+                      remove
+                    </button>
+                  </div>
+                  {siblings.length > 0 && (
+                    <p className="mt-1 text-xs text-slate-500">
+                      also {policy.mode === 'whitelist' ? 'allows' : 'blocks'}: {siblings.join(', ')}
+                    </p>
+                  )}
                 </li>
-              ))}
-              {policy.apps.length === 0 && <p className="text-sm text-slate-500">No apps yet.</p>}
-            </ul>
-          </>
-        )}
-      </Card>
+              );
+            })}
+            {policy.domains.length === 0 && <p className="text-sm text-slate-500">No domains yet.</p>}
+          </ul>
+        </Card>
+
+        <Card>
+          <div className="mb-3 flex items-start justify-between gap-3">
+            <CardTitle hint="Matched by executable name on Windows (e.g. chrome.exe).">
+              Blocked apps
+            </CardTitle>
+            {appBlockingLocked && <Badge tone="neutral">Pro</Badge>}
+          </div>
+          {appBlockingLocked ? (
+            <div>
+              <div className="mb-3 flex gap-2">
+                <Input value="" placeholder="chrome.exe" disabled />
+                <Button disabled>Add</Button>
+              </div>
+              <Button variant="ghost" onClick={onUpgrade}>
+                Upgrade for app blocking
+              </Button>
+            </div>
+          ) : (
+            <>
+              <div className="mb-3 flex gap-2">
+                <Button onClick={openAppPicker} disabled={appLimitReached}>
+                  Choose apps
+                </Button>
+              </div>
+              <div className="mb-3 flex gap-2">
+                <Input
+                  value={appName}
+                  onChange={(e) => setAppName(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && addApp()}
+                  placeholder="Manual entry, e.g. chrome.exe or chrome"
+                  disabled={appLimitReached}
+                />
+                <Button onClick={addApp} disabled={appLimitReached}>
+                  Add
+                </Button>
+              </div>
+              {maxApps !== null && (
+                <p className="mb-3 text-xs text-slate-500">
+                  {policy.apps.length}/{maxApps} apps
+                </p>
+              )}
+              <ul className="flex flex-col gap-2">
+                {policy.apps.map((a) => (
+                  <li key={appKey(a)} className="flex items-center justify-between gap-3 rounded-lg bg-panel2 px-3 py-2">
+                    <span className="flex flex-wrap items-center gap-2 text-sm text-slate-200">
+                      {a.label} {appBadges(a)}
+                    </span>
+                    <button onClick={() => removeApp(a)} className="text-xs text-red-400 hover:underline">
+                      remove
+                    </button>
+                  </li>
+                ))}
+                {policy.apps.length === 0 && <p className="text-sm text-slate-500">No apps yet.</p>}
+              </ul>
+            </>
+          )}
+        </Card>
+
+      </div>
 
       {pickerOpen && (
         <div
@@ -372,7 +527,7 @@ export function Blocklists({ onUpgrade }: { onUpgrade: () => void }) {
         </div>
       )}
 
-      {error && <p className="text-sm text-red-400 lg:col-span-2">{error}</p>}
+      {error && <p className="text-sm text-red-400">{error}</p>}
     </div>
   );
 }

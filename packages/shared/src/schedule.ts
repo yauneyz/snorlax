@@ -11,8 +11,11 @@ export interface ScheduleWindow {
   start: string;
   /** "HH:MM" 24h local time, exclusive end. */
   end: string;
-  /** Optionally a different policy applies during this window. */
-  policyId?: string;
+  /**
+   * Blocking profile to switch to for the duration of this window. When omitted the window
+   * enforces whatever profile is already active.
+   */
+  profileId?: string;
   /** If true, a present USB key cannot disable focus during this window ("no escape"). */
   locked: boolean;
 }

@@ -54,6 +54,29 @@ export function Badge({ children, tone = 'neutral' }: { children: React.ReactNod
   );
 }
 
+export function Select(props: React.SelectHTMLAttributes<HTMLSelectElement>) {
+  return (
+    <select
+      {...props}
+      className={cx(
+        'w-full rounded-lg border border-white/[0.09] bg-white/[0.03] px-3 py-2 text-sm text-white outline-none transition focus:border-white/25 focus:bg-white/[0.05] disabled:cursor-not-allowed disabled:opacity-50 [&>option]:bg-panel [&>option]:text-white',
+        props.className,
+      )}
+    />
+  );
+}
+
+/** Round colour chip identifying a blocking profile. */
+export function ProfileDot({ color, className }: { color: string; className?: string }) {
+  return (
+    <span
+      aria-hidden
+      className={cx('inline-block h-2.5 w-2.5 shrink-0 rounded-full', className)}
+      style={{ backgroundColor: color }}
+    />
+  );
+}
+
 export function Input(props: React.InputHTMLAttributes<HTMLInputElement>) {
   return (
     <input

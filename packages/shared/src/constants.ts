@@ -4,7 +4,7 @@
  */
 
 /** Protocol version negotiated on connect; bump on breaking RPC changes. */
-export const PROTOCOL_VERSION = 1;
+export const PROTOCOL_VERSION = 2;
 
 /** Deep-link scheme used for the billing return (Phase 3) and tray re-focus. */
 export const DEEP_LINK_SCHEME = 'talysman';
@@ -42,6 +42,8 @@ export const ErrorCode = {
   NO_PAIRED_KEY: 'NO_PAIRED_KEY',
   /** Unpair refused: the requested key is the only paired key. */
   LAST_PAIRED_KEY: 'LAST_PAIRED_KEY',
+  /** Profile delete refused: the requested profile is the only one left. */
+  LAST_PROFILE: 'LAST_PROFILE',
   /** Disable refused: a `locked` schedule window is currently active. */
   LOCKED: 'LOCKED',
   /** Recovery code did not match. */

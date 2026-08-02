@@ -40,6 +40,50 @@ pub struct Policy {
     pub apps: Vec<AppRef>,
 }
 
+/// A named policy the user can switch between (mirrors packages/shared/src/profile.ts). Focus
+/// enforces exactly one profile at a time; schedule windows may switch which one.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Profile {
+    pub id: String,
+    pub name: String,
+    #[serde(default = "default_profile_color")]
+    pub color: String,
+    #[serde(default)]
+    pub policy: Policy,
+}
+
+pub const DEFAULT_PROFILE_ID: &str = "profile-default";
+pub const DEFAULT_PROFILE_NAME: &str = "Default";
+pub const DEFAULT_PROFILE_COLOR: &str = "#4fd6c0";
+/// Mirrors MAX_PROFILE_NAME_LENGTH in packages/shared/src/profile.ts.
+pub const MAX_PROFILE_NAME_LENGTH: usize = 40;
+
+fn default_profile_color() -> String {
+    DEFAULT_PROFILE_COLOR.to_string()
+}
+
+impl Default for Profile {
+    fn default() -> Self {
+        Profile {
+            id: DEFAULT_PROFILE_ID.to_string(),
+            name: DEFAULT_PROFILE_NAME.to_string(),
+            color: DEFAULT_PROFILE_COLOR.to_string(),
+            policy: Policy::default(),
+        }
+    }
+}
+
+impl Profile {
+    /// Wrap a bare policy as the default profile (used when migrating pre-profile state).
+    pub fn from_policy(policy: Policy) -> Self {
+        Profile {
+            policy,
+            ..Profile::default()
+        }
+    }
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ScheduleWindow {
@@ -47,8 +91,9 @@ pub struct ScheduleWindow {
     pub days: Vec<String>,
     pub start: String,
     pub end: String,
+    /// Blocking profile this window switches to; `None` keeps whatever is already active.
     #[serde(skip_serializing_if = "Option::is_none", default)]
-    pub policy_id: Option<String>,
+    pub profile_id: Option<String>,
     #[serde(default)]
     pub locked: bool,
 }
@@ -101,6 +146,9 @@ pub struct ServiceState {
     pub service_version: String,
     pub focus_active: bool,
     pub focus_source: FocusSource,
+    pub profiles: Vec<Profile>,
+    pub active_profile_id: String,
+    /// Derived: the active profile's policy — what enforcement actually applies.
     pub policy: Policy,
     pub schedule: Schedule,
     pub settings: Settings,

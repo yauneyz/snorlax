@@ -1,24 +1,41 @@
 import React, { useState } from 'react';
 import type { ScheduleWindow, Weekday } from '@talysman/shared';
-import { WEEKDAYS } from '@talysman/shared';
+import { WEEKDAYS, resolveActiveProfile } from '@talysman/shared';
 import { request } from '../lib/bridge.js';
 import { useFocusStore } from '../store/useFocusStore.js';
-import { Badge, Button, Card, CardTitle, Input } from '../components/ui/index.js';
+import {
+  Badge,
+  Button,
+  Card,
+  CardTitle,
+  Input,
+  ProfileDot,
+  Select,
+} from '../components/ui/index.js';
 import { isScheduleEnabled } from '../../shared/productLimits.js';
+
+/** Sentinel for "don't switch profiles" — a window with no `profileId`. */
+const KEEP_ACTIVE = '';
 
 let idCounter = 0;
 const newId = () => `win-${Date.now()}-${idCounter++}`;
 
 export function SchedulePage({ onUpgrade }: { onUpgrade: () => void }) {
   const schedule = useFocusStore((s) => s.schedule);
+  const profiles = useFocusStore((s) => s.profiles);
+  const activeProfileId = useFocusStore((s) => s.activeProfileId);
   const productLimits = useFocusStore((s) => s.productLimits);
   const refresh = useFocusStore((s) => s.refresh);
   const [days, setDays] = useState<Weekday[]>(['mon', 'tue', 'wed', 'thu', 'fri']);
   const [start, setStart] = useState('09:00');
   const [end, setEnd] = useState('17:00');
   const [locked, setLocked] = useState(false);
+  const [profileId, setProfileId] = useState<string>(KEEP_ACTIVE);
   const [error, setError] = useState<string | null>(null);
   const scheduleEnabled = isScheduleEnabled(productLimits);
+  const profileFor = (id: string | undefined) =>
+    id ? profiles.find((p) => p.id === id) : undefined;
+  const activeProfile = resolveActiveProfile(profiles, activeProfileId);
 
   async function save(windows: ScheduleWindow[]) {
     setError(null);
@@ -36,7 +53,14 @@ export function SchedulePage({ onUpgrade }: { onUpgrade: () => void }) {
   const addWindow = () => {
     if (!scheduleEnabled) return onUpgrade();
     if (days.length === 0) return setError('Pick at least one day.');
-    const w: ScheduleWindow = { id: newId(), days, start, end, locked };
+    const w: ScheduleWindow = {
+      id: newId(),
+      days,
+      start,
+      end,
+      locked,
+      ...(profileId ? { profileId } : {}),
+    };
     void save([...schedule.windows, w]);
   };
   const removeWindow = (id: string) => save(schedule.windows.filter((w) => w.id !== id));
@@ -84,6 +108,29 @@ export function SchedulePage({ onUpgrade }: { onUpgrade: () => void }) {
             disabled={!scheduleEnabled}
           />
         </div>
+        <div className="mb-4">
+          <label className="mb-2 block text-sm text-slate-400" htmlFor="window-profile">
+            Blocking profile
+          </label>
+          <Select
+            id="window-profile"
+            value={profileId}
+            onChange={(e) => setProfileId(e.target.value)}
+            disabled={!scheduleEnabled}
+          >
+            <option value={KEEP_ACTIVE}>
+              Keep the active profile{activeProfile ? ` (now: ${activeProfile.name})` : ''}
+            </option>
+            {profiles.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name}
+              </option>
+            ))}
+          </Select>
+          <p className="mt-2 text-xs text-slate-500">
+            Focus switches to this profile for the length of the window, then leaves it in place.
+          </p>
+        </div>
         <label className="mb-4 flex items-center gap-2 text-sm text-slate-300">
           <input
             type="checkbox"
@@ -100,16 +147,32 @@ export function SchedulePage({ onUpgrade }: { onUpgrade: () => void }) {
       <Card>
         <CardTitle>Scheduled windows</CardTitle>
         <ul className="flex flex-col gap-2">
-          {schedule.windows.map((w) => (
-            <li key={w.id} className="flex items-center justify-between rounded-lg bg-panel2 px-3 py-2">
-              <span className="text-sm text-slate-200">
-                {w.days.join(', ')} - {w.start}-{w.end} {w.locked && <Badge tone="danger">locked</Badge>}
-              </span>
-              <button onClick={() => removeWindow(w.id)} className="text-xs text-red-400 hover:underline">
-                remove
-              </button>
-            </li>
-          ))}
+          {schedule.windows.map((w) => {
+            const profile = profileFor(w.profileId);
+            return (
+              <li key={w.id} className="flex items-start justify-between gap-3 rounded-lg bg-panel2 px-3 py-2">
+                <span className="min-w-0">
+                  <span className="text-sm text-slate-200">
+                    {w.days.join(', ')} - {w.start}-{w.end}{' '}
+                    {w.locked && <Badge tone="danger">locked</Badge>}
+                  </span>
+                  <span className="mt-1 flex items-center gap-1.5 text-xs text-slate-500">
+                    {profile ? (
+                      <>
+                        <ProfileDot color={profile.color} />
+                        {profile.name}
+                      </>
+                    ) : (
+                      'keeps the active profile'
+                    )}
+                  </span>
+                </span>
+                <button onClick={() => removeWindow(w.id)} className="text-xs text-red-400 hover:underline">
+                  remove
+                </button>
+              </li>
+            );
+          })}
           {schedule.windows.length === 0 && <p className="text-sm text-slate-500">No windows yet.</p>}
         </ul>
       </Card>

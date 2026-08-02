@@ -21,6 +21,9 @@ export default function PricingPage() {
           priceLabel="$0"
           features={[
             `${FREE_BLOCKED_SITE_LIMIT} websites blocked`,
+            "Unlimited websites in whitelist mode",
+            "Block all internet",
+            "One blocking profile",
             `Prove to yourself that ${config.app.name} works for you`,
           ]}
         />
@@ -28,13 +31,23 @@ export default function PricingPage() {
           plan="monthly"
           title="Monthly"
           priceLabel="$10 / month"
-          features={["Unlimited websites blocked", "Block apps", "Scheduled blocking"]}
+          features={[
+            "Unlimited websites blocked",
+            "Unlimited blocking profiles",
+            "Block apps",
+            "Scheduled blocking, profile by profile",
+          ]}
         />
         <PricingCard
           plan="yearly"
           title="Annual"
           priceLabel="$100 / year"
-          features={["Unlimited websites blocked", "Block apps", "Scheduled blocking"]}
+          features={[
+            "Unlimited websites blocked",
+            "Unlimited blocking profiles",
+            "Block apps",
+            "Scheduled blocking, profile by profile",
+          ]}
         />
       </div>
     </section>

@@ -4,7 +4,7 @@
 
 use windows::Win32::System::SystemInformation::GetLocalTime;
 
-use crate::model::Schedule;
+use crate::model::{Policy, Profile, Schedule};
 
 const WEEKDAYS: [&str; 7] = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"];
 
@@ -12,6 +12,8 @@ const WEEKDAYS: [&str; 7] = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"];
 pub struct ScheduleEvaluation {
     pub active: bool,
     pub window_id: Option<String>,
+    /// Blocking profile the driving window switches to, if it names one.
+    pub profile_id: Option<String>,
     pub locked: bool,
 }
 
@@ -83,10 +85,13 @@ pub fn evaluate_at(schedule: &Schedule, day: &str, minute: u32) -> ScheduleEvalu
             eval.active = true;
             if eval.window_id.is_none() {
                 eval.window_id = Some(w.id.clone());
+                eval.profile_id = w.profile_id.clone();
             }
-            if w.locked {
+            if w.locked && !eval.locked {
                 eval.locked = true;
+                // Prefer reporting the locked window — and the profile it demands.
                 eval.window_id = Some(w.id.clone());
+                eval.profile_id = w.profile_id.clone();
             }
         }
     }
@@ -94,10 +99,28 @@ pub fn evaluate_at(schedule: &Schedule, day: &str, minute: u32) -> ScheduleEvalu
 }
 
 /// Whether `next` enforces at least as much as `prev` at every minute of the week: it never drops
-/// a covered (focus-forced) minute and never unlocks a locked one. Equal or stricter schedules
-/// return true; any relaxation returns false. Window policy references are not compared here —
-/// coverage and locking are the schedule's own contribution to enforcement.
-pub fn is_at_least_as_restrictive(prev: &Schedule, next: &Schedule) -> bool {
+/// a covered (focus-forced) minute, never unlocks a locked one, and never swaps in a laxer
+/// blocking profile. Equal or stricter schedules return true; any relaxation returns false.
+///
+/// `profiles` / `active_profile_id` resolve each window's `profile_id` to the policy it would
+/// actually enforce — repointing a window at an emptier profile is as much a relaxation as
+/// deleting the window outright.
+pub fn is_at_least_as_restrictive(
+    prev: &Schedule,
+    next: &Schedule,
+    profiles: &[Profile],
+    active_profile_id: &str,
+) -> bool {
+    let resolve = |id: Option<&str>| -> Option<&Policy> {
+        let wanted = id.unwrap_or(active_profile_id);
+        profiles
+            .iter()
+            .find(|p| p.id == wanted)
+            .or_else(|| profiles.iter().find(|p| p.id == active_profile_id))
+            .or_else(|| profiles.first())
+            .map(|p| &p.policy)
+    };
+
     for day in WEEKDAYS {
         for minute in 0..24 * 60 {
             let p = evaluate_at(prev, day, minute);
@@ -107,6 +130,22 @@ pub fn is_at_least_as_restrictive(prev: &Schedule, next: &Schedule) -> bool {
             let n = evaluate_at(next, day, minute);
             if !n.active || (p.locked && !n.locked) {
                 return false;
+            }
+            if p.profile_id == n.profile_id {
+                continue;
+            }
+            match (
+                resolve(p.profile_id.as_deref()),
+                resolve(n.profile_id.as_deref()),
+            ) {
+                (Some(prev_policy), Some(next_policy)) => {
+                    if !crate::policy_match::is_at_least_as_restrictive(prev_policy, next_policy) {
+                        return false;
+                    }
+                }
+                // No profiles to compare against (shouldn't happen post-migration) — treat a
+                // profile change as a relaxation rather than waving it through.
+                _ => return false,
             }
         }
     }
@@ -130,7 +169,7 @@ mod tests {
             ],
             start: "09:00".into(),
             end: "17:00".into(),
-            policy_id: None,
+            profile_id: None,
             locked,
         }
     }
@@ -173,5 +212,101 @@ mod tests {
         assert!(evaluate_at(&s, "fri", 23 * 60).active);
         assert!(evaluate_at(&s, "sat", 60).active);
         assert!(!evaluate_at(&s, "sat", 3 * 60).active);
+    }
+}
+
+#[cfg(test)]
+mod profile_tests {
+    use super::*;
+    use crate::model::{Mode, Policy, ScheduleWindow};
+
+    fn profile(id: &str, policy: Policy) -> Profile {
+        Profile {
+            id: id.into(),
+            name: id.into(),
+            color: "#4fd6c0".into(),
+            policy,
+        }
+    }
+
+    fn blacklist(domains: &[&str]) -> Policy {
+        Policy {
+            mode: Mode::Blacklist,
+            domains: domains.iter().map(|d| (*d).to_string()).collect(),
+            apps: Vec::new(),
+        }
+    }
+
+    fn win(id: &str, profile_id: Option<&str>, locked: bool) -> ScheduleWindow {
+        ScheduleWindow {
+            id: id.into(),
+            days: vec!["mon".into()],
+            start: "09:00".into(),
+            end: "17:00".into(),
+            profile_id: profile_id.map(|s| s.to_string()),
+            locked,
+        }
+    }
+
+    fn profiles() -> Vec<Profile> {
+        vec![
+            profile("strict", blacklist(&["a.com", "b.com"])),
+            profile("lax", blacklist(&["a.com"])),
+        ]
+    }
+
+    #[test]
+    fn evaluation_reports_the_window_profile() {
+        let s = Schedule {
+            windows: vec![win("w1", Some("strict"), false)],
+        };
+        let e = evaluate_at(&s, "mon", 10 * 60);
+        assert!(e.active);
+        assert_eq!(e.profile_id.as_deref(), Some("strict"));
+    }
+
+    #[test]
+    fn a_locked_window_wins_the_profile_when_windows_overlap() {
+        let s = Schedule {
+            windows: vec![win("w1", Some("lax"), false), win("w2", Some("strict"), true)],
+        };
+        let e = evaluate_at(&s, "mon", 10 * 60);
+        assert!(e.locked);
+        assert_eq!(e.profile_id.as_deref(), Some("strict"));
+    }
+
+    #[test]
+    fn repointing_a_window_at_a_laxer_profile_is_blocked() {
+        let prev = Schedule {
+            windows: vec![win("w1", Some("strict"), false)],
+        };
+        let next = Schedule {
+            windows: vec![win("w1", Some("lax"), false)],
+        };
+        assert!(!is_at_least_as_restrictive(&prev, &next, &profiles(), "strict"));
+    }
+
+    #[test]
+    fn repointing_a_window_at_a_stricter_profile_is_allowed() {
+        let prev = Schedule {
+            windows: vec![win("w1", Some("lax"), false)],
+        };
+        let next = Schedule {
+            windows: vec![win("w1", Some("strict"), false)],
+        };
+        assert!(is_at_least_as_restrictive(&prev, &next, &profiles(), "strict"));
+    }
+
+    #[test]
+    fn an_unpinned_window_resolves_to_the_active_profile() {
+        // prev inherits "strict" (the active profile); next pins the laxer one.
+        let prev = Schedule {
+            windows: vec![win("w1", None, false)],
+        };
+        let next = Schedule {
+            windows: vec![win("w1", Some("lax"), false)],
+        };
+        assert!(!is_at_least_as_restrictive(&prev, &next, &profiles(), "strict"));
+        assert!(is_at_least_as_restrictive(&next, &prev, &profiles(), "strict"));
     }
 }

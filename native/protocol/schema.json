@@ -1,6 +1,6 @@
 {
   "$comment": "Language-neutral mirror of packages/shared/src/protocol.ts + events.ts. The TypeScript types are the source of truth; this file documents the same contract for the Rust service. Wire format: newline-delimited JSON, one message per line.",
-  "protocolVersion": 1,
+  "protocolVersion": 2,
   "transport": {
     "windows": "named pipe \\\\.\\pipe\\talysman (dev: talysman-dev)"
   },
@@ -22,6 +22,22 @@
       "domains": "string[]",
       "apps": "AppRef[]"
     },
+    "Profile": {
+      "id": "string",
+      "name": "string",
+      "color": "string",
+      "policy": "Policy",
+      "$comment": "A named policy. Focus enforces exactly one profile at a time; ServiceState.policy is the derived active profile's policy."
+    },
+    "ScheduleWindow": {
+      "id": "string",
+      "days": "string[]",
+      "start": "HH:MM",
+      "end": "HH:MM",
+      "profileId": "string?",
+      "locked": "boolean",
+      "$comment": "profileId switches the active blocking profile for the length of the window; omitted keeps whatever is already active."
+    },
     "Settings": {
       "browserHandshakeEnabled": "boolean"
     },
@@ -35,7 +51,30 @@
     "getState": { "params": null, "result": "ServiceState" },
     "ping": { "params": null, "result": { "version": "string", "protocolVersion": "number" } },
     "getKeyPresence": { "params": null, "result": { "present": "boolean", "keyId": "string?" } },
-    "setPolicy": { "params": { "policy": "Policy" }, "result": { "ok": true } },
+    "setPolicy": {
+      "params": { "policy": "Policy" },
+      "result": { "ok": true },
+      "errors": ["KEY_REQUIRED"],
+      "$comment": "Shorthand for setProfile on the active profile."
+    },
+    "setProfile": {
+      "params": { "profile": "Profile" },
+      "result": { "ok": true },
+      "errors": ["KEY_REQUIRED", "BAD_REQUEST"],
+      "$comment": "Create or replace one profile. Relaxing any profile's policy is key-gated, active or not — a locked window may switch to it later."
+    },
+    "deleteProfile": {
+      "params": { "profileId": "string" },
+      "result": { "ok": true },
+      "errors": ["KEY_REQUIRED", "LOCKED", "LAST_PROFILE", "BAD_REQUEST"],
+      "$comment": "Key-gated when the profile is active or referenced by a schedule window. Orphaned windows fall back to the active profile."
+    },
+    "setActiveProfile": {
+      "params": { "profileId": "string" },
+      "result": { "ok": true },
+      "errors": ["KEY_REQUIRED", "LOCKED", "BAD_REQUEST"],
+      "$comment": "Refused inside a locked window; key-gated when the switch loosens blocking and focus is active (or a locked window exists)."
+    },
     "setSchedule": { "params": { "schedule": "Schedule" }, "result": { "ok": true } },
     "setBrowserHandshake": {
       "params": { "enabled": "boolean" },
@@ -64,10 +103,11 @@
     "keyPresenceChanged": { "present": "boolean", "keyId": "string?" },
     "focusChanged": { "active": "boolean", "source": "user|schedule|boot|recover" },
     "policyChanged": { "policy": "Policy" },
+    "profilesChanged": { "profiles": "Profile[]", "activeProfileId": "string" },
     "scheduleFired": { "windowId": "string", "active": "boolean" },
     "settingsChanged": { "settings": "Settings" },
     "browserWatchdogWarning": { "browser": "string", "pid": "number" },
     "browserWatchdogKilled": { "browser": "string", "pid": "number" }
   },
-  "errorCodes": ["KEY_REQUIRED", "NO_PAIRED_KEY", "LAST_PAIRED_KEY", "LOCKED", "BAD_RECOVERY_CODE", "BAD_REQUEST", "INTERNAL"]
+  "errorCodes": ["KEY_REQUIRED", "NO_PAIRED_KEY", "LAST_PAIRED_KEY", "LAST_PROFILE", "LOCKED", "BAD_RECOVERY_CODE", "BAD_REQUEST", "INTERNAL"]
 }

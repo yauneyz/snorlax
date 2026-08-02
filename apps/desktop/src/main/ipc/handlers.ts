@@ -38,9 +38,12 @@ import {
 import {
   type CheckoutPrice,
   constrainPolicyToLimits,
+  constrainProfilesToLimits,
   constrainScheduleToLimits,
   limitsForPlan,
+  maxProfiles,
   validatePolicyForLimits,
+  validateProfilesForLimits,
   validateScheduleForLimits,
   type SubscriptionPlan,
 } from '../../shared/productLimits.js';
@@ -67,6 +70,7 @@ const FORWARDED_EVENTS: EventName[] = [
   'keyPresenceChanged',
   'focusChanged',
   'policyChanged',
+  'profilesChanged',
   'scheduleFired',
   'settingsChanged',
   'browserWatchdogWarning',
@@ -154,22 +158,38 @@ async function applyCurrentPlanLimits(service: ServiceConnection): Promise<void>
   if (!limits) return;
 
   const state = await service.request('getState', undefined);
-  const policy = constrainPolicyToLimits(state.policy, limits);
   const schedule = constrainScheduleToLimits(state.schedule, limits);
+  const profiles = constrainProfilesToLimits(state.profiles, state.activeProfileId, limits);
+  const policy = constrainPolicyToLimits(state.policy, limits);
 
-  // Trimming policy/schedule to plan limits can relax them (free clears all schedule windows and
-  // caps the blocklist). The service gates any loosening behind the USB key, so these may be
-  // refused — in which case the stricter state stays until the user unlocks. That's the intended
-  // fail-safe, so swallow the gate errors instead of failing the whole sync.
-  await applyConstrainedState(service, 'setPolicy', { policy }, 'policy');
+  // Trimming policy/profiles/schedule to plan limits can relax them (free clears all schedule
+  // windows, keeps one profile, and caps the blocklist). The service gates any loosening behind
+  // the USB key, so these may be refused — in which case the stricter state stays until the user
+  // unlocks. That's the intended fail-safe, so swallow the gate errors instead of failing the
+  // whole sync.
+  //
+  // Order matters: the schedule goes first because a window pointing at a profile makes deleting
+  // that profile key-gated, and on Free those windows are being dropped anyway.
   await applyConstrainedState(service, 'setSchedule', { schedule }, 'schedule');
+  for (const dropped of state.profiles) {
+    if (profiles.some((kept) => kept.id === dropped.id)) continue;
+    await applyConstrainedState(
+      service,
+      'deleteProfile',
+      { profileId: dropped.id },
+      `profile "${dropped.name}"`,
+    );
+  }
+  await applyConstrainedState(service, 'setPolicy', { policy }, 'policy');
 }
 
+type ConstrainedMethod = 'setPolicy' | 'setSchedule' | 'deleteProfile';
+
 /** Apply a plan-limit-constrained update, tolerating the service's key gate on any relaxation. */
-async function applyConstrainedState(
+async function applyConstrainedState<M extends ConstrainedMethod>(
   service: ServiceConnection,
-  method: 'setPolicy' | 'setSchedule',
-  params: Params<'setPolicy'> | Params<'setSchedule'>,
+  method: M,
+  params: Params<M>,
   label: string,
 ): Promise<void> {
   try {
@@ -216,6 +236,24 @@ export async function registerIpcHandlers(ctx: HandlerContext): Promise<void> {
         const params = arg.params as Params<'setPolicy'>;
         const violations = validatePolicyForLimits(params.policy, limits);
         if (violations[0]) return limitError(violations[0].message);
+      }
+
+      if (arg.method === 'setProfile') {
+        const params = arg.params as Params<'setProfile'>;
+        const policyViolations = validatePolicyForLimits(params.profile.policy, limits);
+        if (policyViolations[0]) return limitError(policyViolations[0].message);
+
+        // Only a *new* profile can push the user over the plan's profile allowance.
+        if (maxProfiles(limits) !== null) {
+          const state = await service.request('getState', undefined);
+          if (!state.profiles.some((p) => p.id === params.profile.id)) {
+            const violations = validateProfilesForLimits(
+              [...state.profiles, params.profile],
+              limits,
+            );
+            if (violations[0]) return limitError(violations[0].message);
+          }
+        }
       }
 
       if (arg.method === 'setSchedule') {

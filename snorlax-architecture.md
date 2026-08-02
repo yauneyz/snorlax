@@ -431,8 +431,11 @@ need a real OS IPC channel between them.
 | Method | Payload | Returns | Notes |
 |---|---|---|---|
 | `getState` | – | full state snapshot | called on connect |
-| `setPolicy` | `Policy` | ok | edit blocklists / mode |
-| `setSchedule` | `Schedule` | ok | replace schedule |
+| `setPolicy` | `Policy` | ok \| `KEY_REQUIRED` | shorthand: edit the **active** profile's policy |
+| `setProfile` | `Profile` | ok \| `KEY_REQUIRED` | create or replace one blocking profile |
+| `deleteProfile` | `{ profileId }` | ok \| `KEY_REQUIRED` \| `LOCKED` \| `LAST_PROFILE` | key-gated when active or scheduled |
+| `setActiveProfile` | `{ profileId }` | ok \| `KEY_REQUIRED` \| `LOCKED` | switch which profile focus enforces |
+| `setSchedule` | `Schedule` | ok \| `KEY_REQUIRED` | replace schedule |
 | `enableFocus` | `{ reason }` | ok | turn blocking on |
 | `disableFocus` | `{ }` | ok \| `KEY_REQUIRED` | **service re-checks USB presence itself** |
 | `listRemovableDrives` | – | `Drive[]` | for the pairing picker |
@@ -447,7 +450,8 @@ need a real OS IPC channel between them.
 |---|---|---|
 | `keyPresenceChanged` | `{ present, keyId? }` | drives the red/green indicator |
 | `focusChanged` | `{ active, source }` | focus toggled (by user, schedule, or boot) |
-| `policyChanged` | `Policy` | state changed, UI should refresh |
+| `policyChanged` | `Policy` | the *enforced* (active profile's) policy changed |
+| `profilesChanged` | `{ profiles, activeProfileId }` | a profile was added/edited/removed, or the active one switched |
 | `scheduleFired` | `{ windowId, active }` | a schedule window started/ended |
 
 **Security at the boundary:** `disableFocus` and `unpairKey` cause the service to physically
@@ -490,6 +494,42 @@ wildcards into the matcher form each enforcer expects, dedupes, and rejects nons
 **normalized** policy is what crosses the IPC boundary to the service, so the privileged code
 receives clean, validated input and never has to parse user free-text.
 
+### 7.1 Blocking profiles
+
+A **profile** is a named policy (`packages/shared/src/profile.ts`). Users keep several — "Deep
+Work", "Evening", "Weekend" — and exactly one is *active* at a time. **Focus executes the active
+profile**, and schedule windows switch it (§8).
+
+```ts
+interface Profile {
+  id: string;
+  name: string;
+  color: string;   // accent used to identify the profile in the UI
+  policy: Policy;
+}
+```
+
+The service stores `profiles[]` + `activeProfileId` and derives `ServiceState.policy` from them.
+That derived field is what enforcement, the browser extension, and `policyChanged` consume, so
+**the enforcement layer knows nothing about profiles** — it only ever sees one flat policy.
+
+Pre-profile state files stored a single bare `policy`; `PersistentState::migrate` folds it into
+the default profile on load and never writes the legacy field back.
+
+**Key gating.** The invariant is unchanged from single-policy Talysman — *the enforced policy
+never gets laxer without the key*:
+
+- Relaxing **any** profile's policy is key-gated, active or not. A dormant profile can be
+  switched in by a locked window later, so pre-loosening one must cost the same.
+- Deleting a profile is key-gated when it is active or referenced by a schedule window, and
+  refused outright (`LAST_PROFILE`) when it is the only one.
+- Switching the active profile is refused inside a locked window, and key-gated when the switch
+  loosens blocking while something is enforcing it (focus on, or a locked window exists).
+
+**Plan limits.** Free gets one profile; Pro is unlimited (`packages/product`). On downgrade,
+`constrainProfilesToLimits` keeps the **active** profile rather than the first, so a plan change
+never silently swaps out what is being enforced.
+
 ---
 
 ## 8. Schedule system
@@ -504,7 +544,7 @@ interface ScheduleWindow {
   days: Weekday[];          // ['mon','tue','wed','thu','fri']
   start: string;            // "09:00" (local time)
   end: string;              // "17:00"
-  policyId?: string;        // optionally a different policy per window
+  profileId?: string;       // blocking profile to switch to; omitted = keep the active one
   locked: boolean;          // if true, USB key cannot disable during this window
 }
 interface Schedule { windows: ScheduleWindow[]; }
@@ -513,6 +553,12 @@ interface Schedule { windows: ScheduleWindow[]; }
 - The service keeps a timer that wakes at the next boundary, calls the pure engine to
   evaluate the current state, and flips focus accordingly — emitting `focusChanged` /
   `scheduleFired`.
+- **Scheduling is per profile.** A covering window that names a `profileId` switches the active
+  profile for its duration, even mid-session. That switch is *not* key-gated: it replays the
+  user's earlier, already-gated decision. Where windows overlap, a locked one wins and its
+  profile is the one enforced.
+- Because a window's profile is part of what it enforces, repointing a window at a laxer profile
+  counts as relaxing the schedule and needs the key, exactly like shrinking or unlocking it.
 - `locked` windows are the "no escape" mode: during a locked window even a present USB key
   won't disable focus. Manual (non-scheduled) focus is always key-disableable. This gives
   you both "soft" and "hard" commitment options.

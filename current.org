@@ -37,7 +37,7 @@ For pricing:
 - Add the free forever tier:
 
 
-  - 3 websites blocked
+  - 5 websites blocked
   - prove to yourself that Talysman works for you
 - No "standard vs priority support
 - Paid tiers have:

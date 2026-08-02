@@ -1,6 +1,6 @@
 //! Constants mirrored from packages/shared/src/constants.ts.
 
-pub const PROTOCOL_VERSION: u32 = 1;
+pub const PROTOCOL_VERSION: u32 = 2;
 pub const SERVICE_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 pub const SERVICE_NAME: &str = "talysman";
@@ -25,6 +25,7 @@ pub mod err {
     pub const KEY_REQUIRED: &str = "KEY_REQUIRED";
     pub const NO_PAIRED_KEY: &str = "NO_PAIRED_KEY";
     pub const LAST_PAIRED_KEY: &str = "LAST_PAIRED_KEY";
+    pub const LAST_PROFILE: &str = "LAST_PROFILE";
     pub const LOCKED: &str = "LOCKED";
     pub const BAD_RECOVERY_CODE: &str = "BAD_RECOVERY_CODE";
     pub const BAD_REQUEST: &str = "BAD_REQUEST";

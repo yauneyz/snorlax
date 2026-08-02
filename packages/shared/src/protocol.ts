@@ -8,6 +8,7 @@
  */
 
 import type { Policy } from './policy.js';
+import type { Profile } from './profile.js';
 import type { Schedule } from './schedule.js';
 import type { Settings, BrowserHealth } from './settings.js';
 import type { ErrorCode } from './constants.js';
@@ -48,6 +49,11 @@ export interface ServiceState {
   serviceVersion: string;
   focusActive: boolean;
   focusSource: FocusSource;
+  /** Every blocking profile the user has defined; never empty. */
+  profiles: Profile[];
+  /** Which profile focus enforces right now. */
+  activeProfileId: string;
+  /** Derived: the active profile's policy. This is what enforcement actually applies. */
   policy: Policy;
   schedule: Schedule;
   settings: Settings;
@@ -64,7 +70,27 @@ export interface ServiceState {
 
 export interface RequestMap {
   getState: { params: void; result: ServiceState };
+  /**
+   * Edit the **active** profile's policy. Kept as the flat shorthand the blocklist editor uses;
+   * gated exactly like `setProfile` on the active profile.
+   */
   setPolicy: { params: { policy: Policy }; result: Ok };
+  /**
+   * Create or replace one profile. Relaxing a profile's policy is key-gated — a profile that is
+   * not active today may be switched in by a locked schedule window tomorrow, so pre-loosening
+   * it must cost the same as loosening the live one.
+   */
+  setProfile: { params: { profile: Profile }; result: Ok };
+  /**
+   * Remove a profile. Key-gated when the profile is active or referenced by a schedule window;
+   * may fail LAST_PROFILE when it is the only one left.
+   */
+  deleteProfile: { params: { profileId: string }; result: Ok };
+  /**
+   * Switch which profile focus enforces. Free while focus is off; key-gated while focus is
+   * active (any switch can relax what is currently blocked) and refused during a locked window.
+   */
+  setActiveProfile: { params: { profileId: string }; result: Ok };
   setSchedule: { params: { schedule: Schedule }; result: Ok };
   /**
    * Toggle the browser handshake strict mode. Enabling is free; **disabling** is gated

@@ -17,6 +17,8 @@ export interface ScheduleEvaluation {
   active: boolean;
   /** The window currently driving `active`, if any. */
   windowId?: string;
+  /** Blocking profile the driving window switches to, if it names one. */
+  profileId?: string;
   /** True if the active window is locked (USB key cannot disable). */
   locked: boolean;
 }
@@ -62,6 +64,9 @@ export function windowCovers(window: ScheduleWindow, day: Weekday, minuteOfDay: 
 /**
  * Evaluate the whole schedule at `now`. Focus is active if any window covers the instant.
  * `locked` is true if any *covering* window is locked (lock wins for safety).
+ *
+ * The reported window also decides which blocking profile the schedule wants enforced. When
+ * windows overlap a locked one wins, otherwise the first covering window does.
  */
 export function evaluateSchedule(schedule: Schedule, now: Date): ScheduleEvaluation {
   const day = weekdayOf(now);
@@ -70,17 +75,23 @@ export function evaluateSchedule(schedule: Schedule, now: Date): ScheduleEvaluat
   let active = false;
   let locked = false;
   let windowId: string | undefined;
+  let profileId: string | undefined;
 
   for (const w of schedule.windows) {
     if (windowCovers(w, day, minute)) {
       active = true;
-      if (!windowId) windowId = w.id;
-      if (w.locked) {
+      if (!windowId) {
+        windowId = w.id;
+        profileId = w.profileId;
+      }
+      if (w.locked && !locked) {
         locked = true;
-        windowId = w.id; // prefer reporting the locked window
+        // Prefer reporting the locked window — and the profile it demands.
+        windowId = w.id;
+        profileId = w.profileId;
       }
     }
   }
 
-  return { active, windowId, locked };
+  return { active, windowId, profileId, locked };
 }

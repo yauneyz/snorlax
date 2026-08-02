@@ -50,7 +50,7 @@ I found three high-priority edge cases and several medium/low-priority UX incons
 | Resolved | Paid users can redeem a complimentary code without billing changing             | Redemption now immediately cancels any current paid subscription                              |
 | Resolved | Web account copy does not represent cancellation or price cleanly               | Typed plan/cancellation copy is used and unknown price IDs remain unknown                      |
 | Low      | Signed-in marketing header still shows Get started                              | It redirects through signup and commonly lands back where the user started                    |
-| Resolved | Free-plan allowance differs between pricing and enforcement                     | One shared product constant now sets all surfaces to 3 blocked sites                           |
+| Resolved | Free-plan allowance differs between pricing and enforcement                     | One shared product constant now sets all surfaces to 5 blacklist sites                         |
 
 ## Findings
 
@@ -343,11 +343,11 @@ like a button that reloads the user's current page through two unrelated routes.
 Make the CTA session-aware: Dashboard for entitled users, Choose a plan or Download for
 free users, and no redundant CTA when already on its destination.
 
-### 10. Resolved — free-plan copy and enforcement share one limit
+### 10. Resolved — free-plan blacklist copy and enforcement share one limit
 
 Originally, web pricing promised "3 websites blocked," while desktop Plans and the product
-limit enforced 5. This could make a free user believe they received an unexplained upgrade
-or make pricing look stale.
+blacklist limit enforced 5. This could make a free user believe they received an unexplained
+upgrade or make pricing look stale.
 
 **Evidence**
 
@@ -358,7 +358,8 @@ or make pricing look stale.
 **Resolution**
 
 `FREE_BLOCKED_SITE_LIMIT` is exported from the shared product package with the value
-`3`. Product enforcement plus web and desktop plan copy all consume that constant.
+`5`. Blacklist enforcement plus web and desktop plan copy all consume that constant. Whitelist
+mode and its website list are unlimited on Free, and block-all is also included.
 
 ## Lower-confidence edge worth a targeted test
 
@@ -405,4 +406,4 @@ Relevant code:
 6. Tighten desktop billing-button visibility. **Done:** paid/comp redemption now cancels
    the paid subscription.
 7. Clean up the remaining account/header copy. **Done:** pricing and enforcement now share
-   the three-site limit.
+   the five-site limit.

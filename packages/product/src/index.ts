@@ -1,9 +1,12 @@
 import { z } from 'zod';
-import type { Mode, Policy, Schedule } from '@talysman/shared';
+import type { Mode, Policy, Profile, Schedule } from '@talysman/shared';
+import { resolveActiveProfile } from '@talysman/shared';
 
 export const SUBSCRIPTION_PLANS = ['free', 'pro'] as const;
 export const CHECKOUT_PRICES = ['monthly', 'yearly'] as const;
-export const FREE_BLOCKED_SITE_LIMIT = 3;
+export const FREE_BLOCKED_SITE_LIMIT = 5;
+/** Free keeps a single blocking profile; Pro is unlimited. */
+export const FREE_PROFILE_LIMIT = 1;
 export const ENTITLEMENT_GRACE_PERIOD_MS = 30 * 24 * 60 * 60 * 1000;
 
 export const subscriptionPlanSchema = z.enum(SUBSCRIPTION_PLANS);
@@ -57,8 +60,11 @@ type LimitedValue = number | null;
 export interface ProductLimits {
   policy?: {
     modes?: readonly Mode[];
-    maxDomains?: LimitedValue;
+    maxDomainsByMode?: Partial<Record<Mode, LimitedValue>>;
     maxApps?: LimitedValue;
+  };
+  profiles?: {
+    max?: LimitedValue;
   };
   schedule?: {
     enabled?: boolean;
@@ -66,15 +72,18 @@ export interface ProductLimits {
 }
 
 export interface LimitViolation {
-  field: 'policy.mode' | 'policy.domains' | 'policy.apps' | 'schedule';
+  field: 'policy.mode' | 'policy.domains' | 'policy.apps' | 'profiles' | 'schedule';
   message: string;
 }
 
 const FREE_LIMITS: ProductLimits = {
   policy: {
-    modes: ['blacklist', 'block-all'],
-    maxDomains: FREE_BLOCKED_SITE_LIMIT,
+    modes: ['blacklist', 'whitelist', 'block-all'],
+    maxDomainsByMode: { blacklist: FREE_BLOCKED_SITE_LIMIT },
     maxApps: 0,
+  },
+  profiles: {
+    max: FREE_PROFILE_LIMIT,
   },
   schedule: {
     enabled: false,
@@ -122,12 +131,17 @@ export function allowedPolicyModes(limits: ProductLimits | null): readonly Mode[
   return limits?.policy?.modes ?? null;
 }
 
-export function maxPolicyDomains(limits: ProductLimits | null): LimitedValue {
-  return limits?.policy?.maxDomains ?? null;
+export function maxPolicyDomains(limits: ProductLimits | null, mode: Mode): LimitedValue {
+  return limits?.policy?.maxDomainsByMode?.[mode] ?? null;
 }
 
 export function maxPolicyApps(limits: ProductLimits | null): LimitedValue {
   return limits?.policy?.maxApps ?? null;
+}
+
+/** How many blocking profiles the plan allows; null means unlimited. */
+export function maxProfiles(limits: ProductLimits | null): LimitedValue {
+  return limits?.profiles?.max ?? null;
 }
 
 export function validatePolicyForLimits(
@@ -138,20 +152,20 @@ export function validatePolicyForLimits(
 
   const violations: LimitViolation[] = [];
   const modes = allowedPolicyModes(limits);
-  const maxDomains = maxPolicyDomains(limits);
+  const maxDomains = maxPolicyDomains(limits, policy.mode);
   const maxApps = maxPolicyApps(limits);
 
   if (modes && !modes.includes(policy.mode)) {
     violations.push({
       field: 'policy.mode',
-      message: 'Free supports blacklist and block-all modes only.',
+      message: 'This policy mode is not available on Free.',
     });
   }
 
   if (maxDomains !== null && policy.domains.length > maxDomains) {
     violations.push({
       field: 'policy.domains',
-      message: `Free supports up to ${maxDomains} blocked websites.`,
+      message: `Free supports up to ${maxDomains} blocked websites in blacklist mode.`,
     });
   }
 
@@ -163,6 +177,23 @@ export function validatePolicyForLimits(
   }
 
   return violations;
+}
+
+export function validateProfilesForLimits(
+  profiles: readonly Profile[],
+  limits: ProductLimits | null,
+): LimitViolation[] {
+  const max = maxProfiles(limits);
+  if (max === null || profiles.length <= max) return [];
+  return [
+    {
+      field: 'profiles',
+      message:
+        max === 1
+          ? 'Free includes one blocking profile. Upgrade for unlimited profiles.'
+          : `Free supports up to ${max} blocking profiles.`,
+    },
+  ];
 }
 
 export function validateScheduleForLimits(
@@ -177,14 +208,34 @@ export function constrainPolicyToLimits(policy: Policy, limits: ProductLimits | 
   if (!limits?.policy) return policy;
 
   const modes = allowedPolicyModes(limits);
-  const maxDomains = maxPolicyDomains(limits);
   const maxApps = maxPolicyApps(limits);
+  const mode = modes?.includes(policy.mode) ? policy.mode : modes?.[0] ?? policy.mode;
+  const maxDomains = maxPolicyDomains(limits, mode);
 
   return {
-    mode: modes?.includes(policy.mode) ? policy.mode : modes?.[0] ?? policy.mode,
+    mode,
     domains: maxDomains === null ? policy.domains : policy.domains.slice(0, maxDomains),
     apps: maxApps === null ? policy.apps : policy.apps.slice(0, maxApps),
   };
+}
+
+/**
+ * Trim the profile set to the plan's allowance. The *active* profile is always the one kept —
+ * a downgrade must never silently swap out what is being enforced right now. The returned
+ * profiles are otherwise order-stable.
+ */
+export function constrainProfilesToLimits(
+  profiles: readonly Profile[],
+  activeProfileId: string,
+  limits: ProductLimits | null,
+): Profile[] {
+  const max = maxProfiles(limits);
+  if (max === null || profiles.length <= max) return profiles as Profile[];
+  if (max <= 0) return profiles.slice(0, 1);
+
+  const active = resolveActiveProfile(profiles, activeProfileId);
+  const kept = profiles.filter((p) => p.id !== active?.id).slice(0, Math.max(0, max - 1));
+  return profiles.filter((p) => p.id === active?.id || kept.includes(p));
 }
 
 export function constrainScheduleToLimits(

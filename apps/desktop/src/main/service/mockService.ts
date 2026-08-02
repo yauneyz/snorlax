@@ -9,17 +9,24 @@
  */
 
 import {
+  DEFAULT_PROFILE_ID,
+  DEFAULT_PROFILE_NAME,
   DEFAULT_SETTINGS,
   EMPTY_POLICY,
   EMPTY_SCHEDULE,
   ErrorCode,
+  MAX_PROFILE_NAME_LENGTH,
+  PROFILE_COLORS,
   PROTOCOL_VERSION,
+  activePolicy,
+  upsertProfile,
   type Drive,
   type EventName,
   type EventPayload,
   type Method,
   type PairedKey,
   type Params,
+  type Profile,
   type Result,
   type ServiceState,
   OK,
@@ -52,6 +59,15 @@ export class MockServiceConnection implements ServiceConnection {
     serviceVersion: '0.1.0-mock',
     focusActive: false,
     focusSource: 'boot',
+    profiles: [
+      {
+        id: DEFAULT_PROFILE_ID,
+        name: DEFAULT_PROFILE_NAME,
+        color: PROFILE_COLORS[0],
+        policy: { ...EMPTY_POLICY, domains: ['youtube.com', '*.reddit.com'] },
+      },
+    ],
+    activeProfileId: DEFAULT_PROFILE_ID,
     policy: { ...EMPTY_POLICY, domains: ['youtube.com', '*.reddit.com'] },
     schedule: EMPTY_SCHEDULE,
     settings: { ...DEFAULT_SETTINGS },
@@ -83,10 +99,29 @@ export class MockServiceConnection implements ServiceConnection {
     const evalNow = evaluateSchedule(this.state.schedule, new Date());
     return {
       ...this.state,
+      policy: activePolicy(this.state.profiles, this.state.activeProfileId),
       keyPresent: this.keyPresent,
       presentKeyId: this.presentKeyId,
       scheduleLocked: evalNow.active && evalNow.locked,
     };
+  }
+
+  /**
+   * Write a new profile set / active profile and announce it. `policy` is derived here so the
+   * flat snapshot field and the profiles can never disagree.
+   */
+  private commitProfiles(profiles: Profile[], activeProfileId = this.state.activeProfileId): void {
+    const policy = activePolicy(profiles, activeProfileId);
+    const policyChanged = JSON.stringify(policy) !== JSON.stringify(this.state.policy);
+    this.state = { ...this.state, profiles, activeProfileId, policy };
+    this.emit('profilesChanged', { profiles, activeProfileId });
+    if (policyChanged) this.emit('policyChanged', { policy });
+  }
+
+  /** Drop the `rejected` diagnostics so what we store is a plain Policy. */
+  private clean(policy: Parameters<typeof normalizePolicy>[0]) {
+    const { rejected: _rejected, ...clean } = normalizePolicy(policy);
+    return clean;
   }
 
   /** Dev-only: simulate plugging/unplugging the paired key. */
@@ -110,14 +145,87 @@ export class MockServiceConnection implements ServiceConnection {
         return { present: this.keyPresent, keyId: this.presentKeyId } as Result<M>;
 
       case 'setPolicy': {
+        // The flat shorthand: edit whichever profile is active.
         const policy = (params as Params<'setPolicy'>).policy;
-        this.state.policy = normalizePolicy(policy);
-        this.emit('policyChanged', { policy: this.state.policy });
+        const active = this.state.profiles.find((p) => p.id === this.state.activeProfileId);
+        if (!active) throw err(ErrorCode.INTERNAL, 'No active profile.');
+        this.commitProfiles(
+          upsertProfile(this.state.profiles, { ...active, policy: this.clean(policy) }),
+        );
+        return OK;
+      }
+
+      case 'setProfile': {
+        const { profile } = params as Params<'setProfile'>;
+        const name = profile.name.trim();
+        if (!profile.id.trim()) throw err(ErrorCode.BAD_REQUEST, 'Profile id cannot be empty.');
+        if (!name) throw err(ErrorCode.BAD_REQUEST, 'Profile name cannot be empty.');
+        if (name.length > MAX_PROFILE_NAME_LENGTH) {
+          throw err(
+            ErrorCode.BAD_REQUEST,
+            `Profile names are limited to ${MAX_PROFILE_NAME_LENGTH} characters.`,
+          );
+        }
+        this.commitProfiles(
+          upsertProfile(this.state.profiles, { ...profile, name, policy: this.clean(profile.policy) }),
+        );
+        return OK;
+      }
+
+      case 'deleteProfile': {
+        const { profileId } = params as Params<'deleteProfile'>;
+        if (!this.state.profiles.some((p) => p.id === profileId)) {
+          throw err(ErrorCode.BAD_REQUEST, 'Profile not found.');
+        }
+        if (this.state.profiles.length === 1) {
+          throw err(ErrorCode.LAST_PROFILE, 'Keep at least one blocking profile.');
+        }
+        const isActive = this.state.activeProfileId === profileId;
+        const scheduled = this.state.schedule.windows.some((w) => w.profileId === profileId);
+        if (isActive || scheduled) {
+          if (this.snapshot().scheduleLocked) {
+            throw err(ErrorCode.LOCKED, 'A locked schedule window is active.');
+          }
+          if (!this.keyPresent) {
+            throw err(ErrorCode.KEY_REQUIRED, 'Insert your paired key to delete this profile.');
+          }
+        }
+        const profiles = this.state.profiles.filter((p) => p.id !== profileId);
+        // Orphaned windows fall back to whatever profile is active when they fire.
+        this.state.schedule = {
+          windows: this.state.schedule.windows.map((w) =>
+            w.profileId === profileId ? { ...w, profileId: undefined } : w,
+          ),
+        };
+        this.commitProfiles(profiles, isActive ? profiles[0]!.id : this.state.activeProfileId);
+        return OK;
+      }
+
+      case 'setActiveProfile': {
+        const { profileId } = params as Params<'setActiveProfile'>;
+        if (!this.state.profiles.some((p) => p.id === profileId)) {
+          throw err(ErrorCode.BAD_REQUEST, 'Profile not found.');
+        }
+        if (profileId === this.state.activeProfileId) return OK;
+        if (this.snapshot().scheduleLocked) {
+          throw err(ErrorCode.LOCKED, 'A locked schedule window is active.');
+        }
+        // Switching while the shield is up can loosen what is blocked, so it costs the key.
+        if (this.state.focusActive && !this.keyPresent) {
+          throw err(ErrorCode.KEY_REQUIRED, 'Insert your paired key to switch profiles.');
+        }
+        this.commitProfiles(this.state.profiles, profileId);
         return OK;
       }
 
       case 'setSchedule': {
-        this.state.schedule = (params as Params<'setSchedule'>).schedule;
+        const { schedule } = params as Params<'setSchedule'>;
+        for (const w of schedule.windows) {
+          if (w.profileId && !this.state.profiles.some((p) => p.id === w.profileId)) {
+            throw err(ErrorCode.BAD_REQUEST, `Unknown blocking profile: ${w.profileId}`);
+          }
+        }
+        this.state.schedule = schedule;
         return OK;
       }
 

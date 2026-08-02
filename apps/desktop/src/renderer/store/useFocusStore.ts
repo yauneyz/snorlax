@@ -5,8 +5,15 @@
  */
 
 import { create } from 'zustand';
-import type { Policy, Schedule, ServiceState, Settings } from '@talysman/shared';
-import { EMPTY_POLICY, EMPTY_SCHEDULE, DEFAULT_SETTINGS } from '@talysman/shared';
+import type { Policy, Profile, Schedule, ServiceState, Settings } from '@talysman/shared';
+import {
+  DEFAULT_PROFILE,
+  DEFAULT_PROFILE_ID,
+  DEFAULT_SETTINGS,
+  EMPTY_POLICY,
+  EMPTY_SCHEDULE,
+  resolveActiveProfile,
+} from '@talysman/shared';
 import {
   appInfo,
   authStatus,
@@ -45,6 +52,11 @@ interface FocusStore {
   focusActive: boolean;
   keyPresent: boolean;
   scheduleLocked: boolean;
+  /** Every blocking profile the user has defined. */
+  profiles: Profile[];
+  /** The profile focus enforces; also what the blocklist editor edits. */
+  activeProfileId: string;
+  /** Derived by the service: the active profile's policy. */
   policy: Policy;
   schedule: Schedule;
   settings: Settings;
@@ -90,6 +102,8 @@ export const useFocusStore = create<FocusStore>((set, get) => ({
   focusActive: false,
   keyPresent: false,
   scheduleLocked: false,
+  profiles: [DEFAULT_PROFILE],
+  activeProfileId: DEFAULT_PROFILE_ID,
   policy: EMPTY_POLICY,
   schedule: EMPTY_SCHEDULE,
   settings: DEFAULT_SETTINGS,
@@ -101,6 +115,8 @@ export const useFocusStore = create<FocusStore>((set, get) => ({
       focusActive: s.focusActive,
       keyPresent: s.keyPresent,
       scheduleLocked: s.scheduleLocked,
+      profiles: s.profiles,
+      activeProfileId: s.activeProfileId,
       policy: s.policy,
       schedule: s.schedule,
       settings: s.settings,
@@ -202,6 +218,13 @@ export const useFocusStore = create<FocusStore>((set, get) => ({
     onEvent('keyPresenceChanged', ({ present }) => set({ keyPresent: present }));
     onEvent('focusChanged', ({ active }) => set({ focusActive: active }));
     onEvent('policyChanged', ({ policy }) => set({ policy }));
+    onEvent('profilesChanged', ({ profiles, activeProfileId }) =>
+      set({
+        profiles,
+        activeProfileId,
+        policy: resolveActiveProfile(profiles, activeProfileId)?.policy ?? EMPTY_POLICY,
+      }),
+    );
     onEvent('settingsChanged', ({ settings }) => set({ settings }));
     onEvent('browserWatchdogWarning', ({ browser, pid }) => set({ watchdogWarning: { browser, pid } }));
     onEvent('scheduleFired', () => {

@@ -51,7 +51,8 @@ export function Plans() {
         </div>
         <div className="flex flex-col gap-2 text-sm text-slate-300">
           <div>{FREE_BLOCKED_SITE_LIMIT} blocked websites</div>
-          <div>Blacklist mode</div>
+          <div>Unlimited websites in whitelist mode</div>
+          <div>One blocking profile</div>
           <div>Block-all internet mode</div>
           <div>Manual focus toggle</div>
           <div>USB key required to turn focus off</div>
@@ -65,9 +66,9 @@ export function Plans() {
         </div>
         <div className="mb-5 flex flex-col gap-2 text-sm text-slate-300">
           <div>Unlimited blocked websites</div>
+          <div>Unlimited blocking profiles</div>
           <div>App blocking</div>
-          <div>Scheduling</div>
-          <div>Whitelist mode</div>
+          <div>Scheduling, profile by profile</div>
           <div>All future Pro features by default</div>
         </div>
         <div className="flex flex-wrap gap-2">

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { ErrorCode } from '@talysman/shared';
+import type { Profile } from '@talysman/shared';
+import { DEFAULT_PROFILE_ID, EMPTY_POLICY, ErrorCode } from '@talysman/shared';
 import { MockServiceConnection } from '../../helpers/mockService.js';
 
 async function pairMockKey(svc: MockServiceConnection, driveId = 'mock-drive-1') {
@@ -79,5 +80,141 @@ describe('MockServiceConnection — focus and key gates', () => {
     await svc.request('unpairKey', { keyId: secondKey.id });
     const state = await svc.request('getState', undefined);
     expect(state.pairedKeys).toHaveLength(1);
+  });
+});
+
+const evening: Profile = {
+  id: 'evening',
+  name: 'Evening',
+  color: '#ff8f6b',
+  policy: { ...EMPTY_POLICY, mode: 'block-all' },
+};
+
+async function addEvening(svc: MockServiceConnection) {
+  await svc.request('setProfile', { profile: evening });
+}
+
+describe('MockServiceConnection — blocking profiles', () => {
+  it('starts with one profile and reports its policy as the enforced one', async () => {
+    const svc = new MockServiceConnection();
+    const state = await svc.request('getState', undefined);
+
+    expect(state.profiles).toHaveLength(1);
+    expect(state.activeProfileId).toBe(DEFAULT_PROFILE_ID);
+    expect(state.policy).toEqual(state.profiles[0]!.policy);
+  });
+
+  it('edits the active profile when setPolicy is used', async () => {
+    const svc = new MockServiceConnection();
+    await svc.request('setPolicy', { policy: { ...EMPTY_POLICY, domains: ['news.example.com'] } });
+
+    const state = await svc.request('getState', undefined);
+    expect(state.profiles[0]!.policy.domains).toEqual(['news.example.com']);
+    expect(state.policy.domains).toEqual(['news.example.com']);
+  });
+
+  it('adds a profile without disturbing which one is enforced', async () => {
+    const svc = new MockServiceConnection();
+    await addEvening(svc);
+
+    const state = await svc.request('getState', undefined);
+    expect(state.profiles.map((p) => p.id)).toEqual([DEFAULT_PROFILE_ID, 'evening']);
+    expect(state.activeProfileId).toBe(DEFAULT_PROFILE_ID);
+    expect(state.policy.mode).toBe('blacklist');
+  });
+
+  it('switches the enforced policy when the active profile changes', async () => {
+    const svc = new MockServiceConnection();
+    await addEvening(svc);
+    const seen: string[] = [];
+    svc.on('policyChanged', ({ policy }) => seen.push(policy.mode));
+
+    await svc.request('setActiveProfile', { profileId: 'evening' });
+
+    const state = await svc.request('getState', undefined);
+    expect(state.activeProfileId).toBe('evening');
+    expect(state.policy.mode).toBe('block-all');
+    expect(seen).toEqual(['block-all']);
+  });
+
+  it('requires the key to switch profiles while focus is on', async () => {
+    const svc = new MockServiceConnection();
+    await addEvening(svc);
+    await pairMockKey(svc);
+    await svc.request('enableFocus', { reason: 'test' });
+
+    await expect(svc.request('setActiveProfile', { profileId: 'evening' })).rejects.toMatchObject({
+      code: ErrorCode.KEY_REQUIRED,
+    });
+
+    svc.devToggleKey(); // plug in
+    await svc.request('setActiveProfile', { profileId: 'evening' });
+    expect((await svc.request('getState', undefined)).activeProfileId).toBe('evening');
+  });
+
+  it('refuses to delete the last profile', async () => {
+    const svc = new MockServiceConnection();
+    await expect(
+      svc.request('deleteProfile', { profileId: DEFAULT_PROFILE_ID }),
+    ).rejects.toMatchObject({ code: ErrorCode.LAST_PROFILE });
+  });
+
+  it('deletes an idle profile freely but key-gates deleting the active one', async () => {
+    const svc = new MockServiceConnection();
+    await addEvening(svc);
+
+    // "evening" is neither active nor scheduled, so it goes without the key.
+    await svc.request('deleteProfile', { profileId: 'evening' });
+    expect((await svc.request('getState', undefined)).profiles).toHaveLength(1);
+
+    await addEvening(svc);
+    await svc.request('setActiveProfile', { profileId: 'evening' });
+    await pairMockKey(svc);
+    await expect(svc.request('deleteProfile', { profileId: 'evening' })).rejects.toMatchObject({
+      code: ErrorCode.KEY_REQUIRED,
+    });
+  });
+
+  it('falls the schedule back to the active profile when a scheduled profile is deleted', async () => {
+    const svc = new MockServiceConnection();
+    await addEvening(svc);
+    await svc.request('setSchedule', {
+      schedule: {
+        windows: [
+          { id: 'w1', days: ['mon'], start: '19:00', end: '22:00', locked: false, profileId: 'evening' },
+        ],
+      },
+    });
+    await pairMockKey(svc);
+    svc.devToggleKey(); // deleting a scheduled profile is key-gated
+
+    await svc.request('deleteProfile', { profileId: 'evening' });
+
+    const state = await svc.request('getState', undefined);
+    expect(state.schedule.windows[0]!.profileId).toBeUndefined();
+    expect(state.profiles).toHaveLength(1);
+  });
+
+  it('rejects a schedule window pointing at an unknown profile', async () => {
+    const svc = new MockServiceConnection();
+    await expect(
+      svc.request('setSchedule', {
+        schedule: {
+          windows: [
+            { id: 'w1', days: ['mon'], start: '09:00', end: '17:00', locked: false, profileId: 'nope' },
+          ],
+        },
+      }),
+    ).rejects.toMatchObject({ code: ErrorCode.BAD_REQUEST });
+  });
+
+  it('rejects a blank or over-long profile name', async () => {
+    const svc = new MockServiceConnection();
+    await expect(
+      svc.request('setProfile', { profile: { ...evening, name: '   ' } }),
+    ).rejects.toMatchObject({ code: ErrorCode.BAD_REQUEST });
+    await expect(
+      svc.request('setProfile', { profile: { ...evening, name: 'x'.repeat(41) } }),
+    ).rejects.toMatchObject({ code: ErrorCode.BAD_REQUEST });
   });
 });

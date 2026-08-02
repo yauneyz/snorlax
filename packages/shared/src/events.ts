@@ -1,13 +1,17 @@
 /** Server-pushed event types (architecture §6). The service pushes these unsolicited. */
 
 import type { Policy } from './policy.js';
+import type { Profile } from './profile.js';
 import type { Settings } from './settings.js';
 import type { FocusSource } from './protocol.js';
 
 export interface EventMap {
   keyPresenceChanged: { present: boolean; keyId?: string };
   focusChanged: { active: boolean; source: FocusSource };
+  /** The enforced (active profile's) policy changed, for whatever reason. */
   policyChanged: { policy: Policy };
+  /** The profile set or the active profile changed. */
+  profilesChanged: { profiles: Profile[]; activeProfileId: string };
   scheduleFired: { windowId: string; active: boolean };
   settingsChanged: { settings: Settings };
   /**

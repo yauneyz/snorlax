@@ -19,7 +19,7 @@ pub async fn serve(socket_path: String, shutdown: watch::Receiver<bool>) {
 
     let state = PersistentState::load();
     let store = SecureStore::load();
-    let shared = Arc::new(EnforceShared::new(state.policy.clone(), state.focus_active));
+    let shared = Arc::new(EnforceShared::new(state.active_policy(), state.focus_active));
 
     let core = Arc::new(Mutex::new(Core::new(state, store, shared.clone())));
     core.lock().await.rearm_on_boot();

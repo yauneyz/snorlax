@@ -1,11 +1,16 @@
 import { describe, expect, it } from 'vitest';
-import type { Policy, Schedule } from '@talysman/shared';
+import type { Policy, Profile, Schedule } from '@talysman/shared';
+import { EMPTY_POLICY } from '@talysman/shared';
 import {
   constrainPolicyToLimits,
+  constrainProfilesToLimits,
   constrainScheduleToLimits,
   FREE_BLOCKED_SITE_LIMIT,
+  FREE_PROFILE_LIMIT,
   limitsForPlan,
+  maxProfiles,
   validatePolicyForLimits,
+  validateProfilesForLimits,
   validateScheduleForLimits,
 } from '../../../apps/desktop/src/shared/productLimits.js';
 
@@ -19,7 +24,16 @@ const schedule: Schedule = {
   windows: [{ id: 'w1', days: ['mon'], start: '09:00', end: '17:00', locked: false }],
 };
 
+const profiles: Profile[] = [
+  { id: 'deep', name: 'Deep Work', color: '#4fd6c0', policy: EMPTY_POLICY },
+  { id: 'evening', name: 'Evening', color: '#ff8f6b', policy: { ...EMPTY_POLICY, mode: 'block-all' } },
+];
+
 describe('product limits', () => {
+  it('sets the Free blacklist allowance to five websites', () => {
+    expect(FREE_BLOCKED_SITE_LIMIT).toBe(5);
+  });
+
   it('keeps Pro unrestricted by default', () => {
     const limits = limitsForPlan('pro');
 
@@ -30,22 +44,62 @@ describe('product limits', () => {
     expect(constrainScheduleToLimits(schedule, limits)).toBe(schedule);
   });
 
-  it(`limits Free to ${FREE_BLOCKED_SITE_LIMIT} websites, 0 apps, and no schedule`, () => {
+  it('gives Free unlimited whitelist websites while keeping apps and schedules gated', () => {
     const limits = limitsForPlan('free');
 
-    expect(validatePolicyForLimits(policy, limits).map((v) => v.field)).toEqual([
-      'policy.mode',
-      'policy.domains',
-      'policy.apps',
-    ]);
+    expect(validatePolicyForLimits(policy, limits).map((v) => v.field)).toEqual(['policy.apps']);
     expect(validateScheduleForLimits(schedule, limits).map((v) => v.field)).toEqual(['schedule']);
 
     expect(constrainPolicyToLimits(policy, limits)).toEqual({
-      mode: 'blacklist',
-      domains: policy.domains.slice(0, FREE_BLOCKED_SITE_LIMIT),
+      mode: 'whitelist',
+      domains: policy.domains,
       apps: [],
     });
     expect(constrainScheduleToLimits(schedule, limits)).toEqual({ windows: [] });
+  });
+
+  it(`limits only the Free blacklist to ${FREE_BLOCKED_SITE_LIMIT} websites`, () => {
+    const limits = limitsForPlan('free');
+    const blacklistPolicy: Policy = { ...policy, mode: 'blacklist', apps: [] };
+
+    expect(validatePolicyForLimits(blacklistPolicy, limits).map((v) => v.field)).toEqual([
+      'policy.domains',
+    ]);
+    expect(constrainPolicyToLimits(blacklistPolicy, limits)).toEqual({
+      ...blacklistPolicy,
+      domains: blacklistPolicy.domains.slice(0, FREE_BLOCKED_SITE_LIMIT),
+    });
+  });
+
+  it('gives Free one blocking profile and Pro unlimited', () => {
+    expect(FREE_PROFILE_LIMIT).toBe(1);
+    expect(maxProfiles(limitsForPlan('free'))).toBe(1);
+    expect(maxProfiles(limitsForPlan('pro'))).toBeNull();
+  });
+
+  it('flags a second profile on Free but not on Pro', () => {
+    expect(validateProfilesForLimits(profiles, limitsForPlan('pro'))).toEqual([]);
+    expect(validateProfilesForLimits([profiles[0]!], limitsForPlan('free'))).toEqual([]);
+    expect(validateProfilesForLimits(profiles, limitsForPlan('free')).map((v) => v.field)).toEqual([
+      'profiles',
+    ]);
+  });
+
+  it('keeps the active profile when trimming to the Free allowance', () => {
+    // "evening" is second in the list — a naive slice(0, 1) would drop what is being enforced.
+    expect(constrainProfilesToLimits(profiles, 'evening', limitsForPlan('free'))).toEqual([
+      profiles[1],
+    ]);
+    expect(constrainProfilesToLimits(profiles, 'deep', limitsForPlan('free'))).toEqual([
+      profiles[0],
+    ]);
+    expect(constrainProfilesToLimits(profiles, 'deep', limitsForPlan('pro'))).toBe(profiles);
+  });
+
+  it('falls back to the first profile when the active id is dangling', () => {
+    expect(constrainProfilesToLimits(profiles, 'gone', limitsForPlan('free'))).toEqual([
+      profiles[0],
+    ]);
   });
 
   it('allows Free to use block-all mode', () => {
