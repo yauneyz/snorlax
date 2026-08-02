@@ -72,7 +72,7 @@ export function Settings() {
   }
 
   return (
-    <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+    <div className="grid grid-cols-1 gap-3 py-3 lg:grid-cols-2">
       <Card>
         <CardTitle>About</CardTitle>
         <div className="flex flex-col gap-2 text-sm text-slate-300">
@@ -122,7 +122,7 @@ export function Settings() {
               </Button>
             </div>
             {localEntitlementError && (
-              <p className="text-sm text-amber-300">{localEntitlementError}</p>
+              <p className="text-[12.5px] text-warn">{localEntitlementError}</p>
             )}
           </div>
         </Card>
@@ -154,7 +154,7 @@ export function Settings() {
           {handshakeEnabled && !keyPresent && (
             <p className="text-xs text-slate-500">Insert your paired USB key to turn this off.</p>
           )}
-          {handshakeError && <p className="text-sm text-amber-300">{handshakeError}</p>}
+          {handshakeError && <p className="text-[12.5px] text-warn">{handshakeError}</p>}
         </div>
       </Card>
 
@@ -171,7 +171,7 @@ export function Settings() {
               <div
                 role="group"
                 aria-label="Development account plan"
-                className="inline-grid grid-cols-2 rounded-lg border border-border bg-panel2 p-1"
+                className="inline-grid grid-cols-2 rounded-full border border-white/[0.07] bg-white/[0.05] p-[3px]"
               >
                 {(['free', 'pro'] as const).map((plan) => {
                   const selected = subscriptionPlan === plan;
@@ -183,10 +183,10 @@ export function Settings() {
                       disabled={planBusy}
                       onClick={() => choosePlan(plan)}
                       className={cx(
-                        'min-w-24 rounded-md px-4 py-2 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-60',
+                        'min-w-24 rounded-full px-4 py-1.5 text-[12.5px] font-medium transition disabled:cursor-not-allowed disabled:opacity-60',
                         selected
-                          ? 'bg-accent text-accentInk shadow-sm'
-                          : 'text-slate-300 hover:bg-white/[0.07] hover:text-white',
+                          ? 'bg-white/[0.10] text-white'
+                          : 'text-slate-400 hover:bg-white/[0.05] hover:text-slate-200',
                       )}
                     >
                       {plan === 'pro' ? 'Pro' : 'Free'}
@@ -194,7 +194,7 @@ export function Settings() {
                   );
                 })}
               </div>
-              {planError && <p className="mt-2 text-sm text-amber-300">{planError}</p>}
+              {planError && <p className="mt-2 text-[12.5px] text-warn">{planError}</p>}
             </div>
           )}
 

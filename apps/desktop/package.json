@@ -10,6 +10,8 @@
     "preview": "electron-vite preview"
   },
   "dependencies": {
+    "@fontsource-variable/jetbrains-mono": "^5.3.0",
+    "@fontsource-variable/space-grotesk": "^5.3.0",
     "@supabase/supabase-js": "^2.47.10",
     "@talysman/auth-contracts": "workspace:*",
     "@talysman/core": "workspace:*",

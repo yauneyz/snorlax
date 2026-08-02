@@ -4,6 +4,16 @@ import { Badge, Button, Card, CardTitle } from '../components/ui/index.js';
 import { useFocusStore } from '../store/useFocusStore.js';
 import { startCheckout, type CheckoutPrice } from '../lib/bridge.js';
 
+/** Feature line with the teal tick the design uses for anything "included". */
+function Feature({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="flex items-baseline gap-2.5 text-[12.5px] text-slate-250">
+      <span className="font-mono text-[10px] text-sealInk">✓</span>
+      {children}
+    </div>
+  );
+}
+
 export function Plans() {
   const subscriptionPlan = useFocusStore((s) => s.subscriptionPlan);
   const entitlementLoaded = useFocusStore((s) => s.entitlementLoaded);
@@ -43,33 +53,33 @@ export function Plans() {
   }
 
   return (
-    <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
+    <div className="grid grid-cols-1 gap-3 py-3 xl:grid-cols-2">
       <Card>
         <div className="mb-4 flex items-center justify-between gap-3">
           <CardTitle hint="Manual blocking with USB-key unlock protection.">Free</CardTitle>
           {entitlementLoaded && subscriptionPlan === 'free' && <Badge tone="neutral">current</Badge>}
         </div>
-        <div className="flex flex-col gap-2 text-sm text-slate-300">
-          <div>{FREE_BLOCKED_SITE_LIMIT} blocked websites</div>
-          <div>Unlimited websites in whitelist mode</div>
-          <div>One blocking profile</div>
-          <div>Block-all internet mode</div>
-          <div>Manual focus toggle</div>
-          <div>USB key required to turn focus off</div>
+        <div className="flex flex-col gap-2">
+          <Feature>{FREE_BLOCKED_SITE_LIMIT} blocked websites</Feature>
+          <Feature>Unlimited websites in whitelist mode</Feature>
+          <Feature>One blocking profile</Feature>
+          <Feature>Block-all internet mode</Feature>
+          <Feature>Manual focus toggle</Feature>
+          <Feature>USB key required to turn focus off</Feature>
         </div>
       </Card>
 
-      <Card className="border-white/20 bg-white/[0.04]">
+      <Card className="border-seal/22 bg-gradient-to-br from-seal/[0.09] to-white/[0.015]">
         <div className="mb-4 flex items-center justify-between gap-3">
           <CardTitle hint="Everything in the app, including future Pro capabilities.">Pro</CardTitle>
           {entitlementLoaded && subscriptionPlan === 'pro' && <Badge tone="ok">current</Badge>}
         </div>
-        <div className="mb-5 flex flex-col gap-2 text-sm text-slate-300">
-          <div>Unlimited blocked websites</div>
-          <div>Unlimited blocking profiles</div>
-          <div>App blocking</div>
-          <div>Scheduling, profile by profile</div>
-          <div>All future Pro features by default</div>
+        <div className="mb-5 flex flex-col gap-2">
+          <Feature>Unlimited blocked websites</Feature>
+          <Feature>Unlimited blocking profiles</Feature>
+          <Feature>App blocking</Feature>
+          <Feature>Scheduling, profile by profile</Feature>
+          <Feature>All future Pro features by default</Feature>
         </div>
         <div className="flex flex-wrap gap-2">
           <Button

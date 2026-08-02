@@ -1,5 +1,4 @@
-- UI redesign
-- Web redesign
+- UI redesigngn
 
 
 
@@ -39,7 +38,6 @@ X initial post
 - themes, custom themes
 - tracking amount of time unblocked (especially useful when AI is in charge)
 - actual time usage analysis
-- blocking profiles
 
 * Audience Building Loop
 - Discord

@@ -34,6 +34,9 @@ export default defineConfig(({ mode }) => {
     '@talysman/shared': resolve(__dirname, '../../packages/shared/src/index.ts'),
     '@talysman/auth-contracts': resolve(__dirname, '../../packages/auth-contracts/src/index.ts'),
     '@talysman/core/browser': resolve(__dirname, '../../packages/core/src/browser.ts'),
+    // Schedule evaluation without dragging in core's node:crypto pairing helpers, which
+    // the renderer bundle can't resolve.
+    '@talysman/core/schedule': resolve(__dirname, '../../packages/core/src/scheduleEngine.ts'),
     '@talysman/core': resolve(__dirname, '../../packages/core/src/index.ts'),
   };
 

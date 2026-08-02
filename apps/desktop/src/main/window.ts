@@ -41,7 +41,7 @@ export function createWindow(): BrowserWindow {
     minWidth: 880,
     minHeight: 600,
     show: false,
-    backgroundColor: '#08090a',
+    backgroundColor: '#06070a',
     title: 'Talysman',
     icon: windowIcon(),
     webPreferences: {

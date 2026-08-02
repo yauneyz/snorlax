@@ -2,8 +2,8 @@
  * E2E: blocking profiles and the Free/Pro profile allowance. Drives the real Electron app
  * against the in-process mock service, the same way focus-toggle.spec.ts does.
  *
- * Dev builds start on Pro (see DEFAULT_DEV_PLAN), so this walks Pro first and then drops to
- * Free through the Settings dev plan switcher.
+ * The dev plan persists across launches, so the walk starts by pinning Pro through the Settings
+ * switcher rather than trusting whatever the last run left behind, then drops to Free the same way.
  */
 import { test, expect, _electron as electron } from '@playwright/test';
 import { resolve } from 'node:path';
@@ -18,6 +18,10 @@ test('Pro gets unlimited blocking profiles, Free gets one', async () => {
 
     const info = await win.evaluate(() => window.api.appInfo());
     expect(info.usingMock).toBe(true);
+
+    const devPlan = win.getByRole('group', { name: 'Development account plan' });
+    await win.getByRole('button', { name: 'Settings' }).click();
+    await devPlan.getByText('Pro').click();
 
     await win.getByRole('button', { name: 'Blocklists' }).click();
 
@@ -53,7 +57,7 @@ test('Pro gets unlimited blocking profiles, Free gets one', async () => {
 
     // Drop to Free: the allowance shows up and the add button becomes an upgrade prompt.
     await win.getByRole('button', { name: 'Settings' }).click();
-    await win.getByRole('group', { name: 'Development account plan' }).getByText('Free').click();
+    await devPlan.getByText('Free').click();
 
     await win.getByRole('button', { name: 'Blocklists' }).click();
     await expect(win.getByText('1/1 profiles')).toBeVisible();

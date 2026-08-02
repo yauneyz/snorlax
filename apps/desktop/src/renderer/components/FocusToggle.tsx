@@ -1,24 +1,37 @@
 /**
- * The big on/off control. Enabling requires a paired key; disabling is available when the UI
- * knows a paired key is present. Both actions still route through the authoritative service.
+ * The seal — the app's one big control. Enabling requires a paired key; disabling is available
+ * when the UI knows a paired key is present. Both actions still route through the authoritative
+ * service, which re-checks every gate itself.
  */
 import React, { useState } from 'react';
-import { ErrorCode } from '@talysman/shared';
+import { ErrorCode, resolveActiveProfile } from '@talysman/shared';
 import { request } from '../lib/bridge.js';
 import { useFocusStore } from '../store/useFocusStore.js';
-import { cx } from '../lib/utils.js';
-import { Button } from './ui/index.js';
+import { cx, profileSummary } from '../lib/utils.js';
+import { Button, Kicker } from './ui/index.js';
+import { TalysmanMark } from './TalysmanMark.js';
+import { ProfilePicker } from './ProfilePicker.js';
+
+const RING = 272;
+/** 60 minute-marks around the rim; every fifth one is brighter, like a bezel. */
+const TICKS = Array.from({ length: 60 }, (_, i) => i);
 
 export function FocusToggle() {
   const focusActive = useFocusStore((s) => s.focusActive);
   const keyPresent = useFocusStore((s) => s.keyPresent);
   const pairedKeys = useFocusStore((s) => s.pairedKeys);
   const scheduleLocked = useFocusStore((s) => s.scheduleLocked);
+  const profiles = useFocusStore((s) => s.profiles);
+  const activeProfileId = useFocusStore((s) => s.activeProfileId);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const [pickerOpen, setPickerOpen] = useState(false);
   const keyRequired = focusActive && !keyPresent;
   const pairedKeyRequired = !focusActive && pairedKeys.length === 0;
   const toggleUnavailable = busy || keyRequired || pairedKeyRequired;
+  const activeProfile = resolveActiveProfile(profiles, activeProfileId);
+  // Switching while enforcing is key-gated at the service; don't offer it without the key.
+  const switchLocked = focusActive && !keyPresent;
 
   async function toggle() {
     setBusy(true);
@@ -31,9 +44,10 @@ export function FocusToggle() {
       }
     } catch (e) {
       const code = (e as { code?: string }).code;
-      if (code === ErrorCode.KEY_REQUIRED) setMessage('🔑 Insert your paired key to unlock.');
+      if (code === ErrorCode.KEY_REQUIRED) setMessage('Insert your paired key to unlock.');
       else if (code === ErrorCode.NO_PAIRED_KEY) setMessage('Pair a key before turning on focus.');
-      else if (code === ErrorCode.LOCKED) setMessage('🔒 A locked schedule window is active — no key can unlock right now.');
+      else if (code === ErrorCode.LOCKED)
+        setMessage('A locked schedule window is active — no key can unlock right now.');
       else setMessage((e as Error).message);
     } finally {
       setBusy(false);
@@ -41,40 +55,117 @@ export function FocusToggle() {
   }
 
   return (
-    <div className="flex flex-col items-center gap-4">
-      <button
-        onClick={toggle}
-        disabled={toggleUnavailable}
-        className={cx(
-          'relative flex h-44 w-44 items-center justify-center rounded-full border-4 text-xl font-bold tracking-wide backdrop-blur-sm transition duration-200',
-          focusActive
-            ? 'border-ok bg-green-500/10 text-green-300 shadow-[0_0_40px_rgba(34,197,94,0.25)]'
-            : 'border-white/[0.10] bg-white/[0.04] text-slate-300 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] hover:border-white/25 hover:bg-white/[0.07] hover:text-white',
-          toggleUnavailable && 'cursor-not-allowed opacity-60',
-        )}
+    <div className="flex flex-col items-center">
+      <div
+        className="relative flex items-center justify-center"
+        style={{ width: RING, height: RING }}
       >
-        {focusActive ? 'FOCUSED' : 'OFF'}
-      </button>
+        <div
+          className={cx(
+            'absolute inset-0 rounded-full border',
+            focusActive
+              ? 'border-seal/30 shadow-[0_0_30px_rgba(79,214,192,0.14),inset_0_0_40px_rgba(79,214,192,0.06)]'
+              : 'border-warn/20 shadow-[0_0_24px_rgba(255,180,84,0.08),inset_0_0_34px_rgba(255,180,84,0.04)]',
+          )}
+        />
+        <div className="absolute inset-4 animate-spin-slow rounded-full border border-dashed border-white/[0.06]" />
+        <div className="absolute inset-[34px] rounded-full border border-white/[0.05]" />
+        <div
+          aria-hidden
+          className="absolute inset-[50px] rounded-full"
+          style={{
+            background: `radial-gradient(circle, ${
+              focusActive ? 'rgba(79,214,192,0.14)' : 'rgba(255,180,84,0.08)'
+            }, transparent 72%)`,
+          }}
+        />
+        {TICKS.map((i) => (
+          <span
+            key={i}
+            aria-hidden
+            className="absolute left-1/2 top-1/2 block w-px origin-[50%_0]"
+            style={{
+              height: RING / 2,
+              transform: `translate(-50%,0) rotate(${i * 6}deg)`,
+              background: `linear-gradient(to bottom, transparent 0, transparent ${
+                RING / 2 - 15
+              }px, ${i % 5 === 0 ? 'rgba(199,204,212,0.34)' : 'rgba(199,204,212,0.12)'} ${
+                RING / 2 - 15
+              }px)`,
+            }}
+          />
+        ))}
 
-      <div className="flex flex-col items-center gap-2">
+        <div className="relative flex flex-col items-center gap-1.5">
+          <TalysmanMark
+            size={46}
+            className={cx(
+              focusActive
+                ? 'drop-shadow-[0_0_14px_rgba(79,214,192,0.35)]'
+                : 'opacity-75 grayscale-[0.5]',
+            )}
+          />
+          <div className="mt-2 text-2xl font-bold tracking-[0.06em] text-slate-100">
+            {focusActive ? 'FOCUSED' : 'UNPROTECTED'}
+          </div>
+
+          <Kicker className="mt-0.5">Active profile</Kicker>
+          <button
+            onClick={() => !switchLocked && setPickerOpen(true)}
+            disabled={switchLocked}
+            className={cx(
+              'flex items-center gap-2 rounded-full border px-3 py-1 transition',
+              switchLocked
+                ? 'cursor-not-allowed border-white/[0.05] bg-transparent'
+                : 'border-white/[0.12] bg-white/[0.05] hover:bg-white/[0.09]',
+            )}
+          >
+            <span
+              className="block h-[7px] w-[7px] rounded-[2px]"
+              style={{ backgroundColor: activeProfile?.color ?? '#4fd6c0' }}
+            />
+            <span className="whitespace-nowrap text-[12.5px] font-semibold text-slate-200">
+              {activeProfile?.name ?? 'None'}
+            </span>
+            <span
+              className={cx(
+                'font-mono text-[9px] tracking-[0.06em]',
+                switchLocked ? 'text-slate-450' : 'text-slate-400',
+              )}
+            >
+              {switchLocked ? 'LOCKED' : 'SWITCH'}
+            </span>
+          </button>
+
+          <div className="text-[12px] text-slate-400">
+            {focusActive && activeProfile ? profileSummary(activeProfile) : 'nothing is being blocked'}
+          </div>
+        </div>
+      </div>
+
+      <div className="mt-5 flex flex-col items-center gap-2.5">
         <Button
           onClick={toggle}
           disabled={toggleUnavailable}
-          variant={keyRequired || pairedKeyRequired ? 'ghost' : focusActive ? 'danger' : 'primary'}
+          variant={keyRequired || pairedKeyRequired ? 'ghost' : focusActive ? 'danger' : 'hero'}
+          className="rounded-full px-7 py-2.5 text-[13.5px]"
         >
           {focusActive ? 'Turn off focus' : 'Turn on focus'}
         </Button>
-        {keyRequired && (
-          <p className="text-center text-sm text-slate-400">insert key to turn off focus</p>
-        )}
-        {pairedKeyRequired && (
-          <p className="text-center text-sm text-slate-400">pair a key to turn on focus</p>
+        {keyRequired && <p className="text-[12px] text-dangerInk">insert key to turn off focus</p>}
+        {pairedKeyRequired && <p className="text-[12px] text-warn">pair a key to turn on focus</p>}
+        {message && <p className="max-w-xs text-center text-[12px] text-warn">{message}</p>}
+        {scheduleLocked && !message && (
+          <p className="text-[12px] text-warn">A locked schedule window is active.</p>
         )}
       </div>
 
-      {message && <p className="max-w-xs text-center text-sm text-amber-300">{message}</p>}
-      {scheduleLocked && !message && (
-        <p className="text-center text-sm text-amber-400">🔒 A locked schedule window is active.</p>
+      {pickerOpen && (
+        <ProfilePicker
+          profiles={profiles}
+          activeProfileId={activeProfileId}
+          onClose={() => setPickerOpen(false)}
+        />
       )}
     </div>
   );

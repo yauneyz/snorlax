@@ -172,7 +172,7 @@ export function Account({ onUpgrade }: { onUpgrade: () => void }) {
   // priority over everything else on the page.
   if (passwordRecovery) {
     return (
-      <div className="grid grid-cols-1 gap-6">
+      <div className="grid grid-cols-1 gap-3 py-3">
         <Card>
           <CardTitle hint="You followed a password-reset link. Pick a new password to finish.">
             Choose a new password
@@ -200,7 +200,7 @@ export function Account({ onUpgrade }: { onUpgrade: () => void }) {
               Save new password
             </Button>
           </form>
-          {message && <p className="mt-3 text-sm text-amber-300">{message}</p>}
+          {message && <p className="mt-3 text-[12.5px] text-warn">{message}</p>}
         </Card>
       </div>
     );
@@ -209,7 +209,7 @@ export function Account({ onUpgrade }: { onUpgrade: () => void }) {
   const detail = subscriptionDetail;
 
   return (
-    <div className="grid grid-cols-1 gap-6">
+    <div className="grid grid-cols-1 gap-3 py-3">
       <Card>
         <CardTitle>Account</CardTitle>
         <div className="flex flex-col gap-2 text-sm text-slate-300">
@@ -251,7 +251,7 @@ export function Account({ onUpgrade }: { onUpgrade: () => void }) {
             </div>
           )}
           {signedIn && detail?.status === 'past_due' && (
-            <div className="text-amber-300">
+            <div className="text-[12.5px] text-warn">
               Your last payment failed — use Manage billing to update your payment method.
             </div>
           )}
@@ -346,7 +346,7 @@ export function Account({ onUpgrade }: { onUpgrade: () => void }) {
             </div>
           </div>
         ) : view === 'signup' ? (
-          <div className="mt-4 flex flex-col gap-4">
+          <div className="mt-4 flex max-w-sm flex-col gap-4">
             {__APP_CONFIG__.GOOGLE_AUTH_ENABLED && (
               <>
                 <Button disabled={busy} onClick={() => run(() => signInGoogle())}>
@@ -391,7 +391,7 @@ export function Account({ onUpgrade }: { onUpgrade: () => void }) {
             </div>
           </div>
         ) : view === 'forgot' ? (
-          <div className="mt-4 flex flex-col gap-4">
+          <div className="mt-4 flex max-w-sm flex-col gap-4">
             {notice ? (
               <p className="text-sm text-slate-300">{notice}</p>
             ) : (
@@ -414,7 +414,7 @@ export function Account({ onUpgrade }: { onUpgrade: () => void }) {
             </div>
           </div>
         ) : (
-          <div className="mt-4 flex flex-col gap-4">
+          <div className="mt-4 flex max-w-sm flex-col gap-4">
             {__APP_CONFIG__.GOOGLE_AUTH_ENABLED && (
               <>
                 <Button disabled={busy} onClick={() => run(() => signInGoogle())}>
@@ -452,7 +452,7 @@ export function Account({ onUpgrade }: { onUpgrade: () => void }) {
         )}
 
         {(message ?? authError) && (
-          <p className="mt-3 text-sm text-amber-300">{message ?? authError}</p>
+          <p className="mt-3 text-[12.5px] text-warn">{message ?? authError}</p>
         )}
       </Card>
     </div>

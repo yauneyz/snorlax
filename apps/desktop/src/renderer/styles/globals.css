@@ -1,9 +1,21 @@
+/* Fonts are bundled, never fetched — the renderer runs under a `default-src 'self'` CSP. */
+@import '@fontsource-variable/space-grotesk';
+@import '@fontsource-variable/jetbrains-mono';
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 :root {
   color-scheme: dark;
+
+  /* Seal palette. Teal is the "protected" signal; amber is "unprotected but not wrong";
+     coral is the only red, reserved for destructive and key-gated states. */
+  --seal: #4fd6c0;
+  --seal-ink: #8ee6d8;
+  --warn: #ffb454;
+  --danger: #ff6b6b;
+  --danger-ink: #ff9d9d;
 }
 
 html,
@@ -14,10 +26,49 @@ body,
 }
 
 body {
-  background: #08090a;
+  background: #06070a;
   color: #dcdee2;
-  font-family: ui-sans-serif, system-ui, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  font-family: 'Space Grotesk Variable', ui-sans-serif, system-ui, 'Segoe UI', Roboto, sans-serif;
   -webkit-font-smoothing: antialiased;
+  overflow: hidden;
+}
+
+/* Numbers, hostnames, and the all-caps section kickers are monospaced — they're the
+   instrument-panel voice of the design and want to line up column-wise. */
+.kicker {
+  font-family: 'JetBrains Mono Variable', ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: #676c74;
+}
+
+@keyframes tal-pulse {
+  0%,
+  100% {
+    opacity: 0.5;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+@keyframes tal-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes tal-rise {
+  from {
+    transform: translateY(6px);
+    opacity: 0;
+  }
+  to {
+    transform: none;
+    opacity: 1;
+  }
 }
 
 ::-webkit-scrollbar {
@@ -39,4 +90,10 @@ body {
 :focus-visible {
   outline: 2px solid rgba(199, 204, 212, 0.5);
   outline-offset: 2px;
+}
+
+/* Time inputs render a browser-default light calendar glyph; invert it onto the dark panel. */
+input[type='time']::-webkit-calendar-picker-indicator {
+  filter: invert(0.7);
+  cursor: pointer;
 }

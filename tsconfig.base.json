@@ -19,6 +19,8 @@
       "@core/*": ["packages/core/src/*"],
       "@talysman/shared": ["packages/shared/src/index.ts"],
       "@talysman/core": ["packages/core/src/index.ts"],
+      "@talysman/core/browser": ["packages/core/src/browser.ts"],
+      "@talysman/core/schedule": ["packages/core/src/scheduleEngine.ts"],
       "@talysman/product": ["packages/product/src/index.ts"],
       "@talysman/auth-contracts": ["packages/auth-contracts/src/index.ts"],
       "@talysman/billing-server": ["packages/billing-server/src/index.ts"],

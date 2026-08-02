@@ -9,8 +9,8 @@ import {
 import { siblingsFor } from '@talysman/core/browser';
 import { listInstalledApps, request } from '../lib/bridge.js';
 import { useFocusStore } from '../store/useFocusStore.js';
-import { Badge, Button, Card, CardTitle, Input, ProfileDot } from '../components/ui/index.js';
-import { cx } from '../lib/utils.js';
+import { Badge, Button, Input, Kicker, ProfileDot } from '../components/ui/index.js';
+import { cx, profileSummary } from '../lib/utils.js';
 import type { AppPickerItem } from '../../shared/appPicker.js';
 import {
   allowedPolicyModes,
@@ -20,9 +20,9 @@ import {
 } from '../../shared/productLimits.js';
 
 const MODES: { value: Mode; label: string; hint: string }[] = [
-  { value: 'blacklist', label: 'Blacklist', hint: 'Block only the listed sites.' },
-  { value: 'whitelist', label: 'Whitelist', hint: 'Block everything except the listed sites/apps.' },
-  { value: 'block-all', label: 'Block all', hint: 'Total internet block.' },
+  { value: 'blacklist', label: 'Blacklist', hint: 'Block only the sites you list.' },
+  { value: 'whitelist', label: 'Whitelist', hint: 'Block everything except your list.' },
+  { value: 'block-all', label: 'Block all', hint: 'No internet at all.' },
 ];
 
 function appKey(app: AppRef): string {
@@ -33,23 +33,14 @@ function appKey(app: AppRef): string {
   ].join('|');
 }
 
-/** One-line description of what a profile blocks, for the profile rail. */
-function profileSummary(profile: Profile): string {
-  const { mode, domains, apps } = profile.policy;
-  if (mode === 'block-all') return 'blocks everything';
-  const noun = mode === 'whitelist' ? 'allowed' : 'blocked';
-  const sites = `${domains.length} ${noun} site${domains.length === 1 ? '' : 's'}`;
-  return apps.length > 0 ? `${sites} · ${apps.length} app${apps.length === 1 ? '' : 's'}` : sites;
-}
-
-function appBadges(app: AppRef) {
-  return (
-    <>
-      {app.windowsImageName && <Badge tone="neutral">{app.windowsImageName}</Badge>}
-      {app.linuxProcessName && <Badge tone="neutral">{app.linuxProcessName}</Badge>}
-      {app.macBundleId && <Badge tone="neutral">{app.macBundleId}</Badge>}
-    </>
-  );
+/**
+ * The executable identifiers behind an app entry, shown as the chip's small print. Manual
+ * entries name the executable as their label, so drop anything that just repeats it.
+ */
+function appIdentifiers(app: AppRef): string {
+  return [...new Set([app.windowsImageName, app.linuxProcessName, app.macBundleId])]
+    .filter((id): id is string => Boolean(id) && id !== app.label)
+    .join(' · ');
 }
 
 export function Blocklists({ onUpgrade }: { onUpgrade: () => void }) {
@@ -73,6 +64,7 @@ export function Blocklists({ onUpgrade }: { onUpgrade: () => void }) {
   const selected = resolveActiveProfile(profiles, selectedId ?? activeProfileId);
   const policy = selected?.policy ?? EMPTY_POLICY;
   const isActive = selected?.id === activeProfileId;
+  const accent = selected?.color ?? '#4fd6c0';
   const profileLimit = maxProfiles(productLimits);
   const profileLimitReached = profileLimit !== null && profiles.length >= profileLimit;
 
@@ -224,239 +216,308 @@ export function Blocklists({ onUpgrade }: { onUpgrade: () => void }) {
     setSelectedApps(new Set());
   }
 
+  const listKicker =
+    policy.mode === 'blacklist' ? 'Blocked sites' : policy.mode === 'whitelist' ? 'Allowed sites' : 'Sites';
+
   return (
-    <div className="flex flex-col gap-6 lg:flex-row lg:items-start">
-      <Card className="lg:w-72 lg:shrink-0">
-        <div className="mb-3 flex items-start justify-between gap-3">
-          <CardTitle hint="Focus enforces one profile at a time; the schedule can switch it.">
-            Profiles
-          </CardTitle>
+    <div className="flex h-full min-h-0 gap-5">
+      <aside className="flex w-[248px] shrink-0 flex-col border-r border-white/[0.06] py-3 pr-4">
+        <div className="flex items-baseline justify-between">
+          <Kicker>Profiles</Kicker>
           {profileLimitReached && <Badge tone="neutral">Pro</Badge>}
         </div>
-        <ul className="mb-3 flex flex-col gap-2">
+
+        <ul className="mt-3 flex min-h-0 flex-1 flex-col gap-1.5 overflow-y-auto pr-1">
           {profiles.map((p) => (
             <li key={p.id}>
               <button
                 onClick={() => setSelectedId(p.id)}
                 className={cx(
-                  'w-full rounded-lg border p-3 text-left transition',
+                  'w-full rounded-[10px] border px-3 py-2.5 text-left transition',
                   p.id === selected?.id
-                    ? 'border-white/25 bg-white/[0.07]'
-                    : 'border-white/[0.07] bg-white/[0.02] hover:border-white/[0.14] hover:bg-white/[0.05]',
+                    ? 'border-white/[0.12] bg-white/[0.06]'
+                    : 'border-white/[0.05] bg-transparent hover:border-white/[0.10] hover:bg-white/[0.03]',
                 )}
               >
                 <span className="flex items-center gap-2">
                   <ProfileDot color={p.color} />
-                  <span className="min-w-0 flex-1 truncate text-sm font-medium text-slate-100">
+                  <span
+                    className={cx(
+                      'min-w-0 flex-1 truncate text-[13px] font-semibold',
+                      p.id === selected?.id ? 'text-slate-100' : 'text-slate-250',
+                    )}
+                  >
                     {p.name}
                   </span>
-                  {p.id === activeProfileId && <Badge tone="ok">active</Badge>}
+                  {p.id === activeProfileId && <Badge tone="ok">ON</Badge>}
                 </span>
-                <span className="mt-1 block text-xs text-slate-500">{profileSummary(p)}</span>
+                <span className="mt-1.5 block pl-4 text-[11px] text-slate-400">
+                  {profileSummary(p)}
+                </span>
               </button>
             </li>
           ))}
         </ul>
-        <Button variant="ghost" onClick={addProfile} className="w-full">
-          {profileLimitReached ? 'Upgrade for more profiles' : 'New profile'}
-        </Button>
-        {profileLimit !== null && (
-          <p className="mt-3 text-xs text-slate-500">
-            {profiles.length}/{profileLimit} profiles
+
+        <div className="mt-3 flex flex-col gap-2 border-t border-white/[0.06] pt-3">
+          <Button variant="ghost" onClick={addProfile} className="w-full">
+            {profileLimitReached ? 'Upgrade for more profiles' : 'New profile'}
+          </Button>
+          {profileLimit !== null && (
+            <p className="font-mono text-[10px] tracking-[0.08em] text-slate-450">
+              {profiles.length}/{profileLimit} profiles
+            </p>
+          )}
+          <p className="text-[11px] leading-relaxed text-slate-450">
+            Switch profiles by hand any time, or let the schedule do it. Loosening one needs your
+            key.
           </p>
-        )}
-      </Card>
+        </div>
+      </aside>
 
-      <div className="grid min-w-0 flex-1 grid-cols-1 gap-6 lg:grid-cols-2">
-        <Card className="lg:col-span-2">
-          <CardTitle hint="Renaming or editing a profile never changes which one is enforced.">
-            Profile
-          </CardTitle>
-          <div className="flex flex-wrap items-center gap-3">
-            <ProfileDot color={selected?.color ?? '#4fd6c0'} className="h-3.5 w-3.5" />
-            <Input
-              key={selected?.id}
-              defaultValue={selected?.name ?? ''}
-              maxLength={MAX_PROFILE_NAME_LENGTH}
-              onBlur={(e) => void renameProfile(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
-              placeholder="Profile name"
-              className="w-56"
-              aria-label="Profile name"
-            />
-            {isActive ? (
-              <Badge tone="ok">enforced by focus</Badge>
-            ) : (
-              <Button variant="ghost" onClick={() => selected && void activateProfile(selected.id)}>
-                Use this profile
-              </Button>
-            )}
-            {profiles.length > 1 && (
+      <section className="flex min-h-0 min-w-0 flex-1 flex-col py-3">
+        <div className="flex flex-wrap items-center gap-3">
+          <ProfileDot color={accent} size={9} />
+          {/* Deliberately chrome-less: the profile name reads as the page heading until you
+              click into it. Not the shared Input, whose w-full would eat the whole row. */}
+          <input
+            key={selected?.id}
+            defaultValue={selected?.name ?? ''}
+            maxLength={MAX_PROFILE_NAME_LENGTH}
+            onBlur={(e) => void renameProfile(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
+            placeholder="Profile name"
+            size={18}
+            className="rounded-md border border-transparent bg-transparent px-1.5 py-1 text-[17px] font-bold text-slate-100 outline-none transition placeholder:text-slate-600 hover:border-white/[0.09] focus:border-white/25 focus:bg-white/[0.05]"
+            aria-label="Profile name"
+          />
+          {isActive ? (
+            <Badge tone="ok">enforced by focus</Badge>
+          ) : (
+            <Button
+              variant="ghost"
+              onClick={() => selected && void activateProfile(selected.id)}
+              className="ml-auto"
+            >
+              Use this profile
+            </Button>
+          )}
+          {profiles.length > 1 && (
+            <button
+              onClick={() => selected && void deleteProfile(selected.id)}
+              className={cx(
+                'text-[11px] font-medium text-slate-500 transition hover:text-dangerInk',
+                isActive && 'ml-auto',
+              )}
+            >
+              delete profile
+            </button>
+          )}
+        </div>
+
+        <div className="mt-3.5 flex gap-2">
+          {MODES.map((m) => {
+            const on = policy.mode === m.value;
+            const locked = Boolean(allowedModes && !allowedModes.includes(m.value));
+            return (
               <button
-                onClick={() => selected && void deleteProfile(selected.id)}
-                className="ml-auto text-xs text-red-400 hover:underline"
+                key={m.value}
+                onClick={() => (locked ? onUpgrade() : setMode(m.value))}
+                aria-disabled={locked}
+                className={cx(
+                  'flex-1 rounded-[10px] border px-3 py-2.5 text-left transition',
+                  on
+                    ? 'border-seal/30 bg-seal/[0.09] shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_0_18px_rgba(79,214,192,0.10)]'
+                    : 'border-white/[0.07] bg-white/[0.025] hover:border-white/[0.14] hover:bg-white/[0.05]',
+                  locked && 'opacity-65',
+                )}
               >
-                delete profile
+                <span className="flex items-center gap-2">
+                  <span
+                    className={cx(
+                      'block h-2 w-2 rounded-full border',
+                      on
+                        ? 'border-seal bg-seal shadow-[0_0_7px_1px_rgba(79,214,192,0.6)]'
+                        : 'border-white/25 bg-transparent',
+                    )}
+                  />
+                  <span
+                    className={cx(
+                      'text-[12.5px] font-semibold',
+                      on ? 'text-slate-100' : 'text-slate-250',
+                    )}
+                  >
+                    {m.label}
+                  </span>
+                  {locked && <Badge tone="neutral">Pro</Badge>}
+                </span>
+                <span className="mt-1 block pl-4 text-[11px] leading-snug text-slate-400">
+                  {m.hint}
+                </span>
               </button>
-            )}
-          </div>
-        </Card>
+            );
+          })}
+        </div>
 
-        <Card className="lg:col-span-2">
-          <CardTitle hint="How the service decides what to block.">Mode</CardTitle>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-            {MODES.map((m) => {
-              const locked = Boolean(allowedModes && !allowedModes.includes(m.value));
-              return (
-                <button
-                  key={m.value}
-                  onClick={() => (locked ? onUpgrade() : setMode(m.value))}
-                  aria-disabled={locked}
-                  className={cx(
-                    'rounded-lg border p-4 text-left transition',
-                    policy.mode === m.value
-                      ? 'border-white/25 bg-white/[0.07] shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]'
-                      : 'border-white/[0.07] bg-white/[0.02] hover:border-white/[0.14] hover:bg-white/[0.05]',
-                    locked && 'opacity-65',
-                  )}
-                >
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="font-semibold text-white">{m.label}</span>
-                    {locked && <Badge tone="neutral">Pro</Badge>}
+        {policy.mode === 'block-all' ? (
+          <div className="mt-4 flex min-h-0 flex-1 flex-col items-center justify-center gap-1.5 rounded-[10px] border border-dashed border-[#ff8f6b]/30 bg-[#ff8f6b]/[0.05] p-6 text-center">
+            <span className="text-[14px] font-semibold text-[#ffb59d]">No list needed</span>
+            <span className="max-w-xs text-[12px] leading-relaxed text-slate-400">
+              Block-all cuts every outbound connection. Only loopback stays reachable.
+            </span>
+          </div>
+        ) : (
+          <>
+            <div className="mt-4 flex items-baseline gap-2.5">
+              <Kicker>{listKicker}</Kicker>
+              <span className="text-[11px] text-slate-600">
+                {maxDomains === null
+                  ? policy.domains.length
+                  : `${policy.domains.length}/${maxDomains}`}
+              </span>
+              <span className="ml-auto text-[11px] text-slate-450">
+                wildcards allowed as a leading “*.”
+              </span>
+            </div>
+
+            <div className="mt-2 flex gap-2">
+              <Input
+                value={domain}
+                onChange={(e) => setDomain(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && addDomain()}
+                placeholder={policy.mode === 'whitelist' ? 'mail.google.com' : 'reddit.com'}
+                disabled={domainLimitReached}
+                className="font-mono"
+              />
+              <Button onClick={addDomain} disabled={domainLimitReached} className="shrink-0 px-5">
+                Add
+              </Button>
+            </div>
+
+            <div className="mt-2.5 flex min-h-0 flex-1 flex-col gap-px overflow-y-auto rounded-[10px] border border-white/[0.06] bg-white/[0.05]">
+              {policy.domains.map((d) => {
+                const siblings = siblingsFor(d);
+                return (
+                  <div key={d} className="flex items-center gap-2.5 bg-panel px-3.5 py-2">
+                    <span
+                      className="block h-[5px] w-[5px] shrink-0 rounded-full"
+                      style={{ backgroundColor: accent }}
+                    />
+                    <span className="min-w-0 flex-1 truncate font-mono text-[12.5px] text-slate-200">
+                      {d}
+                    </span>
+                    {siblings.length > 0 && (
+                      <span className="hidden truncate text-[11px] text-slate-450 lg:block">
+                        also {policy.mode === 'whitelist' ? 'allows' : 'blocks'} {siblings.join(', ')}
+                      </span>
+                    )}
+                    <button
+                      onClick={() => removeDomain(d)}
+                      className="shrink-0 text-[11px] font-medium text-slate-500 transition hover:text-dangerInk"
+                    >
+                      remove
+                    </button>
                   </div>
-                  <div className="mt-1 text-xs text-slate-400">{m.hint}</div>
-                </button>
-              );
-            })}
-          </div>
-        </Card>
+                );
+              })}
+              {policy.domains.length === 0 && (
+                <p className="bg-panel px-3.5 py-3 text-[12px] text-slate-500">No sites yet.</p>
+              )}
+            </div>
+          </>
+        )}
 
-        <Card>
-          <CardTitle hint='Wildcards allowed as a leading "*." (e.g. *.reddit.com).'>
-            {policy.mode === 'whitelist' ? 'Allowed domains' : 'Blocked domains'}
-          </CardTitle>
-          <div className="mb-3 flex gap-2">
+        <div className="mt-4 flex items-baseline gap-2.5">
+          <Kicker>Apps blocked</Kicker>
+          <span className="text-[11px] text-slate-600">
+            {maxApps === null ? policy.apps.length : `${policy.apps.length}/${maxApps}`}
+          </span>
+          {appBlockingLocked ? (
+            <button
+              onClick={onUpgrade}
+              className="ml-auto text-[11px] font-medium text-slate-400 transition hover:text-slate-200"
+            >
+              Upgrade for app blocking →
+            </button>
+          ) : (
+            <button
+              onClick={openAppPicker}
+              disabled={appLimitReached}
+              className="ml-auto text-[11px] font-medium text-slate-400 transition hover:text-slate-200 disabled:opacity-45"
+            >
+              Choose apps →
+            </button>
+          )}
+        </div>
+
+        {!appBlockingLocked && (
+          <div className="mt-2 flex gap-2">
             <Input
-              value={domain}
-              onChange={(e) => setDomain(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && addDomain()}
-              placeholder="youtube.com"
-              disabled={domainLimitReached}
+              value={appName}
+              onChange={(e) => setAppName(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && addApp()}
+              placeholder="Manual entry, e.g. chrome.exe or chrome"
+              disabled={appLimitReached}
+              className="font-mono"
             />
-            <Button onClick={addDomain} disabled={domainLimitReached}>
+            <Button onClick={addApp} disabled={appLimitReached} className="shrink-0 px-5">
               Add
             </Button>
           </div>
-          {maxDomains !== null && (
-            <p className="mb-3 text-xs text-slate-500">
-              {policy.domains.length}/{maxDomains} websites
+        )}
+
+        <div className="mt-2.5 flex flex-wrap gap-1.5">
+          {policy.apps.map((a) => (
+            <span
+              key={appKey(a)}
+              className="inline-flex items-center gap-2 rounded-lg border border-white/[0.08] bg-white/[0.03] py-1.5 pl-2.5 pr-1.5 text-[11.5px] font-medium text-slate-200"
+            >
+              {a.label}
+              <span className="font-mono text-[10px] text-slate-450">{appIdentifiers(a)}</span>
+              <button
+                onClick={() => removeApp(a)}
+                aria-label={`Remove ${a.label}`}
+                className="rounded px-1 text-slate-500 transition hover:text-dangerInk"
+              >
+                ×
+              </button>
+            </span>
+          ))}
+          {policy.apps.length === 0 && (
+            <p className="text-[12px] text-slate-500">
+              {appBlockingLocked ? 'App blocking is a Pro feature.' : 'No apps yet.'}
             </p>
           )}
-          <ul className="flex flex-col gap-2">
-            {policy.domains.map((d) => {
-              const siblings = siblingsFor(d);
-              return (
-                <li key={d} className="rounded-lg bg-panel2 px-3 py-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-slate-200">{d}</span>
-                    <button onClick={() => removeDomain(d)} className="text-xs text-red-400 hover:underline">
-                      remove
-                    </button>
-                  </div>
-                  {siblings.length > 0 && (
-                    <p className="mt-1 text-xs text-slate-500">
-                      also {policy.mode === 'whitelist' ? 'allows' : 'blocks'}: {siblings.join(', ')}
-                    </p>
-                  )}
-                </li>
-              );
-            })}
-            {policy.domains.length === 0 && <p className="text-sm text-slate-500">No domains yet.</p>}
-          </ul>
-        </Card>
+        </div>
 
-        <Card>
-          <div className="mb-3 flex items-start justify-between gap-3">
-            <CardTitle hint="Matched by executable name on Windows (e.g. chrome.exe).">
-              Blocked apps
-            </CardTitle>
-            {appBlockingLocked && <Badge tone="neutral">Pro</Badge>}
-          </div>
-          {appBlockingLocked ? (
-            <div>
-              <div className="mb-3 flex gap-2">
-                <Input value="" placeholder="chrome.exe" disabled />
-                <Button disabled>Add</Button>
-              </div>
-              <Button variant="ghost" onClick={onUpgrade}>
-                Upgrade for app blocking
-              </Button>
-            </div>
-          ) : (
-            <>
-              <div className="mb-3 flex gap-2">
-                <Button onClick={openAppPicker} disabled={appLimitReached}>
-                  Choose apps
-                </Button>
-              </div>
-              <div className="mb-3 flex gap-2">
-                <Input
-                  value={appName}
-                  onChange={(e) => setAppName(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && addApp()}
-                  placeholder="Manual entry, e.g. chrome.exe or chrome"
-                  disabled={appLimitReached}
-                />
-                <Button onClick={addApp} disabled={appLimitReached}>
-                  Add
-                </Button>
-              </div>
-              {maxApps !== null && (
-                <p className="mb-3 text-xs text-slate-500">
-                  {policy.apps.length}/{maxApps} apps
-                </p>
-              )}
-              <ul className="flex flex-col gap-2">
-                {policy.apps.map((a) => (
-                  <li key={appKey(a)} className="flex items-center justify-between gap-3 rounded-lg bg-panel2 px-3 py-2">
-                    <span className="flex flex-wrap items-center gap-2 text-sm text-slate-200">
-                      {a.label} {appBadges(a)}
-                    </span>
-                    <button onClick={() => removeApp(a)} className="text-xs text-red-400 hover:underline">
-                      remove
-                    </button>
-                  </li>
-                ))}
-                {policy.apps.length === 0 && <p className="text-sm text-slate-500">No apps yet.</p>}
-              </ul>
-            </>
-          )}
-        </Card>
-
-      </div>
+        {error && <p className="mt-3 text-[12.5px] text-dangerInk">{error}</p>}
+      </section>
 
       {pickerOpen && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(4,5,7,0.72)] px-4 backdrop-blur-md"
           role="dialog"
           aria-modal="true"
           aria-labelledby="app-picker-title"
         >
-          <div className="flex max-h-[82vh] w-full max-w-2xl flex-col rounded-xl border border-border bg-panel shadow-2xl">
-            <div className="border-b border-border p-5">
+          <div className="flex max-h-[82vh] w-full max-w-2xl flex-col rounded-xl border border-white/[0.09] bg-[rgba(10,11,14,0.96)] shadow-[0_24px_60px_-20px_rgba(0,0,0,0.9)]">
+            <div className="border-b border-white/[0.07] p-5">
               <div className="flex items-start justify-between gap-4">
                 <div>
-                  <h2 id="app-picker-title" className="text-lg font-semibold text-white">
+                  <h2
+                    id="app-picker-title"
+                    className="font-mono text-[10px] font-medium uppercase tracking-[0.2em] text-slate-500"
+                  >
                     Choose apps
                   </h2>
-                  <p className="mt-1 text-sm text-slate-400">
+                  <p className="mt-2 text-[12.5px] text-slate-400">
                     {selectedApps.size} selected
-                    {maxApps !== null ? ` - ${remainingAppSlots} slots available` : ''}
+                    {maxApps !== null ? ` · ${remainingAppSlots} slots available` : ''}
                   </p>
                 </div>
                 <button
                   onClick={() => setPickerOpen(false)}
-                  className="rounded-lg px-2 py-1 text-sm text-slate-400 hover:bg-panel2 hover:text-white"
+                  className="rounded-lg px-2 py-1 text-[12px] text-slate-400 hover:bg-white/[0.06] hover:text-white"
                   aria-label="Close app picker"
                 >
                   Close
@@ -472,39 +533,41 @@ export function Blocklists({ onUpgrade }: { onUpgrade: () => void }) {
             </div>
 
             <div className="min-h-0 flex-1 overflow-y-auto p-3">
-              {pickerLoading && <p className="p-3 text-sm text-slate-500">Loading apps...</p>}
-              {pickerError && <p className="p-3 text-sm text-red-400">{pickerError}</p>}
+              {pickerLoading && <p className="p-3 text-[12.5px] text-slate-500">Loading apps...</p>}
+              {pickerError && <p className="p-3 text-[12.5px] text-dangerInk">{pickerError}</p>}
               {!pickerLoading && !pickerError && filteredPickerItems.length === 0 && (
-                <p className="p-3 text-sm text-slate-500">No installed apps found.</p>
+                <p className="p-3 text-[12.5px] text-slate-500">No installed apps found.</p>
               )}
               {!pickerLoading && !pickerError && (
                 <ul className="flex flex-col gap-1">
                   {filteredPickerItems.map((item) => {
                     const key = appKey(item.app);
                     const alreadyAdded = existingAppKeys.has(key);
-                    const selected = selectedApps.has(key);
-                    const blockedByLimit = !selected && selectedApps.size >= remainingAppSlots;
+                    const isPicked = selectedApps.has(key);
+                    const blockedByLimit = !isPicked && selectedApps.size >= remainingAppSlots;
                     const disabled = alreadyAdded || blockedByLimit;
                     return (
                       <li key={item.id}>
                         <label
                           className={cx(
                             'flex cursor-pointer items-center gap-3 rounded-lg px-3 py-2 transition',
-                            disabled ? 'cursor-not-allowed opacity-55' : 'hover:bg-panel2',
+                            disabled ? 'cursor-not-allowed opacity-55' : 'hover:bg-white/[0.05]',
                           )}
                         >
                           <input
                             type="checkbox"
-                            className="h-4 w-4"
-                            checked={selected || alreadyAdded}
+                            className="h-4 w-4 accent-seal"
+                            checked={isPicked || alreadyAdded}
                             disabled={disabled}
                             onChange={() => togglePickerItem(item)}
                           />
                           <span className="min-w-0 flex-1">
-                            <span className="block truncate text-sm font-medium text-slate-100">
+                            <span className="block truncate text-[12.5px] font-semibold text-slate-100">
                               {item.label}
                             </span>
-                            <span className="mt-1 flex flex-wrap gap-2">{appBadges(item.app)}</span>
+                            <span className="mt-0.5 block truncate font-mono text-[10px] text-slate-450">
+                              {appIdentifiers(item.app)}
+                            </span>
                           </span>
                           {alreadyAdded && <Badge tone="neutral">Added</Badge>}
                         </label>
@@ -515,7 +578,7 @@ export function Blocklists({ onUpgrade }: { onUpgrade: () => void }) {
               )}
             </div>
 
-            <div className="flex justify-end gap-2 border-t border-border p-4">
+            <div className="flex justify-end gap-2 border-t border-white/[0.07] p-4">
               <Button variant="ghost" onClick={() => setPickerOpen(false)}>
                 Cancel
               </Button>
@@ -526,8 +589,6 @@ export function Blocklists({ onUpgrade }: { onUpgrade: () => void }) {
           </div>
         </div>
       )}
-
-      {error && <p className="text-sm text-red-400">{error}</p>}
     </div>
   );
 }
