@@ -166,7 +166,9 @@ describe('release script wiring', () => {
     const source = read('scripts/upload-release.mjs');
     expect(source).toContain('assertLiveStripeForPublish();');
     expect(source.indexOf('assertLiveStripeForPublish();')).toBeLessThan(
-      source.indexOf('if (!noBuild) buildHostInstallers(buildable);'),
+      source.indexOf(
+        'if (!noBuild) buildHostInstallers(buildable, buildEnvironment);',
+      ),
     );
   });
 

@@ -5,7 +5,15 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabaseBrowser } from "@/lib/supabase/browser";
 
-export function AccountMenu() {
+/** Up to two letters for the avatar disc: initials for a full name, else the first letter. */
+function initials(label: string | undefined): string {
+  const words = (label ?? "").trim().split(/\s+/).filter(Boolean);
+  if (words.length === 0) return "•";
+  if (words.length === 1) return words[0].slice(0, 2).toUpperCase();
+  return (words[0][0] + words[words.length - 1][0]).toUpperCase();
+}
+
+export function AccountMenu({ name }: { name?: string }) {
   const [open, setOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
@@ -43,6 +51,9 @@ export function AccountMenu() {
         aria-haspopup="menu"
         onClick={() => setOpen((value) => !value)}
       >
+        <span className="site-account-menu__avatar" aria-hidden="true">
+          {initials(name)}
+        </span>
         Account
       </button>
       {open ? (

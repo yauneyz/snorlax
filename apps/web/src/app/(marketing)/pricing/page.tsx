@@ -42,6 +42,8 @@ export default function PricingPage() {
           plan="yearly"
           title="Annual"
           priceLabel="$100 / year"
+          featured
+          badge="Best value"
           features={[
             "Unlimited websites blocked",
             "Unlimited blocking profiles",

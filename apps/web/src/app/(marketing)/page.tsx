@@ -28,31 +28,38 @@ export default function LandingPage() {
   return (
     <>
       <section className="hero">
-        <div className="hero__glow" aria-hidden="true">
-          <TalysmanMark size={420} />
+        <div className="hero__copy">
+          <h1 className="hero__headline">
+            A distraction blocker that actually works, built for the device where your work
+            actually happens
+          </h1>
+          <div className="hero__sub">
+            <p>
+              Most focus apps are for your phone. What about your computer, the place you actually
+              get work done? {config.app.name} can block specific websites on desktop browsers and
+              also blocks distracting apps.
+            </p>
+            <p>
+              Even better, turning it off requires a physical USB drive that you pair with the app.
+              Turning the blocker off is easy enough that you don&apos;t have to worry about
+              emergencies, but hard enough that you won&apos;t just do it out of habit like you
+              already do with your other blockers.
+            </p>
+            <p>{config.app.name} is built for getting real work done</p>
+          </div>
+          <div className="hero__ctas">
+            <Link href="/download" className="landing__cta landing__cta--primary">
+              Download {config.app.name}
+            </Link>
+          </div>
         </div>
-        <h1 className="hero__headline">
-          A distraction blocker that actually works, built for the device where your work actually
-          happens
-        </h1>
-        <div className="hero__sub">
-          <p>
-            Most focus apps are for your phone. What about your computer, the place you actually
-            get work done? {config.app.name} can block specific websites on desktop browsers and
-            also blocks distracting apps.
-          </p>
-          <p>
-            Even better, turning it off requires a physical USB drive that you pair with the app.
-            Turning the blocker off is easy enough that you don&apos;t have to worry about
-            emergencies, but hard enough that you won&apos;t just do it out of habit like you
-            already do with your other blockers.
-          </p>
-          <p>{config.app.name} is built for getting real work done</p>
-        </div>
-        <div className="hero__ctas">
-          <Link href="/download" className="landing__cta landing__cta--primary">
-            Download {config.app.name}
-          </Link>
+
+        {/* The mark suspended inside its rings — decorative; the headline carries the meaning. */}
+        <div className="hero__seal" aria-hidden="true">
+          <span className="hero__seal-bloom" />
+          <span className="hero__seal-ring hero__seal-ring--outer" />
+          <span className="hero__seal-ring hero__seal-ring--inner" />
+          <TalysmanMark size={180} className="hero__seal-mark" />
         </div>
       </section>
 

@@ -10,11 +10,20 @@ const nextConfig: NextConfig = {
     "@talysman/auth-contracts",
     "@talysman/billing-server",
     "@talysman/product",
+    "@talysman/shared",
   ],
   images: {
     remotePatterns: [],
   },
   webpack(config, { dev }) {
+    // Workspace packages use Node-compatible `.js` specifiers in their
+    // TypeScript sources. Resolve those specifiers to source files while Next
+    // transpiles the packages, then fall back to JavaScript dependencies.
+    config.resolve.extensionAlias = {
+      ...config.resolve.extensionAlias,
+      ".js": [".ts", ".js"],
+      ".jsx": [".tsx", ".jsx"],
+    };
     config.ignoreWarnings = [
       ...(config.ignoreWarnings ?? []),
       // Sentry's Node tracing integrations use dynamic require hooks. Webpack

@@ -8,9 +8,12 @@ type Props = {
   title: string;
   priceLabel: string;
   features: string[];
+  /** The recommended plan: teal panel, lit CTA, and the badge. */
+  featured?: boolean;
+  badge?: string;
 };
 
-export function PricingCard({ plan, title, priceLabel, features }: Props) {
+export function PricingCard({ plan, title, priceLabel, features, featured, badge }: Props) {
   const router = useRouter();
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -45,7 +48,10 @@ export function PricingCard({ plan, title, priceLabel, features }: Props) {
   };
 
   return (
-    <article className={`pricing-card pricing-card--${plan}`}>
+    <article
+      className={`pricing-card pricing-card--${plan}${featured ? " pricing-card--featured" : ""}`}
+    >
+      {badge ? <span className="pricing-card__badge">{badge}</span> : null}
       <h2>{title}</h2>
       <p className="pricing-card__price">{priceLabel}</p>
       <ul className="pricing-card__features">

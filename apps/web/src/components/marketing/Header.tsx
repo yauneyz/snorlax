@@ -20,15 +20,20 @@ export async function Header() {
         <Link href="/download">Download</Link>
         <Link href="/pricing">Pricing</Link>
         {user ? (
-          <AccountMenu />
+          <>
+            <Link href="/app">Dashboard</Link>
+            <AccountMenu name={(user.user_metadata?.full_name as string | undefined) ?? user.email} />
+          </>
         ) : (
-          <Link href="/login" className="site-nav__login">
-            Log in
-          </Link>
+          <>
+            <Link href="/login" className="site-nav__login">
+              Log in
+            </Link>
+            <Link href="/signup" className="site-nav__cta">
+              Get started
+            </Link>
+          </>
         )}
-        <Link href="/signup" className="site-nav__cta">
-          Get started
-        </Link>
       </nav>
     </header>
   );

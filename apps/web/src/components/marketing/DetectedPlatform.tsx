@@ -2,12 +2,13 @@
 
 import { useEffect, useState } from "react";
 
-type Detected = { label: string; href: string };
+type PlatformKey = "win" | "mac" | "linux";
+type Detected = { key: PlatformKey; label: string; href: string };
 
-const byPlatform: Record<string, Detected> = {
-  win: { label: "Windows", href: "/api/desktop/download?platform=win" },
-  mac: { label: "macOS", href: "/api/desktop/download?platform=mac" },
-  linux: { label: "Linux", href: "/api/desktop/download?platform=linux" },
+const byPlatform: Record<PlatformKey, Detected> = {
+  win: { key: "win", label: "Windows", href: "/api/desktop/download?platform=win" },
+  mac: { key: "mac", label: "macOS", href: "/api/desktop/download?platform=mac" },
+  linux: { key: "linux", label: "Linux", href: "/api/desktop/download?platform=linux" },
 };
 
 function detect(userAgent: string): Detected | null {
@@ -21,11 +22,14 @@ function detect(userAgent: string): Detected | null {
 }
 
 /**
- * The "we think you're on X" pill above the platform grid. Renders nothing until mounted so
+ * The "we think you're on X" banner above the platform grid. Renders nothing until mounted so
  * the server and client markup agree, and nothing at all on mobile or an unknown UA — the
  * grid below it is the fallback.
+ *
+ * The glyphs arrive pre-rendered from the server page rather than being imported here, so the
+ * Font Awesome icon data stays out of the client bundle.
  */
-export function DetectedPlatform() {
+export function DetectedPlatform({ icons }: { icons: Record<PlatformKey, React.ReactNode> }) {
   const [detected, setDetected] = useState<Detected | null>(null);
 
   useEffect(() => {
@@ -36,12 +40,18 @@ export function DetectedPlatform() {
 
   return (
     <div className="detected-platform">
-      <p>
-        Looks like you&apos;re on {detected.label}
+      <div className="detected-platform__banner">
+        <span className="detected-platform__icon" aria-hidden="true">
+          {icons[detected.key]}
+        </span>
+        <p className="detected-platform__text">
+          <span className="detected-platform__eyebrow">Detected</span>
+          <span className="detected-platform__name">{detected.label}</span>
+        </p>
         <a className="detected-platform__link" href={detected.href}>
           Download for {detected.label}
         </a>
-      </p>
+      </div>
     </div>
   );
 }

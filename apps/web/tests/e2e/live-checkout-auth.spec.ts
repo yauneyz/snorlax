@@ -15,6 +15,7 @@ test.describe("live auth + checkout flow", () => {
   );
 
   test("logs in, completes Stripe Checkout, and unlocks the subscribed app", async ({ page }) => {
+    test.setTimeout(180_000);
     const env = readLiveEnv();
     const supabase = createClient(env.supabaseUrl, env.supabaseSecretKey, {
       auth: { autoRefreshToken: false, persistSession: false },
@@ -155,6 +156,8 @@ async function lookupStripeCustomerId(supabase: SupabaseClient, userId: string) 
 
 async function completeStripeCheckout(page: Page, email: string) {
   await fillIfVisible(page.getByLabel(/^email$/i), email);
+  const card = page.getByRole("radio", { name: /^card$/i });
+  if ((await card.count()) > 0) await card.check();
   await page.getByPlaceholder("1234 1234 1234 1234").fill("4242 4242 4242 4242");
   await page.getByPlaceholder(/MM\s*\/\s*YY/i).fill("12 / 34");
   await page.getByPlaceholder(/CVC/i).fill("123");
@@ -163,6 +166,12 @@ async function completeStripeCheckout(page: Page, email: string) {
     "E2E Checkout User",
   );
   await fillIfVisible(page.getByLabel(/zip|postal/i), "94107");
+  const saveDetails = page.getByRole("checkbox", {
+    name: /save my information for faster checkout/i,
+  });
+  if ((await saveDetails.count()) > 0 && (await saveDetails.isChecked())) {
+    await saveDetails.uncheck();
+  }
   await page.getByRole("button", { name: /subscribe|pay|start|confirm/i }).click();
 }
 

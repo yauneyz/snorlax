@@ -50,37 +50,54 @@ export default async function AccountPage() {
       ? "Pro (verification pending)"
       : "Plan unavailable (verification required)";
 
+  // The plan lives in its own panel, so the record on the left only carries the rest.
+  const renewal =
+    detail?.hasSubscription && detail.currentPeriodEnd
+      ? {
+          label: detail.cancelAtPeriodEnd ? "Cancels" : "Renews",
+          date: new Date(detail.currentPeriodEnd).toLocaleDateString(),
+        }
+      : null;
+
   return (
     <section className="account">
       <h1>Account</h1>
-      <dl className="account__details">
-        <dt>Name</dt>
-        <dd>{profile?.full_name ?? "—"}</dd>
-        <dt>Email</dt>
-        <dd>{profile?.email ?? user.email}</dd>
-        <dt>Plan</dt>
-        <dd>{planLabel}</dd>
-        {detail?.hasSubscription && detail.currentPeriodEnd ? (
-          <>
-            <dt>{detail.cancelAtPeriodEnd ? "Cancels" : "Renews"}</dt>
-            <dd>{new Date(detail.currentPeriodEnd).toLocaleDateString()}</dd>
-          </>
-        ) : null}
-        {detail?.status &&
-        !["active", "trialing", "comped"].includes(detail.status) ? (
-          <>
-            <dt>Billing status</dt>
-            <dd>{detail.status.replaceAll("_", " ")}</dd>
-          </>
-        ) : null}
-      </dl>
-      {detail?.hasSubscription ? (
-        <ManageBillingButton />
-      ) : detailResult.unavailable || detail?.status === "comped" ? null : (
-        <Link href="/pricing" className="account__subscribe">
-          Upgrade to Pro
-        </Link>
-      )}
+      <div className="account__grid">
+        <dl className="account__details">
+          <dt>Name</dt>
+          <dd>{profile?.full_name ?? "—"}</dd>
+          <dt>Email</dt>
+          <dd>{profile?.email ?? user.email}</dd>
+          {detail?.status &&
+          !["active", "trialing", "comped"].includes(detail.status) ? (
+            <>
+              <dt>Billing status</dt>
+              <dd>{detail.status.replaceAll("_", " ")}</dd>
+            </>
+          ) : null}
+        </dl>
+
+        <aside className="account__plan">
+          <span className="account__plan-eyebrow">Plan</span>
+          <p className="account__plan-name">{planLabel}</p>
+          {renewal ? (
+            <p className="account__plan-meta">
+              {renewal.label} {renewal.date}
+            </p>
+          ) : null}
+          {detail?.hasSubscription ? (
+            <div className="account__plan-actions">
+              <ManageBillingButton />
+            </div>
+          ) : detailResult.unavailable || detail?.status === "comped" ? null : (
+            <div className="account__plan-actions">
+              <Link href="/pricing" className="account__subscribe">
+                Upgrade to Pro
+              </Link>
+            </div>
+          )}
+        </aside>
+      </div>
     </section>
   );
 }

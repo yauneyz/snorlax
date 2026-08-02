@@ -1,5 +1,5 @@
 /**
- * Gradient-filled platform glyphs for the download-page tiles.
+ * Platform glyphs for the download-page tiles and the detected-platform banner.
  *
  * Paths come from Font Awesome Free 6 brands (CC BY 4.0, https://fontawesome.com/license/free) —
  * the same glyph set the reference design used, but imported rather than pulled off a CDN, so
@@ -7,8 +7,9 @@
  * data is resolved during render and never ships to the browser.
  *
  * Each icon keeps its own viewBox and is letterboxed into a square by preserveAspectRatio, which
- * gives the row a consistent cap height without distorting any single mark. Gradient ids are
- * suffixed per platform because SVG ids are document-global.
+ * gives the row a consistent cap height without distorting any single mark. The fill is
+ * `currentColor` rather than a gradient so the same mark can appear more than once on a page
+ * without colliding SVG ids, and so a tile can tint its glyph on hover.
  */
 import {
   faApple,
@@ -33,7 +34,6 @@ const icons: Record<Platform, IconDefinition> = {
 
 export function PlatformIcon({ platform, size = 40 }: { platform: Platform; size?: number }) {
   const [width, height, , , path] = icons[platform].icon;
-  const gradientId = `plat-grad-${platform}`;
 
   return (
     <svg
@@ -44,14 +44,7 @@ export function PlatformIcon({ platform, size = 40 }: { platform: Platform; size
       aria-hidden="true"
       focusable="false"
     >
-      <defs>
-        <linearGradient id={gradientId} x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0" stopColor="#ffffff" />
-          <stop offset="0.5" stopColor="#c7ccd4" />
-          <stop offset="1" stopColor="#8b9098" />
-        </linearGradient>
-      </defs>
-      <path d={Array.isArray(path) ? path.join(" ") : path} fill={`url(#${gradientId})`} />
+      <path d={Array.isArray(path) ? path.join(" ") : path} fill="currentColor" />
     </svg>
   );
 }

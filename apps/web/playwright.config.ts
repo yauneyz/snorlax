@@ -9,6 +9,10 @@ const BASE_URL = process.env.E2E_BASE_URL ?? `http://localhost:${PORT}`;
 
 export default defineConfig({
   testDir: "./tests/e2e",
+  // Next's development server compiles routes on first request. A full suite
+  // can legitimately spend more than Playwright's 30s default warming two
+  // otherwise unrelated pages in the same test.
+  timeout: 60_000,
   fullyParallel: false,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 1 : 0,

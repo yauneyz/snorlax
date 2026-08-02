@@ -1,8 +1,28 @@
 import type { Metadata, Viewport } from "next";
 import { GoogleAnalytics } from "@next/third-parties/google";
+import { JetBrains_Mono, Space_Grotesk } from "next/font/google";
 import { Providers } from "./providers";
 import { config } from "@/lib/config";
 import "./globals.css";
+
+/**
+ * Space Grotesk for everything, JetBrains Mono for the small caps-and-numbers labels
+ * (step counters, "DETECTED", metadata). Self-hosted by next/font, so no request to
+ * fonts.googleapis.com in the critical path.
+ */
+const sans = Space_Grotesk({
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
+  variable: "--font-sans",
+  display: "swap",
+});
+
+const mono = JetBrains_Mono({
+  subsets: ["latin"],
+  weight: ["400", "500", "700"],
+  variable: "--font-mono",
+  display: "swap",
+});
 
 export const metadata: Metadata = {
   metadataBase: new URL(config.app.url),
@@ -29,13 +49,13 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#08090a",
+  themeColor: "#06070a",
   colorScheme: "dark",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="en" className={`${sans.variable} ${mono.variable}`} suppressHydrationWarning>
       <body>
         <Providers>{children}</Providers>
         {config.google.ga4MeasurementId ? (

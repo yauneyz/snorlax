@@ -72,7 +72,7 @@ function DownloadCard({ target }: { target: DownloadTarget }) {
       {...(target.external ? { target: "_blank", rel: "noreferrer" } : {})}
     >
       <span className="download-card__icon">
-        <PlatformIcon platform={target.platform} />
+        <PlatformIcon platform={target.platform} size={22} />
       </span>
       <h3>{target.name}</h3>
       <span className="download-card__note">{target.note}</span>
@@ -91,7 +91,15 @@ export default function DownloadPage() {
         </p>
       </header>
 
-      <DetectedPlatform />
+      {/* Icons are rendered here, on the server, so the banner reuses the same marks as the
+          cards without pulling the icon set into the client bundle. */}
+      <DetectedPlatform
+        icons={{
+          win: <PlatformIcon platform="windows" size={22} />,
+          mac: <PlatformIcon platform="macos" size={22} />,
+          linux: <PlatformIcon platform="linux" size={22} />,
+        }}
+      />
 
       <div className="download__group">
         <div className="download__group-head">

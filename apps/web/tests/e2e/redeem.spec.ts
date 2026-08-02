@@ -50,7 +50,7 @@ test.describe("complimentary code redemption", () => {
 
       // Redemption is an explicit click — loading the URL must never burn the code.
       await page.getByRole("button", { name: /^redeem$/i }).click();
-      await expect(page.getByText(/you're on pro/i)).toBeVisible();
+      await expect(page.getByText(/you're on pro/i)).toBeVisible({ timeout: 15_000 });
 
       // The grant is live: the gated app renders instead of bouncing to /pricing.
       await page.goto("/app");
