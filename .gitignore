@@ -33,6 +33,7 @@ native/common/target/
 
 # Env (machine-local secrets/overrides)
 .credentials
+local-credentials/
 .env.local
 .env.*.local
 apps/web/.env

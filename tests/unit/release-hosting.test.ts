@@ -25,6 +25,12 @@ import {
   // eslint-disable-next-line @typescript-eslint/ban-ts-comment
   // @ts-ignore — untyped .mjs module shared with release scripts
 } from '../../scripts/lib/desktop-environment.mjs';
+import {
+  DEFAULT_APPLE_CERTIFICATE_PATH,
+  appleReleaseEnvironment,
+  // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+  // @ts-ignore — untyped .mjs module shared with release scripts
+} from '../../scripts/lib/apple-release.mjs';
 
 type Platform = keyof typeof STABLE_INSTALLER_KEYS;
 const platforms = PLATFORMS as Platform[];
@@ -45,6 +51,89 @@ describe('release command boundaries', () => {
     expect(localReleaseSource).toContain("capture('git', ['rev-parse', 'HEAD'])");
     expect(localReleaseSource).toContain("join(homedir(), '.snorlax-src')");
     expect(localReleaseSource).toContain("'--override-input'");
+  });
+});
+
+describe('macOS release credentials', () => {
+  const root = '/repo';
+  const p12 = `/repo/${DEFAULT_APPLE_CERTIFICATE_PATH}`;
+  const p8 = '/repo/local-credentials/apple/AuthKey_TEST.p8';
+  const pathExists = (path: string) => path === p12 || path === p8;
+
+  it('uses the ignored local p12 and .credentials values for a manual release', () => {
+    const result = appleReleaseEnvironment({
+      root,
+      env: {},
+      pathExists,
+      credentials: {
+        apple: {
+          certificate_password: 'p12-password',
+          api_key_path: 'local-credentials/apple/AuthKey_TEST.p8',
+          api_key_id: 'KEY123',
+          api_issuer: '00000000-0000-0000-0000-000000000000',
+          team_id: '456BD9S45N',
+        },
+      },
+    });
+
+    expect(result).toMatchObject({
+      CSC_LINK: p12,
+      CSC_KEY_PASSWORD: 'p12-password',
+      APPLE_API_KEY: p8,
+      APPLE_API_KEY_ID: 'KEY123',
+      APPLE_TEAM_ID: '456BD9S45N',
+    });
+  });
+
+  it('preserves the GitHub Actions environment contract', () => {
+    const result = appleReleaseEnvironment({
+      root,
+      credentials: null,
+      pathExists,
+      env: {
+        CSC_LINK: p12,
+        CSC_KEY_PASSWORD: 'ci-password',
+        APPLE_API_KEY: p8,
+        APPLE_API_KEY_ID: 'CIKEY',
+        APPLE_API_ISSUER: '11111111-1111-1111-1111-111111111111',
+        APPLE_TEAM_ID: '456BD9S45N',
+      },
+    });
+    expect(result.CSC_LINK).toBe(p12);
+    expect(result.CSC_KEY_PASSWORD).toBe('ci-password');
+  });
+
+  it('uses an existing notarytool Keychain profile without API-key values', () => {
+    const result = appleReleaseEnvironment({
+      root,
+      pathExists,
+      env: { APPLE_API_KEY_ID: 'stale-partial-value' },
+      credentials: {
+        apple: {
+          certificate_password: 'p12-password',
+          keychain_profile: 'talysman-notary',
+        },
+      },
+    });
+
+    expect(result).toMatchObject({
+      CSC_LINK: p12,
+      CSC_KEY_PASSWORD: 'p12-password',
+      APPLE_KEYCHAIN_PROFILE: 'talysman-notary',
+    });
+    expect(result.APPLE_API_KEY_ID).toBeUndefined();
+    expect(result.APPLE_API_KEY).toBeUndefined();
+  });
+
+  it('fails before building when notarization credentials are incomplete', () => {
+    expect(() =>
+      appleReleaseEnvironment({
+        root,
+        env: {},
+        pathExists,
+        credentials: { apple: { certificate_password: 'p12-password' } },
+      }),
+    ).toThrow(/notarization authentication/);
   });
 });
 

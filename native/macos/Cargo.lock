@@ -634,7 +634,7 @@ dependencies = [
 
 [[package]]
 name = "talysman-macos"
-version = "0.1.0"
+version = "0.1.3"
 dependencies = [
  "anyhow",
  "chrono",
@@ -653,7 +653,7 @@ dependencies = [
 
 [[package]]
 name = "talysman_common"
-version = "0.1.0"
+version = "0.1.3"
 dependencies = [
  "serde",
  "serde_json",

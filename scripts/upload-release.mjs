@@ -15,6 +15,7 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import toml from "@iarna/toml";
 
+import { appleReleaseEnvironment } from "./lib/apple-release.mjs";
 import {
   assertLiveStripeRelease,
   desktopStripeReleaseIssues,
@@ -73,6 +74,11 @@ const credentialsCandidates = [
   resolve(root, "..", "indigo", ".credentials"),
 ];
 
+function localCredentials() {
+  const source = credentialsCandidates.find((candidate) => existsSync(candidate));
+  return source ? toml.parse(readFileSync(source, "utf8")) : null;
+}
+
 function loadHosting() {
   if (
     process.env.RELEASE_ARTIFACTS_BUCKET &&
@@ -126,13 +132,14 @@ function runAws(hosting, commandArgs, options = {}) {
   });
 }
 
-function buildHostInstallers(platforms) {
+function buildHostInstallers(platforms, env = process.env) {
   for (const platform of platforms) {
     if (dryRun) {
       console.log(`[dry run] would run pnpm ${BUILD_SCRIPTS[platform]}`);
     } else {
       execFileSync("pnpm", ["run", BUILD_SCRIPTS[platform]], {
         cwd: root,
+        env,
         stdio: "inherit",
       });
     }
@@ -433,7 +440,14 @@ async function main() {
   if (hostPlatforms.length === 0)
     throw new Error(`No release platforms configured for ${process.platform}`);
   const buildable = buildablePlatformsForHost(process.platform);
-  if (!noBuild) buildHostInstallers(buildable);
+  const buildEnvironment = buildable.includes("mac")
+    ? appleReleaseEnvironment({
+        root,
+        credentials: localCredentials(),
+        env: process.env,
+      })
+    : process.env;
+  if (!noBuild) buildHostInstallers(buildable, buildEnvironment);
   const files = existsSync(distDir)
     ? readdirSync(distDir).map((name) => ({
         name,
