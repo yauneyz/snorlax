@@ -14,6 +14,7 @@ const Channels = {
   serviceRequest: 'service:request',
   serviceEvent: 'service:event',
   devToggleKey: 'app:devToggleKey',
+  devSimulateExtension: 'app:devSimulateExtension',
   entitlement: 'app:entitlement',
   devSetEntitlementPlan: 'app:devSetEntitlementPlan',
   setLocalEntitlementEnabled: 'app:setLocalEntitlementEnabled',
@@ -34,8 +35,17 @@ const Channels = {
   cancelSubscription: 'app:cancelSubscription',
   resumeSubscription: 'app:resumeSubscription',
   redeemCode: 'app:redeemCode',
+  onboardingStatus: 'app:onboardingStatus',
+  completeOnboarding: 'app:completeOnboarding',
+  resetOnboarding: 'app:resetOnboarding',
   appEvent: 'app:event',
 } as const;
+
+export interface OnboardingStatusInfo {
+  complete: boolean;
+  completedAt?: string;
+  version?: number;
+}
 
 export interface EntitlementInfo {
   active: boolean;
@@ -116,6 +126,10 @@ const api = {
   devToggleKey: (): Promise<{ ok: boolean; present?: boolean; message?: string }> =>
     ipcRenderer.invoke(Channels.devToggleKey),
 
+  /** Dev-only: emit one fake extension heartbeat from the mock service. */
+  devSimulateExtension: (): Promise<ActionResult> =>
+    ipcRenderer.invoke(Channels.devSimulateExtension),
+
   entitlement: (): Promise<EntitlementInfo> =>
     ipcRenderer.invoke(Channels.entitlement),
 
@@ -167,6 +181,18 @@ const api = {
   /** Redeem a complimentary-access code. `granted` is true once the account holds Pro. */
   redeemCode: (code: string): Promise<ActionResult & { granted?: boolean }> =>
     ipcRenderer.invoke(Channels.redeemCode, { code }),
+
+  // --- first run ---
+  /** Whether the first-run walkthrough has already been completed on this machine. */
+  onboardingStatus: (): Promise<OnboardingStatusInfo> =>
+    ipcRenderer.invoke(Channels.onboardingStatus),
+  /** Mark the first-run walkthrough as done so it doesn't reappear. */
+  completeOnboarding: (): Promise<OnboardingStatusInfo> =>
+    ipcRenderer.invoke(Channels.completeOnboarding),
+  /** Dev-only: forget the first run so the walkthrough replays on the next launch. */
+  resetOnboarding: (): Promise<
+    ActionResult & { status?: OnboardingStatusInfo }
+  > => ipcRenderer.invoke(Channels.resetOnboarding),
 
   /** Subscribe to main-pushed auth/entitlement change events. Returns an unsubscribe fn. */
   onAppEvent: (cb: (event: AppEventName) => void): (() => void) => {

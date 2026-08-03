@@ -1,10 +1,8 @@
-import { test, expect, _electron as electron } from '@playwright/test';
-import { resolve } from 'node:path';
+import { test, expect } from '@playwright/test';
+import { launchApp } from './launch.js';
 
 test('about shows client and service versions and exposes the updater check', async () => {
-  const app = await electron.launch({
-    args: [resolve(__dirname, '../../../apps/desktop/out/main/index.cjs')],
-  });
+  const app = await launchApp();
   try {
     const win = await app.firstWindow();
     await win.getByText('Connecting…').waitFor({ state: 'detached' });

@@ -17,11 +17,14 @@ import {
 import {
   appInfo,
   authStatus,
+  completeOnboarding,
   devSetEntitlementPlan,
   entitlement,
   onAppEvent,
   onEvent,
+  onboardingStatus,
   request,
+  resetOnboarding,
   setLocalEntitlementEnabled,
   subscriptionDetail,
   type SubscriptionDetailInfo,
@@ -68,6 +71,24 @@ interface FocusStore {
   lastError?: { code: string; message: string };
   /** Transient watchdog warning surfaced as a toast in the UI. */
   watchdogWarning?: { browser: string; pid: number };
+  /**
+   * The most recent extension heartbeat this session, or undefined if no browser extension has
+   * reached the service yet. Extensions beat every ~5s, so this doubles as a liveness signal.
+   */
+  extensionContact?: {
+    browser: string;
+    pid: number;
+    extensionVersion?: string;
+    healthy: boolean;
+    /** Client clock, epoch ms — only ever compared against other client-clock readings. */
+    at: number;
+  };
+
+  /** Undefined until the first-run status has been read from main. */
+  onboardingComplete?: boolean;
+  finishOnboarding: () => Promise<void>;
+  /** Dev-only: forget the first run and show the walkthrough again immediately. */
+  replayOnboarding: () => Promise<void>;
 
   init: () => Promise<void>;
   refresh: () => Promise<void>;
@@ -129,6 +150,17 @@ export const useFocusStore = create<FocusStore>((set, get) => ({
   clearWatchdogWarning: () => set({ watchdogWarning: undefined }),
 
   setError: (lastError) => set({ lastError }),
+
+  finishOnboarding: async () => {
+    const status = await completeOnboarding();
+    set({ onboardingComplete: status.complete });
+  },
+
+  replayOnboarding: async () => {
+    const res = await resetOnboarding();
+    if (!res.ok) throw new Error(res.message ?? 'Unable to reset the first-run walkthrough.');
+    set({ onboardingComplete: false });
+  },
 
   refreshAuth: async () => {
     const status = await authStatus();
@@ -212,6 +244,7 @@ export const useFocusStore = create<FocusStore>((set, get) => ({
       isLocalRelease: info.isLocalRelease,
       localEntitlementEnabled: info.localEntitlementEnabled,
     });
+    set({ onboardingComplete: (await onboardingStatus()).complete });
     await get().refreshAuth();
     await get().refreshEntitlement();
     void get().refreshSubscriptionDetail();
@@ -231,6 +264,9 @@ export const useFocusStore = create<FocusStore>((set, get) => ({
     );
     onEvent('settingsChanged', ({ settings }) => set({ settings }));
     onEvent('browserWatchdogWarning', ({ browser, pid }) => set({ watchdogWarning: { browser, pid } }));
+    onEvent('extensionHeartbeat', ({ browser, pid, extensionVersion, healthy }) =>
+      set({ extensionContact: { browser, pid, extensionVersion, healthy, at: Date.now() } }),
+    );
     onEvent('scheduleFired', () => {
       // Schedule boundaries can change focus + lock state; re-pull the snapshot.
       void get().refresh();

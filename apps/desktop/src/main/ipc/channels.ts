@@ -7,6 +7,8 @@ export const Channels = {
   serviceEvent: 'service:event',
   /** invoke: dev-only — toggle the simulated USB key in the mock service. */
   devToggleKey: 'app:devToggleKey',
+  /** invoke: dev-only — emit one fake browser-extension heartbeat from the mock service. */
+  devSimulateExtension: 'app:devSimulateExtension',
   /** invoke: returns the current subscription entitlement snapshot. */
   entitlement: 'app:entitlement',
   /** invoke: dev-only - override the simulated subscription plan. */
@@ -47,6 +49,12 @@ export const Channels = {
   resumeSubscription: 'app:resumeSubscription',
   /** invoke: { code } → redeem a complimentary-access code. */
   redeemCode: 'app:redeemCode',
+  /** invoke: returns whether the first-run walkthrough has been completed. */
+  onboardingStatus: 'app:onboardingStatus',
+  /** invoke: mark the first-run walkthrough as done. */
+  completeOnboarding: 'app:completeOnboarding',
+  /** invoke: dev-only — forget the first run so the walkthrough replays. */
+  resetOnboarding: 'app:resetOnboarding',
   /** main→renderer push: { event } where event is 'authChanged' | 'entitlementChanged'. */
   appEvent: 'app:event',
 } as const;

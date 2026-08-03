@@ -40,6 +40,40 @@ body {
   isolation: isolate;
 }
 
+/* Development builds get a viewport-level energy blade. Fixed positioning is intentional:
+   the compositor may make `.desktop-workspace` narrower than the actual window. */
+.desktop-workspace--dev::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  box-sizing: border-box;
+  pointer-events: none;
+  border: 2px solid #ff3434;
+  box-shadow:
+    inset 0 0 5px rgba(255, 52, 52, 0.95),
+    inset 0 0 13px rgba(255, 28, 28, 0.58),
+    inset 0 0 24px rgba(255, 20, 20, 0.2);
+  animation: dev-lightsaber-pulse 2.4s ease-in-out infinite;
+}
+
+.dev-mode-label {
+  border: 1px solid rgba(255, 52, 52, 0.72);
+  border-radius: 4px;
+  padding: 1px 5px;
+  color: #ff5252;
+  background: rgba(255, 35, 35, 0.1);
+  box-shadow:
+    inset 0 0 5px rgba(255, 35, 35, 0.18),
+    0 0 7px rgba(255, 35, 35, 0.24);
+  font-family: 'JetBrains Mono Variable', ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 14px;
+  letter-spacing: 0.08em;
+  text-shadow: 0 0 5px rgba(255, 52, 52, 0.75);
+}
+
 /* Tiling Wayland compositors are allowed to disregard the BrowserWindow's requested bounds.
    Keep the controls on one continuous surface, but center their vertical working area when the
    compositor gives Talysman substantially more height than its intended portrait window. */
@@ -79,6 +113,24 @@ body {
   }
 }
 
+@keyframes dev-lightsaber-pulse {
+  0%,
+  100% {
+    border-color: #ff3434;
+    box-shadow:
+      inset 0 0 5px rgba(255, 52, 52, 0.9),
+      inset 0 0 13px rgba(255, 28, 28, 0.5),
+      inset 0 0 24px rgba(255, 20, 20, 0.16);
+  }
+  50% {
+    border-color: #ff5555;
+    box-shadow:
+      inset 0 0 7px rgba(255, 70, 70, 1),
+      inset 0 0 17px rgba(255, 35, 35, 0.66),
+      inset 0 0 30px rgba(255, 20, 20, 0.24);
+  }
+}
+
 @keyframes tal-rise {
   from {
     transform: translateY(6px);
@@ -87,6 +139,24 @@ body {
   to {
     transform: none;
     opacity: 1;
+  }
+}
+
+/* A packet crossing the app ⇄ browser channel in the first-run handshake read-out. */
+@keyframes tal-relay {
+  0% {
+    left: 0;
+    opacity: 0;
+  }
+  12% {
+    opacity: 1;
+  }
+  88% {
+    opacity: 1;
+  }
+  100% {
+    left: 100%;
+    opacity: 0;
   }
 }
 
@@ -115,4 +185,10 @@ body {
 input[type='time']::-webkit-calendar-picker-indicator {
   filter: invert(0.7);
   cursor: pointer;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .desktop-workspace--dev::after {
+    animation: none;
+  }
 }

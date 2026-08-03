@@ -15,6 +15,7 @@ import type { AppPickerItem } from '../../shared/appPicker.js';
 import type {
   AppEventName,
   AppUpdateCheckResult,
+  OnboardingStatusInfo,
   SubscriptionDetailInfo,
 } from '../../preload/index.js';
 
@@ -52,6 +53,7 @@ export const checkForUpdates = (): Promise<AppUpdateCheckResult> => window.api.c
 export const listInstalledApps = (): Promise<AppPickerItem[]> => window.api.listInstalledApps();
 export const openExternal = (url: string) => window.api.openExternal(url);
 export const devToggleKey = () => window.api.devToggleKey();
+export const devSimulateExtension = () => window.api.devSimulateExtension();
 export const entitlement = () => window.api.entitlement();
 export const devSetEntitlementPlan = (plan: SubscriptionPlan) =>
   window.api.devSetEntitlementPlan(plan);
@@ -74,4 +76,14 @@ export const cancelSubscription = () => window.api.cancelSubscription();
 export const resumeSubscription = () => window.api.resumeSubscription();
 export const redeemCode = (code: string) => window.api.redeemCode(code);
 
-export type { AppUpdateCheckResult, CheckoutPrice, SubscriptionPlan, SubscriptionDetailInfo };
+export const onboardingStatus = () => window.api.onboardingStatus();
+export const completeOnboarding = () => window.api.completeOnboarding();
+export const resetOnboarding = () => window.api.resetOnboarding();
+
+export type {
+  AppUpdateCheckResult,
+  CheckoutPrice,
+  OnboardingStatusInfo,
+  SubscriptionPlan,
+  SubscriptionDetailInfo,
+};

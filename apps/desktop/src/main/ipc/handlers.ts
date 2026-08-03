@@ -48,6 +48,7 @@ import {
   validateScheduleForLimits,
   type SubscriptionPlan,
 } from '../../shared/productLimits.js';
+import { completeOnboarding, getOnboardingStatus, resetOnboarding } from '../onboarding.js';
 import { Channels } from './channels.js';
 
 /** Events pushed to renderers so the UI re-pulls auth/entitlement after a change. */
@@ -77,6 +78,7 @@ const FORWARDED_EVENTS: EventName[] = [
   'settingsChanged',
   'browserWatchdogWarning',
   'browserWatchdogKilled',
+  'extensionHeartbeat',
 ];
 
 const WATCHDOG_KILLED_DETAIL =
@@ -296,6 +298,12 @@ export async function registerIpcHandlers(ctx: HandlerContext): Promise<void> {
     return { ok: true, present: mock.devToggleKey() };
   });
 
+  ipcMain.handle(Channels.devSimulateExtension, () => {
+    if (!mock) return { ok: false, message: 'Only available against the mock service.' };
+    mock.devSimulateExtensionHeartbeat();
+    return { ok: true };
+  });
+
   ipcMain.handle(Channels.entitlement, () => getEntitlement());
 
   ipcMain.handle(Channels.devSetEntitlementPlan, async (_e, plan: SubscriptionPlan) => {
@@ -370,6 +378,16 @@ export async function registerIpcHandlers(ctx: HandlerContext): Promise<void> {
     }
     return result;
   });
+  // --- first run ---
+  ipcMain.handle(Channels.onboardingStatus, () => getOnboardingStatus());
+  ipcMain.handle(Channels.completeOnboarding, () => completeOnboarding());
+  ipcMain.handle(Channels.resetOnboarding, async () => {
+    if (config.appEnv === 'production' && !config.isLocalRelease) {
+      return { ok: false, message: 'Only available in development builds.' };
+    }
+    return { ok: true, status: await resetOnboarding() };
+  });
+
   ipcMain.handle(Channels.redeemCode, async (_e, args: { code: string }) => {
     const result = await redeemCompCode(String(args?.code ?? ''));
     if (result.granted) {

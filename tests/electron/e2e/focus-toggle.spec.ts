@@ -4,13 +4,11 @@
  * playwright-electron to be installed (see README.md). Kept out of the vitest `pnpm test`
  * run so the unit suite stays dependency-light.
  */
-import { test, expect, _electron as electron } from '@playwright/test';
-import { resolve } from 'node:path';
+import { test, expect } from '@playwright/test';
+import { launchApp } from './launch.js';
 
 test('focus requires a paired key and disabling requires it to be connected', async () => {
-  const app = await electron.launch({
-    args: [resolve(__dirname, '../../../apps/desktop/out/main/index.cjs')],
-  });
+  const app = await launchApp();
   try {
     const win = await app.firstWindow();
 

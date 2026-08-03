@@ -1,6 +1,11 @@
 import React, { useState } from 'react';
 import { useFocusStore } from '../store/useFocusStore.js';
-import { checkForUpdates, devToggleKey, type SubscriptionPlan } from '../lib/bridge.js';
+import {
+  checkForUpdates,
+  devSimulateExtension,
+  devToggleKey,
+  type SubscriptionPlan,
+} from '../lib/bridge.js';
 import { Badge, Button, Card, CardTitle } from '../components/ui/index.js';
 import { cx } from '../lib/utils.js';
 
@@ -20,6 +25,8 @@ export function Settings() {
   const handshakeEnabled = useFocusStore((s) => s.settings.browserHandshakeEnabled);
   const keyPresent = useFocusStore((s) => s.keyPresent);
   const setBrowserHandshake = useFocusStore((s) => s.setBrowserHandshake);
+  const replayOnboarding = useFocusStore((s) => s.replayOnboarding);
+  const [firstRunError, setFirstRunError] = useState<string | null>(null);
   const [planBusy, setPlanBusy] = useState(false);
   const [planError, setPlanError] = useState<string | null>(null);
   const [localEntitlementBusy, setLocalEntitlementBusy] = useState(false);
@@ -240,16 +247,39 @@ export function Settings() {
           )}
 
           {usingMock && (
-            <div>
+            <div className="mb-5">
               <p className="mb-3 text-sm text-slate-400">
                 Simulate plugging/unplugging the paired USB key to test the red/green indicator and
-                the key-required disable gate.
+                the key-required disable gate, or fake one browser-extension heartbeat — the real
+                native-messaging host can’t reach the in-process mock.
               </p>
-              <Button variant="ghost" onClick={() => devToggleKey()}>
-                Toggle simulated USB key
-              </Button>
+              <div className="flex flex-wrap gap-2">
+                <Button variant="ghost" onClick={() => devToggleKey()}>
+                  Toggle simulated USB key
+                </Button>
+                <Button variant="ghost" onClick={() => devSimulateExtension()}>
+                  Simulate extension heartbeat
+                </Button>
+              </div>
             </div>
           )}
+
+          <div>
+            <p className="mb-3 text-sm text-slate-400">
+              Clear the first-run flag and reopen the setup walkthrough. This only affects what the
+              app shows you — profiles, keys and enforcement state are left alone.
+            </p>
+            <Button
+              variant="ghost"
+              onClick={() => {
+                setFirstRunError(null);
+                replayOnboarding().catch((e) => setFirstRunError((e as Error).message));
+              }}
+            >
+              Replay first run
+            </Button>
+            {firstRunError && <p className="mt-2 text-[12.5px] text-warn">{firstRunError}</p>}
+          </div>
         </Card>
       )}
     </div>

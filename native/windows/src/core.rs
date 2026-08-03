@@ -635,6 +635,22 @@ impl Core {
                 );
                 if pid != 0 {
                     self.shared.record_heartbeat(pid, healthy);
+                    // Tell the UI the extension is talking to us. Emitted on every beat and
+                    // independent of the handshake setting: first-run setup uses it to confirm
+                    // the extension install actually reached this service.
+                    self.emit(
+                        "extensionHeartbeat",
+                        json!({
+                            "browser": browser,
+                            "pid": pid,
+                            "extensionVersion": if extension_version.is_empty() {
+                                Value::Null
+                            } else {
+                                Value::String(extension_version.to_string())
+                            },
+                            "healthy": healthy,
+                        }),
+                    );
                 } else {
                     tracing::warn!("extension heartbeat ignored: native host reported pid=0");
                 }

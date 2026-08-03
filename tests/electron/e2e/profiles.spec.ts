@@ -2,16 +2,14 @@
  * E2E: blocking profiles and the Free/Pro profile allowance. Drives the real Electron app
  * against the in-process mock service, the same way focus-toggle.spec.ts does.
  *
- * The dev plan persists across launches, so the walk starts by pinning Pro through the Settings
- * switcher rather than trusting whatever the last run left behind, then drops to Free the same way.
+ * The walk starts by pinning Pro through the Settings switcher rather than trusting the default,
+ * then drops to Free the same way.
  */
-import { test, expect, _electron as electron } from '@playwright/test';
-import { resolve } from 'node:path';
+import { test, expect } from '@playwright/test';
+import { launchApp } from './launch.js';
 
 test('Pro gets unlimited blocking profiles, Free gets one', async () => {
-  const app = await electron.launch({
-    args: [resolve(__dirname, '../../../apps/desktop/out/main/index.cjs')],
-  });
+  const app = await launchApp();
   try {
     const win = await app.firstWindow();
     await win.getByText('Connecting…').waitFor({ state: 'detached' });

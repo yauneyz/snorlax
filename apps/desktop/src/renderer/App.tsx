@@ -8,6 +8,7 @@ import { Keys } from './pages/Keys.js';
 import { Account } from './pages/Account.js';
 import { Settings } from './pages/Settings.js';
 import { Plans } from './pages/Plans.js';
+import { FirstRun } from './components/FirstRun.js';
 import { ProfileDot } from './components/ui/index.js';
 import { cx } from './lib/utils.js';
 
@@ -28,6 +29,9 @@ const MODE_LABELS: Record<string, string> = {
   'block-all': 'Block all',
 };
 
+// Unlike Vite's DEV flag, APP_ENV remains "development" in packaged dev builds too.
+const IS_DEV = __APP_CONFIG__.APP_ENV !== 'production';
+
 export default function App() {
   const init = useFocusStore((s) => s.init);
   const ready = useFocusStore((s) => s.ready);
@@ -40,6 +44,7 @@ export default function App() {
   const watchdogWarning = useFocusStore((s) => s.watchdogWarning);
   const clearWatchdogWarning = useFocusStore((s) => s.clearWatchdogWarning);
   const passwordRecovery = useFocusStore((s) => s.passwordRecovery);
+  const onboardingComplete = useFocusStore((s) => s.onboardingComplete);
   const [route, setRoute] = useState<Route>('dashboard');
   const activeProfile = resolveActiveProfile(profiles, activeProfileId);
 
@@ -63,8 +68,19 @@ export default function App() {
   // when nothing is being blocked. It's the fastest read of state in the app.
   const ambient = focusActive ? 'rgba(79,214,192,0.10)' : 'rgba(255,180,84,0.07)';
 
+  // The walkthrough covers the whole window until it's finished. It needs live service state
+  // (drives, paired keys, the active profile), so it waits for the same `ready` gate as the pages.
+  const showFirstRun = ready && onboardingComplete === false;
+
   return (
-    <div className="desktop-workspace relative mx-auto flex h-full w-full overflow-hidden bg-bg text-slate-200">
+    <div
+      className={cx(
+        'desktop-workspace relative mx-auto flex h-full w-full overflow-hidden bg-bg text-slate-200',
+        IS_DEV && 'desktop-workspace--dev',
+      )}
+    >
+      {showFirstRun && <FirstRun onDone={() => setRoute('dashboard')} />}
+
       {/* The dashboard alone gets the ambient bloom across the continuous window surface. */}
       {route === 'dashboard' && (
         <div
@@ -80,9 +96,9 @@ export default function App() {
       <aside className="desktop-sidebar relative flex w-44 shrink-0 flex-col border-r border-white/[0.06] bg-[rgba(8,9,12,0.72)] backdrop-blur-xl">
         <div className="flex items-center gap-2 px-[18px] pb-[15px] pt-[17px]">
           <span className="text-[13px] font-semibold tracking-[0.1em] text-slate-250">Talysman</span>
-          {import.meta.env.DEV && (
-            <span className="rounded border border-danger/50 px-1 font-mono text-[9px] font-bold tracking-[0.14em] text-danger">
-              DEV
+          {IS_DEV && (
+            <span className="dev-mode-label" aria-label="Development mode">
+              Dev
             </span>
           )}
         </div>

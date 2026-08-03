@@ -107,7 +107,8 @@
     "scheduleFired": { "windowId": "string", "active": "boolean" },
     "settingsChanged": { "settings": "Settings" },
     "browserWatchdogWarning": { "browser": "string", "pid": "number" },
-    "browserWatchdogKilled": { "browser": "string", "pid": "number" }
+    "browserWatchdogKilled": { "browser": "string", "pid": "number" },
+    "extensionHeartbeat": { "browser": "string", "pid": "number", "extensionVersion": "string?", "healthy": "boolean" }
   },
   "errorCodes": ["KEY_REQUIRED", "NO_PAIRED_KEY", "LAST_PAIRED_KEY", "LAST_PROFILE", "LOCKED", "BAD_RECOVERY_CODE", "BAD_REQUEST", "INTERNAL"]
 }

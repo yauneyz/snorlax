@@ -124,6 +124,20 @@ export class MockServiceConnection implements ServiceConnection {
     return clean;
   }
 
+  /**
+   * Dev-only: fake one browser-extension heartbeat. The real native-messaging host can't reach
+   * the in-process mock, so this is the only way to exercise the extension handshake UI under
+   * `pnpm dev:mock`.
+   */
+  devSimulateExtensionHeartbeat(): void {
+    this.emit('extensionHeartbeat', {
+      browser: 'Chrome',
+      pid: 4242,
+      extensionVersion: '0.1.0-mock',
+      healthy: true,
+    });
+  }
+
   /** Dev-only: simulate plugging/unplugging the paired key. */
   devToggleKey(): boolean {
     const firstKey = this.state.pairedKeys[0];
@@ -262,9 +276,18 @@ export class MockServiceConnection implements ServiceConnection {
         return OK;
       }
 
-      case 'extHeartbeat':
-        // The mock has no real browsers to watch; accept and ignore.
+      case 'extHeartbeat': {
+        // The mock has no real browsers to watch, but it still announces the beat so the UI's
+        // "extension is talking to us" signal behaves the same as against the real service.
+        const beat = params as Params<'extHeartbeat'>;
+        this.emit('extensionHeartbeat', {
+          browser: beat.browser,
+          pid: beat.browserPid,
+          extensionVersion: beat.extensionVersion,
+          healthy: beat.health.canBlock && beat.health.permissionsOk,
+        });
         return OK;
+      }
 
       case 'listRemovableDrives':
         return { drives: MOCK_DRIVES } as Result<M>;

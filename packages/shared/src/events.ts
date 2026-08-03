@@ -26,6 +26,18 @@ export interface EventMap {
    * The desktop main process turns this into a native system notification with recovery steps.
    */
   browserWatchdogKilled: { browser: string; pid: number };
+  /**
+   * A liveness heartbeat arrived from a browser extension (see `extHeartbeat`). Emitted for every
+   * beat, whatever the handshake setting is, so the UI can show that the app and the extension are
+   * actually talking — first-run setup waits on this to confirm the install worked.
+   */
+  extensionHeartbeat: {
+    browser: string;
+    pid: number;
+    extensionVersion?: string;
+    /** The extension reports it holds the permissions **and** applied rules needed to block. */
+    healthy: boolean;
+  };
 }
 
 export type EventName = keyof EventMap;
