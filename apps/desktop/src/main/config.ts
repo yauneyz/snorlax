@@ -13,6 +13,8 @@ export interface MainConfig {
   pipeBaseName: string;
   /** Full platform IPC endpoint used by the service client. */
   pipePath: string;
+  /** Explicit opt-in to the in-process service used by UI development and E2E tests. */
+  useMockService: boolean;
   /** Origin of the Next.js web backend the main process calls (`/api/desktop/*`). */
   apiBaseUrl: string;
   /** Supabase project URL + publishable anon key for the main-process auth client. */
@@ -33,6 +35,7 @@ function build(): MainConfig {
           APP_ENV: (process.env.APP_ENV as 'development' | 'production') ?? 'development',
           GOOGLE_AUTH_ENABLED: process.env.GOOGLE_AUTH_ENABLED === 'true',
           TALYSMAN_PIPE: process.env.TALYSMAN_PIPE ?? PIPE_BASE_DEV,
+          TALYSMAN_USE_MOCK_SERVICE: process.env.TALYSMAN_USE_MOCK_SERVICE === 'true',
           API_BASE_URL: process.env.API_BASE_URL ?? '',
           VITE_SUPABASE_URL: process.env.VITE_SUPABASE_URL ?? '',
           VITE_SUPABASE_ANON_KEY: process.env.VITE_SUPABASE_ANON_KEY ?? '',
@@ -52,6 +55,7 @@ function build(): MainConfig {
     googleAuthEnabled: injected.GOOGLE_AUTH_ENABLED,
     pipeBaseName,
     pipePath,
+    useMockService: injected.TALYSMAN_USE_MOCK_SERVICE,
     apiBaseUrl: injected.API_BASE_URL.replace(/\/$/, ''),
     supabaseUrl: injected.VITE_SUPABASE_URL,
     supabaseAnonKey: injected.VITE_SUPABASE_ANON_KEY,

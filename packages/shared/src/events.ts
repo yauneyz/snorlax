@@ -3,9 +3,11 @@
 import type { Policy } from './policy.js';
 import type { Profile } from './profile.js';
 import type { Settings } from './settings.js';
-import type { FocusSource } from './protocol.js';
+import type { FocusSource, ServiceState } from './protocol.js';
 
 export interface EventMap {
+  /** Complete authoritative snapshot after any persisted daemon state mutation. */
+  stateChanged: { state: ServiceState };
   keyPresenceChanged: { present: boolean; keyId?: string };
   focusChanged: { active: boolean; source: FocusSource };
   /** The enforced (active profile's) policy changed, for whatever reason. */

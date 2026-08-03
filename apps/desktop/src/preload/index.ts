@@ -19,6 +19,7 @@ const Channels = {
   setLocalEntitlementEnabled: 'app:setLocalEntitlementEnabled',
   openExternal: 'app:openExternal',
   appInfo: 'app:info',
+  checkForUpdates: 'app:checkForUpdates',
   listInstalledApps: 'app:listInstalledApps',
   authStatus: 'app:authStatus',
   signInGoogle: 'app:signInGoogle',
@@ -68,6 +69,12 @@ export interface ActionResult {
   message?: string;
 }
 
+export type AppUpdateCheckResult =
+  | { status: 'up-to-date'; version: string }
+  | { status: 'update-available'; version: string }
+  | { status: 'unavailable'; message: string }
+  | { status: 'error'; message: string };
+
 export interface ServiceResponse {
   ok: boolean;
   result?: unknown;
@@ -88,12 +95,16 @@ const api = {
   },
 
   appInfo: (): Promise<{
+    appVersion: string;
     appEnv: string;
     isLocalRelease: boolean;
     localEntitlementEnabled: boolean;
     usingMock: boolean;
     serviceConnected: boolean;
   }> => ipcRenderer.invoke(Channels.appInfo),
+
+  checkForUpdates: (): Promise<AppUpdateCheckResult> =>
+    ipcRenderer.invoke(Channels.checkForUpdates),
 
   listInstalledApps: (): Promise<AppPickerItem[]> =>
     ipcRenderer.invoke(Channels.listInstalledApps),

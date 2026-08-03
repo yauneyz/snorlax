@@ -19,6 +19,7 @@ export default defineConfig(({ mode }) => {
     GOOGLE_AUTH_ENABLED: envValue('GOOGLE_AUTH_ENABLED') === 'true',
     TALYSMAN_PIPE:
       envValue('TALYSMAN_PIPE') ?? (appEnv === 'production' ? 'talysman' : 'talysman-dev'),
+    TALYSMAN_USE_MOCK_SERVICE: envValue('TALYSMAN_USE_MOCK_SERVICE') === 'true',
     // Public endpoints the main process needs to talk to the web backend + Supabase (§auth).
     API_BASE_URL: envValue('API_BASE_URL') ?? '',
     VITE_SUPABASE_URL: envValue('VITE_SUPABASE_URL') ?? '',

@@ -45,14 +45,21 @@ export function createTray(service: ServiceConnection, mock?: MockServiceConnect
 
   rebuildMenu(false);
 
-  service.on('keyPresenceChanged', ({ present }) => {
+  const applyPresence = (present: boolean) => {
     logger.debug(`[tray] key presence → ${present}`);
     tray?.setImage(iconFor(present));
     rebuildMenu(present);
-  });
+  };
+
+  service.on('stateChanged', ({ state }) => applyPresence(state.keyPresent));
+  service.on('keyPresenceChanged', ({ present }) => applyPresence(present));
+  void service
+    .request('getKeyPresence', undefined)
+    .then(({ present }) => applyPresence(present))
+    .catch((error: Error) => logger.warn(`[tray] initial key presence failed: ${error.message}`));
 
   tray.on('click', () => showMainWindow());
 
-  if (config.isDev) logger.debug('[tray] dev mode: simulated-key toggle available');
+  if (mock && config.isDev) logger.debug('[tray] dev mode: simulated-key toggle available');
   return tray;
 }

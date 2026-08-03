@@ -8,13 +8,11 @@ import { ErrorCode, resolveActiveProfile } from '@talysman/shared';
 import { request } from '../lib/bridge.js';
 import { useFocusStore } from '../store/useFocusStore.js';
 import { cx, profileSummary } from '../lib/utils.js';
-import { Button, Kicker } from './ui/index.js';
+import { Button } from './ui/index.js';
 import { TalysmanMark } from './TalysmanMark.js';
 import { ProfilePicker } from './ProfilePicker.js';
 
 const RING = 272;
-/** 60 minute-marks around the rim; every fifth one is brighter, like a bezel. */
-const TICKS = Array.from({ length: 60 }, (_, i) => i);
 
 export function FocusToggle() {
   const focusActive = useFocusStore((s) => s.focusActive);
@@ -69,7 +67,6 @@ export function FocusToggle() {
           )}
         />
         <div className="absolute inset-4 animate-spin-slow rounded-full border border-dashed border-white/[0.06]" />
-        <div className="absolute inset-[34px] rounded-full border border-white/[0.05]" />
         <div
           aria-hidden
           className="absolute inset-[50px] rounded-full"
@@ -79,23 +76,6 @@ export function FocusToggle() {
             }, transparent 72%)`,
           }}
         />
-        {TICKS.map((i) => (
-          <span
-            key={i}
-            aria-hidden
-            className="absolute left-1/2 top-1/2 block w-px origin-[50%_0]"
-            style={{
-              height: RING / 2,
-              transform: `translate(-50%,0) rotate(${i * 6}deg)`,
-              background: `linear-gradient(to bottom, transparent 0, transparent ${
-                RING / 2 - 15
-              }px, ${i % 5 === 0 ? 'rgba(199,204,212,0.34)' : 'rgba(199,204,212,0.12)'} ${
-                RING / 2 - 15
-              }px)`,
-            }}
-          />
-        ))}
-
         <div className="relative flex flex-col items-center gap-1.5">
           <TalysmanMark
             size={46}
@@ -109,7 +89,6 @@ export function FocusToggle() {
             {focusActive ? 'FOCUSED' : 'UNPROTECTED'}
           </div>
 
-          <Kicker className="mt-0.5">Active profile</Kicker>
           <button
             onClick={() => !switchLocked && setPickerOpen(true)}
             disabled={switchLocked}
@@ -143,12 +122,12 @@ export function FocusToggle() {
         </div>
       </div>
 
-      <div className="mt-5 flex flex-col items-center gap-2.5">
+      <div className="mt-[18px] flex flex-col items-center gap-[9px]">
         <Button
           onClick={toggle}
           disabled={toggleUnavailable}
           variant={keyRequired || pairedKeyRequired ? 'ghost' : focusActive ? 'danger' : 'hero'}
-          className="rounded-full px-7 py-2.5 text-[13.5px]"
+          className="rounded-full px-7 py-[11px] text-[13.5px]"
         >
           {focusActive ? 'Turn off focus' : 'Turn on focus'}
         </Button>

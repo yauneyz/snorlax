@@ -4,11 +4,12 @@
  * Phase 3.
  */
 
-import { BrowserWindow, dialog, ipcMain, Notification, shell } from 'electron';
+import { app, BrowserWindow, dialog, ipcMain, Notification, shell } from 'electron';
 import { ErrorCode, type EventName, type Method, type Params } from '@talysman/shared';
 import { config } from '../config.js';
 import { logger } from '../logging.js';
 import { listInstalledApps } from '../appDiscovery.js';
+import { checkForAppUpdates } from '../updater.js';
 import { isServiceError, type ServiceConnection } from '../service/connection.js';
 import type { MockServiceConnection } from '../service/mockService.js';
 import {
@@ -67,6 +68,7 @@ export async function applyPlanLimitsNow(): Promise<void> {
 }
 
 const FORWARDED_EVENTS: EventName[] = [
+  'stateChanged',
   'keyPresenceChanged',
   'focusChanged',
   'policyChanged',
@@ -272,12 +274,15 @@ export async function registerIpcHandlers(ctx: HandlerContext): Promise<void> {
   });
 
   ipcMain.handle(Channels.appInfo, () => ({
+    appVersion: app.getVersion(),
     appEnv: config.appEnv,
     isLocalRelease: config.isLocalRelease,
     localEntitlementEnabled: config.isLocalRelease && isLocalEntitlementEnabled(),
     usingMock: Boolean(mock),
     serviceConnected: service.connected,
   }));
+
+  ipcMain.handle(Channels.checkForUpdates, () => checkForAppUpdates());
 
   ipcMain.handle(Channels.listInstalledApps, () => listInstalledApps());
 

@@ -46,11 +46,13 @@ function appIdentifiers(app: AppRef): string {
 export function Blocklists({ onUpgrade }: { onUpgrade: () => void }) {
   const profiles = useFocusStore((s) => s.profiles);
   const activeProfileId = useFocusStore((s) => s.activeProfileId);
+  const keyPresent = useFocusStore((s) => s.keyPresent);
   const productLimits = useFocusStore((s) => s.productLimits);
   const refresh = useFocusStore((s) => s.refresh);
   // Which profile the editor is pointed at. `null` keeps it tracking whatever focus is
   // enforcing, so a scheduled profile switch carries the editor with it.
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [menuOpen, setMenuOpen] = useState(false);
   const [domain, setDomain] = useState('');
   const [appName, setAppName] = useState('');
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -121,6 +123,19 @@ export function Blocklists({ onUpgrade }: { onUpgrade: () => void }) {
       name: `Profile ${profiles.length + 1}`,
       color: nextProfileColor(profiles),
       policy: EMPTY_POLICY,
+    };
+    if (await saveProfile(profile)) setSelectedId(profile.id);
+  }
+
+  /** Copy the selected profile's whole policy under a new id — the fastest way to a variant. */
+  async function duplicateProfile() {
+    if (!selected) return;
+    if (profileLimitReached) return onUpgrade();
+    const profile: Profile = {
+      ...selected,
+      id: `profile-${Date.now().toString(36)}`,
+      name: `${selected.name} copy`.slice(0, MAX_PROFILE_NAME_LENGTH),
+      color: nextProfileColor(profiles),
     };
     if (await saveProfile(profile)) setSelectedId(profile.id);
   }
@@ -220,102 +235,172 @@ export function Blocklists({ onUpgrade }: { onUpgrade: () => void }) {
     policy.mode === 'blacklist' ? 'Blocked sites' : policy.mode === 'whitelist' ? 'Allowed sites' : 'Sites';
 
   return (
-    <div className="flex h-full min-h-0 gap-5">
-      <aside className="flex w-[248px] shrink-0 flex-col border-r border-white/[0.06] py-3 pr-4">
-        <div className="flex items-baseline justify-between">
-          <Kicker>Profiles</Kicker>
-          {profileLimitReached && <Badge tone="neutral">Pro</Badge>}
-        </div>
-
-        <ul className="mt-3 flex min-h-0 flex-1 flex-col gap-1.5 overflow-y-auto pr-1">
-          {profiles.map((p) => (
-            <li key={p.id}>
-              <button
-                onClick={() => setSelectedId(p.id)}
-                className={cx(
-                  'w-full rounded-[10px] border px-3 py-2.5 text-left transition',
-                  p.id === selected?.id
-                    ? 'border-white/[0.12] bg-white/[0.06]'
-                    : 'border-white/[0.05] bg-transparent hover:border-white/[0.10] hover:bg-white/[0.03]',
-                )}
-              >
-                <span className="flex items-center gap-2">
-                  <ProfileDot color={p.color} />
-                  <span
-                    className={cx(
-                      'min-w-0 flex-1 truncate text-[13px] font-semibold',
-                      p.id === selected?.id ? 'text-slate-100' : 'text-slate-250',
-                    )}
-                  >
-                    {p.name}
-                  </span>
-                  {p.id === activeProfileId && <Badge tone="ok">ON</Badge>}
-                </span>
-                <span className="mt-1.5 block pl-4 text-[11px] text-slate-400">
-                  {profileSummary(p)}
-                </span>
-              </button>
-            </li>
-          ))}
-        </ul>
-
-        <div className="mt-3 flex flex-col gap-2 border-t border-white/[0.06] pt-3">
-          <Button variant="ghost" onClick={addProfile} className="w-full">
-            {profileLimitReached ? 'Upgrade for more profiles' : 'New profile'}
-          </Button>
-          {profileLimit !== null && (
-            <p className="font-mono text-[10px] tracking-[0.08em] text-slate-450">
-              {profiles.length}/{profileLimit} profiles
-            </p>
-          )}
-          <p className="text-[11px] leading-relaxed text-slate-450">
-            Switch profiles by hand any time, or let the schedule do it. Loosening one needs your
-            key.
-          </p>
-        </div>
-      </aside>
-
-      <section className="flex min-h-0 min-w-0 flex-1 flex-col py-3">
-        <div className="flex flex-wrap items-center gap-3">
-          <ProfileDot color={accent} size={9} />
-          {/* Deliberately chrome-less: the profile name reads as the page heading until you
-              click into it. Not the shared Input, whose w-full would eat the whole row. */}
-          <input
-            key={selected?.id}
-            defaultValue={selected?.name ?? ''}
-            maxLength={MAX_PROFILE_NAME_LENGTH}
-            onBlur={(e) => void renameProfile(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
-            placeholder="Profile name"
-            size={18}
-            className="rounded-md border border-transparent bg-transparent px-1.5 py-1 text-[17px] font-bold text-slate-100 outline-none transition placeholder:text-slate-600 hover:border-white/[0.09] focus:border-white/25 focus:bg-white/[0.05]"
-            aria-label="Profile name"
-          />
-          {isActive ? (
-            <Badge tone="ok">enforced by focus</Badge>
-          ) : (
-            <Button
-              variant="ghost"
-              onClick={() => selected && void activateProfile(selected.id)}
-              className="ml-auto"
-            >
-              Use this profile
-            </Button>
-          )}
-          {profiles.length > 1 && (
-            <button
-              onClick={() => selected && void deleteProfile(selected.id)}
+    <div className="flex h-full min-h-0 flex-col pt-3">
+      <div className="flex items-center gap-3">
+        {/* The profile is the page's subject, so it doubles as the heading and the switcher. */}
+        <div className="relative">
+          <button
+            onClick={() => setMenuOpen((v) => !v)}
+            aria-expanded={menuOpen}
+            className={cx(
+              'flex items-center gap-3 rounded-[11px] border py-2 pl-3 pr-3.5 transition',
+              menuOpen
+                ? 'border-white/[0.18] bg-white/[0.07]'
+                : 'border-white/[0.09] bg-white/[0.03] hover:border-white/[0.14] hover:bg-white/[0.05]',
+            )}
+          >
+            <ProfileDot color={accent} size={10} glow className="rounded-[3px]" />
+            <span className="flex min-w-0 flex-col items-start gap-0.5">
+              <span className="max-w-[190px] truncate text-[17px] font-bold leading-none text-slate-100">
+                {selected?.name ?? 'No profile'}
+              </span>
+              <span className="font-mono text-[10.5px] uppercase tracking-[0.08em] text-slate-500">
+                {selected ? profileSummary(selected) : '—'}
+              </span>
+            </span>
+            <span className="flex flex-col items-start gap-[3px] border-l border-white/[0.10] pl-[7px] pt-px">
+              <span className="font-mono text-[9px] font-medium tracking-[0.14em] text-slate-450">
+                PROFILE
+              </span>
+              <span className="text-[11px] text-slate-400">
+                {profiles.length} to switch between
+              </span>
+            </span>
+            <span
               className={cx(
-                'text-[11px] font-medium text-slate-500 transition hover:text-dangerInk',
-                isActive && 'ml-auto',
+                'ml-0.5 text-[11px] text-slate-400 transition-transform',
+                menuOpen && 'rotate-180',
               )}
             >
-              delete profile
-            </button>
+              ▾
+            </span>
+          </button>
+
+          {menuOpen && (
+            <>
+              <div className="fixed inset-0 z-40" onClick={() => setMenuOpen(false)} />
+              <div className="absolute left-0 top-[calc(100%+7px)] z-50 w-[322px] animate-rise rounded-xl border border-white/[0.12] bg-[rgba(13,14,18,0.97)] p-[7px] shadow-[0_18px_46px_rgba(0,0,0,0.6)] backdrop-blur-xl">
+                <div className="px-2 pb-[7px] pt-1.5 font-mono text-[9.5px] font-medium tracking-[0.18em] text-slate-450">
+                  SWITCH PROFILE ·{' '}
+                  {profileLimit === null ? profiles.length : `${profiles.length}/${profileLimit}`}
+                </div>
+
+                <div className="flex max-h-56 flex-col gap-0.5 overflow-y-auto">
+                  {profiles.map((p) => (
+                    <button
+                      key={p.id}
+                      onClick={() => {
+                        setSelectedId(p.id);
+                        setMenuOpen(false);
+                      }}
+                      className={cx(
+                        'flex items-center gap-2.5 rounded-[9px] border px-2.5 py-2.5 text-left transition',
+                        p.id === selected?.id
+                          ? 'border-white/[0.12] bg-white/[0.06]'
+                          : 'border-white/[0.05] bg-transparent hover:border-white/[0.10] hover:bg-white/[0.03]',
+                      )}
+                    >
+                      <ProfileDot color={p.color} />
+                      <span className="min-w-0 flex-1">
+                        <span
+                          className={cx(
+                            'block truncate text-[12.5px] font-semibold',
+                            p.id === selected?.id ? 'text-slate-100' : 'text-slate-250',
+                          )}
+                        >
+                          {p.name}
+                        </span>
+                        <span className="mt-0.5 block truncate font-mono text-[10.5px] text-slate-450">
+                          {profileSummary(p)}
+                        </span>
+                      </span>
+                      {p.id === activeProfileId ? (
+                        <Badge tone="ok">ON</Badge>
+                      ) : (
+                        p.id === selected?.id && (
+                          <span className="text-[11px] text-slate-400">editing</span>
+                        )
+                      )}
+                    </button>
+                  ))}
+                </div>
+
+                <div className="mt-1.5 flex flex-col gap-0.5 border-t border-white/[0.07] pt-1.5">
+                  <button
+                    onClick={() => {
+                      setMenuOpen(false);
+                      void addProfile();
+                    }}
+                    className="flex items-center gap-2.5 rounded-[9px] px-2.5 py-2 text-left text-[12px] font-medium text-slate-200 transition hover:bg-white/[0.05]"
+                  >
+                    <span className="font-mono text-[13px] text-slate-500">+</span>
+                    {profileLimitReached ? 'Upgrade for more profiles' : 'New profile'}
+                  </button>
+                  <button
+                    onClick={() => {
+                      setMenuOpen(false);
+                      void duplicateProfile();
+                    }}
+                    disabled={!selected}
+                    className="flex items-center gap-2.5 rounded-[9px] px-2.5 py-2 text-left text-[12px] font-medium text-slate-400 transition hover:bg-white/[0.05] hover:text-slate-200 disabled:opacity-45"
+                  >
+                    <span className="font-mono text-[13px] text-slate-500">⧉</span>
+                    Duplicate {selected?.name}
+                  </button>
+                </div>
+
+                <div className="mt-1.5 border-t border-white/[0.07] px-1.5 pb-1 pt-2">
+                  <div className="flex items-baseline justify-between">
+                    <Kicker className="text-[9.5px] tracking-[0.18em]">Rename</Kicker>
+                    {profiles.length > 1 && (
+                      <button
+                        onClick={() => {
+                          setMenuOpen(false);
+                          if (selected) void deleteProfile(selected.id);
+                        }}
+                        className="text-[11px] font-medium text-slate-500 transition hover:text-dangerInk"
+                      >
+                        delete profile
+                      </button>
+                    )}
+                  </div>
+                  <Input
+                    key={selected?.id}
+                    className="mt-1.5"
+                    defaultValue={selected?.name ?? ''}
+                    maxLength={MAX_PROFILE_NAME_LENGTH}
+                    onBlur={(e) => void renameProfile(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
+                    placeholder="Profile name"
+                    aria-label="Profile name"
+                  />
+                  {/* Only worth saying while the key is out — with it in, nothing here is gated. */}
+                  {!keyPresent && (
+                    <p className="mt-2 text-[11px] leading-relaxed text-slate-450">
+                      Loosening a profile needs your key.
+                    </p>
+                  )}
+                </div>
+              </div>
+            </>
           )}
         </div>
 
-        <div className="mt-3.5 flex gap-2">
+        {isActive ? (
+          <Badge tone="ok">ENFORCING NOW</Badge>
+        ) : (
+          <Button
+            variant="ghost"
+            onClick={() => selected && void activateProfile(selected.id)}
+            className="ml-auto"
+          >
+            Activate now
+          </Button>
+        )}
+      </div>
+
+      <section className="flex min-h-0 min-w-0 flex-1 flex-col">
+        <div className="mt-3 flex gap-2">
           {MODES.map((m) => {
             const on = policy.mode === m.value;
             const locked = Boolean(allowedModes && !allowedModes.includes(m.value));
@@ -394,7 +479,8 @@ export function Blocklists({ onUpgrade }: { onUpgrade: () => void }) {
               </Button>
             </div>
 
-            <div className="mt-2.5 flex min-h-0 flex-1 flex-col gap-px overflow-y-auto rounded-[10px] border border-white/[0.06] bg-white/[0.05]">
+            {/* Two columns of hairline-separated rows: the 1px grid gap *is* the divider. */}
+            <div className="mt-2.5 grid min-h-0 flex-1 grid-cols-2 content-start gap-px overflow-y-auto rounded-[10px] border border-white/[0.06] bg-white/[0.05]">
               {policy.domains.map((d) => {
                 const siblings = siblingsFor(d);
                 return (
@@ -407,8 +493,11 @@ export function Blocklists({ onUpgrade }: { onUpgrade: () => void }) {
                       {d}
                     </span>
                     {siblings.length > 0 && (
-                      <span className="hidden truncate text-[11px] text-slate-450 lg:block">
-                        also {policy.mode === 'whitelist' ? 'allows' : 'blocks'} {siblings.join(', ')}
+                      <span
+                        className="hidden max-w-[40%] truncate text-[11px] text-slate-450 xl:block"
+                        title={siblings.join(', ')}
+                      >
+                        also {siblings.join(', ')}
                       </span>
                     )}
                     <button
@@ -421,7 +510,9 @@ export function Blocklists({ onUpgrade }: { onUpgrade: () => void }) {
                 );
               })}
               {policy.domains.length === 0 && (
-                <p className="bg-panel px-3.5 py-3 text-[12px] text-slate-500">No sites yet.</p>
+                <p className="col-span-2 bg-panel px-3.5 py-3 text-[12px] text-slate-500">
+                  No sites yet.
+                </p>
               )}
             </div>
           </>

@@ -32,6 +32,7 @@ import { limitsForPlan, type ProductLimits } from '../../shared/productLimits.js
 interface FocusStore {
   ready: boolean;
   usingMock: boolean;
+  appVersion: string;
   appEnv: string;
   isLocalRelease: boolean;
   localEntitlementEnabled: boolean;
@@ -84,6 +85,7 @@ interface FocusStore {
 export const useFocusStore = create<FocusStore>((set, get) => ({
   ready: false,
   usingMock: false,
+  appVersion: 'unknown',
   appEnv: 'development',
   isLocalRelease: false,
   localEntitlementEnabled: false,
@@ -205,6 +207,7 @@ export const useFocusStore = create<FocusStore>((set, get) => ({
     const info = await appInfo();
     set({
       usingMock: info.usingMock,
+      appVersion: info.appVersion,
       appEnv: info.appEnv,
       isLocalRelease: info.isLocalRelease,
       localEntitlementEnabled: info.localEntitlementEnabled,
@@ -213,8 +216,9 @@ export const useFocusStore = create<FocusStore>((set, get) => ({
     await get().refreshEntitlement();
     void get().refreshSubscriptionDetail();
 
-    await get().refresh();
-
+    // Subscribe before taking the initial snapshot. If another desktop client changes the daemon
+    // during startup, the following getState either includes it or a later event applies it.
+    onEvent('stateChanged', ({ state }) => get().applySnapshot(state));
     onEvent('keyPresenceChanged', ({ present }) => set({ keyPresent: present }));
     onEvent('focusChanged', ({ active }) => set({ focusActive: active }));
     onEvent('policyChanged', ({ policy }) => set({ policy }));
@@ -240,6 +244,7 @@ export const useFocusStore = create<FocusStore>((set, get) => ({
       void get().refreshEntitlement();
     });
 
+    await get().refresh();
     set({ ready: true });
   },
 }));

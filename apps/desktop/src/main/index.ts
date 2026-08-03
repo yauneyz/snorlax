@@ -1,15 +1,15 @@
 /**
  * App entry: single-instance lock, talysman:// protocol registration, window + tray,
- * service connection (real pipe, or in-process mock when the pipe is unavailable / dev),
+ * service connection (real pipe, or an explicitly requested in-process mock),
  * IPC handlers, service version reconciliation, and guarded auto-update.
  *
- * Service selection: we try the real named-pipe service first; if it isn't reachable (e.g.
- * running `pnpm dev` on a box without the installed service, or on WSL), we transparently
- * fall back to the in-process mock so the whole UI still works.
+ * `pnpm dev` intentionally shares the installed service with the production desktop client so
+ * both windows and the existing browser extensions observe one authoritative blocker state.
+ * UI-only development and E2E tests opt into the mock explicitly.
  */
 
 import { app } from 'electron';
-import { DEEP_LINK_SCHEME } from '@talysman/shared';
+import { DEEP_LINK_SCHEME, PROTOCOL_VERSION } from '@talysman/shared';
 import { config } from './config.js';
 import { logger } from './logging.js';
 import { registerIpcHandlers } from './ipc/handlers.js';
@@ -27,6 +27,13 @@ const CONNECT_TIMEOUT_MS = 2000;
 app.setAppUserModelId('com.talysman.app');
 
 async function connectService(): Promise<{ service: ServiceConnection; mock?: MockServiceConnection }> {
+  if (config.useMockService) {
+    logger.warn('[main] using explicitly requested in-process mock service');
+    const mock = new MockServiceConnection();
+    await mock.connect();
+    return { service: mock, mock };
+  }
+
   const pipe = new PipeServiceConnection(config.pipePath);
   const connected = await Promise.race([
     pipe.connect().then(() => true),
@@ -34,15 +41,27 @@ async function connectService(): Promise<{ service: ServiceConnection; mock?: Mo
   ]);
 
   if (connected && pipe.connected) {
+    let ping: { version: string; protocolVersion: number };
+    try {
+      ping = await pipe.request('ping', undefined);
+    } catch (error) {
+      pipe.close();
+      throw error;
+    }
+    if (ping.protocolVersion !== PROTOCOL_VERSION) {
+      pipe.close();
+      throw new Error(
+        `Talysman service protocol ${ping.protocolVersion} is incompatible with desktop protocol ${PROTOCOL_VERSION}.`,
+      );
+    }
     logger.info('[main] using real privileged service over named pipe');
     return { service: pipe };
   }
 
   pipe.close();
-  logger.warn('[main] privileged service not reachable — falling back to in-process mock');
-  const mock = new MockServiceConnection();
-  await mock.connect();
-  return { service: mock, mock };
+  throw new Error(
+    `Privileged service is not reachable at ${config.pipePath}. Start/install Talysman, or use pnpm dev:mock for UI-only development.`,
+  );
 }
 
 function registerDeepLink(): void {

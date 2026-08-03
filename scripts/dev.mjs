@@ -167,6 +167,11 @@ function waitForWeb(child, timeoutMs = 90_000) {
 
 async function main() {
   process.env.APP_ENV ??= 'development';
+  // The normal development workflow is a second control client for the installed daemon. This
+  // gives it real USB discovery and lets the already-installed browser extensions observe dev
+  // focus changes. `pnpm dev:mock` overrides both values for UI-only work and E2E-style testing.
+  process.env.TALYSMAN_PIPE ??= 'talysman';
+  process.env.TALYSMAN_USE_MOCK_SERVICE ??= 'false';
 
   await assertPortAvailable(3000);
 
@@ -201,6 +206,11 @@ async function main() {
   announce(`waiting for ${webUrl}`);
   await waitForWeb(webProcess);
 
+  announce(
+    process.env.TALYSMAN_USE_MOCK_SERVICE === 'true'
+      ? 'desktop will use the in-process mock service'
+      : 'desktop will share the installed Talysman service',
+  );
   startProcess('desktop app', pnpm, ['--filter', '@talysman/desktop', 'dev']);
   announce('stack is ready; press Ctrl+C to stop Stripe, Next, and Electron');
   console.log('[dev] Supabase remains running; use `pnpm dev:down` to stop it.');

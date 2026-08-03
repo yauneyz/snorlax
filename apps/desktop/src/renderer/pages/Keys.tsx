@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import type { Drive } from '@talysman/shared';
 import { ErrorCode } from '@talysman/shared';
 import { request } from '../lib/bridge.js';
@@ -16,23 +16,27 @@ export function Keys() {
   const [error, setError] = useState<string | null>(null);
   const [scanning, setScanning] = useState(false);
 
-  async function scan() {
-    setScanning(true);
-    setError(null);
+  const scan = useCallback(async (showProgress = true) => {
+    if (showProgress) setScanning(true);
+    if (showProgress) setError(null);
     try {
       const { drives } = await request('listRemovableDrives', undefined);
       setDrives(drives);
-      if (drives[0]) setSelected(drives[0].id);
+      setSelected((current) =>
+        drives.some((drive) => drive.id === current) ? current : (drives[0]?.id ?? ''),
+      );
     } catch (e) {
       setError((e as Error).message);
     } finally {
-      setScanning(false);
+      if (showProgress) setScanning(false);
     }
-  }
+  }, []);
 
   useEffect(() => {
     void scan();
-  }, []);
+    const timer = window.setInterval(() => void scan(false), 3_000);
+    return () => window.clearInterval(timer);
+  }, [scan]);
 
   async function pair() {
     if (!selected) return;
@@ -141,7 +145,7 @@ export function Keys() {
           <div className="flex items-baseline justify-between">
             <Kicker>Pair a new key</Kicker>
             <button
-              onClick={scan}
+              onClick={() => void scan()}
               disabled={scanning}
               className="text-[11px] font-medium text-slate-400 transition hover:text-slate-200 disabled:opacity-50"
             >

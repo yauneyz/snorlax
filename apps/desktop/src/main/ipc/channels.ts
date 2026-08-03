@@ -17,6 +17,8 @@ export const Channels = {
   openExternal: 'app:openExternal',
   /** invoke: returns build, local-entitlement, and service status. */
   appInfo: 'app:info',
+  /** invoke: manually run the configured desktop updater check. */
+  checkForUpdates: 'app:checkForUpdates',
   /** invoke: returns installed apps discovered on the local OS. */
   listInstalledApps: 'app:listInstalledApps',
   /** invoke: returns { signedIn, email? } from the main-process Supabase client. */

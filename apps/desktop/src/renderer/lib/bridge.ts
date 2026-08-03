@@ -12,7 +12,11 @@ import type {
 } from '@talysman/shared';
 import type { CheckoutPrice, SubscriptionPlan } from '../../shared/productLimits.js';
 import type { AppPickerItem } from '../../shared/appPicker.js';
-import type { AppEventName, SubscriptionDetailInfo } from '../../preload/index.js';
+import type {
+  AppEventName,
+  AppUpdateCheckResult,
+  SubscriptionDetailInfo,
+} from '../../preload/index.js';
 
 export interface BridgeError extends Error {
   code: string;
@@ -44,6 +48,7 @@ export function onAppEvent(cb: (event: AppEventName) => void): () => void {
 }
 
 export const appInfo = () => window.api.appInfo();
+export const checkForUpdates = (): Promise<AppUpdateCheckResult> => window.api.checkForUpdates();
 export const listInstalledApps = (): Promise<AppPickerItem[]> => window.api.listInstalledApps();
 export const openExternal = (url: string) => window.api.openExternal(url);
 export const devToggleKey = () => window.api.devToggleKey();
@@ -69,4 +74,4 @@ export const cancelSubscription = () => window.api.cancelSubscription();
 export const resumeSubscription = () => window.api.resumeSubscription();
 export const redeemCode = (code: string) => window.api.redeemCode(code);
 
-export type { CheckoutPrice, SubscriptionPlan, SubscriptionDetailInfo };
+export type { AppUpdateCheckResult, CheckoutPrice, SubscriptionPlan, SubscriptionDetailInfo };

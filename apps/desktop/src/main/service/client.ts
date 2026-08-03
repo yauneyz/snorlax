@@ -67,6 +67,17 @@ export class PipeServiceConnection implements ServiceConnection {
       logger.info(`[service] connected to ${this.pipePath}`);
       this.connectWaiters.forEach((w) => w());
       this.connectWaiters = [];
+
+      // A connection can miss broadcasts while it is down. Reconcile from the daemon's
+      // authoritative snapshot after every connect (the initial one is harmless before UI
+      // listeners are registered).
+      void this.request('getState', undefined)
+        .then((state) => {
+          this.listeners.get('stateChanged')?.forEach((cb) => cb({ state }));
+        })
+        .catch((e: Error) => {
+          logger.warn(`[service] state reconciliation failed: ${e.message}`);
+        });
     });
 
     socket.on('data', (chunk: string) => this.onData(chunk));

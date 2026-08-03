@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
 import { useFocusStore } from '../store/useFocusStore.js';
-import { devToggleKey, type SubscriptionPlan } from '../lib/bridge.js';
+import { checkForUpdates, devToggleKey, type SubscriptionPlan } from '../lib/bridge.js';
 import { Badge, Button, Card, CardTitle } from '../components/ui/index.js';
 import { cx } from '../lib/utils.js';
 
 export function Settings() {
   const appEnv = useFocusStore((s) => s.appEnv);
+  const appVersion = useFocusStore((s) => s.appVersion);
   const isLocalRelease = useFocusStore((s) => s.isLocalRelease);
   const localEntitlementEnabled = useFocusStore((s) => s.localEntitlementEnabled);
   const usingMock = useFocusStore((s) => s.usingMock);
@@ -25,6 +26,11 @@ export function Settings() {
   const [localEntitlementError, setLocalEntitlementError] = useState<string | null>(null);
   const [handshakeBusy, setHandshakeBusy] = useState(false);
   const [handshakeError, setHandshakeError] = useState<string | null>(null);
+  const [updateBusy, setUpdateBusy] = useState(false);
+  const [updateStatus, setUpdateStatus] = useState<{
+    message: string;
+    error?: boolean;
+  } | null>(null);
 
   const showDeveloper = appEnv !== 'production' || usingMock;
 
@@ -71,6 +77,27 @@ export function Settings() {
     }
   }
 
+  async function runUpdateCheck() {
+    setUpdateBusy(true);
+    setUpdateStatus(null);
+    try {
+      const result = await checkForUpdates();
+      if (result.status === 'up-to-date') {
+        setUpdateStatus({ message: `Talysman ${result.version} is up to date.` });
+      } else if (result.status === 'update-available') {
+        setUpdateStatus({
+          message: `Talysman ${result.version} is available and is being downloaded.`,
+        });
+      } else {
+        setUpdateStatus({ message: result.message, error: result.status === 'error' });
+      }
+    } catch (e) {
+      setUpdateStatus({ message: (e as Error).message, error: true });
+    } finally {
+      setUpdateBusy(false);
+    }
+  }
+
   return (
     <div className="grid grid-cols-1 gap-3 py-3 lg:grid-cols-2">
       <Card>
@@ -83,6 +110,7 @@ export function Settings() {
             Service: <Badge tone={usingMock ? 'neutral' : 'ok'}>{usingMock ? 'mock (in-process)' : 'native'}</Badge>
           </div>
           <div>Service version: {serviceVersion}</div>
+          <div>Client version: {appVersion}</div>
           <div>
             Plan:{' '}
             {entitlementLoaded ? (
@@ -91,6 +119,19 @@ export function Settings() {
               </Badge>
             ) : (
               <Badge tone="neutral">Checking…</Badge>
+            )}
+          </div>
+          <div className="mt-2 flex flex-col items-start gap-2 border-t border-white/[0.07] pt-4">
+            <Button variant="ghost" disabled={updateBusy} onClick={() => runUpdateCheck()}>
+              {updateBusy ? 'Checking…' : 'Check for updates'}
+            </Button>
+            {updateStatus && (
+              <p
+                role="status"
+                className={updateStatus.error ? 'text-[12.5px] text-warn' : 'text-[12.5px] text-slate-400'}
+              >
+                {updateStatus.message}
+              </p>
             )}
           </div>
         </div>

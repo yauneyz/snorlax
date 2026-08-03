@@ -9,6 +9,22 @@ import { canRestartForUpdate } from './updaterPolicy.js';
 const STARTUP_CHECK_DELAY_MS = 30_000;
 const CHECK_INTERVAL_MS = 6 * 60 * 60 * 1_000;
 
+export type AppUpdateCheckResult =
+  | { status: 'up-to-date'; version: string }
+  | { status: 'update-available'; version: string }
+  | { status: 'unavailable'; message: string }
+  | { status: 'error'; message: string };
+
+let runManualCheck: () => Promise<AppUpdateCheckResult> = async () => ({
+  status: 'unavailable',
+  message: 'The updater is still starting. Try again in a moment.',
+});
+
+/** Run the same guarded updater check used at startup and by the background interval. */
+export function checkForAppUpdates(): Promise<AppUpdateCheckResult> {
+  return runManualCheck();
+}
+
 function updaterInstance(): AppUpdater {
   // electron-updater is CommonJS; default import + destructuring is its documented ESM bridge.
   return electronUpdater.autoUpdater;
@@ -37,10 +53,18 @@ function notifyDeferredUpdate(version: string): void {
 export function initUpdater(service: ServiceConnection): () => void {
   if (!app.isPackaged) {
     logger.debug('[updater] skipped for unpackaged development build');
+    runManualCheck = async () => ({
+      status: 'unavailable',
+      message: 'Update checks are only available in an installed app.',
+    });
     return () => undefined;
   }
   if (process.platform === 'linux') {
     logger.info('[updater] Linux updates are managed by the signed APT/Nix package source');
+    runManualCheck = async () => ({
+      status: 'unavailable',
+      message: 'Updates on Linux are managed by your package manager.',
+    });
     return () => undefined;
   }
 
@@ -53,7 +77,7 @@ export function initUpdater(service: ServiceConnection): () => void {
 
   let downloaded: UpdateDownloadedEvent | null = null;
   let promptOpen = false;
-  let checking = false;
+  let activeCheck: Promise<AppUpdateCheckResult> | null = null;
   let userDeferred = false;
   let unsafeNotificationShown = false;
 
@@ -93,20 +117,41 @@ export function initUpdater(service: ServiceConnection): () => void {
     }
   };
 
-  const check = async (): Promise<void> => {
-    if (checking) return;
-    checking = true;
-    userDeferred = false;
-    try {
-      logger.info('[updater] checking for updates');
-      await autoUpdater.checkForUpdates();
-      await maybeOfferInstall();
-    } catch (error) {
-      logger.warn('[updater] update check failed', error);
-    } finally {
-      checking = false;
-    }
+  const check = (): Promise<AppUpdateCheckResult> => {
+    if (activeCheck) return activeCheck;
+
+    const nextCheck = (async (): Promise<AppUpdateCheckResult> => {
+      userDeferred = false;
+      try {
+        logger.info('[updater] checking for updates');
+        const result = await autoUpdater.checkForUpdates();
+        await maybeOfferInstall();
+
+        if (!result) {
+          return {
+            status: 'error',
+            message: 'The updater is unavailable right now.',
+          };
+        }
+        return result.isUpdateAvailable
+          ? { status: 'update-available', version: result.updateInfo.version }
+          : { status: 'up-to-date', version: app.getVersion() };
+      } catch (error) {
+        logger.warn('[updater] update check failed', error);
+        return {
+          status: 'error',
+          message: error instanceof Error ? error.message : 'Unable to check for updates.',
+        };
+      }
+    })().finally(() => {
+      activeCheck = null;
+    });
+    activeCheck = nextCheck;
+
+    return nextCheck;
   };
+
+  runManualCheck = check;
 
   autoUpdater.on('update-available', (info) => {
     logger.info(`[updater] update available: ${info.version}`);

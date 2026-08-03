@@ -3,6 +3,7 @@ declare const __APP_CONFIG__: {
   APP_ENV: 'development' | 'production';
   GOOGLE_AUTH_ENABLED: boolean;
   TALYSMAN_PIPE: string;
+  TALYSMAN_USE_MOCK_SERVICE: boolean;
   API_BASE_URL: string;
   VITE_SUPABASE_URL: string;
   VITE_SUPABASE_ANON_KEY: string;

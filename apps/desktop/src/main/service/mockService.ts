@@ -1,7 +1,7 @@
 /**
  * In-process fake service implementing the full protocol (architecture §16, category-1).
- * Used by `pnpm dev` (so the UI fully works without the native service / on WSL) and by the
- * e2e tests. It is the behavioural reference for the focus gates: focus requires a paired key
+ * Used by `pnpm dev:mock` (so the UI works without the native service / on WSL) and by the e2e
+ * tests. It is the behavioural reference for the focus gates: focus requires a paired key
  * to enable, and disabling requires a (simulated) key to be present with no locked window.
  *
  * Dev affordance: `devToggleKey()` flips the simulated USB key so you can exercise the

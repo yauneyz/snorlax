@@ -96,6 +96,7 @@ impl Core {
         if let Err(e) = self.store.save() {
             tracing::error!("secure store save failed: {e}");
         }
+        self.emit("stateChanged", json!({ "state": self.snapshot() }));
     }
 
     /// Re-enumerate USB and update the cached presence; emits keyPresenceChanged on a change.

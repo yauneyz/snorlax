@@ -54,8 +54,8 @@ See [snorlax-architecture.md](./snorlax-architecture.md) for the design and trus
 ## Local development
 
 Prerequisites for the complete stack are Node 22.12 or newer, pnpm 11, Docker, the Supabase CLI,
-and the Stripe CLI. Copy `.credentials.example` to the gitignored `.credentials` and fill in the
-local values first.
+the Stripe CLI, and an installed/running Talysman privileged service. Copy `.credentials.example`
+to the gitignored `.credentials` and fill in the local values first.
 
 ```bash
 pnpm install
@@ -63,17 +63,21 @@ pnpm dev
 ```
 
 `pnpm dev` generates local env files, starts Supabase, starts Stripe webhook forwarding, and then
-launches the web and Electron apps. The attached processes stop on Ctrl+C; Supabase remains up for
-fast restarts.
+launches the web and Electron apps. The development desktop shares the installed privileged
+Talysman service with the production desktop, so it gets real USB discovery and its focus changes
+reach the existing browser extensions. The attached processes stop on Ctrl+C; Supabase remains up
+for fast restarts.
 
 ```bash
 pnpm dev:down        # stop the local Supabase stack
 pnpm dev:desktop     # Electron only
+pnpm dev:mock        # complete stack with the UI-only in-process blocker
+pnpm dev:desktop:mock # Electron only with the in-process blocker
 pnpm web:dev         # web app only
 ```
 
-When no development native service is available, the unpackaged Electron app uses its in-process
-mock service. Use a real native service for enforcement testing.
+Normal development fails clearly when the installed privileged service is unavailable instead of
+silently switching to a mock that cannot discover USB drives or reach the browser extensions.
 
 ## Verification
 
