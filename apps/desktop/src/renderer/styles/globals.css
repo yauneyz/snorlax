@@ -55,7 +55,6 @@ body {
     inset 0 0 5px rgba(255, 52, 52, 0.95),
     inset 0 0 13px rgba(255, 28, 28, 0.58),
     inset 0 0 24px rgba(255, 20, 20, 0.2);
-  animation: dev-lightsaber-pulse 2.4s ease-in-out infinite;
 }
 
 .dev-mode-label {

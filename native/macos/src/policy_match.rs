@@ -69,8 +69,7 @@ pub fn is_at_least_as_restrictive(prev: &Policy, next: &Policy) -> bool {
         }
     }
 
-    prev
-        .apps
+    prev.apps
         .iter()
         .all(|app| next.apps.iter().any(|candidate| same_app(candidate, app)))
 }
@@ -226,8 +225,16 @@ mod tests {
     fn app_match_bundle_exact_and_prefix() {
         let mut p = Policy::default();
         p.apps = vec![chrome_app()];
-        assert!(is_app_blocked(&p, "Google Chrome", Some("com.google.Chrome")));
-        assert!(is_app_blocked(&p, "Google Chrome", Some("com.google.chrome")));
+        assert!(is_app_blocked(
+            &p,
+            "Google Chrome",
+            Some("com.google.Chrome")
+        ));
+        assert!(is_app_blocked(
+            &p,
+            "Google Chrome",
+            Some("com.google.chrome")
+        ));
         assert!(is_app_blocked(
             &p,
             "Google Chrome Helper",

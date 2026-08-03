@@ -33,10 +33,13 @@ import { getAccessToken } from './supabase.js';
 const DEFAULT_DEV_PLAN: SubscriptionPlan = 'pro';
 const DEV_ENTITLEMENT_FILE = 'dev-entitlement.json';
 const ENTITLEMENT_CACHE_FILE = 'entitlement-cache.json';
+const MEMORY_CACHE_MS = 60_000;
 
 const SIGNED_OUT: Entitlement = entitlementForPlan('free', 'server');
 
 let cachedDevEntitlement: Entitlement | undefined;
+let cachedEntitlement: { value: Entitlement; at: number } | undefined;
+let entitlementRequest: Promise<Entitlement> | undefined;
 // A local release starts with its signed license enabled on every app launch. Keeping this
 // override in memory makes the Free-plan test mode deliberately temporary.
 let localEntitlementEnabled = true;
@@ -72,6 +75,7 @@ async function loadDevEntitlement(): Promise<Entitlement> {
 }
 
 export async function setDevEntitlementPlan(plan: SubscriptionPlan): Promise<Entitlement> {
+  invalidateEntitlementCache();
   cachedDevEntitlement = entitlementForPlan(plan, 'dev-override');
   await writeFile(
     await userDataFile(DEV_ENTITLEMENT_FILE),
@@ -149,9 +153,14 @@ export function isLocalEntitlementEnabled(): boolean {
 
 export function setLocalEntitlementEnabled(enabled: boolean): void {
   localEntitlementEnabled = enabled;
+  invalidateEntitlementCache();
 }
 
-export async function getEntitlement(): Promise<Entitlement> {
+export function invalidateEntitlementCache(): void {
+  cachedEntitlement = undefined;
+}
+
+async function loadEntitlement(): Promise<Entitlement> {
   // Dev override short-circuits the network in non-production builds.
   if (config.appEnv !== 'production') return loadDevEntitlement();
 
@@ -183,4 +192,21 @@ export async function getEntitlement(): Promise<Entitlement> {
     logger.warn('[entitlement] offline with no cache — defaulting to free', (e as Error).message);
     return SIGNED_OUT;
   }
+}
+
+export async function getEntitlement(): Promise<Entitlement> {
+  if (cachedEntitlement && Date.now() - cachedEntitlement.at < MEMORY_CACHE_MS) {
+    return cachedEntitlement.value;
+  }
+  if (entitlementRequest) return entitlementRequest;
+
+  entitlementRequest = loadEntitlement()
+    .then((value) => {
+      cachedEntitlement = { value, at: Date.now() };
+      return value;
+    })
+    .finally(() => {
+      entitlementRequest = undefined;
+    });
+  return entitlementRequest;
 }

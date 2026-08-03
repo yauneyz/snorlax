@@ -15,6 +15,7 @@ interface DesktopEntry {
 }
 
 const execFileAsync = promisify(execFile);
+let installedAppsRequest: Promise<AppPickerItem[]> | undefined;
 
 export function parseDesktopEntry(content: string): DesktopEntry {
   const entry: DesktopEntry = {};
@@ -323,14 +324,21 @@ async function listWindowsInstalledApps(): Promise<AppPickerItem[]> {
 }
 
 export async function listInstalledApps(): Promise<AppPickerItem[]> {
-  switch (platform()) {
-    case 'win32':
-      return listWindowsInstalledApps();
-    case 'linux':
-      return listLinuxInstalledApps();
-    case 'darwin':
-      return listMacInstalledApps();
-    default:
-      return [];
-  }
+  if (installedAppsRequest) return installedAppsRequest;
+  installedAppsRequest = (async () => {
+    switch (platform()) {
+      case 'win32':
+        return listWindowsInstalledApps();
+      case 'linux':
+        return listLinuxInstalledApps();
+      case 'darwin':
+        return listMacInstalledApps();
+      default:
+        return [];
+    }
+  })().catch((error) => {
+    installedAppsRequest = undefined;
+    throw error;
+  });
+  return installedAppsRequest;
 }

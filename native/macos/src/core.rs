@@ -2,7 +2,9 @@
 //! guards the disable path (architecture §4, §9). Wrapped in an async Mutex and shared by every
 //! IPC connection.
 
+use std::collections::HashMap;
 use std::sync::Arc;
+use std::time::{Duration, Instant};
 
 use rand::RngCore;
 use serde_json::{json, Value};
@@ -41,6 +43,7 @@ pub struct Core {
     pub key_present: bool,
     pub present_key_id: Option<String>,
     pub events: broadcast::Sender<Value>,
+    extension_event_at: HashMap<u32, Instant>,
 }
 
 impl Core {
@@ -53,11 +56,20 @@ impl Core {
             key_present: false,
             present_key_id: None,
             events,
+            extension_event_at: HashMap::new(),
         }
     }
 
     pub fn subscribe(&self) -> broadcast::Receiver<Value> {
         self.events.subscribe()
+    }
+
+    pub fn has_paired_keys(&self) -> bool {
+        !self.state.paired_keys.is_empty()
+    }
+
+    pub fn next_schedule_delay(&self) -> Duration {
+        schedule::next_transition_delay(&self.state.schedule)
     }
 
     fn emit(&self, event: &str, payload: Value) {
@@ -89,7 +101,14 @@ impl Core {
         }
     }
 
-    fn persist(&self) {
+    fn persist_state(&self) {
+        if let Err(e) = self.state.save() {
+            tracing::error!("state save failed: {e}");
+        }
+        self.emit("stateChanged", json!({ "state": self.snapshot() }));
+    }
+
+    fn persist_all(&self) {
         if let Err(e) = self.state.save() {
             tracing::error!("state save failed: {e}");
         }
@@ -122,12 +141,11 @@ impl Core {
             // network gates over the already-warm set, then kicks a refresh for freshness.
             self.shared.set_active(true);
             enforce::apply_network(true);
-            kick_resolver(self.shared.clone());
         } else {
             self.shared.set_active(false);
             enforce::apply_network(false);
         }
-        self.persist();
+        self.persist_state();
         self.emit(
             "focusChanged",
             json!({ "active": active, "source": source }),
@@ -185,9 +203,6 @@ impl Core {
     fn apply_active_policy(&mut self) {
         let policy = self.state.active_policy();
         self.shared.set_policy(policy.clone());
-        // Policy edits change the resolver target list even while focus is off. Kick a one-shot
-        // refresh now so the IP bank is warm before the next session.
-        kick_resolver(self.shared.clone());
         self.emit("policyChanged", json!({ "policy": policy }));
     }
 
@@ -214,7 +229,10 @@ impl Core {
     /// a dormant profile has to cost the same as loosening the live one.
     fn set_profile(&mut self, profile: Profile) -> Result<(), RpcError> {
         if profile.id.trim().is_empty() {
-            return Err(RpcError::new(err::BAD_REQUEST, "Profile id cannot be empty."));
+            return Err(RpcError::new(
+                err::BAD_REQUEST,
+                "Profile id cannot be empty.",
+            ));
         }
         let name = profile.name.trim().to_string();
         if name.is_empty() {
@@ -231,6 +249,10 @@ impl Core {
         }
 
         let existing = self.state.profiles.iter().position(|p| p.id == profile.id);
+        let profile = Profile { name, ..profile };
+        if existing.is_some_and(|idx| self.state.profiles[idx] == profile) {
+            return Ok(());
+        }
         if let Some(idx) = existing {
             let prev = self.state.profiles[idx].policy.clone();
             if !crate::policy_match::is_at_least_as_restrictive(&prev, &profile.policy) {
@@ -239,12 +261,11 @@ impl Core {
         }
 
         let is_active = profile.id == self.state.active_profile_id;
-        let profile = Profile { name, ..profile };
         match existing {
             Some(idx) => self.state.profiles[idx] = profile,
             None => self.state.profiles.push(profile),
         }
-        self.persist();
+        self.persist_state();
         self.emit_profiles();
         if is_active {
             self.apply_active_policy();
@@ -293,7 +314,7 @@ impl Core {
         if is_active {
             self.state.active_profile_id = self.state.profiles[0].id.clone();
         }
-        self.persist();
+        self.persist_state();
         self.emit_profiles();
         if is_active {
             self.apply_active_policy();
@@ -325,10 +346,8 @@ impl Core {
             ));
         }
 
-        let relaxes = !crate::policy_match::is_at_least_as_restrictive(
-            &self.state.active_policy(),
-            &next,
-        );
+        let relaxes =
+            !crate::policy_match::is_at_least_as_restrictive(&self.state.active_policy(), &next);
         let enforcing =
             self.state.focus_active || self.state.schedule.windows.iter().any(|w| w.locked);
         if relaxes && enforcing {
@@ -345,7 +364,7 @@ impl Core {
             return;
         }
         self.state.active_profile_id = profile_id;
-        self.persist();
+        self.persist_state();
         self.emit_profiles();
         self.apply_active_policy();
         tracing::info!("active profile is now {}", self.state.active_profile_id);
@@ -355,6 +374,9 @@ impl Core {
     /// a locked one, or repointing a window at a laxer blocking profile — requires the paired key;
     /// with the key present the user may edit any window, including one that is currently active.
     fn set_schedule(&mut self, schedule: Schedule) -> Result<(), RpcError> {
+        if self.state.schedule == schedule {
+            return Ok(());
+        }
         for w in &schedule.windows {
             if let Some(id) = &w.profile_id {
                 if !self.state.profiles.iter().any(|p| p.id == *id) {
@@ -374,7 +396,7 @@ impl Core {
             self.require_key("Insert your paired key to relax the schedule.")?;
         }
         self.state.schedule = schedule;
-        self.persist();
+        self.persist_state();
         Ok(())
     }
 
@@ -382,6 +404,9 @@ impl Core {
     /// exactly like `disable_focus` (USB key + no locked window), so a user mid-session cannot
     /// simply switch enforcement off.
     fn set_browser_handshake(&mut self, enabled: bool) -> Result<(), RpcError> {
+        if self.state.settings.browser_handshake_enabled == enabled {
+            return Ok(());
+        }
         if !enabled {
             if self.schedule_locked() {
                 return Err(RpcError::new(
@@ -399,7 +424,7 @@ impl Core {
         }
         self.state.settings.browser_handshake_enabled = enabled;
         self.shared.set_handshake_enabled(enabled);
-        self.persist();
+        self.persist_state();
         self.emit(
             "settingsChanged",
             json!({ "settings": self.state.settings.clone() }),
@@ -452,7 +477,7 @@ impl Core {
             paired_at: now_ms(),
         };
         self.state.paired_keys.push(key.clone());
-        self.persist();
+        self.persist_all();
         self.recompute_presence();
         Ok(key)
     }
@@ -477,7 +502,7 @@ impl Core {
         }
         self.state.paired_keys.retain(|k| k.id != key_id);
         self.store.remove_key(key_id);
-        self.persist();
+        self.persist_all();
         self.recompute_presence();
         Ok(())
     }
@@ -519,7 +544,6 @@ impl Core {
         } else if self.state.focus_active {
             self.shared.set_active(true);
             enforce::apply_network(true);
-            kick_resolver(self.shared.clone());
             tracing::info!("re-armed enforcement on boot (focus was active)");
         }
         self.recompute_presence();
@@ -623,41 +647,33 @@ impl Core {
                     .unwrap_or(false);
                 let healthy = can_block && perms_ok;
                 let browser = params.get("browser").and_then(|v| v.as_str()).unwrap_or("");
-                let worker_session = params
-                    .get("workerSessionId")
-                    .and_then(|v| v.as_str())
-                    .unwrap_or("");
                 let sequence = params.get("sequence").and_then(|v| v.as_u64()).unwrap_or(0);
-                let sent_at = params.get("sentAt").and_then(|v| v.as_u64()).unwrap_or(0);
                 let extension_version = params
                     .get("extensionVersion")
                     .and_then(|v| v.as_str())
                     .unwrap_or("");
-                let locked_active = params
-                    .get("lockedActive")
-                    .and_then(|v| v.as_bool())
-                    .unwrap_or(false);
-                tracing::info!(
-                    "extension heartbeat received: browser={browser} pid={pid} worker={worker_session} sequence={sequence} sent_at={sent_at} version={extension_version} locked_active={locked_active} can_block={can_block} permissions_ok={perms_ok} healthy={healthy}"
-                );
                 if pid != 0 {
-                    self.shared.record_heartbeat(pid, healthy);
-                    // Tell the UI the extension is talking to us. Emitted on every beat and
-                    // independent of the handshake setting: first-run setup uses it to confirm
-                    // the extension install actually reached this service.
-                    self.emit(
-                        "extensionHeartbeat",
-                        json!({
-                            "browser": browser,
-                            "pid": pid,
-                            "extensionVersion": if extension_version.is_empty() {
-                                Value::Null
-                            } else {
-                                Value::String(extension_version.to_string())
-                            },
-                            "healthy": healthy,
-                        }),
-                    );
+                    let changed = self.shared.record_heartbeat(pid, healthy);
+                    let now = Instant::now();
+                    let due = self.extension_event_at.get(&pid).map_or(true, |last| {
+                        now.duration_since(*last) >= Duration::from_secs(30)
+                    });
+                    if changed || due {
+                        self.extension_event_at.insert(pid, now);
+                        self.emit(
+                            "extensionHeartbeat",
+                            json!({
+                                "browser": browser,
+                                "pid": pid,
+                                "extensionVersion": if extension_version.is_empty() {
+                                    Value::Null
+                                } else {
+                                    Value::String(extension_version.to_string())
+                                },
+                                "healthy": healthy,
+                            }),
+                        );
+                    }
                 } else {
                     tracing::warn!("extension heartbeat ignored: native host reported pid=0");
                 }
@@ -706,13 +722,6 @@ impl Core {
             )),
         }
     }
-}
-
-/// Fire a one-shot background resolve of the current policy's domains (focus-on / policy-change /
-/// boot). Runs on a detached thread because `resolve_and_ingest` blocks on UDP. The resolver runs
-/// regardless of focus so the next session starts with a warm IP bank.
-fn kick_resolver(shared: Arc<EnforceShared>) {
-    std::thread::spawn(move || crate::enforce::resolve::resolve_and_ingest(&shared));
 }
 
 fn ok() -> Value {

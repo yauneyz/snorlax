@@ -73,7 +73,7 @@ interface FocusStore {
   watchdogWarning?: { browser: string; pid: number };
   /**
    * The most recent extension heartbeat this session, or undefined if no browser extension has
-   * reached the service yet. Extensions beat every ~5s, so this doubles as a liveness signal.
+   * reached the service yet. Strict watchdog sessions beat every ~5s; idle contact is throttled.
    */
   extensionContact?: {
     browser: string;
@@ -102,6 +102,8 @@ interface FocusStore {
   setError: (e?: { code: string; message: string }) => void;
   applySnapshot: (s: ServiceState) => void;
 }
+
+let initialization: Promise<void> | undefined;
 
 export const useFocusStore = create<FocusStore>((set, get) => ({
   ready: false,
@@ -236,51 +238,65 @@ export const useFocusStore = create<FocusStore>((set, get) => ({
   },
 
   init: async () => {
-    const info = await appInfo();
-    set({
-      usingMock: info.usingMock,
-      appVersion: info.appVersion,
-      appEnv: info.appEnv,
-      isLocalRelease: info.isLocalRelease,
-      localEntitlementEnabled: info.localEntitlementEnabled,
-    });
-    set({ onboardingComplete: (await onboardingStatus()).complete });
-    await get().refreshAuth();
-    await get().refreshEntitlement();
-    void get().refreshSubscriptionDetail();
-
-    // Subscribe before taking the initial snapshot. If another desktop client changes the daemon
-    // during startup, the following getState either includes it or a later event applies it.
-    onEvent('stateChanged', ({ state }) => get().applySnapshot(state));
-    onEvent('keyPresenceChanged', ({ present }) => set({ keyPresent: present }));
-    onEvent('focusChanged', ({ active }) => set({ focusActive: active }));
-    onEvent('policyChanged', ({ policy }) => set({ policy }));
-    onEvent('profilesChanged', ({ profiles, activeProfileId }) =>
+    if (initialization) return initialization;
+    initialization = (async () => {
+      const [info, onboarding] = await Promise.all([
+        appInfo(),
+        onboardingStatus(),
+        get().refreshAuth(),
+        get().refreshEntitlement(),
+      ]);
       set({
-        profiles,
-        activeProfileId,
-        policy: resolveActiveProfile(profiles, activeProfileId)?.policy ?? EMPTY_POLICY,
-      }),
-    );
-    onEvent('settingsChanged', ({ settings }) => set({ settings }));
-    onEvent('browserWatchdogWarning', ({ browser, pid }) => set({ watchdogWarning: { browser, pid } }));
-    onEvent('extensionHeartbeat', ({ browser, pid, extensionVersion, healthy }) =>
-      set({ extensionContact: { browser, pid, extensionVersion, healthy, at: Date.now() } }),
-    );
-    onEvent('scheduleFired', () => {
-      // Schedule boundaries can change focus + lock state; re-pull the snapshot.
-      void get().refresh();
-    });
+        usingMock: info.usingMock,
+        appVersion: info.appVersion,
+        appEnv: info.appEnv,
+        isLocalRelease: info.isLocalRelease,
+        localEntitlementEnabled: info.localEntitlementEnabled,
+        onboardingComplete: onboarding.complete,
+      });
+      void get().refreshSubscriptionDetail();
 
-    // Main pushes these after sign-in/out and billing deep-link returns.
-    onAppEvent(() => {
-      void get()
-        .refreshAuth()
-        .then(() => get().refreshSubscriptionDetail());
-      void get().refreshEntitlement();
-    });
+      // Subscribe before taking the initial snapshot. If another desktop client changes the daemon
+      // during startup, the following getState either includes it or a later event applies it.
+      onEvent('stateChanged', ({ state }) => get().applySnapshot(state));
+      onEvent('keyPresenceChanged', ({ present }) => set({ keyPresent: present }));
+      onEvent('focusChanged', ({ active }) => set({ focusActive: active }));
+      onEvent('policyChanged', ({ policy }) => set({ policy }));
+      onEvent('profilesChanged', ({ profiles, activeProfileId }) =>
+        set({
+          profiles,
+          activeProfileId,
+          policy: resolveActiveProfile(profiles, activeProfileId)?.policy ?? EMPTY_POLICY,
+        }),
+      );
+      onEvent('settingsChanged', ({ settings }) => set({ settings }));
+      onEvent('browserWatchdogWarning', ({ browser, pid }) =>
+        set({ watchdogWarning: { browser, pid } }),
+      );
+      onEvent('extensionHeartbeat', ({ browser, pid, extensionVersion, healthy }) =>
+        set({ extensionContact: { browser, pid, extensionVersion, healthy, at: Date.now() } }),
+      );
+      onEvent('scheduleFired', () => {
+        // Schedule boundaries can change focus + lock state; re-pull the snapshot.
+        void get().refresh();
+      });
 
-    await get().refresh();
-    set({ ready: true });
+      // Main pushes these after sign-in/out and billing deep-link returns.
+      onAppEvent(() => {
+        void get()
+          .refreshAuth()
+          .then(() => get().refreshSubscriptionDetail());
+        void get().refreshEntitlement();
+      });
+
+      await get().refresh();
+      set({ ready: true });
+    })();
+    try {
+      await initialization;
+    } catch (error) {
+      initialization = undefined;
+      throw error;
+    }
   },
 }));

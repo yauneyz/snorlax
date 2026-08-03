@@ -7,7 +7,6 @@ import type { ServiceConnection } from './service/connection.js';
 import { canRestartForUpdate } from './updaterPolicy.js';
 
 const STARTUP_CHECK_DELAY_MS = 30_000;
-const CHECK_INTERVAL_MS = 6 * 60 * 60 * 1_000;
 
 export type AppUpdateCheckResult =
   | { status: 'up-to-date'; version: string }
@@ -20,7 +19,7 @@ let runManualCheck: () => Promise<AppUpdateCheckResult> = async () => ({
   message: 'The updater is still starting. Try again in a moment.',
 });
 
-/** Run the same guarded updater check used at startup and by the background interval. */
+/** Run a user-requested update check. */
 export function checkForAppUpdates(): Promise<AppUpdateCheckResult> {
   return runManualCheck();
 }
@@ -70,7 +69,7 @@ export function initUpdater(service: ServiceConnection): () => void {
 
   const autoUpdater = updaterInstance();
   autoUpdater.logger = logger;
-  autoUpdater.autoDownload = true;
+  autoUpdater.autoDownload = false;
   // Talysman must decide when its privileged service may restart; never install merely because
   // the tray application happened to quit.
   autoUpdater.autoInstallOnAppQuit = false;
@@ -117,7 +116,7 @@ export function initUpdater(service: ServiceConnection): () => void {
     }
   };
 
-  const check = (): Promise<AppUpdateCheckResult> => {
+  const check = (manual = false): Promise<AppUpdateCheckResult> => {
     if (activeCheck) return activeCheck;
 
     const nextCheck = (async (): Promise<AppUpdateCheckResult> => {
@@ -133,9 +132,23 @@ export function initUpdater(service: ServiceConnection): () => void {
             message: 'The updater is unavailable right now.',
           };
         }
-        return result.isUpdateAvailable
-          ? { status: 'update-available', version: result.updateInfo.version }
-          : { status: 'up-to-date', version: app.getVersion() };
+        if (result.isUpdateAvailable) {
+          if (manual && !downloaded) {
+            const { response } = await dialog.showMessageBox({
+              type: 'info',
+              title: 'Talysman update available',
+              message: `Talysman ${result.updateInfo.version} is available.`,
+              detail: 'Download it now? Installation will still wait until enforcement can restart safely.',
+              buttons: ['Download', 'Later'],
+              defaultId: 0,
+              cancelId: 1,
+              noLink: true,
+            });
+            if (response === 0) await autoUpdater.downloadUpdate();
+          }
+          return { status: 'update-available', version: result.updateInfo.version };
+        }
+        return { status: 'up-to-date', version: app.getVersion() };
       } catch (error) {
         logger.warn('[updater] update check failed', error);
         return {
@@ -151,7 +164,7 @@ export function initUpdater(service: ServiceConnection): () => void {
     return nextCheck;
   };
 
-  runManualCheck = check;
+  runManualCheck = () => check(true);
 
   autoUpdater.on('update-available', (info) => {
     logger.info(`[updater] update available: ${info.version}`);
@@ -159,8 +172,13 @@ export function initUpdater(service: ServiceConnection): () => void {
   autoUpdater.on('update-not-available', (info) => {
     logger.info(`[updater] current version is up to date (${info.version})`);
   });
+  let lastLoggedDownloadBucket = -1;
   autoUpdater.on('download-progress', (progress) => {
-    logger.info(`[updater] download ${progress.percent.toFixed(1)}%`);
+    const bucket = Math.floor(progress.percent / 10);
+    if (bucket !== lastLoggedDownloadBucket) {
+      lastLoggedDownloadBucket = bucket;
+      logger.info(`[updater] download ${Math.min(bucket * 10, 100)}%`);
+    }
   });
   autoUpdater.on('update-downloaded', (event) => {
     downloaded = event;
@@ -177,14 +195,11 @@ export function initUpdater(service: ServiceConnection): () => void {
   const unsubscribeFocus = service.on('focusChanged', () => void maybeOfferInstall());
   const unsubscribeKey = service.on('keyPresenceChanged', () => void maybeOfferInstall());
 
-  const startupTimer = setTimeout(() => void check(), STARTUP_CHECK_DELAY_MS);
+  const startupTimer = setTimeout(() => void check(false), STARTUP_CHECK_DELAY_MS);
   startupTimer.unref();
-  const interval = setInterval(() => void check(), CHECK_INTERVAL_MS);
-  interval.unref();
 
   return () => {
     clearTimeout(startupTimer);
-    clearInterval(interval);
     unsubscribeFocus();
     unsubscribeKey();
   };

@@ -92,7 +92,7 @@ up to about 5 minutes to sync everywhere.
 
 ### Option B — from the link I sent
 
-If I sent you a link like `https://talysman.app/redeem/TLY-XXXX-XXXX`, just open it in your
+If I sent you a link like `https://www.talysman.app/redeem/TLY-XXXX-XXXX`, just open it in your
 browser. If you're not signed in, it'll walk you through login/signup and bring you back to
 the code. Redeeming is a single explicit click.
 

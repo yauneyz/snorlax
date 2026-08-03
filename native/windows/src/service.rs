@@ -5,17 +5,29 @@
 use std::sync::Arc;
 use std::time::Duration;
 
-use tokio::sync::{watch, Mutex};
+use serde_json::Value;
+use tokio::sync::{broadcast, watch, Mutex};
 
 use crate::core::Core;
+use crate::enforce::divert;
 use crate::enforce::{self, EnforceShared};
 use crate::ipc;
 use crate::secure_store::SecureStore;
 use crate::state::PersistentState;
-use crate::{enforce::apps, enforce::divert};
 
 const PRESENCE_POLL: Duration = Duration::from_secs(3);
-const SCHEDULE_POLL: Duration = Duration::from_secs(30);
+
+async fn wait_for_state_change(events: &mut broadcast::Receiver<Value>) {
+    loop {
+        match events.recv().await {
+            Ok(message) if message.get("event").and_then(Value::as_str) == Some("stateChanged") => {
+                return
+            }
+            Ok(_) => {}
+            Err(_) => return,
+        }
+    }
+}
 
 /// Async entry point. Runs until `shutdown` flips to true.
 pub async fn serve(pipe_path: String, shutdown: watch::Receiver<bool>) {
@@ -23,15 +35,13 @@ pub async fn serve(pipe_path: String, shutdown: watch::Receiver<bool>) {
 
     let state = PersistentState::load();
     let store = SecureStore::load();
-    let shared = Arc::new(EnforceShared::new(state.active_policy(), state.focus_active));
+    let shared = Arc::new(EnforceShared::new(
+        state.active_policy(),
+        state.focus_active,
+    ));
 
     let core = Arc::new(Mutex::new(Core::new(state, store, shared.clone())));
     core.lock().await.rearm_on_boot();
-
-    // Persistently register the user-installed browser extension's native-messaging host. This
-    // is install-time, not focus-toggled: the extension self-gates on the live state the host
-    // pushes (no rules while focus is off), so it's safe to leave installed. Idempotent.
-    enforce::extension_policy::install();
 
     // The WinDivert packet engines run on dedicated OS threads (WinDivert recv is blocking). They
     // self-gate on focus_active and are cleaned up on process exit.
@@ -57,11 +67,7 @@ pub async fn serve(pipe_path: String, shutdown: watch::Receiver<bool>) {
         std::thread::spawn(move || enforce::resolve::run_resolver(shared, shutdown));
     }
 
-    // Always-on app blocker (self-gates on focus_active).
-    tokio::spawn(apps::run_app_blocker(shared.clone(), shutdown.clone()));
-
-    // Browser handshake dead-man's switch (self-gates on focus_active + the handshake setting).
-    // It emits watchdog warnings through the core's event channel so the UI can surface them.
+    // One process snapshot feeds both app blocking and the browser dead-man's switch.
     {
         let events = core.lock().await.events.clone();
         tokio::spawn(enforce::browser_watchdog::run_browser_watchdog(
@@ -71,17 +77,38 @@ pub async fn serve(pipe_path: String, shutdown: watch::Receiver<bool>) {
         ));
     }
 
+    {
+        let shared = shared.clone();
+        let mut sd = shutdown.clone();
+        tokio::spawn(async move {
+            while sd.changed().await.is_ok() {
+                if *sd.borrow() {
+                    shared.wake_all();
+                    break;
+                }
+            }
+        });
+    }
+
     // USB presence poll.
     {
         let core = core.clone();
         let mut sd = shutdown.clone();
+        let mut events = core.lock().await.subscribe();
         tokio::spawn(async move {
             loop {
+                if !core.lock().await.has_paired_keys() {
+                    tokio::select! {
+                        _ = sd.changed() => { if *sd.borrow() { break; } }
+                        _ = wait_for_state_change(&mut events) => {}
+                    }
+                    continue;
+                }
+                core.lock().await.recompute_presence();
                 tokio::select! {
                     _ = sd.changed() => { if *sd.borrow() { break; } }
-                    _ = tokio::time::sleep(PRESENCE_POLL) => {
-                        core.lock().await.recompute_presence();
-                    }
+                    _ = tokio::time::sleep(PRESENCE_POLL) => {}
+                    _ = wait_for_state_change(&mut events) => {}
                 }
             }
         });
@@ -91,13 +118,19 @@ pub async fn serve(pipe_path: String, shutdown: watch::Receiver<bool>) {
     {
         let core = core.clone();
         let mut sd = shutdown.clone();
+        let mut events = core.lock().await.subscribe();
         tokio::spawn(async move {
             loop {
+                while events.try_recv().is_ok() {}
+                let delay = {
+                    let mut core = core.lock().await;
+                    core.schedule_tick();
+                    core.next_schedule_delay()
+                };
                 tokio::select! {
                     _ = sd.changed() => { if *sd.borrow() { break; } }
-                    _ = tokio::time::sleep(SCHEDULE_POLL) => {
-                        core.lock().await.schedule_tick();
-                    }
+                    _ = tokio::time::sleep(delay) => {}
+                    _ = wait_for_state_change(&mut events) => {}
                 }
             }
         });
@@ -115,6 +148,7 @@ pub async fn serve(pipe_path: String, shutdown: watch::Receiver<bool>) {
 /// Build a multi-thread runtime and run `serve` to completion. Shared by SCM + console paths.
 pub fn run_blocking(pipe_path: String, shutdown: watch::Receiver<bool>) {
     let rt = tokio::runtime::Builder::new_multi_thread()
+        .worker_threads(2)
         .enable_all()
         .build()
         .expect("failed to build tokio runtime");

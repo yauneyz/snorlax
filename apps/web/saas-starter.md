@@ -420,7 +420,7 @@ Refunds are initiated from the **Stripe Dashboard** (or optionally via a small a
 - `SubscriptionCancelledEmail` — from webhook.
 - `RefundIssuedEmail` — from webhook.
 
-**Templates** live in `/emails` as `react-email` components. A Vitest snapshot test ensures each renders. `lib/resend/send.ts` exposes one typed `sendEmail({ template, to, props })` function.
+**Templates** live in `/emails` as `react-email` components. A Vitest snapshot test ensures each renders. `lib/resend/send.tsx` exposes one typed `sendEmail({ template, to, props })` function.
 
 **Password reset link:** Supabase sends it; the email's `{{ .ConfirmationURL }}` points at `${APP_URL}/reset-password?...`. That page calls `supabase.auth.updateUser({ password })`.
 

@@ -66,7 +66,7 @@ export function FocusToggle() {
               : 'border-white/[0.10] shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]',
           )}
         />
-        <div className="absolute inset-4 animate-spin-slow rounded-full border border-dashed border-white/[0.06]" />
+        <div className="absolute inset-4 rounded-full border border-dashed border-white/[0.06]" />
         <div
           aria-hidden
           className="absolute inset-[50px] rounded-full"

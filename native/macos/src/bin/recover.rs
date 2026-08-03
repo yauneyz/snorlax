@@ -83,7 +83,7 @@ fn offline_recover(code: &str) -> Result<()> {
     Ok(())
 }
 
-#[tokio::main]
+#[tokio::main(flavor = "current_thread")]
 async fn main() -> Result<()> {
     let Some(code) = parse_code() else {
         eprintln!("usage: talysman-recover --code XXXX-XXXX-XXXX");

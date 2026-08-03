@@ -15,24 +15,45 @@ Companion to [`payments-arch.md`](./payments-arch.md) (architecture). This doc i
 
 ---
 
-## 0. Current state (snapshot — verified via Stripe MCP, 2026-07-29)
+## 0. Current state (snapshot — verified against the Stripe API, 2026-08-03)
+
+Two accounts are in play. The Stripe MCP is bound to the **sandbox**, so live-mode facts
+below were read with `secret_key_live` via curl.
+
+### Sandbox — `acct_1TpxytEtUnIVGugJ` ("Talysman sandbox"), test mode
 
 | Thing | State | Notes |
 |---|---|---|
-| Connected Stripe account | **`acct_1TpxytEtUnIVGugJ` — "Talysman sandbox"** | Test mode. The real Talysman account is separate and **pending verification**. |
 | Monthly price | ✅ `price_1Tq6JTEtUnIVGugJ79g05j6r` | "Talysman Pro", **$10.00/mo** — matches the pricing page. |
 | Annual price | ✅ `price_1Tq6L0EtUnIVGugJfj3PhSR0` | "Talysman Pro Annual", **$100.00/yr** — matches the pricing page. |
-| Stray price | ⚠️ `price_1Tq6kyEtUnIVGugJ918SDdUa` "myproduct" $15/mo | Junk from a `stripe trigger`. Harmless; archive it to avoid confusion. |
-| Webhook endpoint | ✅ `https://talysman.app/api/stripe/webhook` (test) | Subscribed to exactly the 8 events the handler needs (see §1.3). |
-| Billing portal config | ❌ **none exists** | `billingPortal.sessions.create` will **throw** until the test-mode portal is configured once in the Dashboard. See §3.4 / §4.C. |
-| Tax behavior | ⚠️ monthly `unspecified`, annual `exclusive` | Inconsistent. Decide on one before live (see §5.4). |
-| `talysman.app` deploy | ❌ not deployed yet | The registered webhook URL 404s until the Vercel prod deploy exists. |
+| Stray prices | ⚠️ **4 ×** "myproduct" $15/mo | `price_1TztzXEtUnIVGugJmDH9uCTr`, `…1TzB7R…`, `…1TzB6e…`, `…1Tq6ky…`. Junk accumulating from repeated `stripe trigger` runs. Harmless; archive them. |
+| Webhook endpoint | ✅ **none registered** (deleted 2026-08-03) | Was `https://talysman.app/...` (apex), which **308-redirects** to `www`; Stripe doesn't follow redirects, so every delivery failed and Stripe threatened to disable it. A test-mode endpoint aimed at prod was the real mistake — test mode now uses the CLI listener only. |
+| Billing portal config | ✅ `bpc_1TzBFjEtUnIVGugJajuFAlVg` | Active + default. Was missing at the 2026-07-29 snapshot; `billingPortal.sessions.create` now works in test. |
+| Tax behavior | ⚠️ monthly `unspecified`, annual `exclusive` | Still inconsistent **in sandbox** (live is consistent). See §5.4. |
 
-**What this means for sequencing:** the sandbox is *almost* ready to exercise end-to-end
-locally today (Phase A). The registered webhook points at an undeployed domain, so
-sandbox testing happens either (1) locally via the Stripe CLI listener, or (2) against a
-deployed Vercel **preview** URL with a preview-scoped webhook. Live mode (Phase B) is
-blocked on account verification + the prod deploy.
+### Live — `acct_1TpxyiRN4BfSLyzw` ("Talysman")
+
+| Thing | State | Notes |
+|---|---|---|
+| Account status | ✅ **verified** | `charges_enabled`, `payouts_enabled`, `details_submitted` all true. No longer pending. |
+| Monthly price | ✅ `price_1TzAu9RN4BfSLyzwX2MG5YIo` | **$10.00/mo**, `tax_behavior=exclusive`. |
+| Annual price | ✅ `price_1TzAuARN4BfSLyzw88zxlrAI` | **$100.00/yr**, `tax_behavior=exclusive`. |
+| Webhook endpoint | ✅ `we_1TzB2xRN4BfSLyzwzq2fONlJ` | `https://www.talysman.app/api/stripe/webhook`, enabled, subscribed to exactly the 8 events the handler needs (see §1.3). |
+| Billing portal config | ❌ **none exists** | Live "Manage billing" will **throw** until the live portal is configured once in the Dashboard. See §4.C. |
+| `talysman.app` deploy | ✅ live | Vercel project `snorlax-web`. **`www` is canonical; the apex 308-redirects to it.** |
+
+**What this means for sequencing:** Phase A (test mode) runs entirely against the local
+Stripe CLI listener — there is no registered sandbox endpoint by design, and there
+shouldn't be one pointing at prod. Phase B is no longer blocked on account verification or
+the deploy; the remaining live gaps are the **billing portal config** (§4.C) and pushing
+live env to Vercel (§4.E).
+
+> ⚠️ **Always use `https://www.talysman.app` for anything that POSTs.** The apex 308s, and
+> senders that don't follow redirects (Stripe among them) see the 308 as a failure. Worse
+> for authenticated calls: apex→www is **cross-origin**, so a redirect-following client
+> drops the bearer `Authorization` header and you get a 401 instead. `.credentials`
+> `[app].url_prod` is already the `www` host and `scripts/lib/desktop-environment.mjs:90`
+> fails the build if `API_BASE_URL` redirects — don't hand-write the apex anywhere.
 
 ---
 
@@ -82,8 +103,8 @@ email). Any handler throw → 500 → Stripe retries. The success-redirect sync
 
 ### 1.4 External services
 
-- **Stripe** — checkout, portal, subscriptions, webhooks. Test = "Talysman sandbox"; live =
-  the real Talysman account (pending verification).
+- **Stripe** — checkout, portal, subscriptions, webhooks. Test = "Talysman sandbox"
+  (`acct_1TpxytEtUnIVGugJ`); live = "Talysman" (`acct_1TpxyiRN4BfSLyzw`, verified).
 - **Resend** — transactional emails from the webhook. Server-only.
 - **Supabase** — users, `profiles`/`subscriptions`, RLS.
 
@@ -312,16 +333,27 @@ values in `.credentials` and pushing to production is the whole switch.
   one `exclusive`.
 - Archive/ignore any stray products.
 
-### 4.C Configure the live billing portal
+### 4.C Configure the live billing portal — ⚠️ still outstanding
 
 - Dashboard (live) → **Settings → Billing → Customer portal** → enable + Save (same as
   §3.4, but live). Without this, live "Manage billing" throws.
+- Confirmed still missing as of 2026-08-03: the live account has **zero** billing-portal
+  configurations. (Sandbox has one now — `bpc_1TzBFjEtUnIVGugJajuFAlVg` — so §3.4 is done
+  for test mode only. Portal configs do not carry across modes or accounts.)
 
-### 4.D Register the live webhook
+### 4.D Register the live webhook — ✅ done
 
-- The `https://talysman.app/api/stripe/webhook` endpoint currently registered is **test
-  mode**. Register a **live-mode** endpoint at the same URL, subscribed to the exact 8
-  events in §1.3. Capture its **live signing secret** (`whsec_...`).
+- Live endpoint `we_1TzB2xRN4BfSLyzwzq2fONlJ` is registered at
+  **`https://www.talysman.app/api/stripe/webhook`**, enabled, subscribed to exactly the 8
+  events in §1.3 (verified 2026-08-03). Its signing secret is in `.credentials` as
+  `webhook_secret_live`.
+- **Use the `www` host, not the apex.** The apex 308-redirects and Stripe does not follow
+  redirects — an apex-registered endpoint fails every delivery. This is exactly what broke
+  the old sandbox endpoint (now deleted; see §0).
+- The signing secret is only shown at creation. If `webhook_secret_live` ever drifts from
+  this endpoint, deliveries fail signature verification with a 400 at
+  `apps/web/src/app/api/stripe/webhook/route.ts:37-40` — roll the secret in the Dashboard
+  and re-run `pnpm sync:env:prod` rather than guessing.
 
 ### 4.E Fill live env & deploy
 
@@ -338,15 +370,18 @@ pnpm sync:env:prod       # pushes production env to Vercel (never commit .env.lo
 Verify in Vercel (production) that these resolve to live values:
 `STRIPE_MODE=live`, `STRIPE_SECRET_KEY=sk_live_...`,
 `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=pk_live_...`, `STRIPE_WEBHOOK_SECRET` (live),
-`STRIPE_PRICE_MONTHLY`/`STRIPE_PRICE_YEARLY` (live), plus `NEXT_PUBLIC_APP_URL=https://talysman.app`,
-Supabase prod keys, `RESEND_API_KEY`. Deploy `talysman.app` to production.
+`STRIPE_PRICE_MONTHLY`/`STRIPE_PRICE_YEARLY` (live), plus `NEXT_PUBLIC_APP_URL`,
+Supabase prod keys, `RESEND_API_KEY`. (`talysman.app` is already deployed — this step is
+just the env push + redeploy.)
 
 > **Account-mismatch guard (repeat):** live price IDs must belong to the same account as
 > `sk_live_...`. Copy them from the live Dashboard, never from test.
 
 ### 4.F Desktop production build
 
-- Production desktop config: `API_BASE_URL=https://talysman.app`, prod
+- Production desktop config: `API_BASE_URL=https://www.talysman.app` (the **canonical**
+  host — `scripts/lib/desktop-environment.mjs:90` fails the build if it redirects, since a
+  cross-origin apex→www hop would strip the bearer `Authorization` header), prod
   `VITE_SUPABASE_URL`/`ANON_KEY`, `pk_live_...`. Confirm **no** `sk_*` / `whsec_` ships in
   the bundle (`__APP_CONFIG__` carries only public keys). Worth a CI grep.
 - `build:{win,linux,mac}` with `APP_ENV=production` resolves Stripe to live automatically
@@ -440,18 +475,18 @@ is declined, and a real card on a test key does nothing.
 **Test mode (Phase A)**
 - [ ] Automated suites green (§2)
 - [ ] Web + desktop checkout → Pro; DB row correct (§3.2–3.3)
-- [ ] Portal configured + works; no-customer case 400s (§3.4)
+- [x] Portal configured (`bpc_1TzBFjEtUnIVGugJajuFAlVg`); still verify it works + no-customer case 400s (§3.4)
 - [ ] Cancel / resume / immediate-cancel / renew (§3.5)
 - [ ] Payment-failed, decline, 3DS, refund emails (§3.6)
 - [ ] Idempotency + bad-signature 400 (§3.7)
 - [ ] Entitlement server/offline/free (§3.8)
-- [ ] Stray `myproduct` price archived
+- [ ] Stray `myproduct` prices archived (4 of them now)
 
 **Live mode (Phase B)**
-- [ ] Real Stripe account activated & verified (§4.A)
-- [ ] Live products/prices created; tax behavior consistent (§4.B, §5.4)
-- [ ] Live billing portal configured (§4.C)
-- [ ] Live webhook endpoint + secret at `talysman.app/api/stripe/webhook` (§4.D)
+- [x] Real Stripe account activated & verified (§4.A) — `charges_enabled`/`payouts_enabled` true
+- [x] Live products/prices created; tax behavior consistent (§4.B, §5.4) — both `exclusive`
+- [ ] Live billing portal configured (§4.C) — **still missing, only remaining live-config gap**
+- [x] Live webhook endpoint + secret at `www.talysman.app/api/stripe/webhook` (§4.D)
 - [ ] `STRIPE_MODE=live` + all live env in Vercel; prod deployed (§4.E)
 - [ ] Desktop prod build: live pk only, no secrets (§4.F)
 - [ ] `talysman://` protocol registered; billing deep links round-trip from a packaged build (§4.G)

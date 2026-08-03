@@ -41,7 +41,7 @@ pnpm comp code --note "mom"
 
   TLY-4K2P-9XQR
 
-  https://talysman.app/redeem/TLY-4K2P-9XQR
+  https://www.talysman.app/redeem/TLY-4K2P-9XQR
 
   Single use · mom. Only the hash is stored — copy it now, it can't be shown again.
 ```

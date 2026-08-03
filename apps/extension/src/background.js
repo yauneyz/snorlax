@@ -21,19 +21,21 @@ const browserApi = globalThis.chrome || globalThis.browser;
 const HOST_NAME = 'com.talysman.host';
 const RECONNECT_MIN_MS = 1000;
 const RECONNECT_MAX_MS = 30000;
-const HEARTBEAT_MS = 5000;
-const SAFARI_SYNC_MS = 1000;
-const HEARTBEAT_ACK_STALE_MS = 12000;
+const STRICT_HEARTBEAT_MS = 5000;
+const ACTIVE_HEARTBEAT_MS = 30000;
+const IDLE_HEARTBEAT_MS = 60000;
 
 let port = null;
 let reconnectTimer = null;
 let safariSyncTimer = null;
+let heartbeatTimer = null;
 let safariConnected = false;
 let reconnectMs = RECONNECT_MIN_MS;
 let hasReceivedState = false;
 
 // Health/diagnostic state reported in the heartbeat.
 let blockingActive = false; // last state.active the service pushed
+let handshakeEnabled = false;
 let blockingMode = null; // last state.mode the service pushed; never includes configured domains
 let lastApplyOk = true; // last updateDynamicRules succeeded
 let appliedRuleCount = 0; // number of dynamic rules currently applied
@@ -68,9 +70,14 @@ console.info('[talysman] worker started', {
 
 /** Replace all dynamic rules with the ones derived from `state`. */
 async function applyState(state) {
+  const previousHeartbeatDelay = heartbeatDelay();
   blockingActive = !!state.active;
+  handshakeEnabled = !!state.handshakeEnabled;
   blockingMode = ['blacklist', 'whitelist', 'block-all'].includes(state.mode) ? state.mode : null;
   hasReceivedState = true;
+  if (BROWSER !== 'safari' && heartbeatDelay() < previousHeartbeatDelay) {
+    scheduleHeartbeat(0);
+  }
   let next;
   try {
     next = buildRules(state, { safari: BROWSER === 'safari' });
@@ -111,7 +118,7 @@ function currentPopupStatus() {
   const transportConnected = port !== null || safariConnected;
   const roundTripConnected = transportConnected
     && heartbeatAckAgeMs !== null
-    && heartbeatAckAgeMs <= HEARTBEAT_ACK_STALE_MS;
+    && heartbeatAckAgeMs <= heartbeatDelay() * 2.5;
 
   return {
     connection: roundTripConnected ? 'connected' : transportConnected ? 'connecting' : 'disconnected',
@@ -170,12 +177,6 @@ function connect() {
       lastHeartbeatAckAt = Date.now();
       lastHeartbeatAckSequence = msg.sequence ?? null;
       reconnectMs = RECONNECT_MIN_MS;
-      console.info('[talysman] heartbeat acknowledged', {
-        workerSessionId: PROFILE_ID,
-        sequence: msg.sequence,
-        browserPid: msg.browserPid,
-        healthy: msg.healthy,
-      });
     }
   });
 
@@ -210,6 +211,15 @@ function heartbeatFrame() {
   };
 }
 
+function heartbeatDelay() {
+  // Safari's request/response bridge has no pushed state channel. Poll often enough to learn that
+  // the watchdog was enabled before its ten-second warning grace can expire (still 5x slower than
+  // the former one-second loop).
+  if (BROWSER === 'safari') return STRICT_HEARTBEAT_MS;
+  if (blockingActive && handshakeEnabled) return STRICT_HEARTBEAT_MS;
+  return blockingActive ? ACTIVE_HEARTBEAT_MS : IDLE_HEARTBEAT_MS;
+}
+
 // Safari native messaging is mediated by the containing app extension. A short request/response
 // sync is more reliable there than holding Chromium's stdio-style native port open indefinitely.
 // The Swift handler returns both the current blocking state and the heartbeat acknowledgement.
@@ -236,7 +246,7 @@ function scheduleSafariSync(delay) {
           lastHeartbeatAckAt = Date.now();
           lastHeartbeatAckSequence = response.heartbeatAck.sequence ?? null;
         }
-        scheduleSafariSync(SAFARI_SYNC_MS);
+        scheduleSafariSync(heartbeatDelay());
       });
     } catch (error) {
       safariConnected = false;
@@ -263,18 +273,19 @@ function heartbeat() {
     try {
       const frame = heartbeatFrame();
       port.postMessage(frame);
-      console.info('[talysman] heartbeat sent', {
-        workerSessionId: PROFILE_ID,
-        sequence: frame.sequence,
-        sentAt: frame.sentAt,
-        lockedActive: blockingActive,
-        health: frame.health,
-      });
     } catch (e) {
       console.warn('[talysman] heartbeat post failed', e && e.message);
     }
   }
-  setTimeout(heartbeat, HEARTBEAT_MS);
+  scheduleHeartbeat(heartbeatDelay());
+}
+
+function scheduleHeartbeat(delay) {
+  if (heartbeatTimer !== null) clearTimeout(heartbeatTimer);
+  heartbeatTimer = setTimeout(() => {
+    heartbeatTimer = null;
+    heartbeat();
+  }, delay);
 }
 
 // Register these listeners synchronously so Chrome wakes this worker when the profile starts or the

@@ -156,7 +156,7 @@ export default function App() {
             >
               <span
                 className={cx(
-                  'block h-[7px] w-[7px] animate-pulse rounded-full',
+                  'block h-[7px] w-[7px] rounded-full',
                   keyPresent
                     ? 'bg-ok shadow-[0_0_8px_2px_rgba(34,197,94,0.6)]'
                     : 'bg-danger shadow-[0_0_8px_2px_rgba(239,68,68,0.55)]',

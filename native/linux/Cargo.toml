@@ -1,6 +1,6 @@
 [package]
 name = "talysman-linux"
-version = "0.2.2"
+version = "0.3.0"
 edition = "2021"
 description = "Talysman privileged Linux service + installer + recovery killswitch."
 publish = false
@@ -48,6 +48,8 @@ tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 
 [profile.release]
-opt-level = 2
-lto = false
+opt-level = 3
+lto = "thin"
+codegen-units = 1
+panic = "abort"
 strip = true

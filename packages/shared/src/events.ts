@@ -27,9 +27,9 @@ export interface EventMap {
    */
   browserWatchdogKilled: { browser: string; pid: number };
   /**
-   * A liveness heartbeat arrived from a browser extension (see `extHeartbeat`). Emitted for every
-   * beat, whatever the handshake setting is, so the UI can show that the app and the extension are
-   * actually talking — first-run setup waits on this to confirm the install worked.
+   * A liveness heartbeat arrived from a browser extension (see `extHeartbeat`). Emitted on first
+   * contact, health transitions, and at a throttled cadence so UI clients can confirm the install
+   * without receiving every watchdog beat.
    */
   extensionHeartbeat: {
     browser: string;

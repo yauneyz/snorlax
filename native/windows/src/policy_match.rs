@@ -69,8 +69,7 @@ pub fn is_at_least_as_restrictive(prev: &Policy, next: &Policy) -> bool {
         }
     }
 
-    prev
-        .apps
+    prev.apps
         .iter()
         .all(|app| next.apps.iter().any(|candidate| same_app(candidate, app)))
 }

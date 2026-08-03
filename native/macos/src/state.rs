@@ -118,7 +118,10 @@ mod migration_tests {
         assert_eq!(state.profiles[0].id, DEFAULT_PROFILE_ID);
         assert_eq!(state.active_profile_id, DEFAULT_PROFILE_ID);
         assert_eq!(state.active_policy().mode, Mode::Whitelist);
-        assert_eq!(state.active_policy().domains, vec!["github.com".to_string()]);
+        assert_eq!(
+            state.active_policy().domains,
+            vec!["github.com".to_string()]
+        );
         // Unrelated fields survive the migration untouched.
         assert!(state.focus_active);
         assert!(state.settings.browser_handshake_enabled);
@@ -157,7 +160,10 @@ mod migration_tests {
         state.migrate();
 
         let json: serde_json::Value = serde_json::to_value(&state).unwrap();
-        assert!(json.get("policy").is_none(), "top-level policy should be gone");
+        assert!(
+            json.get("policy").is_none(),
+            "top-level policy should be gone"
+        );
         // …but it survives where it now belongs, inside the default profile.
         assert_eq!(state.active_policy().mode, Mode::BlockAll);
         assert!(json["profiles"].is_array());

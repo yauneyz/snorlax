@@ -10,7 +10,11 @@ pub const PLIST_PATH: &str = "/Library/LaunchDaemons/app.talysman.svc.plist";
 /// restart it if it dies — the launchd counterpart of the systemd unit's Restart=always.
 pub fn plist_text(svc_exe: &str) -> String {
     let exe = xml_escape(svc_exe);
-    let log = xml_escape(&crate::paths::data_dir().join("launchd.log").to_string_lossy());
+    let log = xml_escape(
+        &crate::paths::data_dir()
+            .join("launchd.log")
+            .to_string_lossy(),
+    );
     format!(
         r#"<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -37,7 +41,9 @@ pub fn plist_text(svc_exe: &str) -> String {
 }
 
 fn xml_escape(s: &str) -> String {
-    s.replace('&', "&amp;").replace('<', "&lt;").replace('>', "&gt;")
+    s.replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
 }
 
 /// Stop and unload the daemon. Best effort: not loaded is not an error.

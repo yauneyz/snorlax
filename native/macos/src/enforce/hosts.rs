@@ -18,7 +18,8 @@ use crate::policy_match::DOH_BYPASS_HOSTS;
 
 const BEGIN_MARK: &str = "# >>> talysman begin — managed block, do not edit >>>";
 const END_MARK: &str = "# <<< talysman end <<<";
-const POLL: Duration = Duration::from_millis(250);
+const IDLE_WAIT: Duration = Duration::from_secs(60 * 60);
+const RETRY_WAIT: Duration = Duration::from_secs(5);
 
 fn hosts_file() -> PathBuf {
     std::env::var("TALYSMAN_HOSTS_FILE")
@@ -29,6 +30,7 @@ fn hosts_file() -> PathBuf {
 pub fn run_manager(shared: Arc<EnforceShared>, shutdown: tokio::sync::watch::Receiver<bool>) {
     let mut installed_gen: Option<u64> = None;
     let mut cleared_inactive = false;
+    let mut observed = shared.change_generation();
     while !*shutdown.borrow() {
         if !shared.is_active() {
             if installed_gen.take().is_some() || !cleared_inactive {
@@ -39,7 +41,7 @@ pub fn run_manager(shared: Arc<EnforceShared>, shutdown: tokio::sync::watch::Rec
                 }
                 cleared_inactive = true;
             }
-            std::thread::sleep(POLL);
+            observed = shared.wait_for_change(observed, IDLE_WAIT);
             continue;
         }
         cleared_inactive = false;
@@ -55,7 +57,12 @@ pub fn run_manager(shared: Arc<EnforceShared>, shutdown: tokio::sync::watch::Rec
                 Err(e) => tracing::warn!("failed to apply /etc/hosts sinkhole: {e}"),
             }
         }
-        std::thread::sleep(POLL);
+        let wait = if installed_gen == Some(gen) {
+            IDLE_WAIT
+        } else {
+            RETRY_WAIT
+        };
+        observed = shared.wait_for_change(observed, wait);
     }
 }
 

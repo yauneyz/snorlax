@@ -8,8 +8,7 @@ use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 
 pub use talysman_common::extension_identity::{
-    CHROME_STORE_ID as CHROME_EXT_ID, EDGE_STORE_ID as EDGE_EXT_ID,
-    FIREFOX_ID as FIREFOX_EXT_ID,
+    CHROME_STORE_ID as CHROME_EXT_ID, EDGE_STORE_ID as EDGE_EXT_ID, FIREFOX_ID as FIREFOX_EXT_ID,
 };
 
 pub const HOST_NAME: &str = "com.talysman.host";

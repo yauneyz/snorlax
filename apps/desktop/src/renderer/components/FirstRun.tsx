@@ -90,13 +90,15 @@ export function FirstRun({ onDone }: { onDone: () => void }) {
   const current: Step = STEPS[step] ?? 'welcome';
   const allowedModes = allowedPolicyModes(productLimits);
 
-  // Contact goes stale on its own, so the "connected" state has to be able to decay without a
-  // new event arriving. A slow tick is enough — heartbeats land every ~5s.
+  // Wake once when the current contact expires instead of ticking continuously.
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
-    const timer = window.setInterval(() => setNow(Date.now()), 2_000);
-    return () => window.clearInterval(timer);
-  }, []);
+    setNow(Date.now());
+    if (!extensionContact) return;
+    const remaining = Math.max(1, CONTACT_STALE_MS - (Date.now() - extensionContact.at) + 1);
+    const timer = window.setTimeout(() => setNow(Date.now()), remaining);
+    return () => window.clearTimeout(timer);
+  }, [extensionContact]);
 
   const contactLive = Boolean(extensionContact && now - extensionContact.at < CONTACT_STALE_MS);
   // Once the extension has proved itself we keep the step "satisfied" even if the browser is
@@ -113,12 +115,10 @@ export function FirstRun({ onDone }: { onDone: () => void }) {
     }
   }, []);
 
-  // Only poll while the key step is on screen.
+  // Scan on entry; the user can explicitly rescan after inserting a drive.
   useEffect(() => {
     if (current !== 'key') return;
     void scanDrives();
-    const timer = window.setInterval(() => void scanDrives(), 3_000);
-    return () => window.clearInterval(timer);
   }, [current, scanDrives]);
 
   const selectedDrive = drives.find((d) => d.id === driveId);
@@ -357,7 +357,13 @@ export function FirstRun({ onDone }: { onDone: () => void }) {
 
                   {drives.length === 0 && (
                     <div className="rounded-[11px] border border-dashed border-white/[0.10] px-4 py-5 text-[12.5px] text-slate-500">
-                      No removable drives found. Plug one in — this list updates on its own.
+                      No removable drives found. Plug one in, then rescan.
+                      <button
+                        onClick={() => void scanDrives()}
+                        className="ml-2 font-semibold text-slate-300 hover:text-white"
+                      >
+                        Rescan
+                      </button>
                     </div>
                   )}
 
@@ -373,8 +379,8 @@ export function FirstRun({ onDone }: { onDone: () => void }) {
               )}
 
               <div className="flex items-center gap-2 px-0.5 py-1">
-                <span className="block h-1.5 w-1.5 animate-pulse rounded-full bg-seal" />
-                <span className="text-[11.5px] text-slate-500">Watching for new drives…</span>
+                <span className="block h-1.5 w-1.5 rounded-full bg-seal" />
+                <span className="text-[11.5px] text-slate-500">Drive scans run only when requested.</span>
               </div>
             </div>
           </div>
@@ -384,7 +390,7 @@ export function FirstRun({ onDone }: { onDone: () => void }) {
           <div className="flex flex-col items-center animate-rise">
             <div className="relative flex h-[186px] w-[186px] items-center justify-center">
               <div className="absolute inset-0 rounded-full border border-seal/30 shadow-[0_0_34px_rgba(199,204,212,0.18),inset_0_0_34px_rgba(199,204,212,0.07)]" />
-              <div className="absolute inset-[18px] animate-spin-slow rounded-full border border-dashed border-white/[0.07]" />
+              <div className="absolute inset-[18px] rounded-full border border-dashed border-white/[0.07]" />
               <div
                 aria-hidden
                 className="absolute inset-[34px] rounded-full"
@@ -539,7 +545,7 @@ function ExtensionStep({
       <div className="mt-3 flex h-4 items-center gap-2">
         {state === 'waiting' && (
           <>
-            <span className="block h-1.5 w-1.5 animate-pulse rounded-full bg-seal" />
+            <span className="block h-1.5 w-1.5 rounded-full bg-seal" />
             <span className="text-[12px] text-slate-400">
               Listening for the extension… install it and this turns green on its own.
             </span>
@@ -586,22 +592,14 @@ function HandshakeChannel({ state, live }: { state: 'waiting' | 'ok' | 'degraded
         )}
         style={connected ? { backgroundColor: color, boxShadow: `0 0 10px 1px ${color}66` } : undefined}
       />
-      {/* Three probes travelling out while we wait; one steady pulse once contact is live. */}
-      {!connected &&
-        [0, 1, 2].map((i) => (
-          <span
-            key={i}
-            className="absolute block h-1.5 w-1.5 rounded-full bg-seal/70"
-            style={{ animation: `tal-relay 1.8s ${i * 0.6}s linear infinite` }}
-          />
-        ))}
+      {/* Static contact marker; avoids keeping Chromium's compositor active while idle. */}
+      {!connected && <span className="absolute left-1/4 block h-1.5 w-1.5 rounded-full bg-seal/70" />}
       {connected && live && (
         <span
           className="absolute block h-2 w-2 rounded-full"
           style={{
             backgroundColor: color,
             boxShadow: `0 0 10px 2px ${color}`,
-            animation: 'tal-relay 2.4s linear infinite',
           }}
         />
       )}

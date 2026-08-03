@@ -34,8 +34,6 @@ export function Keys() {
 
   useEffect(() => {
     void scan();
-    const timer = window.setInterval(() => void scan(false), 3_000);
-    return () => window.clearInterval(timer);
   }, [scan]);
 
   async function pair() {
@@ -79,7 +77,7 @@ export function Keys() {
       >
         <span
           className={cx(
-            'block h-2.5 w-2.5 animate-pulse rounded-full',
+            'block h-2.5 w-2.5 rounded-full',
             keyPresent
               ? 'bg-ok shadow-[0_0_10px_2px_rgba(34,197,94,0.6)]'
               : 'bg-danger shadow-[0_0_10px_2px_rgba(239,68,68,0.55)]',
@@ -212,8 +210,8 @@ export function Keys() {
           {error && <p className="mt-3 text-[12.5px] text-dangerInk">{error}</p>}
 
           <div className="mt-auto flex items-center gap-2 pt-3">
-            <span className="block h-1.5 w-1.5 animate-pulse rounded-full bg-seal" />
-            <span className="text-[11px] text-slate-500">Watching for new drives…</span>
+            <span className="block h-1.5 w-1.5 rounded-full bg-seal" />
+            <span className="text-[11px] text-slate-500">Use Rescan after inserting a drive.</span>
           </div>
         </Card>
       </div>

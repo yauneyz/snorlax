@@ -18,7 +18,7 @@ use tokio::sync::broadcast;
 use talysman_common::browsers::by_windows_image;
 use talysman_common::watchdog::{heartbeats_by_root, roots, Action, ScannedProc, Watchdog};
 
-use crate::enforce::EnforceShared;
+use crate::enforce::{apps, EnforceShared};
 
 use windows::Win32::Foundation::{CloseHandle, BOOL, HWND, LPARAM, TRUE, WPARAM};
 use windows::Win32::System::Threading::{OpenProcess, TerminateProcess, PROCESS_TERMINATE};
@@ -35,18 +35,29 @@ pub async fn run_browser_watchdog(
 ) {
     let mut sys = System::new();
     let mut wd = Watchdog::default();
+    let mut changes = shared.subscribe_changes();
     tracing::info!("browser watchdog started");
     loop {
+        let policy = shared.policy_snapshot();
+        let active = shared.is_active();
+        let monitor_apps = active && !policy.apps.is_empty();
+        let monitor_browser = active && shared.handshake_enabled();
+        if !monitor_browser {
+            wd.reset();
+        }
         tokio::select! {
             _ = shutdown.changed() => {
                 if *shutdown.borrow() { break; }
             }
-            _ = tokio::time::sleep(POLL) => {
-                if !shared.is_active() || !shared.handshake_enabled() {
-                    wd.reset();
+            _ = changes.changed() => {}
+            _ = tokio::time::sleep(POLL), if monitor_apps || monitor_browser => {
+                sys.refresh_processes();
+                if monitor_apps {
+                    apps::enforce_snapshot(&sys, &policy);
+                }
+                if !monitor_browser {
                     continue;
                 }
-                sys.refresh_processes();
 
                 // Build the browser-process scan (pid, parent, classification).
                 let scan: Vec<ScannedProc> = sys

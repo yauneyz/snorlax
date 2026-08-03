@@ -112,8 +112,9 @@ if (!gotLock) {
   });
 
   app.on('window-all-closed', () => {
-    // Keep running in the tray on Windows/Linux; only quit on explicit Quit.
-    if (process.platform === 'darwin') return;
+    // Enforcement lives in the privileged daemon; keeping Chromium alive after its last window
+    // closes only burns resources and is not required for blocking or schedules.
+    app.quit();
   });
 
   app.on('activate', () => {

@@ -1,12 +1,13 @@
 //! Schedule evaluation for Linux. Times are local wall-clock.
 
 use chrono::{Datelike, Local, Timelike};
+use std::time::Duration;
 
 use crate::model::{Policy, Profile, Schedule};
 
 const WEEKDAYS: [&str; 7] = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"];
 
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct ScheduleEvaluation {
     pub active: bool,
     pub window_id: Option<String>,
@@ -62,6 +63,30 @@ fn local_now() -> (String, u32) {
 pub fn evaluate_now(schedule: &Schedule) -> ScheduleEvaluation {
     let (day, minute) = local_now();
     evaluate_at(schedule, &day, minute)
+}
+
+/// Sleep until the next minute that can change the effective schedule. The one-hour ceiling is
+/// a cheap safety check for wall-clock/DST adjustments; policy edits wake the task separately.
+pub fn next_transition_delay(schedule: &Schedule) -> Duration {
+    let now = Local::now();
+    let day = now.weekday().num_days_from_sunday() as u32;
+    let minute = now.hour() * 60 + now.minute();
+    let current = evaluate_at(schedule, WEEKDAYS[day as usize], minute);
+    let base = day * 24 * 60 + minute;
+    let to_next_minute = 60 - now.second() as u64;
+    for offset in 1..=7 * 24 * 60 {
+        let future = (base + offset) % (7 * 24 * 60);
+        let next = evaluate_at(
+            schedule,
+            WEEKDAYS[(future / (24 * 60)) as usize],
+            future % (24 * 60),
+        );
+        if next != current {
+            return Duration::from_secs(to_next_minute + (offset as u64 - 1) * 60)
+                .min(Duration::from_secs(60 * 60));
+        }
+    }
+    Duration::from_secs(60 * 60)
 }
 
 pub fn evaluate_at(schedule: &Schedule, day: &str, minute: u32) -> ScheduleEvaluation {
@@ -159,7 +184,13 @@ mod restrictiveness_tests {
     fn win(id: &str, start: &str, end: &str, locked: bool) -> ScheduleWindow {
         ScheduleWindow {
             id: id.into(),
-            days: vec!["mon".into(), "tue".into(), "wed".into(), "thu".into(), "fri".into()],
+            days: vec![
+                "mon".into(),
+                "tue".into(),
+                "wed".into(),
+                "thu".into(),
+                "fri".into(),
+            ],
             start: start.into(),
             end: end.into(),
             profile_id: None,
@@ -267,7 +298,10 @@ mod profile_tests {
     #[test]
     fn a_locked_window_wins_the_profile_when_windows_overlap() {
         let s = Schedule {
-            windows: vec![win("w1", Some("lax"), false), win("w2", Some("strict"), true)],
+            windows: vec![
+                win("w1", Some("lax"), false),
+                win("w2", Some("strict"), true),
+            ],
         };
         let e = evaluate_at(&s, "mon", 10 * 60);
         assert!(e.locked);
@@ -282,7 +316,12 @@ mod profile_tests {
         let next = Schedule {
             windows: vec![win("w1", Some("lax"), false)],
         };
-        assert!(!is_at_least_as_restrictive(&prev, &next, &profiles(), "strict"));
+        assert!(!is_at_least_as_restrictive(
+            &prev,
+            &next,
+            &profiles(),
+            "strict"
+        ));
     }
 
     #[test]
@@ -293,7 +332,12 @@ mod profile_tests {
         let next = Schedule {
             windows: vec![win("w1", Some("strict"), false)],
         };
-        assert!(is_at_least_as_restrictive(&prev, &next, &profiles(), "strict"));
+        assert!(is_at_least_as_restrictive(
+            &prev,
+            &next,
+            &profiles(),
+            "strict"
+        ));
     }
 
     #[test]
@@ -305,7 +349,17 @@ mod profile_tests {
         let next = Schedule {
             windows: vec![win("w1", Some("lax"), false)],
         };
-        assert!(!is_at_least_as_restrictive(&prev, &next, &profiles(), "strict"));
-        assert!(is_at_least_as_restrictive(&next, &prev, &profiles(), "strict"));
+        assert!(!is_at_least_as_restrictive(
+            &prev,
+            &next,
+            &profiles(),
+            "strict"
+        ));
+        assert!(is_at_least_as_restrictive(
+            &next,
+            &prev,
+            &profiles(),
+            "strict"
+        ));
     }
 }

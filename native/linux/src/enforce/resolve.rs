@@ -3,7 +3,7 @@
 use std::collections::HashSet;
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr, UdpSocket};
 use std::sync::Arc;
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 use crate::enforce::{EnforceShared, ResolvedClass};
 use crate::model::Mode;
@@ -15,6 +15,7 @@ const QTYPE_A: u16 = 1;
 const QTYPE_AAAA: u16 = 28;
 const QUERY_TIMEOUT: Duration = Duration::from_millis(1500);
 const RESOLVE_INTERVAL: Duration = Duration::from_secs(300);
+const UNFOCUSED_WAIT: Duration = Duration::from_secs(60 * 60 * 24);
 
 pub fn resolve_and_ingest(shared: &EnforceShared) {
     let targets = shared.resolver_targets();
@@ -58,13 +59,20 @@ pub fn resolve_and_ingest(shared: &EnforceShared) {
 }
 
 pub fn run_resolver(shared: Arc<EnforceShared>, shutdown: tokio::sync::watch::Receiver<bool>) {
-    let mut next = Instant::now();
+    resolve_and_ingest(&shared);
+    let mut observed = shared.resolver_generation();
     while !*shutdown.borrow() {
-        if Instant::now() >= next {
-            resolve_and_ingest(&shared);
-            next = Instant::now() + RESOLVE_INTERVAL;
+        let wait = if shared.is_active() {
+            RESOLVE_INTERVAL
+        } else {
+            UNFOCUSED_WAIT
+        };
+        let _ = shared.wait_for_resolver_change(observed, wait);
+        if *shutdown.borrow() {
+            break;
         }
-        std::thread::sleep(Duration::from_millis(500));
+        resolve_and_ingest(&shared);
+        observed = shared.resolver_generation();
     }
     tracing::info!("resolver ticker exited");
 }

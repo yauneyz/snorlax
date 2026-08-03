@@ -3,7 +3,8 @@
 use std::sync::Arc;
 use std::time::Duration;
 
-use tokio::sync::{watch, Mutex};
+use serde_json::Value;
+use tokio::sync::{broadcast, watch, Mutex};
 
 use crate::core::Core;
 use crate::enforce::{self, EnforceShared};
@@ -12,21 +13,31 @@ use crate::secure_store::SecureStore;
 use crate::state::PersistentState;
 
 const PRESENCE_POLL: Duration = Duration::from_secs(3);
-const SCHEDULE_POLL: Duration = Duration::from_secs(30);
+
+async fn wait_for_state_change(events: &mut broadcast::Receiver<Value>) {
+    loop {
+        match events.recv().await {
+            Ok(message) if message.get("event").and_then(Value::as_str) == Some("stateChanged") => {
+                return
+            }
+            Ok(_) => {}
+            Err(_) => return,
+        }
+    }
+}
 
 pub async fn serve(socket_path: String, shutdown: watch::Receiver<bool>) {
     let _ = crate::paths::ensure_data_dir();
 
     let state = PersistentState::load();
     let store = SecureStore::load();
-    let shared = Arc::new(EnforceShared::new(state.active_policy(), state.focus_active));
+    let shared = Arc::new(EnforceShared::new(
+        state.active_policy(),
+        state.focus_active,
+    ));
 
     let core = Arc::new(Mutex::new(Core::new(state, store, shared.clone())));
     core.lock().await.rearm_on_boot();
-
-    // Keep browser native-messaging registration repaired across application upgrades and manual
-    // manifest deletion. The LaunchDaemon runs as root; registration is idempotent.
-    enforce::extension_policy::install();
 
     {
         let shared = shared.clone();
@@ -44,12 +55,7 @@ pub async fn serve(socket_path: String, shutdown: watch::Receiver<bool>) {
         std::thread::spawn(move || enforce::resolve::run_resolver(shared, shutdown));
     }
 
-    tokio::spawn(enforce::apps::run_app_blocker(
-        shared.clone(),
-        shutdown.clone(),
-    ));
-
-    // Browser handshake dead-man's switch (self-gates on focus_active + the handshake setting).
+    // One process snapshot feeds both app blocking and the browser dead-man's switch.
     {
         let events = core.lock().await.events.clone();
         tokio::spawn(enforce::browser_watchdog::run_browser_watchdog(
@@ -60,15 +66,13 @@ pub async fn serve(socket_path: String, shutdown: watch::Receiver<bool>) {
     }
 
     {
-        let core = core.clone();
+        let shared = shared.clone();
         let mut sd = shutdown.clone();
         tokio::spawn(async move {
-            loop {
-                tokio::select! {
-                    _ = sd.changed() => { if *sd.borrow() { break; } }
-                    _ = tokio::time::sleep(PRESENCE_POLL) => {
-                        core.lock().await.recompute_presence();
-                    }
+            while sd.changed().await.is_ok() {
+                if *sd.borrow() {
+                    shared.wake_all();
+                    break;
                 }
             }
         });
@@ -77,13 +81,42 @@ pub async fn serve(socket_path: String, shutdown: watch::Receiver<bool>) {
     {
         let core = core.clone();
         let mut sd = shutdown.clone();
+        let mut events = core.lock().await.subscribe();
         tokio::spawn(async move {
             loop {
+                if !core.lock().await.has_paired_keys() {
+                    tokio::select! {
+                        _ = sd.changed() => { if *sd.borrow() { break; } }
+                        _ = wait_for_state_change(&mut events) => {}
+                    }
+                    continue;
+                }
+                core.lock().await.recompute_presence();
                 tokio::select! {
                     _ = sd.changed() => { if *sd.borrow() { break; } }
-                    _ = tokio::time::sleep(SCHEDULE_POLL) => {
-                        core.lock().await.schedule_tick();
-                    }
+                    _ = tokio::time::sleep(PRESENCE_POLL) => {}
+                    _ = wait_for_state_change(&mut events) => {}
+                }
+            }
+        });
+    }
+
+    {
+        let core = core.clone();
+        let mut sd = shutdown.clone();
+        let mut events = core.lock().await.subscribe();
+        tokio::spawn(async move {
+            loop {
+                while events.try_recv().is_ok() {}
+                let delay = {
+                    let mut core = core.lock().await;
+                    core.schedule_tick();
+                    core.next_schedule_delay()
+                };
+                tokio::select! {
+                    _ = sd.changed() => { if *sd.borrow() { break; } }
+                    _ = tokio::time::sleep(delay) => {}
+                    _ = wait_for_state_change(&mut events) => {}
                 }
             }
         });
@@ -95,6 +128,7 @@ pub async fn serve(socket_path: String, shutdown: watch::Receiver<bool>) {
 
 pub fn run_blocking(socket_path: String, shutdown: watch::Receiver<bool>) {
     let rt = tokio::runtime::Builder::new_multi_thread()
+        .worker_threads(2)
         .enable_all()
         .build()
         .expect("failed to build tokio runtime");

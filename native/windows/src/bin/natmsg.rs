@@ -50,6 +50,7 @@ struct Blocking {
     active: bool,
     mode: String,
     domains: Vec<String>,
+    handshake_enabled: bool,
 }
 
 impl Blocking {
@@ -59,6 +60,7 @@ impl Blocking {
             "active": self.active,
             "mode": if self.mode.is_empty() { "blacklist" } else { self.mode.as_str() },
             "domains": self.domains,
+            "handshakeEnabled": self.handshake_enabled,
         })
     }
 }
@@ -176,7 +178,7 @@ fn heartbeat_ack(response: &Value) -> Option<Value> {
     }))
 }
 
-#[tokio::main]
+#[tokio::main(flavor = "current_thread")]
 async fn main() {
     let browser_pid = browser_root_pid();
 
@@ -307,6 +309,9 @@ async fn pump_pipe(
                             if let Some(policy) = result.get("policy") {
                                 parse_policy(policy, &mut b);
                             }
+                            if let Some(enabled) = result.pointer("/settings/browserHandshakeEnabled").and_then(Value::as_bool) {
+                                b.handshake_enabled = enabled;
+                            }
                             changed = true;
                         }
                     }
@@ -327,6 +332,12 @@ async fn pump_pipe(
                         Some("policyChanged") => {
                             if let Some(policy) = v.pointer("/payload/policy") {
                                 parse_policy(policy, &mut b);
+                                changed = true;
+                            }
+                        }
+                        Some("settingsChanged") => {
+                            if let Some(enabled) = v.pointer("/payload/settings/browserHandshakeEnabled").and_then(Value::as_bool) {
+                                b.handshake_enabled = enabled;
                                 changed = true;
                             }
                         }

@@ -117,7 +117,7 @@ fn stop_service_best_effort() {
     }
 }
 
-#[tokio::main]
+#[tokio::main(flavor = "current_thread")]
 async fn main() -> Result<()> {
     let Some(code) = parse_code() else {
         eprintln!("usage: talysman-recover.exe --code XXXX-XXXX-XXXX");

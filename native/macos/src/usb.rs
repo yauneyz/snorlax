@@ -170,10 +170,8 @@ mod tests {
     use super::*;
 
     fn temp_root(tag: &str) -> PathBuf {
-        let dir = std::env::temp_dir().join(format!(
-            "talysman-usb-test-{tag}-{}",
-            std::process::id()
-        ));
+        let dir =
+            std::env::temp_dir().join(format!("talysman-usb-test-{tag}-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).unwrap();
         dir
@@ -205,7 +203,8 @@ mod tests {
         let link = root.join("Macintosh HD");
         std::os::unix::fs::symlink("/", &link).unwrap();
 
-        let drives = list_drives_at(&[vol.clone(), root.join("notes.txt"), link, root.join("gone")]);
+        let drives =
+            list_drives_at(&[vol.clone(), root.join("notes.txt"), link, root.join("gone")]);
         assert_eq!(drives.len(), 1);
         assert_eq!(drives[0].label, "KEYSTICK");
         assert_eq!(drives[0].mount_point, vol.to_string_lossy());

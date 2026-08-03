@@ -17,7 +17,7 @@ impl Default for Mode {
     }
 }
 
-#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct AppRef {
     #[serde(skip_serializing_if = "Option::is_none", default)]
@@ -29,7 +29,7 @@ pub struct AppRef {
     pub label: String,
 }
 
-#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct Policy {
     #[serde(default)]
@@ -42,7 +42,7 @@ pub struct Policy {
 
 /// A named policy the user can switch between (mirrors packages/shared/src/profile.ts). Focus
 /// enforces exactly one profile at a time; schedule windows may switch which one.
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct Profile {
     pub id: String,
@@ -84,7 +84,7 @@ impl Profile {
     }
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct ScheduleWindow {
     pub id: String,
@@ -98,7 +98,7 @@ pub struct ScheduleWindow {
     pub locked: bool,
 }
 
-#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct Schedule {
     #[serde(default)]
@@ -106,7 +106,7 @@ pub struct Schedule {
 }
 
 /// Optional, opt-in enforcement settings (mirrors packages/shared/src/settings.ts).
-#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct Settings {
     /// Browser handshake dead-man's switch. Default off. Turning it off is key-gated.
@@ -114,7 +114,7 @@ pub struct Settings {
     pub browser_handshake_enabled: bool,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct PairedKey {
     pub id: String,

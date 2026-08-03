@@ -24,15 +24,19 @@ fn init_tracing(to_file: bool) {
     let builder = tracing_subscriber::fmt().with_ansi(!to_file);
     if to_file {
         let path = paths::log_file();
-        builder
-            .with_writer(move || {
-                std::fs::OpenOptions::new()
-                    .create(true)
-                    .append(true)
-                    .open(&path)
-                    .unwrap_or_else(|_| std::fs::File::create(&path).expect("open log file"))
-            })
-            .init();
+        let oversized = path
+            .metadata()
+            .map(|m| m.len() > 2 * 1024 * 1024)
+            .unwrap_or(false);
+        let mut options = std::fs::OpenOptions::new();
+        options.create(true).write(true);
+        if oversized {
+            options.truncate(true);
+        } else {
+            options.append(true);
+        }
+        let file = options.open(&path).expect("open log file");
+        builder.with_writer(file).init();
     } else {
         builder.init();
     }

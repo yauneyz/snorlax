@@ -2,13 +2,14 @@
 //! the service so schedules fire even when the UI is closed. Times are local wall-clock
 //! (DST-correct because we read the OS local time directly).
 
+use std::time::Duration;
 use windows::Win32::System::SystemInformation::GetLocalTime;
 
 use crate::model::{Policy, Profile, Schedule};
 
 const WEEKDAYS: [&str; 7] = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"];
 
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct ScheduleEvaluation {
     pub active: bool,
     pub window_id: Option<String>,
@@ -72,6 +73,29 @@ fn local_now() -> (String, u32) {
 pub fn evaluate_now(schedule: &Schedule) -> ScheduleEvaluation {
     let (day, minute) = local_now();
     evaluate_at(schedule, &day, minute)
+}
+
+pub fn next_transition_delay(schedule: &Schedule) -> Duration {
+    let st = unsafe { GetLocalTime() };
+    let day = st.wDayOfWeek as u32;
+    let minute = st.wHour as u32 * 60 + st.wMinute as u32;
+    let current = evaluate_at(schedule, WEEKDAYS[day as usize], minute);
+    let base = day * 24 * 60 + minute;
+    let to_next_minute_ms =
+        (60_000u64 - (st.wSecond as u64 * 1_000 + st.wMilliseconds as u64)).max(1);
+    for offset in 1..=7 * 24 * 60 {
+        let future = (base + offset) % (7 * 24 * 60);
+        let next = evaluate_at(
+            schedule,
+            WEEKDAYS[(future / (24 * 60)) as usize],
+            future % (24 * 60),
+        );
+        if next != current {
+            return Duration::from_millis(to_next_minute_ms + (offset as u64 - 1) * 60_000)
+                .min(Duration::from_secs(60 * 60));
+        }
+    }
+    Duration::from_secs(60 * 60)
 }
 
 /// Evaluate against an explicit (weekday, minute) — used by tests.
@@ -268,7 +292,10 @@ mod profile_tests {
     #[test]
     fn a_locked_window_wins_the_profile_when_windows_overlap() {
         let s = Schedule {
-            windows: vec![win("w1", Some("lax"), false), win("w2", Some("strict"), true)],
+            windows: vec![
+                win("w1", Some("lax"), false),
+                win("w2", Some("strict"), true),
+            ],
         };
         let e = evaluate_at(&s, "mon", 10 * 60);
         assert!(e.locked);
@@ -283,7 +310,12 @@ mod profile_tests {
         let next = Schedule {
             windows: vec![win("w1", Some("lax"), false)],
         };
-        assert!(!is_at_least_as_restrictive(&prev, &next, &profiles(), "strict"));
+        assert!(!is_at_least_as_restrictive(
+            &prev,
+            &next,
+            &profiles(),
+            "strict"
+        ));
     }
 
     #[test]
@@ -294,7 +326,12 @@ mod profile_tests {
         let next = Schedule {
             windows: vec![win("w1", Some("strict"), false)],
         };
-        assert!(is_at_least_as_restrictive(&prev, &next, &profiles(), "strict"));
+        assert!(is_at_least_as_restrictive(
+            &prev,
+            &next,
+            &profiles(),
+            "strict"
+        ));
     }
 
     #[test]
@@ -306,7 +343,17 @@ mod profile_tests {
         let next = Schedule {
             windows: vec![win("w1", Some("lax"), false)],
         };
-        assert!(!is_at_least_as_restrictive(&prev, &next, &profiles(), "strict"));
-        assert!(is_at_least_as_restrictive(&next, &prev, &profiles(), "strict"));
+        assert!(!is_at_least_as_restrictive(
+            &prev,
+            &next,
+            &profiles(),
+            "strict"
+        ));
+        assert!(is_at_least_as_restrictive(
+            &next,
+            &prev,
+            &profiles(),
+            "strict"
+        ));
     }
 }

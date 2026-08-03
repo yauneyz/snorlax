@@ -30,7 +30,7 @@ use std::time::Duration;
 use windivert_sys::address::WINDIVERT_ADDRESS;
 use windivert_sys::{
     ChecksumFlags, WinDivertClose, WinDivertFlags, WinDivertHelperCalcChecksums, WinDivertLayer,
-    WinDivertOpen, WinDivertRecv, WinDivertSend,
+    WinDivertOpen, WinDivertRecv, WinDivertSend, WinDivertShutdown, WinDivertShutdownMode,
 };
 use windivert_win::Win32::Foundation::HANDLE;
 
@@ -61,6 +61,17 @@ struct Diverter {
 // SAFETY: WinDivert handles may be used concurrently from multiple threads (recv on one,
 // shutdown/close on another), which is exactly how the reset burst is torn down.
 unsafe impl Send for Diverter {}
+
+struct ShutdownHandle(HANDLE);
+unsafe impl Send for ShutdownHandle {}
+
+impl ShutdownHandle {
+    fn shutdown_recv(&self) {
+        unsafe {
+            let _ = WinDivertShutdown(self.0, WinDivertShutdownMode::Recv);
+        }
+    }
+}
 
 impl Diverter {
     fn open(filter: &str, priority: i16, flags: WinDivertFlags) -> std::io::Result<Self> {
@@ -144,8 +155,9 @@ fn inbound_addr_from(captured: &WINDIVERT_ADDRESS) -> WINDIVERT_ADDRESS {
 // Always-on DNS / DoT engine
 // ---------------------------------------------------------------------------
 
-/// Capture every outbound DNS/DoT packet so policy changes take effect live. The handle stays
-/// open for the whole service lifetime; when focus is off we simply reinject everything. Our own
+/// Capture outbound DNS/DoT only while Focus is active. A shared-state notification shuts down
+/// the blocking receive and reopens the handle after policy changes; Focus-off closes it entirely.
+/// Our own
 /// warm resolver (enforce::resolve) binds a fixed local source port; we exclude it so the
 /// sinkhole never poisons our own lookups while focus is active. The filter is split per protocol
 /// so each `SrcPort` term only references its own layer's field (a `tcp.SrcPort` term on a UDP
@@ -159,42 +171,53 @@ fn engine_filter() -> String {
 }
 
 pub fn run_engine(shared: Arc<EnforceShared>, shutdown: tokio::sync::watch::Receiver<bool>) {
-    let diverter = match Diverter::open(&engine_filter(), 0, WinDivertFlags::new()) {
-        Ok(d) => d,
-        Err(e) => {
-            tracing::error!("WinDivert engine open failed: {e} (driver missing or no privilege?)");
-            return;
-        }
-    };
-    tracing::info!("WinDivert DNS/DoT engine running");
     let mut buf = vec![0u8; 65535];
-
-    loop {
-        if *shutdown.borrow() {
-            break;
+    let mut observed = shared.change_generation();
+    while !*shutdown.borrow() {
+        if !shared.is_active() {
+            observed = shared.wait_for_change(observed, Duration::from_secs(60 * 60));
+            continue;
         }
-        let (n, addr) = match diverter.recv(&mut buf) {
-            Ok(x) => x,
+
+        let diverter = match Diverter::open(&engine_filter(), 0, WinDivertFlags::new()) {
+            Ok(d) => d,
             Err(e) => {
-                if *shutdown.borrow() {
-                    break;
-                }
-                tracing::warn!("WinDivert recv error: {e}");
-                std::thread::sleep(Duration::from_millis(100));
+                tracing::error!(
+                    "WinDivert engine open failed: {e} (driver missing or no privilege?)"
+                );
+                observed = shared.wait_for_change(observed, Duration::from_secs(5));
                 continue;
             }
         };
-        let data = &buf[..n];
+        tracing::info!("WinDivert DNS/DoT engine active");
 
-        // Focus off, or we handled (dropped/answered) the packet → otherwise reinject as-is.
-        let consumed = if shared.is_active() {
-            handle_packet(&diverter, &shared.policy_snapshot(), data, &addr)
-        } else {
-            false
-        };
-        if !consumed {
-            let _ = diverter.send(data, &addr);
+        // WinDivertRecv is blocking. A lightweight waiter interrupts it as soon as any relevant
+        // state changes (including shutdown, whose service task calls `wake_all`).
+        let waiter_shared = shared.clone();
+        let waiter_observed = observed;
+        let shutdown_handle = ShutdownHandle(diverter.handle);
+        let waiter = std::thread::spawn(move || {
+            let _ = waiter_shared.wait_for_change(waiter_observed, Duration::from_secs(60 * 60));
+            shutdown_handle.shutdown_recv();
+        });
+
+        loop {
+            let (n, addr) = match diverter.recv(&mut buf) {
+                Ok(value) => value,
+                Err(_) => break,
+            };
+            let data = &buf[..n];
+
+            let consumed = handle_packet(&diverter, &shared.policy_snapshot(), data, &addr);
+            if !consumed {
+                let _ = diverter.send(data, &addr);
+            }
         }
+        // Also release the waiter after an unexpected receive failure, and join it before the
+        // owned handle is closed so it can never act on a recycled Windows handle value.
+        shared.wake_all();
+        let _ = waiter.join();
+        observed = shared.change_generation();
     }
     tracing::info!("WinDivert DNS/DoT engine stopped");
 }
@@ -282,18 +305,12 @@ fn inject_dns_reply(
 // focusd-style stateless IP drop (the website blocker)
 // ---------------------------------------------------------------------------
 
-/// How often the IP-drop manager polls for a focus transition (to tear down / set up its handle)
-/// while idle. Cheap: a few times a second.
-const FOCUS_POLL: Duration = Duration::from_millis(250);
+const MANAGER_IDLE_WAIT: Duration = Duration::from_secs(60 * 60);
+const MANAGER_RETRY_WAIT: Duration = Duration::from_secs(5);
 
 /// Priority of the drop handle: below the DNS engine (priority 0), so the engine sees packets
 /// first and anything it reinjects still traverses the drop filter.
 const IP_DROP_PRIORITY: i16 = -100;
-
-/// How often the IP-drop manager rebuilds its desired filter from the live IP sets. Tighter than
-/// FOCUS_POLL so a resolver swap becomes an installed DROP filter within a few tens of ms. Each
-/// tick is a couple of locked reads + a string compare — essentially free.
-const IP_DROP_POLL: Duration = Duration::from_millis(50);
 
 /// The website blocker (focusd's `output`-hook nftables drop, in WinDivert form). While focused,
 /// keeps a DROP-flag handle open whose filter silently discards outbound packets to the blocked-IP
@@ -307,13 +324,14 @@ const IP_DROP_POLL: Duration = Duration::from_millis(50);
 pub fn run_ip_drop(shared: Arc<EnforceShared>, shutdown: tokio::sync::watch::Receiver<bool>) {
     let mut handle: Option<Diverter> = None;
     let mut installed: Option<String> = None;
+    let mut observed = shared.change_generation();
     while !*shutdown.borrow() {
         if !shared.is_active() {
             if handle.take().is_some() {
                 tracing::info!("IP drop disabled (focus off)");
             }
             installed = None;
-            std::thread::sleep(FOCUS_POLL);
+            observed = shared.wait_for_change(observed, MANAGER_IDLE_WAIT);
             continue;
         }
         // What each mode needs: blacklist drops the resolved blocked set; whitelist spares the
@@ -344,14 +362,14 @@ pub fn run_ip_drop(shared: Arc<EnforceShared>, shutdown: tokio::sync::watch::Rec
                         Err(e) => {
                             // Keep the old handle; `installed` stays stale so we retry next tick.
                             tracing::warn!("IP drop open failed: {e}");
-                            std::thread::sleep(FOCUS_POLL);
+                            observed = shared.wait_for_change(observed, MANAGER_RETRY_WAIT);
                             continue;
                         }
                     }
                 }
             }
         }
-        std::thread::sleep(IP_DROP_POLL);
+        observed = shared.wait_for_change(observed, MANAGER_IDLE_WAIT);
     }
     tracing::info!("IP drop manager exited");
 }

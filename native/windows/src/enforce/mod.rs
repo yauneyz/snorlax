@@ -23,8 +23,8 @@ pub mod wfp;
 use std::collections::{HashMap, HashSet};
 use std::net::IpAddr;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
-use std::sync::Mutex;
-use std::time::Instant;
+use std::sync::{Condvar, Mutex};
+use std::time::{Duration, Instant};
 
 use talysman_common::watchdog::Heartbeat;
 
@@ -35,6 +35,34 @@ use crate::policy_match::is_host_blocked;
 /// string, so this bounds the filter length. Resolver sets are replaced wholesale (focusd-style)
 /// and refreshed continuously, so the cap is a hard sanity ceiling.
 const MAX_FILTER_IPS: usize = 400;
+
+#[derive(Default)]
+struct ChangeSignal {
+    epoch: Mutex<u64>,
+    changed: Condvar,
+}
+
+impl ChangeSignal {
+    fn generation(&self) -> u64 {
+        *self.epoch.lock().unwrap()
+    }
+    fn notify(&self) {
+        let mut epoch = self.epoch.lock().unwrap();
+        *epoch = epoch.wrapping_add(1);
+        self.changed.notify_all();
+    }
+    fn wait(&self, observed: u64, timeout: Duration) -> u64 {
+        let epoch = self.epoch.lock().unwrap();
+        if *epoch != observed {
+            return *epoch;
+        }
+        let (epoch, _) = self
+            .changed
+            .wait_timeout_while(epoch, timeout, |value| *value == observed)
+            .unwrap();
+        *epoch
+    }
+}
 
 /// State shared between the always-running enforcement threads (DNS sinkhole engine, IP-drop
 /// manager, resolver ticker) and the core dispatcher. Policy/focus changes take effect live, and
@@ -59,10 +87,14 @@ pub struct EnforceShared {
     /// Latest heartbeat per browser process PID, fed by the `extHeartbeat` RPC. The watchdog maps
     /// child-process PIDs to their browser root before evaluating liveness.
     heartbeats: Mutex<HashMap<u32, Heartbeat>>,
+    changes: ChangeSignal,
+    resolver_changes: ChangeSignal,
+    async_changes: tokio::sync::watch::Sender<u64>,
 }
 
 impl EnforceShared {
     pub fn new(policy: Policy, focus_active: bool) -> Self {
+        let (async_changes, _) = tokio::sync::watch::channel(0);
         EnforceShared {
             policy: Mutex::new(Self::effective(policy)),
             focus_active: AtomicBool::new(focus_active),
@@ -71,6 +103,9 @@ impl EnforceShared {
             gen: AtomicU64::new(0),
             handshake_enabled: AtomicBool::new(false),
             heartbeats: Mutex::new(HashMap::new()),
+            changes: ChangeSignal::default(),
+            resolver_changes: ChangeSignal::default(),
+            async_changes,
         }
     }
 
@@ -82,21 +117,29 @@ impl EnforceShared {
     /// Toggle the watchdog. Clearing it also drops recorded heartbeats so a later re-enable starts
     /// from a clean slate.
     pub fn set_handshake_enabled(&self, enabled: bool) {
-        self.handshake_enabled.store(enabled, Ordering::SeqCst);
+        let changed = self.handshake_enabled.swap(enabled, Ordering::SeqCst) != enabled;
         if !enabled {
             self.heartbeats.lock().unwrap().clear();
+        }
+        if changed {
+            self.notify_change();
         }
     }
 
     /// Record an extension heartbeat for `pid` (the browser instance the extension runs in).
-    pub fn record_heartbeat(&self, pid: u32, healthy: bool) {
-        self.heartbeats.lock().unwrap().insert(
+    pub fn record_heartbeat(&self, pid: u32, healthy: bool) -> bool {
+        let mut heartbeats = self.heartbeats.lock().unwrap();
+        let changed = heartbeats
+            .get(&pid)
+            .is_none_or(|heartbeat| heartbeat.healthy != healthy);
+        heartbeats.insert(
             pid,
             Heartbeat {
                 last_seen: Instant::now(),
                 healthy,
             },
         );
+        changed
     }
 
     /// A snapshot of all recorded heartbeats, for the watchdog tick.
@@ -125,7 +168,13 @@ impl EnforceShared {
     }
 
     pub fn set_active(&self, active: bool) {
-        self.focus_active.store(active, Ordering::SeqCst);
+        if self.focus_active.swap(active, Ordering::SeqCst) != active {
+            self.gen.fetch_add(1, Ordering::SeqCst);
+            self.notify_change();
+            if active {
+                self.resolver_changes.notify();
+            }
+        }
     }
 
     pub fn policy_snapshot(&self) -> Policy {
@@ -138,7 +187,15 @@ impl EnforceShared {
     }
 
     pub fn set_policy(&self, policy: Policy) {
-        *self.policy.lock().unwrap() = Self::effective(policy);
+        let policy = Self::effective(policy);
+        let mut guard = self.policy.lock().unwrap();
+        if *guard != policy {
+            *guard = policy;
+            self.gen.fetch_add(1, Ordering::SeqCst);
+            drop(guard);
+            self.notify_change();
+            self.resolver_changes.notify();
+        }
     }
 
     /// Replace the resolved **blocked** IP set wholesale (focusd's atomic swap). Called by the
@@ -151,6 +208,8 @@ impl EnforceShared {
         if *guard != ips {
             *guard = ips;
             self.gen.fetch_add(1, Ordering::SeqCst);
+            drop(guard);
+            self.notify_change();
         }
     }
 
@@ -163,6 +222,8 @@ impl EnforceShared {
         if *guard != ips {
             *guard = ips;
             self.gen.fetch_add(1, Ordering::SeqCst);
+            drop(guard);
+            self.notify_change();
         }
     }
 
@@ -205,6 +266,31 @@ impl EnforceShared {
     /// Monotonic counter of drop-set membership changes (poll-and-compare by the IP-drop manager).
     pub fn generation(&self) -> u64 {
         self.gen.load(Ordering::SeqCst)
+    }
+
+    pub fn change_generation(&self) -> u64 {
+        self.changes.generation()
+    }
+    pub fn wait_for_change(&self, observed: u64, timeout: Duration) -> u64 {
+        self.changes.wait(observed, timeout)
+    }
+    pub fn subscribe_changes(&self) -> tokio::sync::watch::Receiver<u64> {
+        self.async_changes.subscribe()
+    }
+    pub fn resolver_generation(&self) -> u64 {
+        self.resolver_changes.generation()
+    }
+    pub fn wait_for_resolver_change(&self, observed: u64, timeout: Duration) -> u64 {
+        self.resolver_changes.wait(observed, timeout)
+    }
+    pub fn wake_all(&self) {
+        self.notify_change();
+        self.resolver_changes.notify();
+    }
+    fn notify_change(&self) {
+        self.changes.notify();
+        self.async_changes
+            .send_modify(|value| *value = value.wrapping_add(1));
     }
 
     fn cap(ips: &mut HashSet<IpAddr>) {

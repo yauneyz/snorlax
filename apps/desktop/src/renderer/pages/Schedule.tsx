@@ -94,8 +94,16 @@ export function SchedulePage({ onUpgrade }: { onUpgrade: () => void }) {
   const [now, setNow] = useState(() => new Date());
 
   useEffect(() => {
-    const t = setInterval(() => setNow(new Date()), 30_000);
-    return () => clearInterval(t);
+    let timer = 0;
+    const arm = () => {
+      const delay = 60_000 - (Date.now() % 60_000) + 20;
+      timer = window.setTimeout(() => {
+        setNow(new Date());
+        arm();
+      }, delay);
+    };
+    arm();
+    return () => window.clearTimeout(timer);
   }, []);
 
   const scheduleEnabled = isScheduleEnabled(productLimits);
@@ -193,7 +201,7 @@ export function SchedulePage({ onUpgrade }: { onUpgrade: () => void }) {
           className={cx(
             'block h-2 w-2 shrink-0 rounded-full',
             runningWindow
-              ? 'animate-pulse bg-ok shadow-[0_0_9px_2px_rgba(34,197,94,0.45)]'
+              ? 'bg-ok shadow-[0_0_9px_2px_rgba(34,197,94,0.45)]'
               : 'bg-slate-450',
           )}
         />

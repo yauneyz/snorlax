@@ -17,8 +17,7 @@ use std::process::Command;
 use crate::paths::nmh_dir;
 use crate::run::run_command;
 pub use talysman_common::extension_identity::{
-    CHROME_STORE_ID as CHROME_EXT_ID, EDGE_STORE_ID as EDGE_EXT_ID,
-    FIREFOX_ID as FIREFOX_EXT_ID,
+    CHROME_STORE_ID as CHROME_EXT_ID, EDGE_STORE_ID as EDGE_EXT_ID, FIREFOX_ID as FIREFOX_EXT_ID,
 };
 
 /// Native-messaging host name. MUST match `HOST_NAME` in the extension's `src/background.js`.

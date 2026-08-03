@@ -3,6 +3,9 @@ productName: Talysman
 copyright: Copyright © 2026
 forceCodeSigning: true
 electronUpdaterCompatibility: ">= 2.16"
+# Chromium otherwise ships dozens of locale packs that this English-only UI never loads.
+electronLanguages:
+  - en-US
 protocols:
   - name: Talysman authentication and billing callbacks
     schemes:

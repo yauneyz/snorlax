@@ -859,12 +859,18 @@ talysman/
 │  │     ├─ policy.ts                # Policy / Mode / AppRef types
 │  │     ├─ schedule.ts              # Schedule / ScheduleWindow types
 │  │     └─ constants.ts             # pipe/socket names, deep-link scheme, versions
-│  └─ core/                          # ===== pure cross-platform business logic =====
-│     ├─ package.json
-│     └─ src/
-│        ├─ scheduleEngine.ts        # pure: "is focus on right now?" given schedule + clock
-│        ├─ policyNormalize.ts       # pure: validate/normalize user policy → enforcement form
-│        └─ pairing.ts               # pure: secret generation, hash, verify helpers
+│  ├─ core/                          # ===== pure cross-platform business logic =====
+│  │  ├─ package.json
+│  │  └─ src/
+│  │     ├─ scheduleEngine.ts        # pure: "is focus on right now?" given schedule + clock
+│  │     ├─ policyNormalize.ts       # pure: validate/normalize user policy → enforcement form
+│  │     └─ pairing.ts               # pure: secret generation, hash, verify helpers
+│  ├─ product/                       # ===== plans, entitlements, feature limits =====
+│  │  └─ src/index.ts                # CHECKOUT_PRICES, entitlement shape, free-tier limits
+│  ├─ billing-server/                # ===== shared Stripe/Supabase billing operations =====
+│  │  └─ src/index.ts                # createCheckoutSession, createPortalSession, syncSubscription, …
+│  └─ auth-contracts/                # ===== web↔desktop auth contract =====
+│     └─ src/index.ts                # zod auth schemas + `talysman://` deep-link path constants
 │
 ├─ native/
 │  ├─ protocol/
@@ -873,26 +879,36 @@ talysman/
 │  │  ├─ Cargo.toml
 │  │  ├─ build.rs
 │  │  ├─ src/
-│  │  │  ├─ main.rs                  # SCM dispatch entry point
+│  │  │  ├─ lib.rs                   # shared library used by all four binaries
+│  │  │  ├─ main.rs                  # talysman-svc.exe — SCM dispatch entry point
+│  │  │  ├─ bin/
+│  │  │  │  ├─ svcctl.rs             # talysman-svcctl.exe — elevated install/configure/recover/remove CLI
+│  │  │  │  ├─ recover.rs            # talysman-recover.exe — the backdoor killswitch (§9)
+│  │  │  │  └─ natmsg.rs             # talysman-natmsg.exe — browser native-messaging host
 │  │  │  ├─ service.rs               # Windows Service lifecycle, recovery, DACL
+│  │  │  ├─ core.rs                  # authoritative core: state + store + enforce handles; RPC dispatch
 │  │  │  ├─ ipc.rs                   # named-pipe NDJSON-RPC server
 │  │  │  ├─ state.rs                 # authoritative state + persistence
 │  │  │  ├─ secure_store.rs          # DPAPI-encrypted store (paired serials, secret hashes)
 │  │  │  ├─ usb.rs                   # WM_DEVICECHANGE + SetupAPI enumeration
 │  │  │  ├─ pairing.rs               # verify a present device matches a paired key
 │  │  │  ├─ schedule.rs              # timer driving the (shared-logic-equivalent) engine
+│  │  │  ├─ model.rs                 # serde types mirroring packages/shared/src/*.ts (camelCase wire format)
+│  │  │  ├─ constants.rs             # constants mirrored from packages/shared/src/constants.ts
+│  │  │  ├─ paths.rs                 # on-disk locations under %PROGRAMDATA%\Talysman
+│  │  │  ├─ policy_match.rs          # pure domain/app matching (exact + leading-wildcard)
+│  │  │  ├─ run.rs                   # safe shell-out helper for netsh/powershell/sc
 │  │  │  └─ enforce/
-│  │  │     ├─ mod.rs                # EnforceShared: pre-armed taint/clean sets; mode-aware seeding
-│  │  │     ├─ divert.rs             # WinDivert engines: DNS sinkhole + 443 SNI exoneration + pre-armed drop
+│  │  │     ├─ mod.rs                # EnforceShared: live policy/focus + resolver-fed IP banks
+│  │  │     ├─ divert.rs             # WinDivert engines: always-on DNS/DoT + focus-gated dest-IP DROP
 │  │  │     ├─ dns.rs                # pure DNS wire helpers (QNAME/QTYPE, NXDOMAIN/NODATA)
-│  │  │     ├─ sni.rs                # pure TLS ClientHello → SNI extraction
 │  │  │     ├─ resolve.rs            # active UDP DNS resolver (fixed src port; pinned upstreams)
-│  │  │     ├─ observations.rs       # persisted host→IP antibody store (observations.json)
 │  │  │     ├─ properties.rs         # multi-domain property groups + blocklist expansion
 │  │  │     ├─ wfp.rs                # persistent firewall backstop (DoT/DoH-IP/QUIC via netsh)
+│  │  │     ├─ extension_policy.rs   # registers the native-messaging host; clears legacy policy keys
+│  │  │     ├─ browser_watchdog.rs   # browser handshake dead-man's switch (warn → WM_CLOSE → kill)
 │  │  │     └─ apps.rs               # process-list poll + TerminateProcess on match
 │  │  └─ installer/
-│  │     ├─ service-install.rs       # tiny elevated CLI: create/configure/recover/remove svc
 │  │     └─ nsis-include.nsh         # NSIS hooks: install/start svc; guard uninstall
 │  └─ macos/                         # ===== macOS daemon + system extension (Swift) =====
 │     ├─ project.yml                 # XcodeGen spec (generates the .xcodeproj)
@@ -1027,8 +1043,13 @@ inventory. The platform READMEs and source-level module comments describe the im
 
 | File | Responsibility |
 |---|---|
-| `src/main.rs` | Service Control Manager dispatch entry point. |
+| `src/lib.rs` | Shared library holding the modules used by all four binaries. |
+| `src/main.rs` | `talysman-svc.exe` — Service Control Manager dispatch entry point. |
+| `src/bin/svcctl.rs` | `talysman-svcctl.exe` — the elevated install/configure/recover/remove CLI invoked by the NSIS installer. **(This replaced the old `installer/service-install.rs`.)** |
+| `src/bin/recover.rs` | `talysman-recover.exe` — the elevated backdoor killswitch (§9). |
+| `src/bin/natmsg.rs` | `talysman-natmsg.exe` — native-messaging host bridging the browser extension to the service's named pipe. |
 | `src/service.rs` | Service start/stop/lifecycle, recovery configuration, restrictive DACL. |
+| `src/core.rs` | Authoritative core: state + secure store + enforcement handles, RPC dispatch, disable-path guard. Async-Mutex-wrapped, shared by every IPC connection. |
 | `src/ipc.rs` | Named-pipe NDJSON-RPC server; routes requests; pushes events. |
 | `src/state.rs` | Authoritative state + persistence to the protected store. |
 | `src/secure_store.rs` | DPAPI-encrypted at-rest store for paired serials + secret hashes. |
@@ -1043,7 +1064,12 @@ inventory. The platform READMEs and source-level module comments describe the im
 | `src/enforce/properties.rs` | Curated multi-domain "property group" table + blocklist expansion (sibling/CDN domains). |
 | `src/enforce/wfp.rs` | Installs/removes the persistent Windows-Firewall backstop (DoT 853, DoH resolver IPs, QUIC UDP 443) via `netsh`. |
 | `src/enforce/apps.rs` | Process-list poll + `TerminateProcess` on a blocked-app match. |
-| `installer/service-install.rs` | Tiny elevated CLI invoked at install/update to create/configure/recover/remove the service. |
+| `src/enforce/browser_watchdog.rs` | Browser handshake dead-man's switch: polls root browser processes + extension heartbeats into `talysman_common::watchdog`, then warns / posts `WM_CLOSE` / kills as the state machine directs. |
+| `src/model.rs` | Serde types mirroring `packages/shared/src/{policy,schedule,protocol,events}.ts`, camelCase to match the TS wire format. |
+| `src/constants.rs` | Constants mirrored from `packages/shared/src/constants.ts` — the pipe name in particular must match the Electron client. |
+| `src/paths.rs` | On-disk locations under `%PROGRAMDATA%\Talysman` (installer sets an ACL denying non-admin writes). |
+| `src/policy_match.rs` | Pure domain/app matching (exact or leading-`*.` wildcard); mirrors `packages/core/src/policyNormalize.ts`. |
+| `src/run.rs` | Centralised shell-out helper for `netsh`/`powershell`/`sc` — logs consistently and never panics the service on failure. |
 | `installer/nsis-include.nsh` | NSIS hooks: register+start service on install; guard the uninstall path (§9). |
 
 ### `native/macos` (Swift)

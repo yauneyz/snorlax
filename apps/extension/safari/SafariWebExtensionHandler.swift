@@ -50,11 +50,13 @@ private enum TalysmanNativeBridge {
 
                 if id == 1 {
                     let policy = result["policy"] as? [String: Any] ?? [:]
+                    let settings = result["settings"] as? [String: Any] ?? [:]
                     state = [
                         "type": "state",
                         "active": result["focusActive"] as? Bool ?? false,
                         "mode": policy["mode"] as? String ?? "blacklist",
                         "domains": policy["domains"] as? [String] ?? [],
+                        "handshakeEnabled": settings["browserHandshakeEnabled"] as? Bool ?? false,
                     ]
                 } else if id == 2, let heartbeat = result["heartbeat"] as? [String: Any] {
                     heartbeatAck = [

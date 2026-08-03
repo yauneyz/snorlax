@@ -45,6 +45,7 @@ platform validation before its enforcement guarantees should be treated as produ
 | `packages/core` | Pure policy, pairing, property-group, and schedule logic |
 | `packages/product` | Plans, entitlements, and feature limits |
 | `packages/billing-server` | Shared Stripe/Supabase billing operations |
+| `packages/auth-contracts` | Zod schemas and `talysman://` deep-link path constants shared by web and desktop |
 | `native/{windows,linux,macos}` | Privileged Rust services and support binaries |
 | `native/common` | Shared browser/watchdog logic |
 | `scripts` | Development, build, release, and infrastructure automation |
@@ -123,5 +124,7 @@ Use these runbooks for the details:
 - [native/windows/README.md](./native/windows/README.md) — Windows service
 - [native/linux/README.md](./native/linux/README.md) — Linux service
 - [native/macos/README.md](./native/macos/README.md) — macOS service and current limitations
-- [apps/extension/README.md](./apps/extension/README.md) — browser extension
-- [extension-hosting.md](./extension-hosting.md) — store distribution
+- [apps/extension/README.md](./apps/extension/README.md) — browser extension, store packages, and
+  native-host registration
+- [apps/extension/STORE_SUBMISSION.md](./apps/extension/STORE_SUBMISSION.md) — listing copy,
+  permission rationales, and reviewer instructions for store distribution

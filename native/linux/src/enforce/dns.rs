@@ -15,11 +15,13 @@ use crate::model::{Mode, Policy};
 
 pub(crate) const RUNTIME_CONFIG_PATH: &str = "/run/talysman/dnsmasq.conf";
 pub(crate) const DNSMASQ_INCLUDE_PATH: &str = "/etc/dnsmasq.d/talysman.conf";
-const POLL: Duration = Duration::from_millis(250);
+const IDLE_WAIT: Duration = Duration::from_secs(60 * 60);
+const RETRY_WAIT: Duration = Duration::from_secs(5);
 
 pub fn run_manager(shared: Arc<EnforceShared>, shutdown: tokio::sync::watch::Receiver<bool>) {
     let mut installed_gen: Option<u64> = None;
     let mut cleared_inactive = false;
+    let mut observed = shared.change_generation();
     while !*shutdown.borrow() {
         if !shared.is_active() {
             if installed_gen.take().is_some() || !cleared_inactive {
@@ -30,7 +32,7 @@ pub fn run_manager(shared: Arc<EnforceShared>, shutdown: tokio::sync::watch::Rec
                 }
                 cleared_inactive = true;
             }
-            std::thread::sleep(POLL);
+            observed = shared.wait_for_change(observed, IDLE_WAIT);
             continue;
         }
         cleared_inactive = false;
@@ -46,7 +48,12 @@ pub fn run_manager(shared: Arc<EnforceShared>, shutdown: tokio::sync::watch::Rec
                 Err(e) => tracing::warn!("failed to apply dnsmasq sinkhole config: {e}"),
             }
         }
-        std::thread::sleep(POLL);
+        let wait = if installed_gen == Some(gen) {
+            IDLE_WAIT
+        } else {
+            RETRY_WAIT
+        };
+        observed = shared.wait_for_change(observed, wait);
     }
 }
 

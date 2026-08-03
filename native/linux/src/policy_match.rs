@@ -69,8 +69,7 @@ pub fn is_at_least_as_restrictive(prev: &Policy, next: &Policy) -> bool {
         }
     }
 
-    prev
-        .apps
+    prev.apps
         .iter()
         .all(|app| next.apps.iter().any(|candidate| same_app(candidate, app)))
 }
@@ -216,9 +215,18 @@ mod restrictiveness_tests {
 
     #[test]
     fn removing_a_blocked_app_is_gated() {
-        let prev = Policy { apps: vec![app("chrome"), app("slack")], ..Policy::default() };
-        let kept = Policy { apps: vec![app("chrome"), app("slack"), app("discord")], ..Policy::default() };
-        let removed = Policy { apps: vec![app("chrome")], ..Policy::default() };
+        let prev = Policy {
+            apps: vec![app("chrome"), app("slack")],
+            ..Policy::default()
+        };
+        let kept = Policy {
+            apps: vec![app("chrome"), app("slack"), app("discord")],
+            ..Policy::default()
+        };
+        let removed = Policy {
+            apps: vec![app("chrome")],
+            ..Policy::default()
+        };
         assert!(is_at_least_as_restrictive(&prev, &kept));
         assert!(!is_at_least_as_restrictive(&prev, &removed));
     }

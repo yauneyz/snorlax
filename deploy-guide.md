@@ -40,9 +40,9 @@ The runtime pieces:
 | Desktop updates  | Disabled for unpackaged builds                          | Generic updater feed in S3 on Windows/macOS; APT on Linux                                                |
 | Release hosting  | None                                                    | `talysman-release-artifacts-prod` in `us-east-1`                                                         |
 | Database + auth  | Local Supabase stack (Docker, `supabase start`)         | Cloud project `lkanoehzgogtrxzycutl.supabase.co`                                                         |
-| Stripe           | Test mode + `stripe listen` webhook forwarding          | Live mode + dashboard webhook endpoint                                                                   |
+| Stripe           | Test mode + `stripe listen` webhook forwarding (no registered endpoint — by design) | Live mode + dashboard webhook endpoint `we_1TzB2xRN4BfSLyzwzq2fONlJ`                  |
 | LLM              | Local vLLM (`LLM_PROVIDER=local`)                       | OpenAI (`LLM_PROVIDER=openai`)                                                                           |
-| App URL          | `http://localhost:3000`                                 | `https://talysman.app`                                                                                   |
+| App URL          | `http://localhost:3000`                                 | **`https://www.talysman.app`** (canonical; the apex 308-redirects to it)                                 |
 | Email            | Inbucket (local mail catcher, port 54324)               | Resend                                                                                                   |
 | Sentry / PostHog | Disabled (placeholder values auto-detected and skipped) | Enabled when real values are in `.credentials`                                                           |
 
@@ -91,7 +91,7 @@ here fails loudly at sync time, not at request time in production.
 | Command (from `apps/web`)      | What it does                                                                                                                                                                                           |
 | ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `pnpm sync:env`                | mode=dev → writes `apps/web/.env.local` (dev Supabase, local LLM) and root `.env.local` (desktop `VITE_*` vars). Runs automatically before `pnpm dev` (`predev` hook).                                 |
-| `pnpm sync:env -- --mode=prod` | Same two files but with prod values (cloud Supabase, OpenAI, `https://talysman.app`). This is what `pnpm prod` does before starting `next dev`.                                                        |
+| `pnpm sync:env -- --mode=prod` | Same two files but with prod values (cloud Supabase, OpenAI, `https://www.talysman.app`). This is what `pnpm prod` does before starting `next dev`.                                                        |
 | `pnpm sync:env:build`          | Runs before `pnpm build` (`prebuild` hook). On a Vercel build (`VERCEL=1`) with no `.credentials` present it **skips entirely** and lets Vercel's own env vars win. Locally it writes prod-mode files. |
 | `pnpm sync:env:prod`           | **Upserts** every non-empty var to Vercel's _production_ environment. Does not write local files.                                                                                                      |
 | `pnpm sync:env:preview`        | Upserts the same prod-mode values to Vercel's _preview_ environment. Does not write local files.                                                                                                       |
@@ -228,8 +228,8 @@ supabase migration list
 Also verify the production and health URLs directly:
 
 ```bash
-curl -I https://talysman.app
-curl https://talysman.app/api/health
+curl -I https://www.talysman.app
+curl https://www.talysman.app/api/health
 ```
 
 The remaining sections describe the intended configuration and the commands used to establish it.
@@ -259,10 +259,12 @@ capture it as a migration file — otherwise dev and prod schemas silently drift
 (`https://supabase.com/dashboard/project/lkanoehzgogtrxzycutl`):
 
 1. **Auth → URL Configuration**
-   - Site URL: `https://talysman.app` (the #1 classic mistake is leaving this as
-     localhost — it breaks confirmation/reset-email links in prod).
+   - Site URL: `https://www.talysman.app` (the #1 classic mistake is leaving this as
+     localhost — it breaks confirmation/reset-email links in prod). Use the **canonical
+     `www` host**: the apex 308-redirects, and bouncing auth callbacks through a
+     cross-origin redirect is needless fragility.
    - Additional redirect URLs:
-     - `https://talysman.app/api/auth/callback`
+     - `https://www.talysman.app/api/auth/callback`
      - `talysman://auth/callback` (desktop deep link)
      - `http://localhost:3000/**` (so `pnpm prod` hybrid mode can log in)
      - optionally `https://*-zacyauney-3805s-projects.vercel.app/**` for Vercel preview
@@ -343,7 +345,7 @@ Rules to remember:
 
 ```bash
 vercel --prod                       # deploy
-curl https://talysman.app/api/health   # liveness (once domain is attached; else use the deployment URL)
+curl https://www.talysman.app/api/health   # liveness (domain is attached; apex 308s to www)
 ```
 
 Then click through login → pricing → checkout. Note that `vercel --prod` deploys with the
@@ -355,6 +357,7 @@ localhost for test-card runs.
 ```bash
 vercel domains ls                        # talysman.app is on the team already
 vercel domains add talysman.app snorlax-web    # attach to the project (or dashboard → Domains)
+# Done: both hosts are attached, with www as canonical and the apex 308-redirecting to it.
 ```
 
 Since the registrar/DNS are external, point DNS per what the dashboard tells you —
@@ -367,22 +370,31 @@ nameservers to Vercel. Production deploys then automatically get the domain alia
 
 Each of these has a dev half (already working) and a prod half (checklist):
 
-**Stripe** — when the real Talysman account clears verification:
+**Stripe** — the real Talysman account (`acct_1TpxyiRN4BfSLyzw`) **cleared verification**;
+`charges_enabled`/`payouts_enabled`/`details_submitted` are all true as of 2026-08-03.
+Steps 1–2 below are done; the outstanding live gap is the **billing portal configuration**
+(live has none — see `payments-verification.md` §4.C).
 
 1. Create live products/prices; put the `price_...` ids in `.credentials` under
    `price_id_monthly_live`/`price_id_yearly_live` (the `_test` pair holds the sandbox
    ids). The target selects which pair — plus which key set — gets exported.
    _(Live prices already created 2026-07-31: `price_1TzAu9RN4BfSLyzwX2MG5YIo` monthly,
    `price_1TzAuARN4BfSLyzw88zxlrAI` yearly.)_
-2. Dashboard → Webhooks → add endpoint `https://talysman.app/api/stripe/webhook`
+2. Dashboard → Webhooks → add endpoint **`https://www.talysman.app/api/stripe/webhook`**
    (subscribe to the checkout + customer.subscription events the handler processes);
    copy its `whsec_...` into `webhook_secret_live`.
+   > ⚠️ **Use the `www` host, not the apex.** The apex 308-redirects and Stripe does not
+   > follow redirects, so an apex-registered endpoint fails *every* delivery and Stripe
+   > eventually disables it. This exact mistake broke the sandbox endpoint (deleted
+   > 2026-08-03 — see `payments-verification.md` §0).
+   _(Done 2026-07-31: live endpoint `we_1TzB2xRN4BfSLyzwzq2fONlJ` is registered at the
+   `www` URL with the correct 8 events; `webhook_secret_live` is populated.)_
 3. Fill `publishable_key_live`/`secret_key_live`, re-push env (§6.3), redeploy. There is
    no mode to flip — `sync:env:prod` exports the live set because it targets production,
    and refuses to run at all while any `_live` value is missing.
 
 **Google OAuth** (Search Console connections) — in the GCP console for the existing
-OAuth client, add `https://talysman.app/api/connections/google/callback` as an
+OAuth client, add `https://www.talysman.app/api/connections/google/callback` as an
 authorized redirect URI (the redirect is derived from `NEXT_PUBLIC_APP_URL`, so dev
 uses `http://localhost:3000/api/connections/google/callback`).
 
@@ -722,7 +734,7 @@ pnpm sync:env:prod                   # upsert .credentials values to Vercel
 vercel --prod                        # or `git push origin main` once Git integration is on
 
 # 4. Verify
-curl https://talysman.app/api/health
+curl https://www.talysman.app/api/health
 vercel ls                            # confirm ● Ready
 ```
 

@@ -20,7 +20,7 @@
 use std::collections::HashSet;
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr, UdpSocket};
 use std::sync::Arc;
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 use crate::enforce::{EnforceShared, ResolvedClass};
 use crate::model::Mode;
@@ -44,6 +44,7 @@ const QUERY_TIMEOUT: Duration = Duration::from_millis(1500);
 /// How often the background resolver re-resolves the policy's domains. CDN IPs rotate, so this
 /// refreshes the blocked/allowed sets on a cadence — focusd uses the same interval-based approach.
 const RESOLVE_INTERVAL: Duration = Duration::from_secs(300);
+const UNFOCUSED_WAIT: Duration = Duration::from_secs(60 * 60 * 24);
 
 /// Resolve the policy's relevant domains and replace the drop-set IPs wholesale (focusd's atomic
 /// swap): in blacklist mode the blocked set, in whitelist mode the allowed set. Runs regardless of
@@ -92,13 +93,20 @@ pub fn resolve_and_ingest(shared: &EnforceShared) {
 /// Background resolver ticker: an initial pass, then every `RESOLVE_INTERVAL`, until shutdown.
 /// Runs on its own OS thread (the UDP client is blocking), mirroring the divert engines.
 pub fn run_resolver(shared: Arc<EnforceShared>, shutdown: tokio::sync::watch::Receiver<bool>) {
-    let mut next = Instant::now();
+    resolve_and_ingest(&shared);
+    let mut observed = shared.resolver_generation();
     while !*shutdown.borrow() {
-        if Instant::now() >= next {
-            resolve_and_ingest(&shared);
-            next = Instant::now() + RESOLVE_INTERVAL;
+        let wait = if shared.is_active() {
+            RESOLVE_INTERVAL
+        } else {
+            UNFOCUSED_WAIT
+        };
+        let _ = shared.wait_for_resolver_change(observed, wait);
+        if *shutdown.borrow() {
+            break;
         }
-        std::thread::sleep(Duration::from_millis(500));
+        resolve_and_ingest(&shared);
+        observed = shared.resolver_generation();
     }
     tracing::info!("resolver ticker exited");
 }

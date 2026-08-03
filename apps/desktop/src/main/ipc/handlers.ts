@@ -14,6 +14,7 @@ import { isServiceError, type ServiceConnection } from '../service/connection.js
 import type { MockServiceConnection } from '../service/mockService.js';
 import {
   getEntitlement,
+  invalidateEntitlementCache,
   isLocalEntitlementEnabled,
   setDevEntitlementPlan,
   setLocalEntitlementEnabled,
@@ -65,6 +66,7 @@ export function broadcastAppEvent(event: AppEvent): void {
 
 /** Re-constrain service state to the current plan's limits (after sign-in / billing return). */
 export async function applyPlanLimitsNow(): Promise<void> {
+  invalidateEntitlementCache();
   if (activeService) await applyCurrentPlanLimits(activeService);
 }
 
@@ -215,6 +217,7 @@ export async function registerIpcHandlers(ctx: HandlerContext): Promise<void> {
   // When the Supabase session changes (sign-in/out, token refresh), re-apply plan limits and
   // tell renderers to re-pull auth + entitlement.
   setAuthChangeListener(() => {
+    invalidateEntitlementCache();
     void applyPlanLimitsNow();
     broadcastAppEvent('authChanged');
   });

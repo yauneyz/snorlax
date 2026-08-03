@@ -48,7 +48,7 @@ export function ProfilePicker({
         className="absolute inset-0 bg-[rgba(8,9,10,0.90)] backdrop-blur-md"
       />
       <div className="relative" style={{ width: BOX, height: BOX }}>
-        <div className="absolute inset-[60px] animate-[tal-spin_60s_linear_infinite] rounded-full border border-dashed border-white/[0.08]" />
+        <div className="absolute inset-[60px] rounded-full border border-dashed border-white/[0.08]" />
         <div className="absolute inset-0 rounded-full bg-[radial-gradient(circle,rgba(199,204,212,0.07),transparent_68%)]" />
 
         {profiles.map((p, i) => {
