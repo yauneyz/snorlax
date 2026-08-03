@@ -40,7 +40,8 @@ X initial post
 - "reset ritual" - based on anti-proctrastination checklist
 - themes, custom themes
 - tracking amount of time unblocked (especially useful when AI is in charge)
-- actual time usage analysis
+- actual time usage analysis (Stats page)
+- device limiting
 
 * Audience Building Loop
 - Discord

@@ -36,10 +36,10 @@ export function getMainWindow(): BrowserWindow | null {
 
 export function createWindow(): BrowserWindow {
   const win = new BrowserWindow({
-    width: 720,
-    height: 1160,
-    minWidth: 640,
-    minHeight: 900,
+    width: 1160,
+    height: 720,
+    minWidth: 900,
+    minHeight: 640,
     show: false,
     backgroundColor: '#06070a',
     title: 'Talysman',
