@@ -5,29 +5,29 @@
   --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas,
     "Liberation Mono", monospace;
 
-  --bg-0: #06070a;
-  --bg-1: #0d0f13;
-  --bg-2: #14171c;
-  --bg-3: #1d2127;
-  --bg-elev: rgba(13, 15, 19, 0.72);
+  /* Palette mirrors the pre-redesign desktop theme. */
+  --bg-0: #08090a;
+  --bg-1: #0e0f11;
+  --bg-2: #16181b;
+  --bg-3: #1f2226;
+  --bg-elev: rgba(14, 15, 17, 0.72);
 
-  --fg-0: #f2f3f5;
+  --fg-0: #ffffff;
   --fg-1: #dcdee2;
   --fg-2: #9aa0a8;
   --fg-3: #8b9098;
   --fg-4: #676c74;
   --fg-5: #5a5f67;
 
-  /* Teal — the colour of a live focus session. `--accent-ink` is the dark text on top of it. */
-  --accent: #4fd6c0;
-  --accent-hi: #c8fff5;
-  --accent-lo: #8ee6d8;
-  --accent-ink: #052220;
-  --accent-soft: rgba(79, 214, 192, 0.1);
-  --accent-line: rgba(79, 214, 192, 0.26);
-  --accent-glow: rgba(79, 214, 192, 0.28);
-  /* Second light source, used only in the ambient page glows and the avatar chip. */
-  --violet: #a58bff;
+  /* Silver, not indigo. `--accent-ink` is the dark text on top of it. */
+  --accent: #c7ccd4;
+  --accent-hi: #f2f3f5;
+  --accent-lo: #8b9098;
+  --accent-ink: #0a0b0d;
+  --accent-soft: rgba(199, 204, 212, 0.1);
+  --accent-line: rgba(199, 204, 212, 0.26);
+  --accent-glow: rgba(199, 204, 212, 0.28);
+  --silver-shadow: #8b9098;
 
   /* The silver of the logo mark, kept for the mark itself and the platform glyphs. */
   --silver-hi: #f2f3f5;
@@ -41,16 +41,16 @@
 
   --border: rgba(255, 255, 255, 0.08);
   --border-strong: rgba(255, 255, 255, 0.12);
-  --border-accent: rgba(79, 214, 192, 0.3);
+  --border-accent: rgba(255, 255, 255, 0.25);
 
-  --grad-brand: linear-gradient(180deg, #6ee7d0, #3fc3ae);
-  --grad-brand-hover: linear-gradient(180deg, #8bf0dd, #4dd2bc);
+  --grad-brand: linear-gradient(180deg, #ffffff 0%, #c7ccd4 100%);
+  --grad-brand-hover: linear-gradient(180deg, #ffffff 0%, #f2f3f5 100%);
   --grad-brand-soft: linear-gradient(
     180deg,
-    rgba(255, 255, 255, 0.045),
-    rgba(255, 255, 255, 0.015)
+    rgba(255, 255, 255, 0.1),
+    rgba(255, 255, 255, 0.035)
   );
-  --grad-accent-panel: linear-gradient(150deg, rgba(79, 214, 192, 0.12), rgba(255, 255, 255, 0.02));
+  --grad-accent-panel: linear-gradient(150deg, rgba(199, 204, 212, 0.12), rgba(255, 255, 255, 0.02));
   --grad-text: linear-gradient(180deg, #ffffff 0%, #b8bcc4 100%);
 
   --r-sm: 6px;
@@ -109,8 +109,8 @@ body {
 }
 
 ::selection {
-  background: rgba(79, 214, 192, 0.3);
-  color: var(--accent-hi);
+  background: rgba(199, 204, 212, 0.28);
+  color: #fff;
 }
 
 ::-webkit-scrollbar {
@@ -231,9 +231,9 @@ button {
   background: none;
 }
 
-/* Focus ring: teal, never the browser default blue. */
+/* Focus ring: silver, never the browser default blue. */
 :focus-visible {
-  outline: 2px solid rgba(79, 214, 192, 0.6);
+  outline: 2px solid rgba(199, 204, 212, 0.5);
   outline-offset: 2px;
   border-radius: var(--r-sm);
 }
@@ -296,8 +296,7 @@ input:-webkit-autofill:focus {
 }
 
 /* ============================================================
- * Shell — the two ambient lights every page sits under: a teal
- * bloom behind the header and a violet one low on the right.
+ * Shell — two restrained silver blooms behind the page content.
  * ========================================================== */
 
 .marketing-shell,
@@ -328,7 +327,7 @@ input:-webkit-autofill:focus {
   width: 1200px;
   height: 900px;
   margin-left: -600px;
-  background: radial-gradient(closest-side, rgba(79, 214, 192, 0.13), transparent 72%);
+  background: radial-gradient(closest-side, rgba(199, 204, 212, 0.1), transparent 72%);
 }
 
 .marketing-shell::after,
@@ -338,7 +337,7 @@ input:-webkit-autofill:focus {
   right: -280px;
   width: 820px;
   height: 820px;
-  background: radial-gradient(closest-side, rgba(165, 139, 255, 0.08), transparent 70%);
+  background: radial-gradient(closest-side, rgba(139, 144, 152, 0.07), transparent 70%);
 }
 
 /* ============================================================
@@ -374,7 +373,7 @@ input:-webkit-autofill:focus {
   z-index: 50;
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
-  background: linear-gradient(to bottom, rgba(6, 7, 10, 0.88), rgba(6, 7, 10, 0.5));
+  background: linear-gradient(to bottom, rgba(8, 9, 10, 0.88), rgba(8, 9, 10, 0.5));
 }
 
 /* Brand lockup: the logo mark beside the wordmark, in every header. */
@@ -476,7 +475,7 @@ input:-webkit-autofill:focus {
   height: 24px;
   flex: none;
   border-radius: 50%;
-  background: linear-gradient(140deg, var(--accent), var(--violet));
+  background: linear-gradient(140deg, var(--accent), var(--silver-shadow));
   color: #06120f;
   font-family: var(--font-sans);
   font-weight: 700;
@@ -659,7 +658,7 @@ input:-webkit-autofill:focus {
 .hero__seal-bloom {
   width: 360px;
   height: 360px;
-  background: radial-gradient(circle, rgba(79, 214, 192, 0.16), transparent 68%);
+  background: radial-gradient(circle, rgba(199, 204, 212, 0.14), transparent 68%);
 }
 
 .hero__seal-ring--outer {
@@ -671,13 +670,13 @@ input:-webkit-autofill:focus {
 .hero__seal-ring--inner {
   width: 236px;
   height: 236px;
-  border: 1px solid rgba(79, 214, 192, 0.14);
-  box-shadow: inset 0 0 60px rgba(79, 214, 192, 0.1);
+  border: 1px solid rgba(199, 204, 212, 0.14);
+  box-shadow: inset 0 0 60px rgba(199, 204, 212, 0.1);
 }
 
 .hero__seal-mark {
   position: relative;
-  filter: drop-shadow(0 0 34px rgba(79, 214, 192, 0.35));
+  filter: drop-shadow(0 0 34px rgba(199, 204, 212, 0.3));
   animation: float 7s ease-in-out infinite;
 }
 
@@ -764,7 +763,7 @@ input:-webkit-autofill:focus {
   font-weight: 600;
   color: var(--accent-lo);
   background: var(--accent-soft);
-  border: 1px solid rgba(79, 214, 192, 0.24);
+  border: 1px solid rgba(199, 204, 212, 0.24);
   border-radius: var(--r-md);
 }
 
@@ -835,7 +834,7 @@ input:-webkit-autofill:focus {
   text-wrap: pretty;
 }
 
-/* Auto-detected platform: a teal banner across the top of the grid, with the
+/* Auto-detected platform: a silver banner across the top of the grid, with the
  * platform's own glyph in the tile so it matches the cards underneath. */
 .detected-platform {
   margin-bottom: 2.75rem;
@@ -846,8 +845,8 @@ input:-webkit-autofill:focus {
   align-items: center;
   gap: 1.25rem;
   padding: 1.35rem 1.6rem;
-  background: linear-gradient(110deg, rgba(79, 214, 192, 0.12), rgba(255, 255, 255, 0.02));
-  border: 1px solid rgba(79, 214, 192, 0.24);
+  background: linear-gradient(110deg, rgba(199, 204, 212, 0.12), rgba(255, 255, 255, 0.02));
+  border: 1px solid rgba(199, 204, 212, 0.24);
   border-radius: var(--r-xl);
   animation: fadeUp 400ms var(--ease) both;
 }
@@ -860,7 +859,7 @@ input:-webkit-autofill:focus {
   height: 44px;
   flex: none;
   color: var(--accent-lo);
-  background: rgba(6, 7, 10, 0.5);
+  background: rgba(8, 9, 10, 0.5);
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: var(--r-lg);
 }
@@ -967,8 +966,8 @@ input:-webkit-autofill:focus {
 
 .download-card:hover .download-card__icon {
   color: var(--accent-lo);
-  border-color: rgba(79, 214, 192, 0.28);
-  box-shadow: inset 0 0 24px rgba(79, 214, 192, 0.12);
+  border-color: rgba(199, 204, 212, 0.28);
+  box-shadow: inset 0 0 24px rgba(199, 204, 212, 0.12);
 }
 
 .download-card h3 {
@@ -1022,7 +1021,7 @@ input:-webkit-autofill:focus {
   border: 1px solid transparent;
 }
 
-/* Primary = the desktop Button `primary` variant, relit in teal. */
+/* Primary = the desktop Button `primary` variant, relit in silver. */
 .landing__cta--primary {
   background: var(--grad-brand);
   color: var(--accent-ink);
@@ -1102,12 +1101,12 @@ input:-webkit-autofill:focus {
 /* The recommended plan, matching the desktop Plans page's highlighted card. */
 .pricing-card--featured {
   background: var(--grad-accent-panel);
-  border-color: rgba(79, 214, 192, 0.28);
-  box-shadow: 0 20px 60px rgba(79, 214, 192, 0.1);
+  border-color: rgba(199, 204, 212, 0.28);
+  box-shadow: 0 20px 60px rgba(199, 204, 212, 0.1);
 }
 
 .pricing-card--featured:hover {
-  border-color: rgba(79, 214, 192, 0.45);
+  border-color: rgba(199, 204, 212, 0.45);
 }
 
 .pricing-card__badge {
@@ -1180,7 +1179,7 @@ input:-webkit-autofill:focus {
   width: 0.9rem;
   height: 0.9rem;
   border-radius: 50%;
-  background: rgba(79, 214, 192, 0.14);
+  background: rgba(199, 204, 212, 0.14);
   border: 1px solid var(--accent-line);
 }
 
@@ -1263,7 +1262,7 @@ input:-webkit-autofill:focus {
 .marketing-main article a {
   color: var(--accent-lo);
   text-decoration: underline;
-  text-decoration-color: rgba(79, 214, 192, 0.35);
+  text-decoration-color: rgba(199, 204, 212, 0.35);
   text-underline-offset: 3px;
   transition: text-decoration-color var(--t-fast) var(--ease), color var(--t-fast) var(--ease);
 }
@@ -1277,7 +1276,7 @@ input:-webkit-autofill:focus {
   margin: 1.5rem 0;
   padding: 0.75rem 1.25rem;
   border-left: 3px solid var(--accent-line);
-  background: rgba(79, 214, 192, 0.05);
+  background: rgba(199, 204, 212, 0.05);
   border-radius: 0 var(--r-md) var(--r-md) 0;
   color: var(--fg-0);
   font-style: italic;
@@ -1298,7 +1297,7 @@ input:-webkit-autofill:focus {
   margin-bottom: 2rem;
   padding-bottom: 1.5rem;
   border-bottom: 1px solid transparent;
-  background: linear-gradient(90deg, rgba(79, 214, 192, 0.4), rgba(255, 255, 255, 0.06) 40%, transparent)
+  background: linear-gradient(90deg, rgba(199, 204, 212, 0.4), rgba(255, 255, 255, 0.06) 40%, transparent)
     bottom / 100% 1px no-repeat;
 }
 
@@ -1504,7 +1503,7 @@ input:-webkit-autofill:focus {
 /* Inputs mirror the desktop Input primitive. */
 .auth-form input {
   padding: 0.75rem 0.9rem;
-  background: rgba(6, 7, 10, 0.6);
+  background: rgba(8, 9, 10, 0.6);
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: var(--r-md);
   color: #e8eaee;
@@ -1518,8 +1517,8 @@ input:-webkit-autofill:focus {
 }
 
 .auth-form input:focus {
-  border-color: rgba(79, 214, 192, 0.5);
-  box-shadow: 0 0 0 3px rgba(79, 214, 192, 0.12);
+  border-color: rgba(199, 204, 212, 0.5);
+  box-shadow: 0 0 0 3px rgba(199, 204, 212, 0.12);
 }
 
 .auth-form button[type="submit"] {
@@ -1577,7 +1576,7 @@ input:-webkit-autofill:focus {
   font-size: 0.88rem;
 }
 
-/* Confirmations read as a live session indicator: teal panel, lit dot. */
+/* Confirmations read as a live session indicator: silver panel, lit dot. */
 .auth-notice {
   display: flex;
   align-items: center;
@@ -1585,8 +1584,8 @@ input:-webkit-autofill:focus {
   margin: 0;
   padding: 0.85rem 1rem;
   color: var(--accent-hi);
-  background: rgba(79, 214, 192, 0.08);
-  border: 1px solid rgba(79, 214, 192, 0.24);
+  background: rgba(199, 204, 212, 0.08);
+  border: 1px solid rgba(199, 204, 212, 0.24);
   border-radius: var(--r-lg);
   font-size: 0.9rem;
 }
@@ -1598,7 +1597,7 @@ input:-webkit-autofill:focus {
   flex: none;
   border-radius: 50%;
   background: var(--accent);
-  box-shadow: 0 0 8px 2px rgba(79, 214, 192, 0.5);
+  box-shadow: 0 0 8px 2px rgba(199, 204, 212, 0.5);
 }
 
 .auth-links {
@@ -1643,7 +1642,7 @@ input:-webkit-autofill:focus {
   z-index: 50;
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
-  background: linear-gradient(to bottom, rgba(6, 7, 10, 0.88), rgba(6, 7, 10, 0.5));
+  background: linear-gradient(to bottom, rgba(8, 9, 10, 0.88), rgba(8, 9, 10, 0.5));
 }
 
 .app-nav {
@@ -1739,7 +1738,7 @@ input:-webkit-autofill:focus {
   height: 2.15rem;
   border-radius: 50%;
   background: var(--accent-soft);
-  border: 1px solid rgba(79, 214, 192, 0.24);
+  border: 1px solid rgba(199, 204, 212, 0.24);
   color: var(--accent-lo);
   font-family: var(--font-mono);
   font-size: 0.8rem;
@@ -1880,13 +1879,13 @@ input:-webkit-autofill:focus {
   font-size: 0.95rem;
 }
 
-/* Plan panel — the one teal surface on the page. */
+/* Plan panel — the brighter silver surface on the page. */
 .account__plan {
   display: flex;
   flex-direction: column;
   padding: 1.6rem 1.5rem;
   background: var(--grad-accent-panel);
-  border: 1px solid rgba(79, 214, 192, 0.22);
+  border: 1px solid rgba(199, 204, 212, 0.22);
   border-radius: var(--r-xl);
 }
 

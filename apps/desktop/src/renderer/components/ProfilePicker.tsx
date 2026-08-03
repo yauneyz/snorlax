@@ -45,11 +45,11 @@ export function ProfilePicker({
       <button
         aria-label="Close profile switcher"
         onClick={onClose}
-        className="absolute inset-0 bg-[rgba(4,5,7,0.90)] backdrop-blur-md"
+        className="absolute inset-0 bg-[rgba(8,9,10,0.90)] backdrop-blur-md"
       />
       <div className="relative" style={{ width: BOX, height: BOX }}>
         <div className="absolute inset-[60px] animate-[tal-spin_60s_linear_infinite] rounded-full border border-dashed border-white/[0.08]" />
-        <div className="absolute inset-0 rounded-full bg-[radial-gradient(circle,rgba(79,214,192,0.07),transparent_68%)]" />
+        <div className="absolute inset-0 rounded-full bg-[radial-gradient(circle,rgba(199,204,212,0.07),transparent_68%)]" />
 
         {profiles.map((p, i) => {
           const angle = (i / profiles.length) * Math.PI * 2 - Math.PI / 2;
@@ -61,8 +61,8 @@ export function ProfilePicker({
               className={cx(
                 'absolute flex flex-col items-center justify-center gap-1.5 rounded-full border p-2 text-center transition',
                 on
-                  ? 'border-white/20 bg-white/[0.07] shadow-[0_0_26px_rgba(79,214,192,0.18)]'
-                  : 'border-white/[0.09] bg-[rgba(12,13,17,0.9)] shadow-[0_8px_24px_rgba(0,0,0,0.6)] hover:border-white/20 hover:bg-white/[0.05]',
+                  ? 'border-white/20 bg-white/[0.07] shadow-[0_0_26px_rgba(199,204,212,0.18)]'
+                  : 'border-white/[0.09] bg-[rgba(14,15,17,0.9)] shadow-[0_8px_24px_rgba(0,0,0,0.6)] hover:border-white/20 hover:bg-white/[0.05]',
               )}
               style={{
                 width: NODE,
@@ -93,7 +93,7 @@ export function ProfilePicker({
           );
         })}
 
-        <div className="absolute left-1/2 top-1/2 flex h-20 w-20 -translate-x-1/2 -translate-y-1/2 flex-col items-center justify-center gap-1 rounded-full border border-white/[0.08] bg-[rgba(8,9,12,0.85)]">
+        <div className="absolute left-1/2 top-1/2 flex h-20 w-20 -translate-x-1/2 -translate-y-1/2 flex-col items-center justify-center gap-1 rounded-full border border-white/[0.08] bg-[rgba(8,9,10,0.85)]">
           <span className="font-mono text-[9px] tracking-[0.16em] text-slate-450">PROFILE</span>
           <button onClick={onClose} className="text-[11px] font-medium text-slate-400 hover:text-slate-200">
             cancel

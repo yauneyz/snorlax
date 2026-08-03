@@ -1,7 +1,7 @@
 /**
  * A handful of hand-rolled UI primitives (kept light instead of a full shadcn install),
- * speaking the "seal" design language: near-black glass panels, hairline borders, teal as
- * the single protected-state signal, and monospaced small caps for anything instrument-like.
+ * speaking the "seal" design language: near-black glass panels, hairline borders, green/red
+ * status signals, and monospaced small caps for anything instrument-like.
  */
 import React from 'react';
 import { cx } from '../../lib/utils.js';
@@ -73,7 +73,7 @@ export function Badge({
   tone?: 'ok' | 'danger' | 'warn' | 'neutral';
 }) {
   const tones = {
-    ok: 'border-seal/30 bg-seal/[0.12] text-sealInk',
+    ok: 'border-ok/30 bg-ok/[0.12] text-okInk',
     danger: 'border-danger/30 bg-danger/[0.12] text-dangerInk',
     warn: 'border-warn/30 bg-warn/[0.12] text-warn',
     neutral: 'border-white/[0.10] bg-white/[0.06] text-slate-300',

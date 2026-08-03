@@ -1,7 +1,7 @@
 {
   "name": "talysman",
   "desktopName": "com.talysman.app.desktop",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "private": true,
   "description": "Talysman — a USB-key-gated distraction blocker (Electron UI + privileged native service).",
   "packageManager": "pnpm@11.15.0",

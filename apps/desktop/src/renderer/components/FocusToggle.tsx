@@ -62,8 +62,8 @@ export function FocusToggle() {
           className={cx(
             'absolute inset-0 rounded-full border',
             focusActive
-              ? 'border-seal/30 shadow-[0_0_30px_rgba(79,214,192,0.14),inset_0_0_40px_rgba(79,214,192,0.06)]'
-              : 'border-warn/20 shadow-[0_0_24px_rgba(255,180,84,0.08),inset_0_0_34px_rgba(255,180,84,0.04)]',
+              ? 'border-ok/40 shadow-[0_0_30px_rgba(34,197,94,0.20),inset_0_0_40px_rgba(34,197,94,0.08)]'
+              : 'border-white/[0.10] shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]',
           )}
         />
         <div className="absolute inset-4 animate-spin-slow rounded-full border border-dashed border-white/[0.06]" />
@@ -72,7 +72,7 @@ export function FocusToggle() {
           className="absolute inset-[50px] rounded-full"
           style={{
             background: `radial-gradient(circle, ${
-              focusActive ? 'rgba(79,214,192,0.14)' : 'rgba(255,180,84,0.08)'
+              focusActive ? 'rgba(34,197,94,0.14)' : 'rgba(199,204,212,0.05)'
             }, transparent 72%)`,
           }}
         />
@@ -81,7 +81,7 @@ export function FocusToggle() {
             size={46}
             className={cx(
               focusActive
-                ? 'drop-shadow-[0_0_14px_rgba(79,214,192,0.35)]'
+                ? 'drop-shadow-[0_0_14px_rgba(34,197,94,0.4)]'
                 : 'opacity-75 grayscale-[0.5]',
             )}
           />
@@ -101,7 +101,7 @@ export function FocusToggle() {
           >
             <span
               className="block h-[7px] w-[7px] rounded-[2px]"
-              style={{ backgroundColor: activeProfile?.color ?? '#4fd6c0' }}
+              style={{ backgroundColor: activeProfile?.color ?? '#c7ccd4' }}
             />
             <span className="whitespace-nowrap text-[12.5px] font-semibold text-slate-200">
               {activeProfile?.name ?? 'None'}

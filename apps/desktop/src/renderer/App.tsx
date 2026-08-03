@@ -64,9 +64,8 @@ export default function App() {
     return () => clearTimeout(t);
   }, [watchdogWarning, clearWatchdogWarning]);
 
-  // The whole canvas is tinted by whether focus is on: teal when enforcing, a warmer amber
-  // when nothing is being blocked. It's the fastest read of state in the app.
-  const ambient = focusActive ? 'rgba(79,214,192,0.10)' : 'rgba(255,180,84,0.07)';
+  // Keep the dashboard depth neutral; focus state belongs to the seal, not the whole canvas.
+  const ambient = 'rgba(199,204,212,0.04)';
 
   // The walkthrough covers the whole window until it's finished. It needs live service state
   // (drives, paired keys, the active profile), so it waits for the same `ready` gate as the pages.
@@ -93,7 +92,7 @@ export default function App() {
       )}
 
       {/* Nav rail. Glass over the bloom so the canvas reads as one surface behind it. */}
-      <aside className="desktop-sidebar relative flex w-44 shrink-0 flex-col border-r border-white/[0.06] bg-[rgba(8,9,12,0.72)] backdrop-blur-xl">
+      <aside className="desktop-sidebar relative flex w-44 shrink-0 flex-col border-r border-white/[0.06] bg-[rgba(14,15,17,0.88)] backdrop-blur-xl">
         <div className="flex items-center gap-2 px-[18px] pb-[15px] pt-[17px]">
           <span className="text-[13px] font-semibold tracking-[0.1em] text-slate-250">Talysman</span>
           {IS_DEV && (
@@ -129,7 +128,7 @@ export default function App() {
         </nav>
 
         <div className="mt-auto flex items-center gap-2.5 border-t border-white/[0.06] px-4 pb-[15px] pt-[13px]">
-          <ProfileDot color={focusActive ? (activeProfile?.color ?? '#4fd6c0') : '#5a5f67'} />
+          <ProfileDot color={focusActive ? (activeProfile?.color ?? '#c7ccd4') : '#5a5f67'} />
           <div>
             <div className="font-mono text-[9.5px] tracking-[0.14em] text-slate-450">MODE</div>
             <div className="mt-0.5 text-[12.5px] font-medium text-slate-200">
@@ -151,7 +150,7 @@ export default function App() {
               className={cx(
                 'ml-auto flex items-center gap-2 rounded-full border py-1.5 pl-2.5 pr-3 backdrop-blur-sm transition',
                 keyPresent
-                  ? 'border-seal/30 bg-seal/[0.09] hover:bg-seal/[0.14]'
+                  ? 'border-ok/30 bg-ok/[0.09] hover:bg-ok/[0.14]'
                   : 'border-danger/30 bg-danger/[0.10] hover:bg-danger/[0.16]',
               )}
             >
@@ -159,14 +158,14 @@ export default function App() {
                 className={cx(
                   'block h-[7px] w-[7px] animate-pulse rounded-full',
                   keyPresent
-                    ? 'bg-seal shadow-[0_0_8px_2px_rgba(79,214,192,0.6)]'
-                    : 'bg-danger shadow-[0_0_8px_2px_rgba(255,107,107,0.55)]',
+                    ? 'bg-ok shadow-[0_0_8px_2px_rgba(34,197,94,0.6)]'
+                    : 'bg-danger shadow-[0_0_8px_2px_rgba(239,68,68,0.55)]',
                 )}
               />
               <span
                 className={cx(
                   'font-mono text-[10.5px] font-medium tracking-[0.12em]',
-                  keyPresent ? 'text-sealInk' : 'text-dangerInk',
+                  keyPresent ? 'text-okInk' : 'text-dangerInk',
                 )}
               >
                 {keyPresent ? 'KEY PRESENT' : 'NO KEY'}

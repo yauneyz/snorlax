@@ -186,14 +186,14 @@ export function SchedulePage({ onUpgrade }: { onUpgrade: () => void }) {
       <div
         className={cx(
           'mt-3 flex items-center gap-2.5 rounded-[10px] border px-3.5 py-2.5',
-          runningWindow ? 'border-seal/25 bg-seal/[0.07]' : 'border-white/[0.07] bg-white/[0.025]',
+          runningWindow ? 'border-ok/25 bg-ok/[0.07]' : 'border-white/[0.07] bg-white/[0.025]',
         )}
       >
         <span
           className={cx(
             'block h-2 w-2 shrink-0 rounded-full',
             runningWindow
-              ? 'animate-pulse bg-seal shadow-[0_0_9px_2px_rgba(79,214,192,0.45)]'
+              ? 'animate-pulse bg-ok shadow-[0_0_9px_2px_rgba(34,197,94,0.45)]'
               : 'bg-slate-450',
           )}
         />

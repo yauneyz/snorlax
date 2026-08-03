@@ -66,7 +66,7 @@ export function Blocklists({ onUpgrade }: { onUpgrade: () => void }) {
   const selected = resolveActiveProfile(profiles, selectedId ?? activeProfileId);
   const policy = selected?.policy ?? EMPTY_POLICY;
   const isActive = selected?.id === activeProfileId;
-  const accent = selected?.color ?? '#4fd6c0';
+  const accent = selected?.color ?? '#c7ccd4';
   const profileLimit = maxProfiles(productLimits);
   const profileLimitReached = profileLimit !== null && profiles.length >= profileLimit;
 
@@ -279,7 +279,7 @@ export function Blocklists({ onUpgrade }: { onUpgrade: () => void }) {
           {menuOpen && (
             <>
               <div className="fixed inset-0 z-40" onClick={() => setMenuOpen(false)} />
-              <div className="absolute left-0 top-[calc(100%+7px)] z-50 w-[322px] animate-rise rounded-xl border border-white/[0.12] bg-[rgba(13,14,18,0.97)] p-[7px] shadow-[0_18px_46px_rgba(0,0,0,0.6)] backdrop-blur-xl">
+              <div className="absolute left-0 top-[calc(100%+7px)] z-50 w-[322px] animate-rise rounded-xl border border-white/[0.12] bg-[rgba(14,15,17,0.97)] p-[7px] shadow-[0_18px_46px_rgba(0,0,0,0.6)] backdrop-blur-xl">
                 <div className="px-2 pb-[7px] pt-1.5 font-mono text-[9.5px] font-medium tracking-[0.18em] text-slate-450">
                   SWITCH PROFILE ·{' '}
                   {profileLimit === null ? profiles.length : `${profiles.length}/${profileLimit}`}
@@ -412,7 +412,7 @@ export function Blocklists({ onUpgrade }: { onUpgrade: () => void }) {
                 className={cx(
                   'flex-1 rounded-[10px] border px-3 py-2.5 text-left transition',
                   on
-                    ? 'border-seal/30 bg-seal/[0.09] shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_0_18px_rgba(79,214,192,0.10)]'
+                    ? 'border-seal/30 bg-seal/[0.09] shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_0_18px_rgba(199,204,212,0.10)]'
                     : 'border-white/[0.07] bg-white/[0.025] hover:border-white/[0.14] hover:bg-white/[0.05]',
                   locked && 'opacity-65',
                 )}
@@ -422,7 +422,7 @@ export function Blocklists({ onUpgrade }: { onUpgrade: () => void }) {
                     className={cx(
                       'block h-2 w-2 rounded-full border',
                       on
-                        ? 'border-seal bg-seal shadow-[0_0_7px_1px_rgba(79,214,192,0.6)]'
+                        ? 'border-seal bg-seal shadow-[0_0_7px_1px_rgba(199,204,212,0.6)]'
                         : 'border-white/25 bg-transparent',
                     )}
                   />
@@ -586,12 +586,12 @@ export function Blocklists({ onUpgrade }: { onUpgrade: () => void }) {
 
       {pickerOpen && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(4,5,7,0.72)] px-4 backdrop-blur-md"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(8,9,10,0.72)] px-4 backdrop-blur-md"
           role="dialog"
           aria-modal="true"
           aria-labelledby="app-picker-title"
         >
-          <div className="flex max-h-[82vh] w-full max-w-2xl flex-col rounded-xl border border-white/[0.09] bg-[rgba(10,11,14,0.96)] shadow-[0_24px_60px_-20px_rgba(0,0,0,0.9)]">
+          <div className="flex max-h-[82vh] w-full max-w-2xl flex-col rounded-xl border border-white/[0.09] bg-[rgba(14,15,17,0.96)] shadow-[0_24px_60px_-20px_rgba(0,0,0,0.9)]">
             <div className="border-b border-white/[0.07] p-5">
               <div className="flex items-start justify-between gap-4">
                 <div>

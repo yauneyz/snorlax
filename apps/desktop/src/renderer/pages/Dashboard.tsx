@@ -7,7 +7,7 @@ import { Kicker } from '../components/ui/index.js';
 /** One compact instrument reading — kicker on top, value below. */
 function Readout({ label, value, tone }: { label: string; value: string; tone?: 'ok' | 'danger' }) {
   const color =
-    tone === 'ok' ? 'text-sealInk' : tone === 'danger' ? 'text-dangerInk' : 'text-slate-200';
+    tone === 'ok' ? 'text-okInk' : tone === 'danger' ? 'text-dangerInk' : 'text-slate-200';
   return (
     <div className="rounded-[11px] border border-white/[0.07] bg-gradient-to-br from-white/[0.045] to-white/[0.012] px-4 py-3">
       <Kicker className="text-[9.5px] tracking-[0.18em]">{label}</Kicker>

@@ -74,22 +74,22 @@ export function Keys() {
       <div
         className={cx(
           'flex items-center gap-3.5 rounded-xl border px-4 py-3.5',
-          keyPresent ? 'border-seal/28 bg-seal/[0.09]' : 'border-danger/30 bg-danger/[0.10]',
+          keyPresent ? 'border-ok/30 bg-ok/[0.09]' : 'border-danger/30 bg-danger/[0.10]',
         )}
       >
         <span
           className={cx(
             'block h-2.5 w-2.5 animate-pulse rounded-full',
             keyPresent
-              ? 'bg-seal shadow-[0_0_10px_2px_rgba(79,214,192,0.6)]'
-              : 'bg-danger shadow-[0_0_10px_2px_rgba(255,107,107,0.55)]',
+              ? 'bg-ok shadow-[0_0_10px_2px_rgba(34,197,94,0.6)]'
+              : 'bg-danger shadow-[0_0_10px_2px_rgba(239,68,68,0.55)]',
           )}
         />
         <div>
           <div
             className={cx(
               'text-[14px] font-semibold',
-              keyPresent ? 'text-sealInk' : 'text-dangerInk',
+              keyPresent ? 'text-okInk' : 'text-dangerInk',
             )}
           >
             {keyPresent ? 'Key mounted' : 'No key mounted'}
@@ -171,7 +171,7 @@ export function Keys() {
                     className={cx(
                       'block h-2 w-2 shrink-0 rounded-full border',
                       on
-                        ? 'border-seal bg-seal shadow-[0_0_7px_1px_rgba(79,214,192,0.6)]'
+                        ? 'border-seal bg-seal shadow-[0_0_7px_1px_rgba(199,204,212,0.6)]'
                         : 'border-white/25 bg-transparent',
                     )}
                   />

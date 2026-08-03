@@ -4,7 +4,7 @@ import { Badge, Button, Card, CardTitle } from '../components/ui/index.js';
 import { useFocusStore } from '../store/useFocusStore.js';
 import { startCheckout, type CheckoutPrice } from '../lib/bridge.js';
 
-/** Feature line with the teal tick the design uses for anything "included". */
+/** Feature line with the silver tick the design uses for anything "included". */
 function Feature({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex items-baseline gap-2.5 text-[12.5px] text-slate-250">

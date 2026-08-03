@@ -8,20 +8,19 @@ export default {
         mono: ['"JetBrains Mono Variable"', 'ui-monospace', 'SFMono-Regular', 'Menlo', 'monospace'],
       },
       colors: {
-        // The canvas is nearly black so the ambient glow and the hairline grid have
-        // somewhere to read; `panel` is the opaque fill used for list rows that must
-        // sit *on top of* the glow rather than tint with it.
-        bg: '#06070a',
-        panel: '#0a0b0e',
-        panel2: '#101216',
+        // Historical near-black surfaces from the pre-redesign palette.
+        bg: '#08090a',
+        panel: '#0e0f11',
+        panel2: '#16181b',
         border: '#26292e',
-        // Teal is "protected". `sealInk` is the legible text weight of it.
-        seal: '#4fd6c0',
-        sealInk: '#8ee6d8',
-        ok: '#4fd6c0',
-        warn: '#ffb454',
-        danger: '#ff6b6b',
-        dangerInk: '#ff9d9d',
+        // Keep the current semantic API while restoring silver as the product accent.
+        seal: '#c7ccd4',
+        sealInk: '#f2f3f5',
+        ok: '#22c55e',
+        okInk: '#4ade80',
+        warn: '#f59e0b',
+        danger: '#ef4444',
+        dangerInk: '#f87171',
         // Silver, not indigo. `accentInk` is the dark text that sits on top of it.
         accent: '#c7ccd4',
         accentInk: '#0a0b0d',

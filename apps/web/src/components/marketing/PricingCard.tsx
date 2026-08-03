@@ -8,7 +8,7 @@ type Props = {
   title: string;
   priceLabel: string;
   features: string[];
-  /** The recommended plan: teal panel, lit CTA, and the badge. */
+  /** The recommended plan: silver panel, lit CTA, and the badge. */
   featured?: boolean;
   badge?: string;
 };

@@ -9,13 +9,14 @@
 :root {
   color-scheme: dark;
 
-  /* Seal palette. Teal is the "protected" signal; amber is "unprotected but not wrong";
-     coral is the only red, reserved for destructive and key-gated states. */
-  --seal: #4fd6c0;
-  --seal-ink: #8ee6d8;
-  --warn: #ffb454;
-  --danger: #ff6b6b;
-  --danger-ink: #ff9d9d;
+  /* Silver is the product accent; green, amber, and red are reserved for status. */
+  --seal: #c7ccd4;
+  --seal-ink: #f2f3f5;
+  --ok: #22c55e;
+  --ok-ink: #4ade80;
+  --warn: #f59e0b;
+  --danger: #ef4444;
+  --danger-ink: #f87171;
 }
 
 html,
@@ -26,7 +27,7 @@ body,
 }
 
 body {
-  background: #06070a;
+  background: #08090a;
   color: #dcdee2;
   font-family: 'Space Grotesk Variable', ui-sans-serif, system-ui, 'Segoe UI', Roboto, sans-serif;
   -webkit-font-smoothing: antialiased;
