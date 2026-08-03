@@ -9,7 +9,7 @@
 //!   gen-code    regenerate the recovery code
 
 use std::ffi::OsString;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use anyhow::{Context, Result};
 
@@ -17,7 +17,7 @@ use talysman::constants::{pipe_path, PIPE_BASE_PROD, SERVICE_DISPLAY_NAME, SERVI
 use talysman::pairing;
 use talysman::paths;
 use talysman::secure_store::SecureStore;
-use windows::Win32::Foundation::ERROR_SERVICE_EXISTS;
+use windows::Win32::Foundation::{ERROR_SERVICE_DOES_NOT_EXIST, ERROR_SERVICE_EXISTS};
 
 use windows_service::service::{
     ServiceAccess, ServiceAction, ServiceActionType, ServiceErrorControl, ServiceFailureActions,
@@ -120,27 +120,42 @@ fn configure_service(service: &windows_service::service::Service) -> Result<()> 
 }
 
 fn stop_if_running(service: &windows_service::service::Service) -> Result<()> {
-    let status = service.query_status().context("query service status")?;
-    if status.current_state == ServiceState::Stopped {
-        println!("Service '{SERVICE_NAME}' is already stopped.");
-        return Ok(());
-    }
+    const STOP_TIMEOUT: Duration = Duration::from_secs(30);
+    const POLL_INTERVAL: Duration = Duration::from_millis(250);
 
-    println!("Stopping existing service '{SERVICE_NAME}'.");
-    if status.current_state != ServiceState::StopPending {
-        service.stop().context("stop service")?;
-    }
-
-    for _ in 0..30 {
+    let deadline = Instant::now() + STOP_TIMEOUT;
+    let mut stop_sent = false;
+    loop {
         let status = service.query_status().context("query service status")?;
-        if status.current_state == ServiceState::Stopped {
-            println!("Service '{SERVICE_NAME}' stopped.");
-            return Ok(());
+        match status.current_state {
+            ServiceState::Stopped => {
+                println!("Service '{SERVICE_NAME}' stopped.");
+                return Ok(());
+            }
+            ServiceState::Running | ServiceState::Paused if !stop_sent => {
+                println!("Stopping service '{SERVICE_NAME}'.");
+                service.stop().context("send service stop control")?;
+                stop_sent = true;
+            }
+            // A service cannot always accept STOP while another transition is pending. Keep
+            // polling; once it reaches Running/Paused the branch above sends the control.
+            ServiceState::StartPending
+            | ServiceState::ContinuePending
+            | ServiceState::PausePending
+            | ServiceState::StopPending
+            | ServiceState::Running
+            | ServiceState::Paused => {}
         }
-        std::thread::sleep(Duration::from_millis(500));
-    }
 
-    anyhow::bail!("service did not stop within 15 seconds");
+        if Instant::now() >= deadline {
+            anyhow::bail!(
+                "service did not stop within {} seconds (last state: {:?})",
+                STOP_TIMEOUT.as_secs(),
+                status.current_state
+            );
+        }
+        std::thread::sleep(POLL_INTERVAL);
+    }
 }
 
 fn start_if_needed(service: &windows_service::service::Service) -> Result<()> {
@@ -155,15 +170,68 @@ fn start_if_needed(service: &windows_service::service::Service) -> Result<()> {
 }
 
 fn uninstall() -> Result<()> {
-    // Clean up registration even if the Windows service was already removed or damaged.
-    talysman::enforce::extension_policy::uninstall();
+    // Keep the standalone controller as safe as the NSIS path. The uninstaller runs this check
+    // first to provide a tailored message, but administrators may also invoke svcctl directly.
+    guard_uninstall()?;
+
     let manager = ServiceManager::local_computer(None::<&str>, ServiceManagerAccess::CONNECT)?;
-    let service = manager.open_service(
+    let service = match manager.open_service(
         SERVICE_NAME,
         ServiceAccess::STOP | ServiceAccess::DELETE | ServiceAccess::QUERY_STATUS,
-    )?;
-    let _ = service.stop();
-    service.delete()?;
+    ) {
+        Ok(service) => Some(service),
+        Err(windows_service::Error::Winapi(err))
+            if err.raw_os_error() == Some(ERROR_SERVICE_DOES_NOT_EXIST.0 as i32) =>
+        {
+            None
+        }
+        Err(err) => return Err(err.into()),
+    };
+
+    // A clean STOP does not invoke SCM recovery actions. Wait until the process has really exited
+    // before marking the service for deletion, otherwise NSIS can race the still-open executable.
+    if let Some(service) = &service {
+        stop_if_running(service).context("stop service before uninstall")?;
+    }
+
+    // The service intentionally leaves its persistent firewall backstop in place on an ordinary
+    // stop. An authorized uninstall is different: remove all machine-level enforcement before
+    // deleting the binaries, matching the Linux and macOS uninstall controllers.
+    let mut state = talysman::state::PersistentState::load();
+    state.focus_active = false;
+    state.focus_source = talysman::model::FocusSource::User;
+    state
+        .save()
+        .context("persist focus-off state before uninstall")?;
+    talysman::enforce::teardown_network();
+    talysman::enforce::extension_policy::uninstall();
+
+    let Some(service) = service else {
+        println!("Service '{SERVICE_NAME}' was already removed.");
+        return Ok(());
+    };
+    service.delete().context("mark service for deletion")?;
+    drop(service);
+
+    // DeleteService is asynchronous with respect to the SCM database. Verify the registration is
+    // actually gone so a later reinstall cannot fail with ERROR_SERVICE_MARKED_FOR_DELETE.
+    let deadline = Instant::now() + Duration::from_secs(15);
+    loop {
+        match manager.open_service(SERVICE_NAME, ServiceAccess::QUERY_STATUS) {
+            Err(windows_service::Error::Winapi(err))
+                if err.raw_os_error() == Some(ERROR_SERVICE_DOES_NOT_EXIST.0 as i32) =>
+            {
+                break
+            }
+            _ if Instant::now() >= deadline => {
+                anyhow::bail!(
+                    "service is still pending deletion after 15 seconds; close the Services console and retry"
+                )
+            }
+            _ => std::thread::sleep(Duration::from_millis(250)),
+        }
+    }
+
     println!("Service '{SERVICE_NAME}' deleted.");
     Ok(())
 }
@@ -223,24 +291,26 @@ fn ensure_recovery_code() -> Result<()> {
 }
 
 /// Exit 10 if focus is active AND no paired key is present (so the NSIS uninstaller can abort).
-/// If the service can't be reached, allow uninstall (exit 0).
-fn guard_uninstall() -> Result<()> {
-    use std::fs::OpenOptions;
-    use std::io::{BufRead, BufReader, Write};
+/// If the service can't be reached, allow uninstall (exit 0). A connected but unresponsive
+/// service fails closed after five seconds instead of hanging the uninstaller indefinitely.
+async fn query_uninstall_guard() -> Result<()> {
+    use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
+    use tokio::net::windows::named_pipe::ClientOptions;
 
     let path = pipe_path(PIPE_BASE_PROD);
-    let file = match OpenOptions::new().read(true).write(true).open(&path) {
-        Ok(f) => f,
+    let client = match ClientOptions::new().open(&path) {
+        Ok(client) => client,
         Err(_) => return Ok(()), // service not running → nothing to guard
     };
+    let (reader, mut writer) = tokio::io::split(client);
 
-    (&file)
-        .write_all(b"{\"kind\":\"request\",\"id\":1,\"method\":\"getState\",\"params\":{}}\n")?;
+    writer
+        .write_all(b"{\"kind\":\"request\",\"id\":1,\"method\":\"getState\",\"params\":{}}\n")
+        .await?;
 
-    let mut reader = BufReader::new(&file);
-    let mut line = String::new();
-    while reader.read_line(&mut line)? != 0 {
-        if let Ok(v) = serde_json::from_str::<serde_json::Value>(line.trim()) {
+    let mut lines = BufReader::new(reader).lines();
+    while let Some(line) = lines.next_line().await? {
+        if let Ok(v) = serde_json::from_str::<serde_json::Value>(&line) {
             if v.get("kind").and_then(|k| k.as_str()) == Some("response") {
                 let r = &v["result"];
                 let focus = r["focusActive"].as_bool().unwrap_or(false);
@@ -252,9 +322,20 @@ fn guard_uninstall() -> Result<()> {
                 return Ok(());
             }
         }
-        line.clear();
     }
-    Ok(())
+    anyhow::bail!("service closed the uninstall safety check without responding")
+}
+
+fn guard_uninstall() -> Result<()> {
+    let runtime = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .context("create uninstall safety-check runtime")?;
+    runtime.block_on(async {
+        tokio::time::timeout(Duration::from_secs(5), query_uninstall_guard())
+            .await
+            .context("service timed out during uninstall safety check")?
+    })
 }
 
 fn main() {

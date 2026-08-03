@@ -39,10 +39,16 @@ jobs:
           role-to-assume: ${{ vars.AWS_RELEASE_ROLE_ARN }}
           aws-region: ${{ vars.AWS_REGION }}
       - run: pnpm install --frozen-lockfile
-      - run: pnpm release:upload -- --require win
+      - name: Build signed Windows installer
+        run: pnpm build:win
         env:
           WIN_CSC_LINK: ${{ secrets.WIN_CSC_LINK }}
           WIN_CSC_KEY_PASSWORD: ${{ secrets.WIN_CSC_KEY_PASSWORD }}
+      - name: Smoke-test Windows uninstall
+        shell: powershell
+        run: ./scripts/smoke-windows-uninstall.ps1
+      - name: Publish verified Windows installer
+        run: pnpm release:upload -- --no-build --require win
 
   macos:
     runs-on: macos-latest
