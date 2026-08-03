@@ -1,6 +1,6 @@
 [package]
 name = "talysman-linux"
-version = "0.1.3"
+version = "0.2.0"
 edition = "2021"
 description = "Talysman privileged Linux service + installer + recovery killswitch."
 publish = false
