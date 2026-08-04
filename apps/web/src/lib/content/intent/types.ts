@@ -1,5 +1,3 @@
-import type { ReactNode } from "react";
-
 /**
  * High-intent search pages.
  *
@@ -28,7 +26,7 @@ export type IntentMedia = {
 
 export type IntentSection =
   /** Running prose. For the parts that need to argue rather than enumerate. */
-  | { kind: "prose"; id?: string; title: string; lede?: string; body: ReactNode }
+  | { kind: "prose"; id?: string; title: string; lede?: string; body: React.ReactNode }
   /**
    * The demonstration. `beats` is the sequence as it happens on screen — write them so the
    * section reads as a demo with the video muted, because for now it is one.
@@ -39,7 +37,7 @@ export type IntentSection =
       title: string;
       lede?: string;
       beats: { label: string; body: string }[];
-      outcome?: ReactNode;
+      outcome?: React.ReactNode;
       media: IntentMedia;
     }
   /**
@@ -55,7 +53,7 @@ export type IntentSection =
       columns: string[];
       rows: string[][];
       highlightLast?: boolean;
-      footnote?: ReactNode;
+      footnote?: React.ReactNode;
     }
   /** Numbered instructions. */
   | {
@@ -63,7 +61,7 @@ export type IntentSection =
       id?: string;
       title: string;
       lede?: string;
-      steps: { title: string; body: ReactNode }[];
+      steps: { title: string; body: React.ReactNode }[];
     }
   /** A grid of short claims, each stated as the outcome rather than the mechanism. */
   | {
@@ -71,14 +69,14 @@ export type IntentSection =
       id?: string;
       title: string;
       lede?: string;
-      cards: { title: string; body: ReactNode }[];
+      cards: { title: string; body: React.ReactNode }[];
     }
   /**
    * The limits of the claim, stated plainly. Every page that promises something hard to
    * escape carries one of these — overselling enforcement is how a blocker loses trust.
    */
-  | { kind: "honesty"; id?: string; title: string; body: ReactNode }
-  | { kind: "faq"; id?: string; title?: string; items: { q: string; a: ReactNode }[] };
+  | { kind: "honesty"; id?: string; title: string; body: React.ReactNode }
+  | { kind: "faq"; id?: string; title?: string; items: { q: string; a: React.ReactNode }[] };
 
 export type IntentPage = {
   /** URL segment, served at the site root: `/website-blocker-you-cant-disable`. */
@@ -91,9 +89,9 @@ export type IntentPage = {
   /** `<title>`. Absolute — the root layout's brand template is not applied. */
   metaTitle: string;
   metaDescription: string;
-  lede: ReactNode;
+  lede: React.ReactNode;
   /** The direct answer, above everything else. Two short paragraphs at most. */
-  answer: ReactNode;
+  answer: React.ReactNode;
   sections: IntentSection[];
   cta?: { heading: string; body: string };
   /** Slugs of sibling pages. Keeps the set crawlable from any one of its members. */

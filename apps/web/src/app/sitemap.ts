@@ -1,4 +1,5 @@
 import type { MetadataRoute } from "next";
+import { intentPages } from "@/lib/content/intent";
 import { config } from "@/lib/config";
 
 export default function sitemap(): MetadataRoute.Sitemap {
@@ -14,5 +15,13 @@ export default function sitemap(): MetadataRoute.Sitemap {
     { url: `${base}/terms`, changeFrequency: "yearly", priority: 0.3 },
   ];
 
-  return staticRoutes;
+  // The high-intent search pages. Nothing in the site chrome links to them, so the
+  // sitemap is how they get discovered — they cross-link to each other from there.
+  const intentRoutes: MetadataRoute.Sitemap = intentPages.map((page) => ({
+    url: `${base}/${page.slug}`,
+    changeFrequency: "monthly",
+    priority: 0.7,
+  }));
+
+  return [...staticRoutes, ...intentRoutes];
 }

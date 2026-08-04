@@ -194,8 +194,8 @@ export function PricingPlans({ freeFeatures, proFeatures, trialAvailable, alread
             <>Manage billing from your account page.</>
           ) : trialAvailable ? (
             <>
-              Card required to start · nothing charged until day {PRO_TRIAL_DAYS + 1} · cancel
-              during the trial and you pay nothing
+              Card required to start · nothing charged for {PRO_TRIAL_DAYS} days · cancel during
+              the trial and you pay nothing
             </>
           ) : (
             <>Cancel anytime · you keep Pro until the period you paid for ends</>

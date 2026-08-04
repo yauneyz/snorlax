@@ -673,6 +673,19 @@ input:-webkit-autofill:focus {
   animation: fadeUp 900ms var(--ease) 150ms both;
 }
 
+/* TEMPORARY: production ships before the demo capture exists. With no visual to sit beside,
+ * the hero collapses to one column instead of leaving half the row empty. Delete along with
+ * `showMediaPlaceholders`. */
+.hero--flat {
+  grid-template-columns: 1fr;
+  max-width: 46rem;
+  padding-bottom: 0.5rem;
+}
+
+.hero--flat .hero__sub {
+  max-width: 46rem;
+}
+
 /* Compatibility above the fold: "does this run on my machine" answered before
  * the first scroll. */
 .compat {
@@ -892,39 +905,152 @@ input:-webkit-autofill:focus {
   font-weight: 500;
 }
 
-/* ── The emotional core, set beside the screen where it happens ── */
-.moment {
+/* ── "The off switch is the problem" ──
+ * The diagnosis: argument on the left, the screen where it happens on the right, and the
+ * two-route comparison running full width underneath. */
+.diagnosis__lead {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 3rem;
   align-items: center;
 }
 
-.moment__copy {
+.diagnosis__copy {
   display: flex;
   flex-direction: column;
   gap: 0.9rem;
 }
 
-.moment__copy p {
+.diagnosis__copy p {
   margin: 0;
   max-width: 46ch;
   color: var(--fg-2);
   text-wrap: pretty;
 }
 
-.moment__copy .section__title {
+.diagnosis__copy .section__title {
   margin-bottom: 0.35rem;
 }
 
-.moment__thesis {
+.diagnosis__thesis {
   color: var(--fg-0);
   font-size: 1.08rem;
   font-weight: 500;
 }
 
-.moment__media {
+.diagnosis__media {
   border-radius: var(--r-lg);
+}
+
+/* TEMPORARY: same story as `.hero--flat` — no screenshot, so the copy runs as prose at a
+ * readable measure rather than staying squeezed into half a grid. */
+.diagnosis--flat .diagnosis__lead {
+  grid-template-columns: 1fr;
+}
+
+.diagnosis--flat .diagnosis__copy p {
+  max-width: 62ch;
+}
+
+/* Two routes out of the same impulse. The middle beat is the whole argument, so the cards
+ * are deliberately identical apart from it — ours lit, theirs dimmed. */
+.paths {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 1.15rem;
+  list-style: none;
+  margin: 2.5rem 0 0;
+  padding: 0;
+}
+
+.path {
+  padding: 1.35rem 1.4rem 1.45rem;
+  border: 1px solid var(--border);
+  border-radius: var(--r-xl);
+}
+
+.path--loss {
+  background: var(--bg-1);
+}
+
+.path--ours {
+  background: var(--grad-brand-soft);
+  border-color: var(--border-strong);
+}
+
+.path__label {
+  display: block;
+  margin-bottom: 0.9rem;
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--fg-5);
+}
+
+.path--ours .path__label {
+  color: var(--accent-lo);
+}
+
+.path__beats {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.5rem 0.6rem;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  font-size: 0.95rem;
+  line-height: 1.45;
+}
+
+.path--loss .path__beats {
+  color: var(--fg-4);
+}
+
+.path--ours .path__beats {
+  color: var(--fg-1);
+}
+
+/* The arrow belongs between beats, not before the first one. */
+.path__beats li + li::before {
+  content: "→";
+  margin-right: 0.6rem;
+  color: var(--fg-5);
+}
+
+/* ── Situations, before capabilities ──
+ * Deliberately not cards: the capability grid directly below is, and two identical grids
+ * back to back read as one long undifferentiated list. */
+/* Two columns rather than auto-fit: there are four of these, and auto-fit lays them out
+ * 3 + 1 at desktop width, which reads as a mistake. */
+.uses {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1.75rem 2.5rem;
+  list-style: none;
+  margin: 2.25rem 0 0;
+  padding: 0;
+}
+
+.use {
+  padding-left: 1.1rem;
+  border-left: 2px solid var(--accent-line);
+}
+
+.use h3 {
+  margin: 0 0 0.4rem;
+  font-size: 1.02rem;
+  color: var(--fg-0);
+  text-wrap: balance;
+}
+
+.use p {
+  margin: 0;
+  font-size: 0.92rem;
+  line-height: 1.6;
+  color: var(--fg-3);
+  text-wrap: pretty;
 }
 
 /* ── Capabilities, framed as consequences ── */
@@ -2593,6 +2719,387 @@ input:-webkit-autofill:focus {
 }
 
 /* ============================================================
+ * High-intent search pages
+ * One template behind `/physical-website-blocker`, `/cold-turkey-alternative` and the
+ * rest. Deliberately reuses the landing page's sections, cards, steps and FAQ — these
+ * pages are the same product argument aimed at a narrower question, and they should
+ * not look like a different site.
+ * ========================================================== */
+
+.intent__hero {
+  max-width: 800px;
+  padding: 3rem 0 0;
+  animation: fadeUp 600ms var(--ease) both;
+}
+
+.intent__eyebrow {
+  margin: 0 0 1rem;
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--fg-4);
+}
+
+.intent__title {
+  margin: 0;
+  font-size: clamp(2.1rem, 2.4vw + 1.15rem, 2.85rem);
+  font-weight: 700;
+  letter-spacing: -0.025em;
+  line-height: 1.1;
+  color: var(--fg-0);
+  text-wrap: balance;
+}
+
+.intent__lede {
+  max-width: 62ch;
+  margin: 1.35rem 0 0;
+  font-size: 1.08rem;
+  line-height: 1.62;
+  color: var(--fg-2);
+  text-wrap: pretty;
+  animation: fadeUp 700ms var(--ease) 100ms both;
+}
+
+.intent__ctas {
+  display: flex;
+  gap: 0.85rem;
+  flex-wrap: wrap;
+  margin-top: 1.75rem;
+  animation: fadeUp 800ms var(--ease) 200ms both;
+}
+
+.intent__trial {
+  margin: 1rem 0 0;
+  font-size: 0.85rem;
+  color: var(--fg-4);
+}
+
+/* The query, answered before anything is sold. Panelled so it reads as the answer
+ * rather than as the first paragraph of a pitch. */
+.intent__answer {
+  margin-top: 2.5rem;
+  padding: 1.7rem 1.75rem 1.6rem;
+  background: var(--grad-accent-panel);
+  border: 1px solid var(--accent-line);
+  border-radius: var(--r-xl);
+  box-shadow: var(--shadow-card);
+}
+
+.intent__answer-eyebrow {
+  margin: 0 0 0.9rem;
+  font-family: var(--font-mono);
+  font-size: 0.66rem;
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--accent-lo);
+}
+
+.intent__answer-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+  max-width: 80ch;
+}
+
+.intent__answer-body p {
+  margin: 0;
+  font-size: 1.02rem;
+  line-height: 1.68;
+  color: var(--fg-1);
+  text-wrap: pretty;
+}
+
+/* ── Prose and the honesty note ── */
+.intent-prose__body,
+.intent-honesty__body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.95rem;
+  max-width: var(--container-narrow);
+  margin-top: 1.35rem;
+}
+
+.intent-prose__body p,
+.intent-honesty__body p {
+  margin: 0;
+  color: var(--fg-2);
+  line-height: 1.7;
+  text-wrap: pretty;
+}
+
+/* Set apart because it is the section that concedes something. It should look
+ * deliberate, not like copy someone forgot to delete. */
+.intent-honesty__body {
+  padding: 1.35rem 1.5rem;
+  background: rgba(255, 255, 255, 0.022);
+  border: 1px solid var(--border);
+  border-left: 2px solid var(--accent-line);
+  border-radius: var(--r-lg);
+}
+
+.intent-prose__body em,
+.intent-honesty__body em,
+.intent__answer-body em {
+  color: var(--fg-0);
+  font-style: italic;
+}
+
+/* ── The demonstration ──
+ * Beats on the left as a timeline, the eventual video on the right. Until the
+ * footage exists the beats are the demo, which is why they get the wider column. */
+.intent-demo__grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr);
+  gap: 2.25rem;
+  align-items: start;
+  margin-top: 1.85rem;
+}
+
+/* No media yet: the beats carry the section alone, at a reading measure. */
+.intent-demo__grid--flat {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 1.5rem;
+  max-width: var(--container-narrow);
+}
+
+.beats {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.beat {
+  position: relative;
+  padding: 0 0 1.3rem 1.6rem;
+  border-left: 1px solid var(--border-strong);
+}
+
+.beat:last-child {
+  padding-bottom: 0;
+  border-left-color: transparent;
+}
+
+.beat::before {
+  content: "";
+  position: absolute;
+  left: -4.5px;
+  top: 0.4rem;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent-lo);
+  box-shadow: 0 0 0 4px var(--bg-0);
+}
+
+.beat__label {
+  display: block;
+  margin-bottom: 0.3rem;
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--accent-lo);
+}
+
+.beat__body {
+  margin: 0;
+  font-size: 0.94rem;
+  line-height: 1.62;
+  color: var(--fg-3);
+  text-wrap: pretty;
+}
+
+.intent-demo__aside {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.intent-demo__outcome {
+  padding: 1.1rem 1.25rem;
+  background: rgba(255, 255, 255, 0.025);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+}
+
+.intent-demo__outcome p {
+  margin: 0;
+  font-size: 0.92rem;
+  line-height: 1.62;
+  color: var(--fg-2);
+  text-wrap: pretty;
+}
+
+.intent-demo__outcome em {
+  color: var(--fg-0);
+}
+
+/* ── Comparison grids ── */
+.intent-table__scroll {
+  margin-top: 1.85rem;
+  overflow-x: auto;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+}
+
+.compare {
+  width: 100%;
+  min-width: 560px;
+  border-collapse: collapse;
+  font-size: 0.92rem;
+}
+
+.compare__caption {
+  caption-side: top;
+  padding: 0.9rem 1rem 0;
+  text-align: left;
+  font-size: 0.82rem;
+  color: var(--fg-4);
+}
+
+.compare th,
+.compare td {
+  padding: 0.8rem 1rem;
+  text-align: left;
+  vertical-align: top;
+  border-bottom: 1px solid var(--border);
+}
+
+.compare thead th {
+  background: rgba(255, 255, 255, 0.03);
+  font-size: 0.76rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--fg-2);
+  white-space: nowrap;
+}
+
+.compare tbody th {
+  min-width: 11rem;
+  font-weight: 600;
+  color: var(--fg-1);
+}
+
+.compare td {
+  color: var(--fg-3);
+  line-height: 1.55;
+}
+
+.compare tbody tr:last-child th,
+.compare tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+/* Our column, lit. Only ever the last one. */
+.compare__cell--ours {
+  background: rgba(199, 204, 212, 0.06);
+  color: var(--fg-1);
+}
+
+.compare thead .compare__cell--ours {
+  background: rgba(199, 204, 212, 0.1);
+  color: var(--accent-hi);
+}
+
+.intent-table__footnote {
+  max-width: var(--container-narrow);
+  margin: 1.1rem 0 0;
+  font-size: 0.85rem;
+  line-height: 1.6;
+  color: var(--fg-4);
+  text-wrap: pretty;
+}
+
+.intent-table__footnote em {
+  color: var(--fg-3);
+}
+
+/* Inline links inside page copy. Buttons and the related-page cards opt out below. */
+.intent__answer-body a,
+.intent__lede a,
+.intent-prose__body a,
+.intent-honesty__body a,
+.intent-demo__outcome a,
+.intent-table__footnote a,
+.intent .step p a {
+  color: var(--accent-lo);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  text-decoration-color: rgba(199, 204, 212, 0.35);
+  transition: color var(--t-fast) var(--ease),
+    text-decoration-color var(--t-fast) var(--ease);
+}
+
+.intent__answer-body a:hover,
+.intent__lede a:hover,
+.intent-prose__body a:hover,
+.intent-honesty__body a:hover,
+.intent-demo__outcome a:hover,
+.intent-table__footnote a:hover,
+.intent .step p a:hover {
+  color: var(--accent-hi);
+  text-decoration-color: var(--accent);
+}
+
+/* ── Cross-links between the pages in the set ── */
+.intent__related {
+  margin: 0 0 2rem;
+}
+
+.intent__related-title {
+  margin: 0 0 1.1rem;
+  font-size: 1.15rem;
+  color: var(--fg-2);
+  letter-spacing: -0.01em;
+}
+
+.intent__related ul {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(255px, 1fr));
+  gap: 0.9rem;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.intent__related a {
+  display: flex;
+  flex-direction: column-reverse;
+  gap: 0.4rem;
+  height: 100%;
+  padding: 1.1rem 1.25rem;
+  background: var(--bg-1);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-card);
+  transition: border-color var(--t-base) var(--ease);
+}
+
+.intent__related a:hover {
+  border-color: var(--border-strong);
+}
+
+.intent__related-name {
+  font-size: 0.95rem;
+  font-weight: 600;
+  line-height: 1.4;
+  color: var(--fg-1);
+  text-wrap: balance;
+}
+
+.intent__related-hint {
+  font-family: var(--font-mono);
+  font-size: 0.66rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--fg-5);
+}
+
+/* ============================================================
  * Responsive
  * ========================================================== */
 
@@ -2605,13 +3112,23 @@ input:-webkit-autofill:focus {
     padding-top: 2.5rem;
   }
 
-  .moment {
+  .diagnosis__lead {
     grid-template-columns: 1fr;
     gap: 2rem;
   }
 
-  .moment__copy p {
+  .diagnosis__copy p {
     max-width: none;
+  }
+
+  .uses {
+    grid-template-columns: 1fr;
+  }
+
+  /* The beats stop competing with the media slot for width and simply lead it. */
+  .intent-demo__grid {
+    grid-template-columns: 1fr;
+    gap: 1.75rem;
   }
 }
 

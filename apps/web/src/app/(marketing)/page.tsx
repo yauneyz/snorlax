@@ -7,14 +7,17 @@ import {
   PRO_PRICE_CENTS,
   PRO_TRIAL_DAYS,
 } from "@talysman/product";
-import { MediaPlaceholder } from "@/components/marketing/MediaPlaceholder";
+import {
+  MediaPlaceholder,
+  showMediaPlaceholders,
+} from "@/components/marketing/MediaPlaceholder";
 import { PlatformIcon, type Platform } from "@/components/marketing/PlatformIcon";
 import { config } from "@/lib/config";
 
 export const metadata: Metadata = {
   // Absolute so the root layout's "%s - Talysman" template doesn't repeat the brand name.
   title: {
-    absolute: `${config.app.name} — Physical-Key Website and App Blocker for Desktop`,
+    absolute: `${config.app.name} — Website & App Blocker You Can't Turn Off on Impulse`,
   },
   description: `${config.app.name} blocks distracting websites and desktop apps. Ending a focus session early requires a physical USB key you left in another room — paired from any USB drive you already own.`,
   alternates: { canonical: `${config.app.url}/` },
@@ -56,6 +59,43 @@ const steps = [
       note: "Photo. Desk and monitor soft-focused in the background.",
       kind: "photo",
     },
+  },
+];
+
+/**
+ * The diagnosis, drawn as two routes out of the same impulse. The point is the middle rung:
+ * one path has a click there, the other has a walk.
+ */
+const paths = [
+  {
+    label: "Every other blocker",
+    tone: "loss",
+    beats: ["The urge hits", "Click “End session”", "The afternoon is gone"],
+  },
+  {
+    label: config.app.name,
+    tone: "ours",
+    beats: ["The urge hits", "Get up and go get the key", "Decide whether you meant it"],
+  },
+];
+
+/** Concrete situations, so the visitor can place themselves before reading capabilities. */
+const uses = [
+  {
+    title: "Finish the hard coding session",
+    body: "The bug takes three hours instead of one. YouTube, Reddit and Discord stay out of reach for all three.",
+  },
+  {
+    title: "Write past the part that isn't fun",
+    body: "Protect the two hours after the initial motivation wears off — the ones where the draft actually gets finished.",
+  },
+  {
+    title: "Study without renegotiating",
+    body: "Schedule the evening in advance so one impulsive break doesn't quietly become the whole evening.",
+  },
+  {
+    title: "Defend the same hours every week",
+    body: "Your best working hours arm themselves automatically, whether or not you remember to start a session.",
   },
 ];
 
@@ -223,17 +263,27 @@ const faqs = [
   },
 ];
 
+/**
+ * TEMPORARY: the testimonials are all placeholder copy, so production hides the section rather
+ * than publishing invented social proof. Development keeps it so the slot stays visible. Remove
+ * this flag once real customer quotes exist.
+ */
+const showTestimonials = config.app.environment !== "production";
+
 export default function LandingPage() {
   return (
     <>
-      <section className="hero">
+      <section className={showMediaPlaceholders ? "hero" : "hero hero--flat"}>
         <div className="hero__copy">
-          <p className="hero__eyebrow">For people who do their real work on a computer</p>
+          <p className="hero__eyebrow">
+            For people whose work and distractions live on the same computer
+          </p>
           <h1 className="hero__headline">A distraction blocker you can&apos;t turn off on impulse</h1>
           <div className="hero__sub">
             <p>
               {config.app.name} blocks distracting websites and desktop apps. To end a focus
-              session early, you need the physical USB key you left across the room.
+              session early, you need the physical USB key you left across the room — so one hard
+              moment can&apos;t become a lost afternoon.
             </p>
           </div>
           <p className="hero__claim">
@@ -243,9 +293,17 @@ export default function LandingPage() {
             <Link href="/download" className="landing__cta landing__cta--primary">
               Start focusing free
             </Link>
-            <a href="#demo" className="landing__cta landing__cta--secondary">
-              Watch the 30-second demo
-            </a>
+            {/* Without the demo capture there's nothing to watch, so the secondary CTA sends
+                people to the three-step explanation instead. */}
+            {showMediaPlaceholders ? (
+              <a href="#demo" className="landing__cta landing__cta--secondary">
+                Watch the 30-second demo
+              </a>
+            ) : (
+              <a href="#how" className="landing__cta landing__cta--secondary">
+                See how it works
+              </a>
+            )}
           </div>
           <p className="hero__trial">
             Free forever for {FREE_BLOCKED_SITE_LIMIT} sites · or try{" "}
@@ -261,14 +319,16 @@ export default function LandingPage() {
           </ul>
         </div>
 
-        <div className="hero__media" id="demo">
-          <MediaPlaceholder
-            ratio="16 / 9"
-            kind="video · muted · autoplay · loop"
-            label="30-second demo: the moment you try to quit"
-            note="Start a session → YouTube, Reddit and a desktop app go blocked → user clicks End session → “Insert your key to end early” → cut to the USB drive sitting in another room → user goes back to work."
-          />
-        </div>
+        {showMediaPlaceholders ? (
+          <div className="hero__media" id="demo">
+            <MediaPlaceholder
+              ratio="16 / 9"
+              kind="video · muted · autoplay · loop"
+              label="30-second demo: the moment you try to quit"
+              note="Start a session → YouTube, Reddit and a desktop app go blocked → user clicks End session → “Insert your key to end early” → cut to the USB drive sitting in another room → user goes back to work."
+            />
+          </div>
+        ) : null}
       </section>
 
       <section className="section recognition">
@@ -283,18 +343,62 @@ export default function LandingPage() {
             had consciously decided to stop working.
           </p>
           <p className="recognition__turn">
-            The problem isn&apos;t that your blocker can&apos;t block websites. The problem is that
-            quitting is still one click away.
-          </p>
-          <p>
-            {config.app.name} puts one small physical obstacle between the impulse and another lost
-            hour.
+            The blocker did exactly what you told it to. The problem isn&apos;t that it can&apos;t
+            block websites — it&apos;s that quitting is still one click away.
           </p>
         </div>
       </section>
 
+      {/* The named idea the rest of the page hangs on. Everything above is the visitor's
+          experience; this is the diagnosis they haven't put into words yet. */}
+      <section
+        className={showMediaPlaceholders ? "section diagnosis" : "section diagnosis diagnosis--flat"}
+      >
+        <div className="diagnosis__lead">
+          <div className="diagnosis__copy">
+            <h2 className="section__title">The off switch is the problem</h2>
+            <p>
+              Every other blocker is controlled from the computer it&apos;s supposed to be
+              protecting. The distracted version of you can undo the decision the focused version
+              made ten minutes ago, with the same mouse, in the same three clicks.
+            </p>
+            <p>
+              {config.app.name} moves that decision into the physical world. Ending a session early
+              means going and getting your key — still possible when you genuinely need to stop, no
+              longer effortless enough to happen on autopilot.
+            </p>
+            <p className="diagnosis__thesis">
+              It doesn&apos;t ask you to have more discipline. It gives the version of you that was
+              thinking clearly some leverage over the one who shows up when the work gets hard.
+            </p>
+          </div>
+          {showMediaPlaceholders ? (
+            <MediaPlaceholder
+              ratio="3 / 2"
+              kind="screenshot"
+              label="“Insert your key to end early”"
+              note="The refusal dialog with the red key indicator — the screen that decides whether the session survives."
+              className="diagnosis__media"
+            />
+          ) : null}
+        </div>
+
+        <ul className="paths">
+          {paths.map((path) => (
+            <li key={path.label} className={`path path--${path.tone}`}>
+              <span className="path__label">{path.label}</span>
+              <ol className="path__beats">
+                {path.beats.map((beat) => (
+                  <li key={beat}>{beat}</li>
+                ))}
+              </ol>
+            </li>
+          ))}
+        </ul>
+      </section>
+
       <section className="section" id="how">
-        <h2 className="section__title">Put the off switch somewhere else</h2>
+        <h2 className="section__title">Start. Unplug. Get back to work.</h2>
         <p className="section__lede">
           Three steps, once. After that the only thing standing between you and a lost hour is a
           walk down the hall.
@@ -319,33 +423,27 @@ export default function LandingPage() {
         </ol>
       </section>
 
-      <section className="section moment">
-        <div className="moment__copy">
-          <h2 className="section__title">Built for the moment your motivation disappears</h2>
-          <p>Starting focused is easy. Every blocker can do that.</p>
-          <p>
-            Staying focused when the task turns frustrating, ambiguous, or boring is the hard part —
-            and that is exactly when your other blockers get switched off.
-          </p>
-          <p className="moment__thesis">
-            {config.app.name} protects the decision you made while thinking clearly from the version
-            of you that wants to escape five minutes later.
-          </p>
-        </div>
-        <MediaPlaceholder
-          ratio="3 / 2"
-          kind="screenshot"
-          label="“Insert your key to end early”"
-          note="The refusal dialog with the red key indicator — the screen that decides whether the session survives."
-          className="moment__media"
-        />
+      <section className="section">
+        <h2 className="section__title">Make your computer a place for work again</h2>
+        <p className="section__lede">
+          Starting a focus session is easy. The hard part arrives twenty minutes later, when the
+          work turns boring or frustrating and your hands start looking for an exit.
+        </p>
+        <ul className="uses">
+          {uses.map((use) => (
+            <li key={use.title} className="use">
+              <h3>{use.title}</h3>
+              <p>{use.body}</p>
+            </li>
+          ))}
+        </ul>
       </section>
 
       <section className="section">
-        <h2 className="section__title">Your computer can be an office again</h2>
+        <h2 className="section__title">Block distractions without blocking your work</h2>
         <p className="section__lede">
-          Every capability below exists for one reason: to make the distracted version of you do
-          more work than the focused one.
+          Pick how strict the session needs to be — a handful of sites, only the tools the job
+          needs, or nothing online at all.
         </p>
         <ul className="outcomes">
           {outcomes.map((outcome) => (
@@ -389,46 +487,48 @@ export default function LandingPage() {
         </p>
       </section>
 
-      <section className="section proof">
-        <h2 className="section__title">From people who kept using it</h2>
-        <p className="section__lede">
-          The claim isn&apos;t that a physical key works for one session. It&apos;s that it keeps
-          working after the novelty wears off — so the proof here should be measured in weeks.
-        </p>
-        <div className="proof__grid">
-          <blockquote className="quote">
-            <p>
-              &ldquo;Other blockers were easy to turn off. {config.app.name} made giving up
-              inconvenient enough that I went back to work.&rdquo;
-            </p>
-            <footer>
-              <MediaPlaceholder
-                ratio="1 / 1"
-                kind="photo"
-                label="Headshot"
-                className="quote__avatar"
-              />
-              <span className="quote__attribution">
-                Placeholder — replace with a real customer: name, role, the blockers they tried
-                before, what they were avoiding, and how many weeks they&apos;ve used{" "}
-                {config.app.name}.
-              </span>
-            </footer>
-          </blockquote>
-          <MediaPlaceholder
-            ratio="16 / 10"
-            kind="case study"
-            label="Customer story: the developer"
-            note="Stopped opening YouTube between hard coding tasks. Needs: previous blockers tried, sessions completed, weeks of use, work shipped."
-          />
-          <MediaPlaceholder
-            ratio="16 / 10"
-            kind="case study"
-            label="Customer story: the writer"
-            note="Protected a two-hour morning block. Same shape of proof: before, during, how long it lasted."
-          />
-        </div>
-      </section>
+      {showTestimonials ? (
+        <section className="section proof">
+          <h2 className="section__title">From people who kept using it</h2>
+          <p className="section__lede">
+            The claim isn&apos;t that a physical key works for one session. It&apos;s that it keeps
+            working after the novelty wears off — so the proof here should be measured in weeks.
+          </p>
+          <div className="proof__grid">
+            <blockquote className="quote">
+              <p>
+                &ldquo;Other blockers were easy to turn off. {config.app.name} made giving up
+                inconvenient enough that I went back to work.&rdquo;
+              </p>
+              <footer>
+                <MediaPlaceholder
+                  ratio="1 / 1"
+                  kind="photo"
+                  label="Headshot"
+                  className="quote__avatar"
+                />
+                <span className="quote__attribution">
+                  Placeholder — replace with a real customer: name, role, the blockers they tried
+                  before, what they were avoiding, and how many weeks they&apos;ve used{" "}
+                  {config.app.name}.
+                </span>
+              </footer>
+            </blockquote>
+            <MediaPlaceholder
+              ratio="16 / 10"
+              kind="case study"
+              label="Customer story: the developer"
+              note="Stopped opening YouTube between hard coding tasks. Needs: previous blockers tried, sessions completed, weeks of use, work shipped."
+            />
+            <MediaPlaceholder
+              ratio="16 / 10"
+              kind="case study"
+              label="Customer story: the writer"
+              note="Protected a two-hour morning block. Same shape of proof: before, during, how long it lasted."
+            />
+          </div>
+        </section>
+      ) : null}
 
       <section className="section faq" id="faq">
         <h2 className="section__title">Frequently asked questions</h2>

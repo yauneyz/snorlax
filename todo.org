@@ -1,17 +1,41 @@
 - homepage media
 - get analytics
+Track these events:
+Landing page viewed
+Download clicked
+Installation completed
+Browser extension installed
+Account created
+USB key paired
+First session started
+First session completed
+Second session completed
+Schedule created
+Trial started
+Subscription started
+Subscription renewed
+Subscription canceled
+
 - improve landing page
 
 
 
 
-Email: lifecycle first, newsletter second
+- Email: lifecycle first, newsletter second
 -Installed but did not pair a key: help finish setup
 -Paired but did not start a session: offer a preconfigured 25-minute block
 -Completed first session: prompt them to schedule the next one
 -Inactive for three days: bring them back with one-click session settings
 -Trial ending: summarize sessions and focus time protected
 -Weekly: show sessions completed, hours protected and the next scheduled block
+
+Before scaling outreach, get:
+
+Three strong testimonials
+One detailed developer case study
+One case study from a second segment
+Several weeks of actual use
+Specific results rather than general praise
 
 
 

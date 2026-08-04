@@ -185,6 +185,45 @@ describe("POST /api/stripe/webhook", () => {
     });
   });
 
+  it("warns before the first charge when a trial is about to end", async () => {
+    const response = await POST(
+      request(
+        event("customer.subscription.trial_will_end", "evt_trial", {
+          customer: "cus_123",
+          cancel_at_period_end: false,
+          trial_end: 1_800_000_000,
+        }),
+      ),
+    );
+
+    expect(response.status).toBe(200);
+    // Notification only — the row is already accurate, so nothing is re-synced.
+    expect(mocks.syncSubscription).not.toHaveBeenCalled();
+    expect(mocks.sendEmail).toHaveBeenCalledWith({
+      to: "billing@example.com",
+      template: "TrialEnding",
+      props: expect.objectContaining({
+        trialEnd: new Date(1_800_000_000 * 1000).toISOString(),
+      }),
+    });
+  });
+
+  it("stays quiet when the trial was already cancelled", async () => {
+    // No charge is coming, so a "you're about to be billed" email would be a lie.
+    const response = await POST(
+      request(
+        event("customer.subscription.trial_will_end", "evt_trial_cancelled", {
+          customer: "cus_123",
+          cancel_at_period_end: true,
+          trial_end: 1_800_000_000,
+        }),
+      ),
+    );
+
+    expect(response.status).toBe(200);
+    expect(mocks.sendEmail).not.toHaveBeenCalled();
+  });
+
   it("deduplicates a redelivery without repeating email side effects", async () => {
     const payload = event("invoice.payment_failed", "evt_duplicate", {
       customer: "cus_123",
