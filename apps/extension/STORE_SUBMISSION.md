@@ -88,7 +88,7 @@ are compiled from that file. Reviewers and local testers therefore use the same 
 No production subscription, payment, or account should be required for reviewer testing. Supply a
 test build or test account if the release changes that assumption.
 
-## Firefox source submission
+## Source submissions
 
 The upload contains an unminified generated `background.js`, unminified popup files, and a static
 blocked page. Their readable sources are under `apps/extension/src/`;
@@ -96,13 +96,15 @@ blocked page. Their readable sources are under `apps/extension/src/`;
 concatenates only those two files without minification or obfuscation. Popup and blocked-page files
 are copied without transformation.
 
-Provide the repository source for the submitted commit and these build instructions to AMO:
+Submit the matching `talysman-<browser>-source-<version>.zip` when a store requests source. Each
+archive contains the minimal repository source and these build instructions needed to reproduce its
+browser package exactly:
 
 ```text
-Requirements: Node.js 20 or newer. No package installation is required by the extension build.
+Requirements: Node.js 22.12 or newer. No package installation is required by the extension build.
 From the repository root: node scripts/build-extension.mjs
-Submitted artifact: apps/extension/release/store/talysman-firefox-<version>.zip
+Submitted artifact: apps/extension/release/store/talysman-<browser>-<version>.zip
 ```
 
-Also include the root `package.json`, `apps/extension/`, `assets/brand/`, and
-`scripts/build-extension.mjs` so the reviewer can reproduce the package exactly.
+The source archives are generated automatically by `pnpm build:extension` and copied to
+`apps/extension/release/store/` by `pnpm release:extension`.

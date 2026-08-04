@@ -99,28 +99,35 @@ function main() {
     {
       name: "chrome",
       artifact: resolve(distDir, `talysman-chrome-${version}.zip`),
+      sourceArtifact: resolve(distDir, `talysman-chrome-source-${version}.zip`),
       manifest: resolve(distDir, "chrome", "manifest.json"),
       destination: resolve(storeDir, `talysman-chrome-${version}.zip`),
+      sourceDestination: resolve(storeDir, `talysman-chrome-source-${version}.zip`),
       uploadTarget: "Chrome Web Store",
     },
     {
       name: "edge",
       artifact: resolve(distDir, `talysman-edge-${version}.zip`),
+      sourceArtifact: resolve(distDir, `talysman-edge-source-${version}.zip`),
       manifest: resolve(distDir, "edge", "manifest.json"),
       destination: resolve(storeDir, `talysman-edge-${version}.zip`),
+      sourceDestination: resolve(storeDir, `talysman-edge-source-${version}.zip`),
       uploadTarget: "Microsoft Edge Add-ons",
     },
     {
       name: "firefox",
       artifact: resolve(distDir, `talysman-firefox-${version}.zip`),
+      sourceArtifact: resolve(distDir, `talysman-firefox-source-${version}.zip`),
       manifest: resolve(distDir, "firefox", "manifest.json"),
       destination: resolve(storeDir, `talysman-firefox-${version}.zip`),
+      sourceDestination: resolve(storeDir, `talysman-firefox-source-${version}.zip`),
       uploadTarget: "Firefox AMO",
     },
   ];
 
   for (const store of stores) {
     assertFile(store.artifact);
+    assertFile(store.sourceArtifact);
     assertStoreManifest(store.name, readJson(store.manifest));
   }
 
@@ -136,6 +143,12 @@ function main() {
         return [store.name, relative(extDir, store.destination).replace(/\\/g, "/")];
       }),
     ),
+    sourceArtifacts: Object.fromEntries(
+      stores.map((store) => {
+        copyFileSync(store.sourceArtifact, store.sourceDestination);
+        return [store.name, relative(extDir, store.sourceDestination).replace(/\\/g, "/")];
+      }),
+    ),
     identities: {
       chrome: identities.chromeStoreId,
       edge: identities.edgeStoreId,
@@ -143,6 +156,7 @@ function main() {
     },
     releaseNotes: [
       "Upload each zip to its matching browser store.",
+      "Keep each source zip with its matching upload for store review.",
       "Do not add custom update_url values to store manifests.",
       "The Chrome ZIP and dist/chrome directory are the same keyed package for upload and Load unpacked.",
       "Store item IDs are assigned before review; record them in native/common/extension-identities.json before building the reviewer desktop installer.",
@@ -157,6 +171,9 @@ function main() {
   for (const store of stores) {
     console.log(
       `  ${store.name.padEnd(7)} ${relative(root, store.destination)} -> ${store.uploadTarget}`,
+    );
+    console.log(
+      `  ${"source".padEnd(7)} ${relative(root, store.sourceDestination)} -> ${store.uploadTarget}`,
     );
   }
   console.log(`\nFirefox Gecko ID: ${FIREFOX_ID}`);

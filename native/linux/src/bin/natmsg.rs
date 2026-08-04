@@ -78,16 +78,7 @@ fn heartbeat_request(frame: &Value, browser_pid: u32) -> Value {
         "kind": "request",
         "id": NEXT_ID.fetch_add(1, Ordering::Relaxed),
         "method": "extHeartbeat",
-        "params": {
-            "browserPid": browser_pid,
-            "browser": frame.get("browser").and_then(|v| v.as_str()).unwrap_or(""),
-            "workerSessionId": frame.get("workerSessionId").cloned().unwrap_or(Value::Null),
-            "sequence": frame.get("sequence").cloned().unwrap_or(Value::Null),
-            "sentAt": frame.get("sentAt").cloned().unwrap_or(Value::Null),
-            "extensionVersion": frame.get("extensionVersion").cloned().unwrap_or(Value::Null),
-            "lockedActive": frame.get("lockedActive").cloned().unwrap_or(Value::Null),
-            "health": frame.get("health").cloned().unwrap_or_else(|| json!({})),
-        }
+        "params": talysman_common::extension_compat::relay_heartbeat_params(frame, browser_pid),
     })
 }
 

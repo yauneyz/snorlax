@@ -632,26 +632,12 @@ impl Core {
             "extHeartbeat" => {
                 // Fire-and-forget liveness from the extension (relayed by talysman-natmsg). Record
                 // it for the watchdog; never errors so a malformed beat can't disrupt the bridge.
-                let pid = params
-                    .get("browserPid")
-                    .and_then(|v| v.as_u64())
-                    .unwrap_or(0) as u32;
-                let health = params.get("health");
-                let can_block = health
-                    .and_then(|h| h.get("canBlock"))
-                    .and_then(|v| v.as_bool())
-                    .unwrap_or(false);
-                let perms_ok = health
-                    .and_then(|h| h.get("permissionsOk"))
-                    .and_then(|v| v.as_bool())
-                    .unwrap_or(false);
-                let healthy = can_block && perms_ok;
-                let browser = params.get("browser").and_then(|v| v.as_str()).unwrap_or("");
-                let sequence = params.get("sequence").and_then(|v| v.as_u64()).unwrap_or(0);
-                let extension_version = params
-                    .get("extensionVersion")
-                    .and_then(|v| v.as_str())
-                    .unwrap_or("");
+                let heartbeat = talysman_common::extension_compat::parse_service_heartbeat(params);
+                let pid = heartbeat.browser_pid;
+                let healthy = heartbeat.healthy;
+                let browser = heartbeat.browser.as_str();
+                let sequence = heartbeat.sequence;
+                let extension_version = heartbeat.extension_version.as_deref().unwrap_or("");
                 if pid != 0 {
                     let changed = self.shared.record_heartbeat(pid, healthy);
                     let now = Instant::now();

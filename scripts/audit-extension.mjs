@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { existsSync, readFileSync, readdirSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
 
@@ -68,12 +68,24 @@ function assertMinimalManifest(manifest, store, expectedKey = null) {
 
 const base = readJson(resolve(extensionDir, "manifest.json"));
 assertMinimalManifest(base, "source");
+const version = base.version;
+if (typeof version !== "string" || version.length === 0) {
+  fail("source: manifest version is required");
+}
 
 for (const [store, directory] of Object.entries({
   chrome: "chrome",
   edge: "edge",
   firefox: "firefox",
 })) {
+  const sourceArchive = resolve(
+    distDir,
+    `talysman-${store}-source-${version}.zip`,
+  );
+  if (!statSync(sourceArchive, { throwIfNoEntry: false })?.isFile()) {
+    fail(`${store}: source archive is missing`);
+  }
+
   const storeDir = resolve(distDir, directory);
   const files = readdirSync(storeDir).sort();
   if (JSON.stringify(files) !== JSON.stringify(expectedFiles)) {

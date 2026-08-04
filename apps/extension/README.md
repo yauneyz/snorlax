@@ -61,16 +61,19 @@ user-installed extension in place and pushes `active:false` so it clears its rul
 
 ## Store packages and identities
 
-`pnpm build:extension` builds three upload-ready ZIP files and unpacked directories under
-`apps/extension/dist/`. The same keyed `dist/chrome` package is used for Chrome Web Store upload and
-Chrome's **Load unpacked** button. Edge has two directories: key-free `dist/edge` matches the Edge
-Add-ons upload, while keyed `dist/edge-dev` has the already-trusted Chrome development ID and is the
-directory to use with Edge's **Load unpacked** button:
+`pnpm build:extension` builds three upload-ready ZIP files, matching store-review source ZIPs, and
+unpacked directories under `apps/extension/dist/`. The same keyed `dist/chrome` package is used for
+Chrome Web Store upload and Chrome's **Load unpacked** button. Edge has two directories: key-free
+`dist/edge` matches the Edge Add-ons upload, while keyed `dist/edge-dev` has the already-trusted
+Chrome development ID and is the directory to use with Edge's **Load unpacked** button:
 
 ```text
 talysman-chrome-<version>.zip
 talysman-edge-<version>.zip
 talysman-firefox-<version>.zip
+talysman-chrome-source-<version>.zip
+talysman-edge-source-<version>.zip
+talysman-firefox-source-<version>.zip
 ```
 
 On macOS the same command additionally generates `talysman-safari-<version>.zip`, an Xcode project,
@@ -85,6 +88,9 @@ to `apps/extension/release/store/`:
 talysman-chrome-<version>.zip
 talysman-edge-<version>.zip
 talysman-firefox-<version>.zip
+talysman-chrome-source-<version>.zip
+talysman-edge-source-<version>.zip
+talysman-firefox-source-<version>.zip
 ```
 
 Chrome Web Store, Microsoft Edge Add-ons, and Firefox AMO sign, host, and update their respective

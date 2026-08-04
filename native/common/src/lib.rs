@@ -7,6 +7,7 @@
 //! ([`browsers`]) and the escalation state machine ([`watchdog`]).
 
 pub mod browsers;
+pub mod extension_compat;
 pub mod watchdog;
 
 /// Browser-store and sideload identities generated from `extension-identities.json`.

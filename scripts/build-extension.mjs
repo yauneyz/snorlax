@@ -10,6 +10,8 @@
  *   apps/extension/dist/talysman-chrome-<version>.zip  Chrome Web Store upload
  *   apps/extension/dist/talysman-edge-<version>.zip    Edge Add-ons upload
  *   apps/extension/dist/talysman-firefox-<version>.zip Firefox AMO upload
+ *   apps/extension/dist/talysman-<browser>-source-<version>.zip
+ *                                                       Store-review source archives
  *
  * The stores sign, host, and update the published packages. Store update URLs and store-assigned
  * Chromium update URLs therefore do not belong in these manifests. The Chrome package has the Web
@@ -190,6 +192,8 @@ function uint32(value) {
   return buffer;
 }
 
+const ZIP_REGULAR_FILE_MODE = (0o100644 << 16) >>> 0;
+
 /** Write a portable, uncompressed ZIP. Store packages are small, so compression adds no value. */
 function zipDirectory(sourceDir, outputPath) {
   const localParts = [];
@@ -233,7 +237,7 @@ function zipDirectory(sourceDir, outputPath) {
         uint16(0),
         uint16(0),
         uint16(0),
-        uint32(0),
+        uint32(ZIP_REGULAR_FILE_MODE),
         uint32(offset),
         name,
       ]),
@@ -253,6 +257,75 @@ function zipDirectory(sourceDir, outputPath) {
     uint16(0),
   ]);
   writeFileSync(outputPath, Buffer.concat([...localParts, central, end]));
+}
+
+const sourceInputPaths = [
+  resolve(root, "package.json"),
+  resolve(extDir, "package.json"),
+  resolve(extDir, "README.md"),
+  resolve(extDir, "STORE_SUBMISSION.md"),
+  resolve(extDir, "manifest.json"),
+  ...listFiles(srcDir).map((file) => file.path),
+  ...Object.values(iconFiles),
+  blockedLogoPath,
+  identitiesPath,
+  resolve(root, "scripts/build-extension.mjs"),
+  resolve(root, "scripts/audit-extension.mjs"),
+];
+
+function sourceReadme(browser, version) {
+  const title = browser[0].toUpperCase() + browser.slice(1);
+  return `# Talysman ${title} extension source
+
+This archive contains the complete source and build inputs for the Talysman ${title} extension
+version ${version}.
+
+## Requirements
+
+- Node.js 22.12 or newer
+- No package installation or network access is required
+
+## Build
+
+From the root of this extracted directory, run:
+
+\`\`\`sh
+node scripts/build-extension.mjs
+node scripts/audit-extension.mjs
+\`\`\`
+
+The ${title} store package is generated at:
+
+\`\`\`text
+apps/extension/dist/talysman-${browser}-${version}.zip
+\`\`\`
+
+The build script removes the ES module \`export\` and \`import\` statements from
+\`apps/extension/src/rules.js\` and \`apps/extension/src/background.js\`, then concatenates those
+two files into an unminified, unobfuscated \`background.js\`. It generates the browser-specific
+\`manifest.json\`, copies the remaining JavaScript, HTML, CSS, SVG, and PNG files without code
+transformation, and writes an uncompressed ZIP.
+`;
+}
+
+function buildSourceArchive(browser, version) {
+  const stagingDir = resolve(distDir, `${browser}-source`);
+  mkdirSync(stagingDir, { recursive: true });
+  writeFileSync(resolve(stagingDir, "README.md"), sourceReadme(browser, version));
+
+  for (const sourcePath of sourceInputPaths) {
+    const destination = resolve(stagingDir, relative(root, sourcePath));
+    mkdirSync(dirname(destination), { recursive: true });
+    copyFileSync(sourcePath, destination);
+  }
+
+  const zipPath = resolve(
+    distDir,
+    `talysman-${browser}-source-${version}.zip`,
+  );
+  zipDirectory(stagingDir, zipPath);
+  rmSync(stagingDir, { recursive: true, force: true });
+  return zipPath;
 }
 
 const base = JSON.parse(readFileSync(resolve(extDir, "manifest.json"), "utf8"));
@@ -306,7 +379,8 @@ for (const store of stores) {
   const unpackedDir = stageStore(store.name, store.manifest, background);
   const zipPath = resolve(distDir, `talysman-${store.name}-${version}.zip`);
   zipDirectory(unpackedDir, zipPath);
-  artifacts.push({ ...store, unpackedDir, zipPath });
+  const sourceZipPath = buildSourceArchive(store.name, version);
+  artifacts.push({ ...store, unpackedDir, zipPath, sourceZipPath });
 }
 
 writeFileSync(
@@ -328,6 +402,12 @@ console.log("\nOK Browser store packages built:");
 for (const artifact of artifacts) {
   console.log(
     `  ${artifact.name.padEnd(7)} ${relative(root, artifact.zipPath)}`,
+  );
+}
+console.log("\nStore-review source archives:");
+for (const artifact of artifacts) {
+  console.log(
+    `  ${artifact.name.padEnd(7)} ${relative(root, artifact.sourceZipPath)}`,
   );
 }
 console.log("\nUnpacked builds for local inspection:");
