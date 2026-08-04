@@ -16,10 +16,6 @@ Subscription started
 Subscription renewed
 Subscription canceled
 
-- improve landing page
-
-
-
 
 - Email: lifecycle first, newsletter second
 -Installed but did not pair a key: help finish setup
@@ -29,13 +25,24 @@ Subscription canceled
 -Trial ending: summarize sessions and focus time protected
 -Weekly: show sessions completed, hours protected and the next scheduled block
 
-Before scaling outreach, get:
 
+- Social Proof:
 Three strong testimonials
 One detailed developer case study
 One case study from a second segment
 Several weeks of actual use
 Specific results rather than general praise
+
+Your testimonial interviews should ask:
+
+Which blockers had you previously used?
+How did you override them?
+What work were you avoiding?
+What distraction did you open?
+What happened the first time Talysman stopped you?
+How many weeks have you continued using it?
+What did you complete during those sessions?
+What nearly caused you to stop using Talysman?
 
 
 
