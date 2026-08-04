@@ -4,6 +4,7 @@ import {
   ENTITLEMENT_GRACE_PERIOD_MS,
   entitlementForPlan,
   isWithinEntitlementGracePeriod,
+  PRO_TRIAL_DAYS,
   type CheckoutPrice,
   type Entitlement,
   type SubscriptionDetail,
@@ -96,6 +97,34 @@ export function priceIdForCheckoutPrice(price: CheckoutPrice, config: BillingCon
   return parsed === 'yearly' ? config.priceYearly : config.priceMonthly;
 }
 
+/**
+ * Whether this user should get the introductory Pro trial.
+ *
+ * The trial is a first-subscription offer, not a per-checkout one. Any prior
+ * subscription row — active, cancelled, or long expired — disqualifies, otherwise a
+ * customer could cancel and re-subscribe on repeat to hold Pro indefinitely for free.
+ * The check reads our own projection rather than Stripe because the webhook writes a
+ * row for every subscription the customer has ever had, including cancelled ones.
+ *
+ * If the lookup fails we deliberately fall back to *no* trial: giving away another
+ * {@link PRO_TRIAL_DAYS} days is the costlier of the two wrong answers, and the
+ * customer still reaches a working paid checkout.
+ */
+export async function isEligibleForTrial(args: {
+  db: SupabaseTableClient;
+  userId: string;
+}): Promise<boolean> {
+  const { db, userId } = args;
+  const { data, error } = await db
+    .from('subscriptions')
+    .select('id')
+    .eq('user_id', userId)
+    .limit(1);
+  if (error) return false;
+  const rows = Array.isArray(data) ? data : data ? [data] : [];
+  return rows.length === 0;
+}
+
 export async function createCheckoutSession(args: {
   db: SupabaseTableClient;
   stripe: Stripe;
@@ -147,6 +176,8 @@ export async function createCheckoutSession(args: {
     }
   }
 
+  const trialing = await isEligibleForTrial({ db, userId });
+
   const session = await stripe.checkout.sessions.create({
     mode: 'subscription',
     customer: customerId,
@@ -159,6 +190,9 @@ export async function createCheckoutSession(args: {
     client_reference_id: userId,
     subscription_data: {
       metadata: { user_id: userId },
+      // A card is still collected up front (Checkout's default for subscriptions), so
+      // the trial converts on its own and `missing_payment_method` never applies.
+      ...(trialing ? { trial_period_days: PRO_TRIAL_DAYS } : {}),
     },
   });
 

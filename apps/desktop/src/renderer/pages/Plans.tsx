@@ -1,5 +1,12 @@
 import React, { useState } from 'react';
-import { FREE_BLOCKED_SITE_LIMIT } from '@talysman/product';
+import {
+  formatPriceUsd,
+  FREE_BLOCKED_SITE_LIMIT,
+  PRO_ANNUAL_MONTHLY_EQUIVALENT_CENTS,
+  PRO_ANNUAL_SAVINGS_CENTS,
+  PRO_PRICE_CENTS,
+  PRO_TRIAL_DAYS,
+} from '@talysman/product';
 import { Badge, Button, Card, CardTitle } from '../components/ui/index.js';
 import { useFocusStore } from '../store/useFocusStore.js';
 import { startCheckout, type CheckoutPrice } from '../lib/bridge.js';
@@ -82,20 +89,29 @@ export function Plans() {
           <Feature>All future Pro features by default</Feature>
         </div>
         <div className="flex flex-wrap gap-2">
+          {/* Annual leads, and both buttons name their price so the choice doesn't
+              require opening the website. */}
           <Button
-            onClick={() => checkout('monthly')}
-            disabled={busy || !entitlementLoaded || subscriptionPlan === 'pro' || !signedIn}
-          >
-            Upgrade — Monthly
-          </Button>
-          <Button
-            variant="ghost"
             onClick={() => checkout('yearly')}
             disabled={busy || !entitlementLoaded || subscriptionPlan === 'pro' || !signedIn}
           >
-            Upgrade — Yearly
+            Annual — {formatPriceUsd(PRO_ANNUAL_MONTHLY_EQUIVALENT_CENTS)}/mo
+          </Button>
+          <Button
+            variant="ghost"
+            onClick={() => checkout('monthly')}
+            disabled={busy || !entitlementLoaded || subscriptionPlan === 'pro' || !signedIn}
+          >
+            Monthly — {formatPriceUsd(PRO_PRICE_CENTS.monthly)}/mo
           </Button>
         </div>
+        {subscriptionPlan !== 'pro' && (
+          <p className="mt-3 text-xs text-slate-500">
+            Annual bills {formatPriceUsd(PRO_PRICE_CENTS.yearly)} once a year and saves{' '}
+            {formatPriceUsd(PRO_ANNUAL_SAVINGS_CENTS)}. First-time subscribers start with a{' '}
+            {PRO_TRIAL_DAYS}-day free trial — nothing is charged until it ends.
+          </p>
+        )}
         {!signedIn && (
           <p className="mt-3 text-sm text-slate-400">Sign in on the Account page to upgrade.</p>
         )}

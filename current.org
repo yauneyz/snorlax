@@ -1,46 +1,131 @@
-Let's work on the web site UI
+What I would change about pricing
 
+Your current pricing is:
 
-- we want to remove the Blog link for now, we don't actually have a blog yet
-- Remove the "Windows & macOS" Free plan available
-- Remove "See Pricing" button
-- Remove "Free to start section"
+Free: three blocked websites
+Monthly: $10
+Annual: $100
 
+The paid plans list unlimited sites, app blocking and scheduling.
 
-- The headline is not "Willpower is a bad security model" the headline is "A distraction blocker that actually works, built for the device where your work actually happens"
+There are five issues.
 
+1. “Three websites” does not communicate a successful free experience
 
-- The subtext:
+The free plan should be designed around the activation event:
 
-  "<p>Most focus apps are for your phone. What about your computer, the place you actually get work done? Talysman can block specific websites on desktop browsers and also blocks distracting apps.</p>
+Pair a key and complete a locked focus session.
 
-  <p>Even better, turning it off requires a physical USB drive that you pair with the app. Turning the blocker off is easy enough that you don't have to worry about emergencies, but hard enough that you won't just do it out of habit like you already do with your other blockers.</p>
+Give people enough functionality to experience the physical mechanism properly. Restrict recurring schedules, advanced policies or the number of saved configurations—not the core magic.
 
-  <p>Talysman is built for getting real work done</p>"
+A free user should be able to say:
 
-  - The CTA is still "Download Talysman"
+“I tried to open YouTube, couldn’t turn the block off from my computer, and finished my task.”
 
+2. Monthly and annual should be one Pro product
 
-Get rid of "What we won't claim" and "Stop negotiating with yourself" and "Built so cheating costs more than working" sections
+Instead of three equally weighted cards, show:
 
+Talysman Free
+Talysman Pro
 
-For the downloads page:
-- No need for "holds your policy . . ."
-- instead of just "Browser extension" it's "Make sure you also get the browser extension"
--remove edge for now, we just have chrome and firefox
-- get rid of the "Already installed? Head . . ." section
+Then offer monthly and annual billing inside the Pro card. They are not different products.
 
+3. Add a full-featured trial
 
-For pricing:
-- 10/mo 100/annual
-- Instead of "One plan . . ." it says "What is your time worth? Get it back with Talysman"
-- Add the free forever tier:
+Your differentiated value includes app blocking and scheduling, but free users currently do not receive those paid features. Give new users seven or fourteen days of complete Pro access after pairing their key.
 
+This is especially important because established alternatives already reduce risk aggressively:
 
-  - 5 websites blocked
-  - prove to yourself that Talysman works for you
-- No "standard vs priority support
-- Paid tiers have:
-  - unlimited websites blocked
-  - block apps
-  - scheduled blocking
+Freedom advertises a seven-day Premium trial, $39.99 annual pricing and a $99.50 lifetime option.
+Opal advertises a $99.99 annual plan, short free trials and a $399 lifetime option.
+Cold Turkey offers a seven-day Pro trial, one-time purchase positioning and a 30-day refund guarantee.
+Brick charges $59 for its physical product and emphasizes lifetime app access without a subscription.
+
+Talysman’s $100 annual price is not inherently unreasonable. But at that price, you are asking for roughly Opal-level annual spending while currently offering much less visible proof and brand trust.
+
+I would not immediately slash the price. I would first reduce the risk.
+
+5. Make annual pricing legible
+
+Do not make visitors calculate it.
+
+Show:
+
+$8.33/month, billed $100 annually
+Save $20 compared with monthly
+
+You might later test a larger annual discount, but retention and support costs should inform that decision.
+
+Here is the pricing-page structure I would use.
+
+Protect your focus before the next tab wins
+
+Start free and experience a focus session you can’t end with one impulsive click.
+
+Talysman Free
+
+$0 forever
+
+Experience the physical-key blocking mechanism.
+
+Pair any USB drive
+Block up to three distracting websites
+Run manual focus sessions
+Complete sessions without an easy digital override
+
+Start focusing free
+
+Talysman Pro
+
+For making focused work a repeatable part of your week
+
+Annual
+
+$8.33/month
+$100 billed annually
+Save $20
+
+Monthly
+
+$10/month
+Cancel anytime
+
+Pro includes:
+
+Block unlimited websites
+Block distracting desktop apps
+Schedule recurring focus sessions
+Use blocklists and allow-only policies
+Require your physical key to end a session early
+Receive all future Pro updates
+
+Try Pro free for 7 days
+
+No payment until your trial ends.
+[Include only when implemented.]
+
+Not sure it will work for you?
+
+Try Talysman during a real workweek.
+
+Pair a key, schedule your hardest work hours and see what happens the first time you try to abandon a session.
+
+[Add a clearly worded refund guarantee when implemented.]
+
+Frequently asked questions
+
+Can I keep using the free plan after my trial?
+Yes. You can return to Talysman Free when the Pro trial ends.
+
+Can I cancel at any time?
+[Insert exact cancellation terms.]
+
+Does one subscription cover all my computers?
+[Insert exact device policy.]
+
+What happens to my schedules if I downgrade?
+[Insert exact downgrade behavior.]
+
+Do you offer a lifetime plan?
+[Insert the current Founder Lifetime offer when available.]

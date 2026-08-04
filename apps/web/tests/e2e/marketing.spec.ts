@@ -8,10 +8,24 @@ test.describe("marketing surface", () => {
     await expect(page.locator('meta[name="robots"][content*="noindex"]')).toHaveCount(0);
   });
 
-  test("/pricing loads", async ({ page }) => {
+  test("/pricing shows both plans and the annual/monthly switch", async ({ page }) => {
     const r = await page.goto("/pricing");
     expect(r?.status()).toBe(200);
-    await expect(page.getByRole("heading", { name: /pricing/i })).toBeVisible();
+    await expect(page.getByRole("heading", { name: /talysman free/i })).toBeVisible();
+    await expect(page.getByRole("heading", { name: /talysman pro/i })).toBeVisible();
+
+    // Annual leads, and its price must be stated per-month so nobody has to divide by 12.
+    const annual = page.getByRole("radio", { name: /annual/i });
+    await expect(annual).toHaveAttribute("aria-checked", "true");
+    await expect(page.getByText(/\$100 billed annually/i)).toBeVisible();
+
+    await page.getByRole("radio", { name: /monthly/i }).click();
+    await expect(page.getByText(/billed monthly/i)).toBeVisible();
+  });
+
+  test("/pricing offers the trial to a signed-out visitor", async ({ page }) => {
+    await page.goto("/pricing");
+    await expect(page.getByRole("button", { name: /try pro free for 14 days/i })).toBeVisible();
   });
 
   test("/blog index and slug render", async ({ page }) => {

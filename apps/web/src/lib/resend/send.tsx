@@ -9,12 +9,14 @@ import {
   type SubscriptionCancelledEmailProps,
 } from "../../../emails/SubscriptionCancelledEmail";
 import { RefundIssuedEmail, type RefundIssuedEmailProps } from "../../../emails/RefundIssuedEmail";
+import { TrialEndingEmail, type TrialEndingEmailProps } from "../../../emails/TrialEndingEmail";
 
 type TemplateMap = {
   Welcome: WelcomeEmailProps;
   PaymentFailed: PaymentFailedEmailProps;
   SubscriptionCancelled: SubscriptionCancelledEmailProps;
   RefundIssued: RefundIssuedEmailProps;
+  TrialEnding: TrialEndingEmailProps;
 };
 
 type SendArgs<K extends keyof TemplateMap> = {
@@ -29,6 +31,7 @@ const subjects: Record<keyof TemplateMap, (p: TemplateMap[keyof TemplateMap]) =>
   PaymentFailed: () => `Payment failed — action required`,
   SubscriptionCancelled: () => `Your subscription was cancelled`,
   RefundIssued: () => `Refund issued`,
+  TrialEnding: () => `Your ${config.app.name} Pro trial ends soon`,
 };
 
 export async function sendEmail<K extends keyof TemplateMap>({ to, template, props, subject }: SendArgs<K>) {
@@ -53,6 +56,8 @@ function renderTemplate<K extends keyof TemplateMap>(template: K, props: Templat
       return <SubscriptionCancelledEmail {...(props as SubscriptionCancelledEmailProps)} />;
     case "RefundIssued":
       return <RefundIssuedEmail {...(props as RefundIssuedEmailProps)} />;
+    case "TrialEnding":
+      return <TrialEndingEmail {...(props as TrialEndingEmailProps)} />;
     default: {
       const _exhaustive: never = template;
       throw new Error(`Unknown template: ${String(_exhaustive)}`);

@@ -9,6 +9,40 @@ export const FREE_BLOCKED_SITE_LIMIT = 5;
 export const FREE_PROFILE_LIMIT = 1;
 export const ENTITLEMENT_GRACE_PERIOD_MS = 30 * 24 * 60 * 60 * 1000;
 
+/**
+ * Length of the full-featured Pro trial started at Checkout. Stripe is the authority
+ * once a subscription exists (`trial_end` is synced onto the row); this constant is
+ * what we *ask* Stripe for, and what the marketing copy must quote.
+ */
+export const PRO_TRIAL_DAYS = 14;
+
+/**
+ * List prices in cents, mirroring the Stripe prices named by STRIPE_PRICE_MONTHLY /
+ * STRIPE_PRICE_YEARLY. Kept here so the pricing page can do the annual math instead of
+ * hardcoding "$8.33" in copy that silently rots when a price changes. Stripe remains the
+ * source of truth for what is actually charged — these only drive display.
+ */
+export const PRO_PRICE_CENTS = {
+  monthly: 1000,
+  yearly: 10000,
+} as const satisfies Record<CheckoutPrice, number>;
+
+/** What a year on the annual plan saves against twelve monthly charges, in cents. */
+export const PRO_ANNUAL_SAVINGS_CENTS = PRO_PRICE_CENTS.monthly * 12 - PRO_PRICE_CENTS.yearly;
+
+/** The annual plan's effective monthly rate, in cents (not a Stripe price — display only). */
+export const PRO_ANNUAL_MONTHLY_EQUIVALENT_CENTS = PRO_PRICE_CENTS.yearly / 12;
+
+/**
+ * Cents as a display price: `$10`, `$8.33`. Fractional cents round *down* so an
+ * advertised "per month" figure can never overstate what twelve of them cost.
+ */
+export function formatPriceUsd(cents: number): string {
+  const whole = Math.floor(cents / 100);
+  const remainder = Math.floor(cents % 100);
+  return remainder === 0 ? `$${whole}` : `$${whole}.${String(remainder).padStart(2, '0')}`;
+}
+
 export const subscriptionPlanSchema = z.enum(SUBSCRIPTION_PLANS);
 export const checkoutPriceSchema = z.enum(CHECKOUT_PRICES);
 

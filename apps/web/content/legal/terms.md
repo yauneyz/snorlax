@@ -2,7 +2,7 @@
 title: "Terms of Service"
 ---
 
-_Last updated: July 22, 2026_
+_Last updated: August 4, 2026_
 
 These Terms of Service ("Terms") govern your access to and use of the Talysman
 website, web application, desktop application, browser extensions, and related
@@ -33,6 +33,12 @@ by our payment provider, Stripe. By subscribing, you authorize us to charge the
 applicable fees to your selected payment method on a recurring basis until you
 cancel.
 
+- **Free trial.** New subscribers may be offered a free trial of Talysman Pro. A
+  payment method is collected when the trial starts, but no charge is made until the
+  trial ends. If you do not cancel before the trial ends, the subscription begins
+  automatically and your payment method is charged the plan price you selected. We
+  will email you before the trial ends. The trial is offered once per customer;
+  subscribing again later does not start a new one.
 - **Renewal.** Subscriptions renew automatically at the end of each billing period
   unless you cancel before the renewal date.
 - **Cancellation.** You may cancel at any time through your account settings.

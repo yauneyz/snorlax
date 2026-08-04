@@ -2,6 +2,7 @@ import "server-only";
 import {
   cancelCurrentSubscription,
   getSubscriptionDetail,
+  isEligibleForTrial,
   setCancelAtPeriodEnd,
   NoActiveSubscriptionError,
 } from "@talysman/billing-server";
@@ -20,6 +21,17 @@ export async function getSubscriptionDetailForUser(userId: string) {
     },
     userId,
   });
+}
+
+/**
+ * Whether to advertise the trial to this visitor. Signed-out visitors are shown the
+ * trial because the account they are about to create has no subscription history; the
+ * authoritative check runs again server-side when Checkout is created, so an
+ * over-optimistic marketing page can never actually mint a second trial.
+ */
+export async function isTrialAvailableForUser(userId: string | null): Promise<boolean> {
+  if (!userId) return true;
+  return isEligibleForTrial({ db: supabaseAdmin(), userId });
 }
 
 export async function setSubscriptionCancelAtPeriodEnd(userId: string, cancel: boolean) {

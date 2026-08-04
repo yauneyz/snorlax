@@ -18,6 +18,7 @@ const relevantEvents = new Set<Stripe.Event["type"]>([
   "customer.subscription.deleted",
   "customer.subscription.paused",
   "customer.subscription.resumed",
+  "customer.subscription.trial_will_end",
   "invoice.payment_failed",
   "charge.refunded",
 ]);
@@ -73,6 +74,12 @@ export async function POST(request: NextRequest) {
         if (event.type === "customer.subscription.deleted") {
           await notifyCancellation(full);
         }
+        break;
+      }
+      case "customer.subscription.trial_will_end": {
+        // Stripe fires this three days out. It is a notification only — the row is
+        // already accurate, so there is nothing to sync.
+        await notifyTrialEnding(event.data.object as Stripe.Subscription);
         break;
       }
       case "invoice.payment_failed": {
@@ -157,6 +164,27 @@ async function notifyCancellation(sub: Stripe.Subscription) {
     props: {
       appName: config.app.name,
       periodEnd: (periodEnd ? new Date(periodEnd * 1000) : new Date()).toISOString(),
+    },
+  });
+}
+
+/**
+ * Warn before the first charge. A trial that bills silently is the thing people
+ * actually fear about trials, and the pricing page promises this email.
+ */
+async function notifyTrialEnding(sub: Stripe.Subscription) {
+  // A subscription that was already cancelled during the trial will never be charged.
+  if (sub.cancel_at_period_end || !sub.trial_end) return;
+  const customerId = typeof sub.customer === "string" ? sub.customer : sub.customer.id;
+  const email = await lookupProfileEmail(customerId);
+  if (!email) return;
+  await sendEmail({
+    to: email,
+    template: "TrialEnding",
+    props: {
+      appName: config.app.name,
+      trialEnd: new Date(sub.trial_end * 1000).toISOString(),
+      accountUrl: `${config.app.url}/account`,
     },
   });
 }

@@ -575,19 +575,28 @@ input:-webkit-autofill:focus {
   background: rgba(255, 255, 255, 0.05);
 }
 
-/* Landing hero. Copy on the left, the mark on the right suspended inside two
- * concentric rings — the talisman under glass. */
+/* Landing hero. Copy on the left, the demo on the right — the mechanism is the
+ * pitch, so the visual that shows it gets the space the mark used to hold. */
 .hero {
   position: relative;
   display: grid;
-  grid-template-columns: 1.12fr 0.88fr;
+  grid-template-columns: 1fr 1fr;
   gap: 3.5rem;
   align-items: center;
-  padding: 4rem 0 1.25rem;
+  padding: 3.5rem 0 1.25rem;
 }
 
 .hero__copy {
   animation: fadeUp 600ms var(--ease) both;
+}
+
+.hero__eyebrow {
+  margin: 0 0 1rem;
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--fg-4);
 }
 
 .hero__headline {
@@ -604,10 +613,10 @@ input:-webkit-autofill:focus {
   display: flex;
   flex-direction: column;
   gap: 0.85rem;
-  font-size: 1.03rem;
+  font-size: 1.08rem;
   color: var(--fg-2);
   max-width: 540px;
-  margin: 1.6rem 0 0;
+  margin: 1.5rem 0 0;
   line-height: 1.62;
   animation: fadeUp 700ms var(--ease) 100ms both;
 }
@@ -618,66 +627,137 @@ input:-webkit-autofill:focus {
   text-wrap: pretty;
 }
 
-/* The closing line of the deck is the one that should land. */
-.hero__sub p:last-child {
-  color: var(--fg-1);
+/* "Any USB drive you already own" is the objection-killer, so it gets a frame
+ * rather than a paragraph. */
+.hero__claim {
+  display: inline-block;
+  margin: 1.35rem 0 0;
+  padding: 0.6rem 1rem;
+  font-size: 0.95rem;
   font-weight: 500;
+  color: var(--fg-1);
+  background: var(--accent-soft);
+  border: 1px solid var(--accent-line);
+  border-radius: var(--r-md);
+  animation: fadeUp 750ms var(--ease) 150ms both;
 }
 
 .hero__ctas {
   display: flex;
   gap: 0.85rem;
   flex-wrap: wrap;
-  margin-top: 2rem;
+  margin-top: 1.85rem;
   animation: fadeUp 800ms var(--ease) 200ms both;
 }
 
-.hero__note {
-  margin: 1.25rem 0 0;
+/* The price/trial answer, given above the fold so nobody has to go looking for it. */
+.hero__trial {
+  margin: 1rem 0 0;
   font-size: 0.85rem;
   color: var(--fg-4);
-  animation: fadeUp 800ms var(--ease) 300ms both;
+  animation: fadeUp 800ms var(--ease) 250ms both;
 }
 
-.hero__seal {
+.hero__trial a {
+  color: var(--fg-2);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  text-decoration-color: var(--accent-line);
+}
+
+.hero__trial a:hover {
+  color: var(--fg-0);
+}
+
+.hero__media {
+  animation: fadeUp 900ms var(--ease) 150ms both;
+}
+
+/* Compatibility above the fold: "does this run on my machine" answered before
+ * the first scroll. */
+.compat {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1.25rem;
+  list-style: none;
+  margin: 1.75rem 0 0;
+  padding: 0;
+  animation: fadeUp 850ms var(--ease) 250ms both;
+}
+
+.compat__item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.85rem;
+  color: var(--fg-4);
+}
+
+.compat__item svg {
+  color: var(--silver-lo);
+}
+
+/* ── Media placeholders ──
+ * Outlined boxes standing in for video, screenshots, and photos that don't
+ * exist yet. Held at the real asset's aspect ratio so dropping the file in
+ * later doesn't reflow the page. */
+.media-slot {
   position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
-  height: 420px;
-  animation: fadeUp 900ms var(--ease) 150ms both;
+  width: 100%;
+  margin: 0;
+  padding: 1.25rem;
+  text-align: center;
+  background:
+    repeating-linear-gradient(
+      -45deg,
+      rgba(255, 255, 255, 0.014) 0 12px,
+      transparent 12px 24px
+    ),
+    var(--bg-1);
+  border: 1px dashed rgba(199, 204, 212, 0.28);
+  border-radius: var(--r-xl);
+  overflow: hidden;
 }
 
-.hero__seal-bloom,
-.hero__seal-ring {
+.media-slot__kind {
   position: absolute;
-  border-radius: 50%;
-  pointer-events: none;
+  top: 0.65rem;
+  left: 0.75rem;
+  font-family: var(--font-mono);
+  font-size: 0.66rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--fg-5);
 }
 
-.hero__seal-bloom {
-  width: 360px;
-  height: 360px;
-  background: radial-gradient(circle, rgba(199, 204, 212, 0.14), transparent 68%);
+.media-slot__body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  max-width: 46ch;
 }
 
-.hero__seal-ring--outer {
-  width: 310px;
-  height: 310px;
-  border: 1px solid rgba(255, 255, 255, 0.06);
+.media-slot__label {
+  font-size: 1.02rem;
+  font-weight: 600;
+  color: var(--fg-1);
+  text-wrap: balance;
 }
 
-.hero__seal-ring--inner {
-  width: 236px;
-  height: 236px;
-  border: 1px solid rgba(199, 204, 212, 0.14);
-  box-shadow: inset 0 0 60px rgba(199, 204, 212, 0.1);
+.media-slot__note {
+  font-size: 0.82rem;
+  line-height: 1.5;
+  color: var(--fg-4);
+  text-wrap: pretty;
 }
 
-.hero__seal-mark {
-  position: relative;
-  filter: drop-shadow(0 0 34px rgba(199, 204, 212, 0.3));
-  animation: float 7s ease-in-out infinite;
+.media-slot__ratio {
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  color: var(--fg-5);
 }
 
 /* Landing content sections below the hero */
@@ -735,7 +815,7 @@ input:-webkit-autofill:focus {
   padding: 0;
   margin: 1.6rem 0 0;
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(290px, 1fr));
   gap: 1.15rem;
 }
 
@@ -745,6 +825,11 @@ input:-webkit-autofill:focus {
   border: 1px solid var(--border);
   border-radius: var(--r-xl);
   transition: border-color var(--t-base) var(--ease);
+}
+
+.step__media {
+  margin-bottom: 1.4rem;
+  border-radius: var(--r-lg);
 }
 
 .step:hover {
@@ -780,8 +865,248 @@ input:-webkit-autofill:focus {
   text-wrap: pretty;
 }
 
-.honesty .section__lede {
-  text-align: left;
+/* ── "You've already tried blocking distractions" ──
+ * Narrow measure and a larger size than body copy: this section is the one the
+ * visitor is supposed to recognize themselves in, so it reads like prose. */
+.recognition__copy {
+  display: flex;
+  flex-direction: column;
+  gap: 1.05rem;
+  max-width: 62ch;
+  margin-top: 1.5rem;
+  font-size: 1.08rem;
+  line-height: 1.65;
+  color: var(--fg-2);
+}
+
+.recognition__copy p {
+  margin: 0;
+  text-wrap: pretty;
+}
+
+/* The pivot from their problem to ours. */
+.recognition__turn {
+  padding-left: 1.1rem;
+  border-left: 2px solid var(--accent-line);
+  color: var(--fg-0);
+  font-weight: 500;
+}
+
+/* ── The emotional core, set beside the screen where it happens ── */
+.moment {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 3rem;
+  align-items: center;
+}
+
+.moment__copy {
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+}
+
+.moment__copy p {
+  margin: 0;
+  max-width: 46ch;
+  color: var(--fg-2);
+  text-wrap: pretty;
+}
+
+.moment__copy .section__title {
+  margin-bottom: 0.35rem;
+}
+
+.moment__thesis {
+  color: var(--fg-0);
+  font-size: 1.08rem;
+  font-weight: 500;
+}
+
+.moment__media {
+  border-radius: var(--r-lg);
+}
+
+/* ── Capabilities, framed as consequences ── */
+.outcomes {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 1.15rem;
+  list-style: none;
+  margin: 2rem 0 0;
+  padding: 0;
+}
+
+.outcome {
+  padding: 1.5rem 1.4rem;
+  background: var(--bg-1);
+  border: 1px solid var(--border);
+  border-radius: var(--r-xl);
+  box-shadow: var(--shadow-card);
+  transition: border-color var(--t-base) var(--ease);
+}
+
+.outcome:hover {
+  border-color: var(--border-strong);
+}
+
+.outcome h3 {
+  margin: 0 0 0.5rem;
+  font-size: 1.02rem;
+  color: var(--fg-0);
+  text-wrap: balance;
+}
+
+.outcome p {
+  margin: 0;
+  font-size: 0.92rem;
+  line-height: 1.6;
+  color: var(--fg-3);
+  text-wrap: pretty;
+}
+
+/* ── Proof ── */
+.proof__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 1.15rem;
+  margin-top: 2rem;
+  align-items: stretch;
+}
+
+.quote {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 1.5rem;
+  margin: 0;
+  padding: 1.75rem 1.6rem;
+  background: var(--grad-brand-soft);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-xl);
+}
+
+.quote > p {
+  margin: 0;
+  font-size: 1.08rem;
+  line-height: 1.6;
+  color: var(--fg-0);
+  text-wrap: pretty;
+}
+
+.quote footer {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+}
+
+/* The headshot slot keeps its own size regardless of the caption length. */
+.quote__avatar {
+  flex: 0 0 auto;
+  width: 52px;
+  padding: 0;
+  border-radius: 50%;
+}
+
+.quote__avatar .media-slot__kind,
+.quote__avatar .media-slot__ratio,
+.quote__avatar .media-slot__note {
+  display: none;
+}
+
+.quote__avatar .media-slot__label {
+  font-size: 0.6rem;
+  font-weight: 500;
+  color: var(--fg-5);
+}
+
+.quote__attribution {
+  font-size: 0.8rem;
+  line-height: 1.5;
+  color: var(--fg-4);
+  text-wrap: pretty;
+}
+
+/* ── FAQ ──
+ * Native <details> so the answers are in the crawlable HTML whether or not the
+ * visitor opens them. */
+.faq__list {
+  display: flex;
+  flex-direction: column;
+  max-width: 78ch;
+  margin-top: 1.75rem;
+  border-top: 1px solid var(--border);
+}
+
+.faq__item {
+  border-bottom: 1px solid var(--border);
+}
+
+.faq__item summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1.05rem 0.25rem;
+  font-size: 1rem;
+  font-weight: 500;
+  color: var(--fg-1);
+  cursor: pointer;
+  list-style: none;
+  transition: color var(--t-fast) var(--ease);
+}
+
+.faq__item summary::-webkit-details-marker {
+  display: none;
+}
+
+.faq__item summary::after {
+  content: "+";
+  flex: 0 0 auto;
+  font-family: var(--font-mono);
+  font-size: 1.1rem;
+  color: var(--fg-4);
+  transition: transform var(--t-base) var(--ease);
+}
+
+.faq__item[open] summary {
+  color: var(--fg-0);
+}
+
+.faq__item[open] summary::after {
+  transform: rotate(45deg);
+}
+
+.faq__item summary:hover {
+  color: var(--fg-0);
+}
+
+.faq__answer {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 0 0.25rem 1.35rem;
+  max-width: 68ch;
+}
+
+.faq__answer p {
+  margin: 0;
+  font-size: 0.95rem;
+  line-height: 1.65;
+  color: var(--fg-2);
+  text-wrap: pretty;
+}
+
+.faq__answer a {
+  color: var(--fg-1);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  text-decoration-color: var(--accent-line);
+}
+
+.faq__answer a:hover {
+  color: var(--fg-0);
+  text-decoration-color: var(--accent);
 }
 
 /* Closing call to action */
@@ -803,6 +1128,57 @@ input:-webkit-autofill:focus {
   margin: 0 auto 1.75rem;
   max-width: 46ch;
   color: var(--fg-2);
+}
+
+.cta-band__note {
+  margin: 1.5rem auto 0 !important;
+  font-size: 0.82rem;
+  color: var(--fg-4) !important;
+}
+
+.cta-band__note a {
+  color: var(--fg-2);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  text-decoration-color: var(--accent-line);
+}
+
+.cta-band__note a:hover {
+  color: var(--fg-0);
+}
+
+/* Free-vs-Pro split on the landing page. Two plain columns: this is a disclosure,
+ * not a second pricing table. */
+.split__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 1.15rem;
+  margin-top: 2rem;
+}
+
+.split__col {
+  padding: 1.5rem 1.4rem;
+  background: rgba(255, 255, 255, 0.025);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+}
+
+.split__col h3 {
+  margin: 0 0 0.6rem;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--fg-3);
+}
+
+.split__col p {
+  margin: 0;
+  color: var(--silver);
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+.split__cta {
+  margin-top: 1.75rem;
 }
 
 /* ── Download page ──
@@ -1049,9 +1425,14 @@ input:-webkit-autofill:focus {
 
 /* Pricing */
 .pricing {
-  max-width: 1060px;
+  max-width: var(--container);
   margin: 0 auto;
   padding: 0.5rem 0 2rem;
+}
+
+.pricing__intro {
+  max-width: var(--container-narrow);
+  margin: 0 auto;
   text-align: center;
 }
 
@@ -1062,28 +1443,27 @@ input:-webkit-autofill:focus {
 }
 
 .pricing__lede {
-  max-width: var(--container-narrow);
   margin: 0 auto;
   color: var(--fg-2);
   font-size: 1.05rem;
 }
 
-.pricing .pricing-card,
-.pricing__grid {
-  text-align: left;
-}
-
-.marketing-main .pricing-grid,
-.pricing__grid,
-.pricing-grid {
+/* Two plans, not three. Pro is wider because it carries the toggle and the longer list. */
+.plans {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.15fr);
   gap: 1.15rem;
   align-items: start;
   margin-top: 2.75rem;
 }
 
-.pricing-card {
+@media (max-width: 900px) {
+  .plans {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.plan {
   position: relative;
   display: flex;
   flex-direction: column;
@@ -1094,22 +1474,22 @@ input:-webkit-autofill:focus {
   transition: border-color var(--t-base) var(--ease), background-color var(--t-base) var(--ease);
 }
 
-.pricing-card:hover {
+.plan:hover {
   border-color: var(--border-strong);
 }
 
-/* The recommended plan, matching the desktop Plans page's highlighted card. */
-.pricing-card--featured {
+/* Pro is the recommended plan: the silver panel and the lit CTA. */
+.plan--pro {
   background: var(--grad-accent-panel);
   border-color: rgba(199, 204, 212, 0.28);
   box-shadow: 0 20px 60px rgba(199, 204, 212, 0.1);
 }
 
-.pricing-card--featured:hover {
+.plan--pro:hover {
   border-color: rgba(199, 204, 212, 0.45);
 }
 
-.pricing-card__badge {
+.plan__badge {
   position: absolute;
   top: 1.15rem;
   right: 1.15rem;
@@ -1125,23 +1505,121 @@ input:-webkit-autofill:focus {
   border-radius: var(--r-pill);
 }
 
-.pricing-card h2 {
-  margin-bottom: 0;
+.plan__head {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+.plan__name {
+  margin: 0;
   font-size: 0.95rem;
   font-weight: 600;
   color: var(--fg-3);
   letter-spacing: 0;
 }
 
-.pricing-card__price {
+.plan__pitch {
+  margin: 0;
+  color: var(--fg-2);
+  font-size: 0.9rem;
+  line-height: 1.45;
+  max-width: 34ch;
+}
+
+.plan__price {
+  margin: 0.35rem 0 0;
   font-size: 2.15rem;
   font-weight: 700;
   color: var(--fg-0);
-  margin: 0.7rem 0 0;
   letter-spacing: -0.02em;
+  line-height: 1.1;
 }
 
-.pricing-card__features {
+.plan__price-unit {
+  font-size: 0.95rem;
+  font-weight: 500;
+  color: var(--fg-3);
+  letter-spacing: 0;
+}
+
+/* The line that saves the visitor from doing division. */
+.plan__price-detail {
+  margin: 0;
+  font-size: 0.86rem;
+  color: var(--fg-2);
+}
+
+.plan__price-detail strong {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+/* Billing-period switch. A radiogroup, not a checkbox: two named choices, both visible. */
+.cycle {
+  display: inline-flex;
+  gap: 0.25rem;
+  margin-top: 0.9rem;
+  padding: 0.25rem;
+  background: rgba(0, 0, 0, 0.28);
+  border: 1px solid var(--border);
+  border-radius: var(--r-pill);
+  align-self: flex-start;
+}
+
+.cycle__option {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.4rem 0.9rem;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--fg-3);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--r-pill);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: color var(--t-fast) var(--ease), background-color var(--t-fast) var(--ease);
+}
+
+.cycle__option:hover {
+  color: var(--fg-1);
+}
+
+.cycle__option--on {
+  color: var(--accent-ink);
+  background: var(--grad-brand);
+  border-color: var(--accent-line);
+}
+
+.cycle__save {
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 0.1rem 0.4rem;
+  border-radius: var(--r-pill);
+  background: rgba(34, 197, 94, 0.16);
+  color: #4ade80;
+}
+
+.cycle__option--on .cycle__save {
+  background: rgba(10, 11, 13, 0.14);
+  color: rgba(10, 11, 13, 0.72);
+}
+
+.plan__includes {
+  margin: 1.6rem 0 0;
+  font-family: var(--font-mono);
+  font-size: 0.66rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--fg-4);
+}
+
+.plan__features {
   position: relative;
   list-style: none;
   padding: 1.35rem 0 0;
@@ -1152,8 +1630,17 @@ input:-webkit-autofill:focus {
   gap: 0.7rem;
 }
 
+.plan__includes + .plan__features {
+  padding-top: 0.9rem;
+  margin-top: 0.6rem;
+}
+
+.plan__includes + .plan__features::before {
+  display: none;
+}
+
 /* The hairline that separates price from features, fading out to the right. */
-.pricing-card__features::before {
+.plan__features::before {
   content: "";
   position: absolute;
   top: 0;
@@ -1163,7 +1650,7 @@ input:-webkit-autofill:focus {
   background: linear-gradient(90deg, rgba(255, 255, 255, 0.12), transparent);
 }
 
-.pricing-card__features li {
+.plan__features li {
   position: relative;
   padding-left: 1.5rem;
   color: var(--silver);
@@ -1171,7 +1658,7 @@ input:-webkit-autofill:focus {
   line-height: 1.45;
 }
 
-.pricing-card__features li::before {
+.plan__features li::before {
   content: "";
   position: absolute;
   left: 0;
@@ -1183,7 +1670,7 @@ input:-webkit-autofill:focus {
   border: 1px solid var(--accent-line);
 }
 
-.pricing-card__features li::after {
+.plan__features li::after {
   content: "";
   position: absolute;
   left: 0.27rem;
@@ -1195,7 +1682,7 @@ input:-webkit-autofill:focus {
   transform: rotate(-45deg);
 }
 
-.pricing-card__cta {
+.plan__cta {
   width: 100%;
   padding: 0.8rem 1.25rem;
   font-weight: 600;
@@ -1204,33 +1691,42 @@ input:-webkit-autofill:focus {
   background: rgba(255, 255, 255, 0.05);
   border: 1px solid rgba(255, 255, 255, 0.14);
   color: var(--fg-1);
+  cursor: pointer;
   transition: background var(--t-base) var(--ease), background-color var(--t-base) var(--ease),
     color var(--t-base) var(--ease), opacity var(--t-base) var(--ease);
 }
 
-.pricing-card__cta:hover:not(:disabled) {
+.plan__cta:hover:not(:disabled) {
   background: rgba(255, 255, 255, 0.09);
   color: var(--fg-0);
 }
 
-/* Only the recommended plan gets the lit button. */
-.pricing-card--featured .pricing-card__cta {
+.plan__cta--primary {
   background: var(--grad-brand);
-  border-color: rgba(140, 255, 235, 0.5);
+  border-color: var(--accent-line);
   color: var(--accent-ink);
 }
 
-.pricing-card--featured .pricing-card__cta:hover:not(:disabled) {
+.plan__cta--primary:hover:not(:disabled) {
   background: var(--grad-brand-hover);
   color: var(--accent-ink);
 }
 
-.pricing-card__cta:disabled {
+.plan__cta:disabled {
   opacity: 0.5;
   cursor: not-allowed;
 }
 
-.pricing-card__error {
+/* The risk line under the button — deliberately quiet, but never omitted. */
+.plan__footnote {
+  margin: 0.75rem 0 0;
+  font-size: 0.78rem;
+  line-height: 1.45;
+  color: var(--fg-4);
+  text-align: center;
+}
+
+.plan__error {
   margin-top: 0.85rem;
   padding: 0.6rem 0.85rem;
   font-size: 0.88rem;
@@ -1238,6 +1734,45 @@ input:-webkit-autofill:focus {
   background: var(--danger-bg);
   border: 1px solid rgba(239, 68, 68, 0.3);
   border-radius: var(--r-md);
+}
+
+/* Risk reversal, between the plans and the FAQ. */
+.assurance {
+  max-width: var(--container-narrow);
+  margin: 4rem auto 0;
+  padding: 2rem 1.75rem;
+  text-align: center;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--border);
+  border-radius: var(--r-xl);
+}
+
+.assurance h2 {
+  margin: 0 0 0.85rem;
+  font-size: 1.4rem;
+  letter-spacing: -0.01em;
+}
+
+.assurance p {
+  margin: 0 auto;
+  color: var(--fg-2);
+  font-size: 0.95rem;
+  line-height: 1.6;
+}
+
+.assurance__terms {
+  margin-top: 0.9rem !important;
+  font-size: 0.82rem !important;
+  color: var(--fg-4) !important;
+}
+
+.faq--pricing {
+  max-width: var(--container-narrow);
+  margin: 4rem auto 0;
+}
+
+.faq--pricing .section__title {
+  text-align: center;
 }
 
 /* Blog & article content (rendered markdown) */
@@ -2061,37 +2596,22 @@ input:-webkit-autofill:focus {
  * Responsive
  * ========================================================== */
 
-/* The hero's rings need real width; below that the mark drops under the copy. */
+/* The two-column hero needs real width for a 16:9 demo beside the deck; below
+ * that the copy leads and the demo follows it. */
 @media (max-width: 62rem) {
   .hero {
     grid-template-columns: 1fr;
-    gap: 1rem;
+    gap: 2.25rem;
     padding-top: 2.5rem;
   }
 
-  .hero__seal {
-    order: -1;
-    height: 280px;
+  .moment {
+    grid-template-columns: 1fr;
+    gap: 2rem;
   }
 
-  .hero__seal-bloom {
-    width: 260px;
-    height: 260px;
-  }
-
-  .hero__seal-ring--outer {
-    width: 224px;
-    height: 224px;
-  }
-
-  .hero__seal-ring--inner {
-    width: 170px;
-    height: 170px;
-  }
-
-  .hero__seal-mark {
-    width: 130px;
-    height: 130px;
+  .moment__copy p {
+    max-width: none;
   }
 }
 

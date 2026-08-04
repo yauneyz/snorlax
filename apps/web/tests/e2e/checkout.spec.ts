@@ -11,7 +11,8 @@ test.describe("checkout (requires live Supabase + Stripe test mode)", () => {
 
     await page.waitForURL(/\/pricing|\/app/);
     await page.goto("/pricing");
-    await page.getByRole("button", { name: /subscribe/i }).first().click();
+    // Reads "Try Pro free for 14 days" on a first subscription and "Subscribe …" after.
+    await page.getByRole("button", { name: /try pro free|subscribe/i }).first().click();
     await page.waitForURL(/checkout\.stripe\.com/, { timeout: 15_000 });
     expect(page.url()).toContain("checkout.stripe.com");
   });
