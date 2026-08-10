@@ -84,6 +84,13 @@ export default [
     ...tseslint.configs.disableTypeChecked,
   },
   {
+    // The marketing capture scripts are Node, but most of their bodies are callbacks that get
+    // serialized and evaluated inside the Electron renderer, where `window` and `document` are
+    // exactly what they mean.
+    files: ["scripts/capture-marketing.mjs", "scripts/record-demo.mjs", "scripts/lib/*.mjs"],
+    languageOptions: { globals: { ...globals.node, ...globals.browser } },
+  },
+  {
     files: ["**/*.d.ts"],
     rules: { "@typescript-eslint/no-explicit-any": "off" },
   },

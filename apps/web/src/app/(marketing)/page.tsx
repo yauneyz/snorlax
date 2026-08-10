@@ -7,10 +7,9 @@ import {
   PRO_PRICE_CENTS,
   PRO_TRIAL_DAYS,
 } from "@talysman/product";
-import {
-  MediaPlaceholder,
-  showMediaPlaceholders,
-} from "@/components/marketing/MediaPlaceholder";
+import { AppShot } from "@/components/marketing/AppShot";
+import { HeroDemo } from "@/components/marketing/HeroDemo";
+import { MediaPlaceholder } from "@/components/marketing/MediaPlaceholder";
 import { PlatformIcon, type Platform } from "@/components/marketing/PlatformIcon";
 import { config } from "@/lib/config";
 
@@ -32,32 +31,30 @@ const platforms: { platform: Platform; label: string }[] = [
   { platform: "firefox", label: "Firefox" },
 ];
 
+/** Shots are 4:3 captures of the real app — see scripts/capture-marketing.mjs. */
 const steps = [
   {
     title: "Pair any USB drive",
     body: `Install ${config.app.name} and pair a USB drive you already own. That drive becomes your physical key. Pair as many as you like — any one of them unlocks.`,
-    media: {
-      label: "Keys screen — pairing a drive",
-      note: "App window showing the removable-drive picker and the green key indicator.",
-      kind: "screenshot",
+    image: {
+      src: "/media/app-pair-key.png",
+      alt: "The Keys screen: two paired drives listed, a third selected in the removable-drive picker, and a green “Key mounted” indicator.",
     },
   },
   {
     title: "Choose what gets blocked",
     body: "Block distracting websites, close the desktop apps that pull you away, or allow only the tools you need. Start a session now, or protect the same hours every week.",
-    media: {
-      label: "Blocklist screen — sites and apps",
-      note: "App window showing a profile with youtube.com, reddit.com and a couple of apps listed.",
-      kind: "screenshot",
+    image: {
+      src: "/media/app-blocklist.png",
+      alt: "The Blocklists screen: a “Deep work” profile blocking eight sites including youtube.com and reddit.com, plus Discord, Steam and Slack.",
     },
   },
   {
     title: "Unplug the key",
     body: "Put it in another room, a drawer, your car. The block holds until the session ends. To quit early, you have to physically go get it.",
-    media: {
-      label: "USB drive in a drawer, across the room",
-      note: "Photo. Desk and monitor soft-focused in the background.",
-      kind: "photo",
+    image: {
+      src: "/media/app-focused-key-away.png",
+      alt: "The dashboard mid-session: the seal reads FOCUSED, the key readout reads “away”, and the header indicator reads NO KEY.",
     },
   },
 ];
@@ -273,7 +270,7 @@ const showTestimonials = config.app.environment !== "production";
 export default function LandingPage() {
   return (
     <>
-      <section className={showMediaPlaceholders ? "hero" : "hero hero--flat"}>
+      <section className="hero">
         <div className="hero__copy">
           <p className="hero__eyebrow">
             For people whose work and distractions live on the same computer
@@ -293,17 +290,9 @@ export default function LandingPage() {
             <Link href="/download" className="landing__cta landing__cta--primary">
               Start focusing free
             </Link>
-            {/* Without the demo capture there's nothing to watch, so the secondary CTA sends
-                people to the three-step explanation instead. */}
-            {showMediaPlaceholders ? (
-              <a href="#demo" className="landing__cta landing__cta--secondary">
-                Watch the 30-second demo
-              </a>
-            ) : (
-              <a href="#how" className="landing__cta landing__cta--secondary">
-                See how it works
-              </a>
-            )}
+            <a href="#demo" className="landing__cta landing__cta--secondary">
+              Watch the 30-second demo
+            </a>
           </div>
           <p className="hero__trial">
             Free forever for {FREE_BLOCKED_SITE_LIMIT} sites · or try{" "}
@@ -319,16 +308,7 @@ export default function LandingPage() {
           </ul>
         </div>
 
-        {showMediaPlaceholders ? (
-          <div className="hero__media" id="demo">
-            <MediaPlaceholder
-              ratio="16 / 9"
-              kind="video · muted · autoplay · loop"
-              label="30-second demo: the moment you try to quit"
-              note="Start a session → YouTube, Reddit and a desktop app go blocked → user clicks End session → “Insert your key to end early” → cut to the USB drive sitting in another room → user goes back to work."
-            />
-          </div>
-        ) : null}
+        <HeroDemo />
       </section>
 
       <section className="section recognition">
@@ -351,9 +331,7 @@ export default function LandingPage() {
 
       {/* The named idea the rest of the page hangs on. Everything above is the visitor's
           experience; this is the diagnosis they haven't put into words yet. */}
-      <section
-        className={showMediaPlaceholders ? "section diagnosis" : "section diagnosis diagnosis--flat"}
-      >
+      <section className="section diagnosis">
         <div className="diagnosis__lead">
           <div className="diagnosis__copy">
             <h2 className="section__title">The off switch is the problem</h2>
@@ -372,15 +350,14 @@ export default function LandingPage() {
               thinking clearly some leverage over the one who shows up when the work gets hard.
             </p>
           </div>
-          {showMediaPlaceholders ? (
-            <MediaPlaceholder
-              ratio="3 / 2"
-              kind="screenshot"
-              label="“Insert your key to end early”"
-              note="The refusal dialog with the red key indicator — the screen that decides whether the session survives."
-              className="diagnosis__media"
-            />
-          ) : null}
+          <AppShot
+            src="/media/app-key-required.png"
+            alt="The seal reading FOCUSED with the “Turn off focus” button greyed out and a red line beneath it: “insert key to turn off focus”."
+            width={1410}
+            height={940}
+            className="diagnosis__media"
+            sizes="(max-width: 900px) 100vw, 44vw"
+          />
         </div>
 
         <ul className="paths">
@@ -406,11 +383,11 @@ export default function LandingPage() {
         <ol className="steps">
           {steps.map((step, index) => (
             <li key={step.title} className="step">
-              <MediaPlaceholder
-                ratio="4 / 3"
-                kind={step.media.kind}
-                label={step.media.label}
-                note={step.media.note}
+              <AppShot
+                src={step.image.src}
+                alt={step.image.alt}
+                width={2160}
+                height={1620}
                 className="step__media"
               />
               <span className="step__number" aria-hidden="true">

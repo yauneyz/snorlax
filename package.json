@@ -51,6 +51,10 @@
     "typecheck": "tsc -b && tsc -p apps/desktop/tsconfig.json --noEmit",
     "test": "vitest run",
     "test:electron:e2e": "cross-env APP_ENV=development TALYSMAN_PIPE=talysman-e2e TALYSMAN_USE_MOCK_SERVICE=true pnpm --filter @talysman/desktop exec electron-vite build --mode development && playwright test tests/electron/e2e --workers=1",
+    "capture:media": "pnpm capture:build && pnpm capture:marketing && pnpm capture:demo",
+    "capture:build": "cross-env APP_ENV=development TALYSMAN_PIPE=talysman-capture TALYSMAN_USE_MOCK_SERVICE=true pnpm --filter @talysman/desktop exec electron-vite build --mode development",
+    "capture:marketing": "node scripts/capture-marketing.mjs",
+    "capture:demo": "node scripts/record-demo.mjs",
     "test:watch": "vitest",
     "lint": "eslint . && pnpm --filter @talysman/web lint",
     "lint:fix": "eslint . --fix && pnpm --filter @talysman/web lint --fix"

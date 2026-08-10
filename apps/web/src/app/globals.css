@@ -670,20 +670,17 @@ input:-webkit-autofill:focus {
 }
 
 .hero__media {
+  margin: 0;
   animation: fadeUp 900ms var(--ease) 150ms both;
 }
 
-/* TEMPORARY: production ships before the demo capture exists. With no visual to sit beside,
- * the hero collapses to one column instead of leaving half the row empty. Delete along with
- * `showMediaPlaceholders`. */
-.hero--flat {
-  grid-template-columns: 1fr;
-  max-width: 46rem;
-  padding-bottom: 0.5rem;
-}
-
-.hero--flat .hero__sub {
-  max-width: 46rem;
+.hero__video {
+  display: block;
+  width: 100%;
+  height: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--r-xl);
+  background: var(--bg-1);
 }
 
 /* Compatibility above the fold: "does this run on my machine" answered before
@@ -708,6 +705,22 @@ input:-webkit-autofill:focus {
 
 .compat__item svg {
   color: var(--silver-lo);
+}
+
+/* ── App screenshots ──
+ * Captures of the real desktop UI (scripts/capture-marketing.mjs). The images carry their own
+ * intrinsic dimensions, so the frame only has to supply the edge and the corner radius. */
+.app-shot {
+  margin: 0;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  background: var(--bg-1);
+}
+
+.app-shot__image {
+  display: block;
+  width: 100%;
+  height: auto;
 }
 
 /* ── Media placeholders ──
@@ -940,16 +953,6 @@ input:-webkit-autofill:focus {
 
 .diagnosis__media {
   border-radius: var(--r-lg);
-}
-
-/* TEMPORARY: same story as `.hero--flat` — no screenshot, so the copy runs as prose at a
- * readable measure rather than staying squeezed into half a grid. */
-.diagnosis--flat .diagnosis__lead {
-  grid-template-columns: 1fr;
-}
-
-.diagnosis--flat .diagnosis__copy p {
-  max-width: 62ch;
 }
 
 /* Two routes out of the same impulse. The middle beat is the whole argument, so the cards
