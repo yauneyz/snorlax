@@ -138,6 +138,8 @@ const credentialsSchema = z.object({
   resend: z.object({
     api_key: z.string().min(1),
     from: z.string().min(1),
+    // Test-only destination for `pnpm web:test:email`; never read by the app itself.
+    email_test_address: z.union([z.string().email(), z.literal("")]).optional().default(""),
   }),
   sentry: z.object({
     dsn: optionalSentryDsn,
@@ -239,6 +241,25 @@ const isProductionPush = process.argv.includes("--production");
 const skipOnVercel = process.argv.includes("--skip-on-vercel");
 const isDryRun = process.argv.includes("--dry-run");
 
+/**
+ * `--dummy` is a local-development escape hatch for a machine that does not have the real
+ * secrets: every credential this script cannot read degrades to an obvious placeholder and
+ * a warning instead of exiting. It is deliberately refused anywhere the missing value would
+ * reach a deployment, so the default run keeps catching genuine configuration mistakes.
+ * `scripts/dev.mjs --dummy` sets the environment variable for the nested pnpm invocation.
+ */
+const dummyRequested =
+  process.argv.includes("--dummy") || process.env.TALYSMAN_DUMMY_CREDENTIALS === "true";
+
+const DUMMY_GOOGLE_OAUTH_CLIENT = {
+  client_id: "dummy-google-oauth-client-id",
+  client_secret: "dummy-google-oauth-client-secret",
+};
+
+function warnDummy(message: string) {
+  console.warn(`[dummy] ${message}`);
+}
+
 const SENSITIVE_VERCEL_VARIABLES = new Set([
   "SUPABASE_SECRET_KEY",
   "STRIPE_SECRET_KEY",
@@ -270,6 +291,15 @@ function resolveVercelEnvironment(): VercelEnvironment | null {
 }
 
 const vercelEnvironment = resolveVercelEnvironment();
+
+const isDeploymentSync = isVercelBuild || vercelEnvironment !== null || process.env.CI === "true";
+if (dummyRequested && isDeploymentSync) {
+  console.error(
+    "--dummy is a local-development escape hatch and cannot be used for a CI or Vercel sync.",
+  );
+  process.exit(1);
+}
+const allowDummyCredentials = dummyRequested;
 
 /**
  * Stripe mode follows the push target, not the dev/prod mode: only the Vercel production
@@ -319,9 +349,20 @@ function loadGoogleOAuthFile(
   const cached = googleOAuthFileCache.get(resolvedPath);
   if (cached) return cached;
 
+  // A missing or unreadable client file is the one failure `--dummy` exists for: the JSON is
+  // gitignored, so a checkout on a second machine has nothing to read.
+  const unusable = (reason: string): z.infer<typeof googleOAuthClientSchema> => {
+    if (!allowDummyCredentials) {
+      console.error(reason);
+      process.exit(1);
+    }
+    warnDummy(`${reason} — using placeholder Google OAuth credentials.`);
+    googleOAuthFileCache.set(resolvedPath, DUMMY_GOOGLE_OAUTH_CLIENT);
+    return DUMMY_GOOGLE_OAUTH_CLIENT;
+  };
+
   if (!fs.existsSync(resolvedPath)) {
-    console.error(`Missing Google OAuth credentials file: ${relativePath}`);
-    process.exit(1);
+    return unusable(`Missing Google OAuth credentials file: ${relativePath}`);
   }
 
   try {
@@ -334,8 +375,7 @@ function loadGoogleOAuthFile(
     return client;
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    console.error(`Invalid Google OAuth credentials file ${relativePath}: ${message}`);
-    process.exit(1);
+    return unusable(`Invalid Google OAuth credentials file ${relativePath}: ${message}`);
   }
 }
 
@@ -388,25 +428,43 @@ function loadCredentials(): Credentials | null {
     console.warn("Create a real .credentials for anything beyond local smoke tests.");
   }
 
-  const raw = fs.readFileSync(source, "utf8");
-  const parsed = toml.parse(raw);
-  const result = credentialsSchema.safeParse(parsed);
+  let result = credentialsSchema.safeParse(toml.parse(fs.readFileSync(source, "utf8")));
+  if (!result.success && allowDummyCredentials) {
+    // An incomplete .credentials is still a credentials failure; fall back to the tracked
+    // example rather than inventing a value for every field the schema wants.
+    const example = EXAMPLE_CANDIDATES.includes(source) ? null : firstExisting(EXAMPLE_CANDIDATES);
+    if (example) {
+      warnDummy(
+        `${path.relative(ROOT, source)} failed validation; syncing from ${path.relative(ROOT, example)} instead.`,
+      );
+      source = example;
+      result = credentialsSchema.safeParse(toml.parse(fs.readFileSync(source, "utf8")));
+    }
+  }
   if (!result.success) {
-    console.error(".credentials failed validation:");
+    console.error(`${path.relative(ROOT, source)} failed validation:`);
     for (const issue of result.error.issues) {
       console.error(`  ${issue.path.join(".")}: ${issue.message}`);
     }
     process.exit(1);
   }
+
   const credentials = hydrateGoogleOAuthFiles(result.data);
   if (
     credentials.google_auth.enabled_dev &&
     (!credentials.google_auth.client_id || !credentials.google_auth.client_secret)
   ) {
-    console.error(
-      ".credentials google_auth.client_id and client_secret are required when enabled_dev is true.",
+    if (!allowDummyCredentials) {
+      console.error(
+        ".credentials google_auth.client_id and client_secret are required when enabled_dev is true.",
+      );
+      process.exit(1);
+    }
+    warnDummy(
+      "google_auth is enabled for dev without a client id/secret — using placeholders; Google sign-in will not work.",
     );
-    process.exit(1);
+    credentials.google_auth.client_id ||= DUMMY_GOOGLE_OAUTH_CLIENT.client_id;
+    credentials.google_auth.client_secret ||= DUMMY_GOOGLE_OAUTH_CLIENT.client_secret;
   }
   return credentials;
 }
@@ -617,8 +675,11 @@ function main() {
   if (!creds) return;
 
   if (mode === "prod" && creds.openai.api_key.length === 0) {
-    console.error("openai.api_key is required for prod mode because prod uses OpenAI.");
-    process.exit(1);
+    if (!allowDummyCredentials) {
+      console.error("openai.api_key is required for prod mode because prod uses OpenAI.");
+      process.exit(1);
+    }
+    warnDummy("openai.api_key is missing; prod-mode LLM calls will fail.");
   }
 
   // The production web deployment is the one target that charges real cards, so it is the
@@ -642,9 +703,12 @@ function main() {
   // The webhook integration test (tests/integration/stripe-webhook-cli.test.ts) drives the
   // real Stripe CLI against test mode and looks for STRIPE_CLI_API_KEY. It is always the
   // test-mode secret key regardless of `mode`, and stays local-only (never pushed to Vercel).
+  // RESEND_TEST_ADDRESS is local-only for the same reason: it is the inbox
+  // `pnpm web:test:email` delivers to, and no deployed code path reads it.
   const localWebPairs: Array<[string, string]> = [
     ...webPairs,
     ["STRIPE_CLI_API_KEY", creds.stripe.secret_key_test],
+    ["RESEND_TEST_ADDRESS", creds.resend.email_test_address],
   ];
 
   writeEnvFile(WEB_ENV_OUT, localWebPairs, mode);

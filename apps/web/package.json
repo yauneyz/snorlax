@@ -21,6 +21,7 @@
     "test:e2e": "playwright test",
     "test:e2e:live": "pnpm sync:env && RUN_LIVE_CHECKOUT_E2E=1 playwright test tests/e2e/live-checkout-auth.spec.ts",
     "stripe:test": "tsx scripts/stripe-test.ts",
+    "email:test": "tsx scripts/email-test.ts",
     "comp": "tsx scripts/comp.ts",
     "email:dev": "email dev --dir emails"
   },

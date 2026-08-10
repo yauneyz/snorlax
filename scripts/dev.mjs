@@ -8,6 +8,10 @@
  *
  * Ctrl+C stops the three attached processes. Run `pnpm dev:down` when the
  * persistent Supabase stack should also be stopped.
+ *
+ * `--dummy` is for a machine that does not have the real secrets: every step that depends on
+ * credentials degrades to a placeholder and a warning instead of aborting the stack. Without
+ * it the startup sequence keeps failing loudly, which is what a configured machine wants.
  */
 
 import { spawn } from 'node:child_process';
@@ -30,11 +34,34 @@ const webhookUrl = 'http://localhost:3000/api/stripe/webhook';
 const webUrl = 'http://localhost:3000';
 const children = new Map();
 
+// Any signature-checked webhook delivery fails against this, which is the honest outcome when
+// the Stripe CLI cannot hand out the real one.
+const DUMMY_WEBHOOK_SECRET = 'whsec_dummydummydummydummydummydummydummy';
+const dummyCredentials = process.argv.includes('--dummy');
+
 let setupChild;
 let shuttingDown = false;
 
 function announce(message) {
   console.log(`\n[dev] ${message}`);
+}
+
+function warnDummy(message) {
+  console.warn(`[dev] [dummy] ${message}`);
+}
+
+/**
+ * Run a credential-dependent setup step. In `--dummy` mode its failure is reported and the
+ * stack continues; otherwise the error propagates and `pnpm dev` stops as it always has.
+ */
+async function attempt(label, step) {
+  try {
+    return { ok: true, value: await step() };
+  } catch (error) {
+    if (!dummyCredentials) throw error;
+    warnDummy(`${label} failed: ${error.message.split('\n')[0]}`);
+    return { ok: false, value: undefined };
+  }
 }
 
 function run(command, args, options = {}) {
@@ -173,28 +200,42 @@ async function main() {
   process.env.TALYSMAN_PIPE ??= 'talysman';
   process.env.TALYSMAN_USE_MOCK_SERVICE ??= 'false';
 
+  if (dummyCredentials) {
+    // Inherited by the nested `pnpm sync:env`, which does the same downgrade for each
+    // credential it cannot read (scripts/sync-env.ts).
+    process.env.TALYSMAN_DUMMY_CREDENTIALS = 'true';
+    announce('running with --dummy: missing credentials become placeholders, not failures');
+  }
+
   await assertPortAvailable(3000);
 
   announce('generating local environment files');
   await run(pnpm, ['sync:env']);
 
   announce('starting local Supabase services');
-  await run('supabase', ['start'], { cwd: web });
+  await attempt('local Supabase services', () => run('supabase', ['start'], { cwd: web }));
 
   announce('reading Stripe CLI webhook secret');
-  const secretOutput = await run(stripe, ['listen', '--print-secret'], { capture: true });
-  const webhookSecret = secretOutput.match(/whsec_[A-Za-z0-9]+/)?.[0];
-  if (!webhookSecret) {
-    throw new Error(
-      'Stripe CLI did not return a webhook signing secret. Run `stripe login` and try again.',
-    );
-  }
+  const secret = await attempt('reading the Stripe CLI webhook secret', async () => {
+    const secretOutput = await run(stripe, ['listen', '--print-secret'], { capture: true });
+    const webhookSecret = secretOutput.match(/whsec_[A-Za-z0-9]+/)?.[0];
+    if (!webhookSecret) {
+      throw new Error(
+        'Stripe CLI did not return a webhook signing secret. Run `stripe login` and try again.',
+      );
+    }
+    return webhookSecret;
+  });
 
-  startProcess('Stripe webhook listener', stripe, ['listen', '--forward-to', webhookUrl]);
+  if (secret.ok) {
+    startProcess('Stripe webhook listener', stripe, ['listen', '--forward-to', webhookUrl]);
+  } else {
+    warnDummy('skipping the webhook listener; Stripe events will not reach the web app');
+  }
 
   const webEnv = {
     ...process.env,
-    STRIPE_WEBHOOK_SECRET: webhookSecret,
+    STRIPE_WEBHOOK_SECRET: secret.value ?? DUMMY_WEBHOOK_SECRET,
   };
   const webProcess = startProcess(
     'web app',
