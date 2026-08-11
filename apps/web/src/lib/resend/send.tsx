@@ -34,16 +34,38 @@ const subjects: Record<keyof TemplateMap, (p: TemplateMap[keyof TemplateMap]) =>
   TrialEnding: () => `Your ${config.app.name} Pro trial ends soon`,
 };
 
+/**
+ * Thrown when Resend rejects a message. The SDK reports API failures in the returned
+ * `error` field rather than throwing, so without this every caller that forgets to
+ * check it fails silently — which is exactly how an unverified sending domain went
+ * unnoticed. Callers decide whether a failed notification is fatal; they can no longer
+ * decide it by accident.
+ */
+export class EmailSendError extends Error {
+  constructor(
+    readonly template: string,
+    readonly reason: string,
+  ) {
+    super(`Resend rejected the ${template} email: ${reason}`);
+    this.name = "EmailSendError";
+  }
+}
+
 export async function sendEmail<K extends keyof TemplateMap>({ to, template, props, subject }: SendArgs<K>) {
   const element = renderTemplate(template, props);
   const html = await render(element);
   const resend = getResend();
-  return resend.emails.send({
+  const { data, error } = await resend.emails.send({
     from: config.resend.from,
     to,
     subject: subject ?? subjects[template](props),
     html,
   });
+
+  if (error) {
+    throw new EmailSendError(template, `${error.name} — ${error.message}`);
+  }
+  return data;
 }
 
 function renderTemplate<K extends keyof TemplateMap>(template: K, props: TemplateMap[K]) {

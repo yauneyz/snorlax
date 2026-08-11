@@ -1,7 +1,10 @@
 // @vitest-environment node
 // The route reads server-only config; jsdom would take config's client branch.
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
+
+const track = vi.hoisted(() => vi.fn().mockResolvedValue(undefined));
+vi.mock("@/server/analytics/track", () => ({ track }));
 
 import { GET } from "@/app/api/desktop/download/route";
 import { config } from "@/lib/config";
@@ -25,6 +28,11 @@ describe("GET /api/desktop/download", () => {
       expect(response.headers.get("location")).toBe(
         `${config.extensionHosting.publicS3BaseUrl.replace(/\/+$/, "")}/app/${file}`,
       );
+      expect(track).toHaveBeenCalledWith(expect.objectContaining({
+        event: "download_clicked",
+        source: "server",
+        platform,
+      }));
     },
   );
 

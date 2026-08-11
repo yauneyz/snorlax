@@ -6,6 +6,7 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
 import { sendEmail } from "@/lib/resend/send";
 import { config } from "@/lib/config";
 import { captureException } from "@/lib/sentry";
+import { trackBillingEvent } from "@/server/analytics/billing";
 
 // Node runtime is required: we read the raw body (`text()`) for signature
 // verification, and the Edge runtime does not expose what Stripe needs.
@@ -19,6 +20,11 @@ const relevantEvents = new Set<Stripe.Event["type"]>([
   "customer.subscription.paused",
   "customer.subscription.resumed",
   "customer.subscription.trial_will_end",
+  // Renewals were previously invisible: `customer.subscription.updated` fires on renewal but
+  // does not tell you a payment cleared. Analytics-only — there is deliberately no `case` for
+  // it in the switch below, so it sends no email and syncs nothing. The subscription row is
+  // already accurate; only `subscription_renewed` needed a source.
+  "invoice.payment_succeeded",
   "invoice.payment_failed",
   "charge.refunded",
 ]);
@@ -50,6 +56,11 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ received: true, duplicate: true });
   }
 
+  // Before the switch, deliberately: this is payload-derived and makes no Stripe round trip,
+  // so the analytics row lands even when a later `retrieve` fails and we return 500 for Stripe
+  // to retry. It cannot throw, so it cannot cost us the sync below.
+  await trackBillingEvent(event);
+
   try {
     switch (event.type) {
       case "checkout.session.completed": {
@@ -72,22 +83,22 @@ export async function POST(request: NextRequest) {
         await syncSubscription(full);
 
         if (event.type === "customer.subscription.deleted") {
-          await notifyCancellation(full);
+          await notify(event, () => notifyCancellation(full));
         }
         break;
       }
       case "customer.subscription.trial_will_end": {
         // Stripe fires this three days out. It is a notification only — the row is
         // already accurate, so there is nothing to sync.
-        await notifyTrialEnding(event.data.object as Stripe.Subscription);
+        await notify(event, () => notifyTrialEnding(event.data.object as Stripe.Subscription));
         break;
       }
       case "invoice.payment_failed": {
-        await notifyPaymentFailed(event.data.object as Stripe.Invoice);
+        await notify(event, () => notifyPaymentFailed(event.data.object as Stripe.Invoice));
         break;
       }
       case "charge.refunded": {
-        await notifyRefund(event.data.object as Stripe.Charge);
+        await notify(event, () => notifyRefund(event.data.object as Stripe.Charge));
         break;
       }
     }
@@ -125,12 +136,39 @@ async function markProcessed(event: Stripe.Event) {
   }
 }
 
+/**
+ * Notification sends are best-effort, and deliberately cannot fail the webhook.
+ *
+ * By the time these run the authoritative state — the subscription row — is already
+ * written, so a non-2xx would buy nothing: Stripe would retry the whole event, re-running
+ * the sync and re-sending any email that did go out. A permanently undeliverable address
+ * is worse than useless here, because it would fail every retry for days and can get the
+ * endpoint disabled altogether, breaking sync for every customer over one bad address.
+ * So a failure is reported and the event still settles.
+ */
+async function notify(event: Stripe.Event, send: () => Promise<void>) {
+  try {
+    await send();
+  } catch (err) {
+    await captureException(err, {
+      eventId: event.id,
+      eventType: event.type,
+      where: "notify",
+    });
+  }
+}
+
 async function lookupProfileEmail(customerId: string): Promise<string | null> {
-  const { data } = await supabaseAdmin()
+  const { data, error } = await supabaseAdmin()
     .from("profiles")
     .select("email")
     .eq("stripe_customer_id", customerId)
     .maybeSingle<{ email: string }>();
+  // A lookup failure and a customer with no profile are indistinguishable to the caller
+  // (both skip the email), so the error has to be reported here or it is lost.
+  if (error) {
+    await captureException(error, { customerId, where: "lookupProfileEmail" });
+  }
   return data?.email ?? null;
 }
 

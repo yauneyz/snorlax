@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import { config } from "@/lib/config";
+import { ANALYTICS_ANON_COOKIE, parseAnonId } from "@/lib/analytics/anon-id";
+import { attributionFromRequest, classifyUserAgent } from "@/server/analytics/ingest";
+import { track } from "@/server/analytics/track";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -35,5 +38,17 @@ export async function GET(request: NextRequest) {
 
   const file = INSTALLERS[platform];
   const s3Url = `${normalizeBaseUrl(config.extensionHosting.publicS3BaseUrl)}/app/${file}`;
+  const props = {
+    platform,
+    ua_class: classifyUserAgent(request.headers.get("user-agent")),
+  };
+  await track({
+    event: "download_clicked",
+    source: "server",
+    anonId: parseAnonId(request.cookies.get(ANALYTICS_ANON_COOKIE)?.value),
+    platform,
+    attribution: attributionFromRequest(request, props),
+    props,
+  });
   return NextResponse.redirect(s3Url, { status: 302 });
 }

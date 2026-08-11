@@ -10,7 +10,7 @@
     "predev": "pnpm sync:env",
     "prebuild": "pnpm sync:env:build",
     "dev": "next dev",
-    "prod": "pnpm sync:env --mode=prod && next dev",
+    "prod": "pnpm sync:env --mode=prod && next dev -H 127.0.0.1",
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",

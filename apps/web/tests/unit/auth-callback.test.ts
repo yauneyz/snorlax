@@ -2,10 +2,12 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
 
 const exchangeCodeForSession = vi.hoisted(() => vi.fn());
+const track = vi.hoisted(() => vi.fn().mockResolvedValue(undefined));
 
 vi.mock("@/lib/supabase/server", () => ({
   supabaseServer: async () => ({ auth: { exchangeCodeForSession } }),
 }));
+vi.mock("@/server/analytics/track", () => ({ track }));
 
 import { GET } from "@/app/api/auth/callback/route";
 
@@ -14,7 +16,10 @@ function request(query: string): NextRequest {
 }
 
 describe("auth callback", () => {
-  beforeEach(() => exchangeCodeForSession.mockReset());
+  beforeEach(() => {
+    exchangeCodeForSession.mockReset();
+    track.mockClear();
+  });
 
   it("creates the session and redirects to a safe internal destination", async () => {
     exchangeCodeForSession.mockResolvedValue({ error: null });
@@ -47,5 +52,20 @@ describe("auth callback", () => {
     expect(response.headers.get("location")).toBe(
       "http://localhost:3000/signup?error=access_denied",
     );
+  });
+
+  it("records OAuth signup and login after the verified code exchange", async () => {
+    exchangeCodeForSession.mockResolvedValue({
+      data: { session: { user: { id: "00000000-0000-4000-8000-000000000010" } } },
+      error: null,
+    });
+    await GET(request("?code=valid&flow=signup"));
+    expect(track).toHaveBeenLastCalledWith(expect.objectContaining({
+      event: "account_created",
+      userId: "00000000-0000-4000-8000-000000000010",
+    }));
+
+    await GET(request("?code=valid&flow=login"));
+    expect(track).toHaveBeenLastCalledWith(expect.objectContaining({ event: "signed_in" }));
   });
 });

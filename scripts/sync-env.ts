@@ -705,10 +705,20 @@ function main() {
   // test-mode secret key regardless of `mode`, and stays local-only (never pushed to Vercel).
   // RESEND_TEST_ADDRESS is local-only for the same reason: it is the inbox
   // `pnpm web:test:email` delivers to, and no deployed code path reads it.
+  // The insights dashboards (analytics-arch.md §12) read BOTH Supabase targets, always, so
+  // /insights (production) and /insights/dev (local postgres) both work from one locally
+  // running server no matter which `--mode` it was started with. These are local-only by
+  // construction rather than by policy: `pushToVercel` iterates `webPairs` and returns above,
+  // so nothing appended here can ever reach a deployment.
   const localWebPairs: Array<[string, string]> = [
     ...webPairs,
     ["STRIPE_CLI_API_KEY", creds.stripe.secret_key_test],
     ["RESEND_TEST_ADDRESS", creds.resend.email_test_address],
+    ["ANALYTICS_DASHBOARD", "1"],
+    ["ANALYTICS_PROD_SUPABASE_URL", creds.supabase.prod.url],
+    ["ANALYTICS_PROD_SUPABASE_SECRET_KEY", creds.supabase.prod.secret_key],
+    ["ANALYTICS_DEV_SUPABASE_URL", creds.supabase.dev.url],
+    ["ANALYTICS_DEV_SUPABASE_SECRET_KEY", creds.supabase.dev.secret_key],
   ];
 
   writeEnvFile(WEB_ENV_OUT, localWebPairs, mode);

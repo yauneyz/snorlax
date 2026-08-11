@@ -15,8 +15,10 @@
  */
 
 import { spawn } from 'node:child_process';
+import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
+import { parseEnv } from 'node:util';
 
 import {
   assertPortAvailable,
@@ -212,12 +214,26 @@ async function main() {
   announce('generating local environment files');
   await run(pnpm, ['sync:env']);
 
+  // Always authenticate the Stripe CLI with the test key selected by sync-env. A cached
+  // `stripe login` credential may belong to another account or have expired, and should not
+  // decide whether this repo can start. Keep the key in the child environment rather than in
+  // argv so it is not exposed by process-listing tools.
+  const generatedWebEnv = parseEnv(readFileSync(resolve(web, '.env.local'), 'utf8'));
+  const stripeCliApiKey = generatedWebEnv.STRIPE_CLI_API_KEY;
+  if (!stripeCliApiKey) {
+    throw new Error('sync:env did not generate STRIPE_CLI_API_KEY in apps/web/.env.local');
+  }
+  const stripeEnv = { ...process.env, STRIPE_API_KEY: stripeCliApiKey };
+
   announce('starting local Supabase services');
   await attempt('local Supabase services', () => run('supabase', ['start'], { cwd: web }));
 
   announce('reading Stripe CLI webhook secret');
   const secret = await attempt('reading the Stripe CLI webhook secret', async () => {
-    const secretOutput = await run(stripe, ['listen', '--print-secret'], { capture: true });
+    const secretOutput = await run(stripe, ['listen', '--print-secret'], {
+      capture: true,
+      env: stripeEnv,
+    });
     const webhookSecret = secretOutput.match(/whsec_[A-Za-z0-9]+/)?.[0];
     if (!webhookSecret) {
       throw new Error(
@@ -228,7 +244,12 @@ async function main() {
   });
 
   if (secret.ok) {
-    startProcess('Stripe webhook listener', stripe, ['listen', '--forward-to', webhookUrl]);
+    startProcess(
+      'Stripe webhook listener',
+      stripe,
+      ['listen', '--forward-to', webhookUrl],
+      stripeEnv,
+    );
   } else {
     warnDummy('skipping the webhook listener; Stripe events will not reach the web app');
   }

@@ -9,19 +9,19 @@
 import { z } from "zod";
 import { normalizeSentryDsn } from "./sentry/config";
 
-const supabaseProjectUrl = z
-  .string()
-  .url()
-  .transform((value) => {
-    const url = new URL(value);
-    const servicePath = /\/(?:rest|auth|storage|functions|realtime)\/v\d+\/?$/;
-    url.pathname = url.pathname.replace(servicePath, "");
-    url.search = "";
-    url.hash = "";
-    return url.toString().replace(/\/$/, "");
-  });
+function normalizeSupabaseUrl(value: string): string {
+  const url = new URL(value);
+  const servicePath = /\/(?:rest|auth|storage|functions|realtime)\/v\d+\/?$/;
+  url.pathname = url.pathname.replace(servicePath, "");
+  url.search = "";
+  url.hash = "";
+  return url.toString().replace(/\/$/, "");
+}
 
-const optionalPosthogKey = z
+const supabaseProjectUrl = z.string().url().transform(normalizeSupabaseUrl);
+
+/** A value containing `...` is a placeholder copied from `.credentials.example`. */
+const optionalStripped = z
   .string()
   .optional()
   .default("")
@@ -29,6 +29,18 @@ const optionalPosthogKey = z
     const trimmed = value.trim();
     return trimmed.includes("...") ? "" : trimmed;
   });
+
+const optionalPosthogKey = optionalStripped;
+
+/** Like `supabaseProjectUrl` but tolerates absence — an unconfigured target is not an error. */
+const optionalSupabaseProjectUrl = optionalStripped.transform((value, ctx) => {
+  if (value === "") return "";
+  if (!z.string().url().safeParse(value).success) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: "must be a URL or empty" });
+    return z.NEVER;
+  }
+  return normalizeSupabaseUrl(value);
+});
 
 const optionalSentryDsn = z.string().optional().default("").transform(normalizeSentryDsn);
 const booleanEnv = z
@@ -86,6 +98,17 @@ const serverSchemaBase = publicSchema.extend({
     .string()
     .regex(/^[A-Za-z0-9+/=]{43,}$/, "must be base64 of ≥32 bytes"),
   OAUTH_STATE_SECRET: z.string().min(32),
+
+  // Insights dashboard (analytics-arch.md §12). All five are optional and default to empty
+  // because `scripts/sync-env.ts` writes them only into the local `.env.local` and never to
+  // Vercel — a required field here would fail `next build` for every deployment. Both target
+  // credential sets are written regardless of `--mode`, so /insights (prod) and /insights/dev
+  // (local postgres) both work from one locally-running server.
+  ANALYTICS_DASHBOARD: z.enum(["0", "1"]).optional().default("0"),
+  ANALYTICS_PROD_SUPABASE_URL: optionalSupabaseProjectUrl,
+  ANALYTICS_PROD_SUPABASE_SECRET_KEY: optionalStripped,
+  ANALYTICS_DEV_SUPABASE_URL: optionalSupabaseProjectUrl,
+  ANALYTICS_DEV_SUPABASE_SECRET_KEY: optionalStripped,
 });
 
 /** "test" | "live" for a prefixed Stripe key; null for placeholders we shouldn't judge. */
@@ -280,6 +303,26 @@ export const config = {
     oauthStateSecret: isServer
       ? (parsed as z.infer<typeof serverSchema>).OAUTH_STATE_SECRET
       : "",
+  },
+  /**
+   * The two analytics read targets. Deliberately separate from `config.supabase`, which
+   * follows whichever mode the server was started in: the dashboards must show the same two
+   * datasets under `pnpm web:dev` and `pnpm web:prod` alike.
+   */
+  insights: {
+    enabled: isServer ? (parsed as z.infer<typeof serverSchema>).ANALYTICS_DASHBOARD === "1" : false,
+    prod: {
+      url: isServer ? (parsed as z.infer<typeof serverSchema>).ANALYTICS_PROD_SUPABASE_URL : "",
+      secretKey: isServer
+        ? (parsed as z.infer<typeof serverSchema>).ANALYTICS_PROD_SUPABASE_SECRET_KEY
+        : "",
+    },
+    dev: {
+      url: isServer ? (parsed as z.infer<typeof serverSchema>).ANALYTICS_DEV_SUPABASE_URL : "",
+      secretKey: isServer
+        ? (parsed as z.infer<typeof serverSchema>).ANALYTICS_DEV_SUPABASE_SECRET_KEY
+        : "",
+    },
   },
 } as const;
 

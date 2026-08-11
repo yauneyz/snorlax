@@ -3,6 +3,7 @@ import { useState } from "react";
 import { supabaseBrowser } from "@/lib/supabase/browser";
 import { config } from "@/lib/config";
 import { safeInternalPath } from "@/lib/auth/redirects";
+import { trackEvent } from "@/lib/analytics/posthog-client";
 
 type Props = { next?: string; mode: "login" | "signup"; initialError?: string };
 
@@ -15,6 +16,9 @@ export function OAuthButtons({ next, mode, initialError }: Props) {
   const handleGoogle = async () => {
     setPending(true);
     setError(null);
+    if (mode === "signup") {
+      await trackEvent("signup_started", { method: "google", surface: "web" }, { beacon: true });
+    }
     try {
       const client = supabaseBrowser();
       const callback = new URL("/api/auth/callback", config.app.url);

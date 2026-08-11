@@ -8,13 +8,48 @@ import {
   ENTITLEMENT_GRACE_COOKIE,
   entitlementGraceCookieIsValid,
 } from "@/lib/auth/entitlement-grace";
+import {
+  ANALYTICS_ANON_COOKIE,
+  ANALYTICS_ANON_MAX_AGE_SECONDS,
+  mintAnonId,
+  parseAnonId,
+} from "@/lib/analytics/anon-id";
+
+function setAnonCookie(response: NextResponse, anonId: string): NextResponse {
+  response.cookies.set(ANALYTICS_ANON_COOKIE, anonId, {
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    path: "/",
+    maxAge: ANALYTICS_ANON_MAX_AGE_SECONDS,
+  });
+  return response;
+}
+
+function apiResponseWithAnonId(request: NextRequest): NextResponse {
+  const existing = parseAnonId(request.cookies.get(ANALYTICS_ANON_COOKIE)?.value);
+  if (existing) return NextResponse.next();
+
+  const anonId = mintAnonId();
+  // Forward the minted value to the route as well as the browser. This keeps a person's
+  // very first request — often the high-integrity download redirect — attributable.
+  const headers = new Headers(request.headers);
+  const cookie = headers.get("cookie");
+  headers.set("cookie", `${cookie ? `${cookie}; ` : ""}${ANALYTICS_ANON_COOKIE}=${anonId}`);
+  return setAnonCookie(NextResponse.next({ request: { headers } }), anonId);
+}
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const kind = classifyPath(pathname);
 
-  // Pass-through for assets and API routes; API handlers do their own auth.
-  if (kind === "asset" || kind === "api") return NextResponse.next();
+  // Assets skip entirely. API handlers do their own auth, but analytics and download API
+  // requests still need the anonymous identity without paying for entitlement round trips.
+  if (kind === "asset") return NextResponse.next();
+  if (kind === "api") return apiResponseWithAnonId(request);
+
+  const anonId =
+    parseAnonId(request.cookies.get(ANALYTICS_ANON_COOKIE)?.value) ?? mintAnonId();
+  const shouldSetAnonId = !parseAnonId(request.cookies.get(ANALYTICS_ANON_COOKIE)?.value);
 
   const { client, response } = supabaseMiddleware(request);
   const {
@@ -52,6 +87,7 @@ export async function middleware(request: NextRequest) {
   }
 
   const finish = (result: NextResponse) => {
+    if (shouldSetAnonId) setAnonCookie(result, anonId);
     if (graceCookie === null) {
       result.cookies.delete(ENTITLEMENT_GRACE_COOKIE);
     } else if (graceCookie) {

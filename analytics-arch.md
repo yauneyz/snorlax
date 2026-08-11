@@ -3,10 +3,11 @@
 > Cross-surface analytics for Talysman: web (Next.js), desktop (Electron), privileged service,
 > browser extension, and Stripe. A small identity graph stitches people across visits and devices;
 > a two-tier storage model keeps lifetime milestones as raw events and daily engagement as
-> pre-aggregated rollups. Dashboard is a dev-only route reading production Supabase from
+> pre-aggregated rollups. Two dev-only dashboard routes read production and local Supabase from
 > `localhost:3000`.
 >
-> Status: **design**. Nothing in this document is implemented yet.
+> Status: **implemented through Phase 4**. See `analytics-plan.md` for the corrected runnable
+> design and remaining Phases 5–8.
 
 ---
 
@@ -128,7 +129,7 @@ you delete one function body and lose nothing.
 ### 4.1 The three identifiers
 
 **`anon_id`** — UUID in a first-party cookie `tal_aid`, set server-side in middleware, `Max-Age`
-400 days (Chrome's cap), `SameSite=Lax`, `Secure`, **not** `httpOnly`. Not httpOnly on purpose: we
+400 days (Chrome's cap), `SameSite=Lax`, `Secure` in production, **not** `httpOnly`. Not httpOnly on purpose: we
 want client JS to hand the same id to PostHog so both stores agree on who is who. It is an opaque
 analytics id, not a credential — nothing is authorized by holding it.
 
@@ -686,7 +687,7 @@ params; it is never overwritten afterwards.
 
 ### 9.1 The seam
 
-`apps/web/src/lib/analytics/track.ts` — server-side, the only thing that writes:
+`apps/web/src/server/analytics/track.ts` — server-side, the only thing that writes:
 
 ```ts
 export async function track(input: TrackInput): Promise<void>
@@ -909,44 +910,25 @@ group by 1 order by 1 desc;
 
 ---
 
-## 12. The dashboard
+## 12. The dashboards
 
-### 12.1 Production Supabase from localhost already works
+### 12.1 Two stable targets
 
-This is the part flagged as tricky, and the repo already solves it — `pnpm web:prod` runs
-`sync:env --mode=prod && next dev`, i.e. **`next dev` on port 3000 against production Supabase**.
-Nothing new to build for data access; the dashboard reads through `supabaseAdmin()` with the
-production secret key that `sync-env` writes into `apps/web/.env.local`.
+`/insights` always reads the dedicated production analytics credentials and `/insights/dev`
+always reads the local Supabase credentials. Neither uses `config.supabase` or
+`supabaseAdmin()`, so both routes show the same datasets under `pnpm web:dev` and
+`pnpm web:prod`. `src/server/analytics/db.ts` module-caches one service-role client per target and
+adds a four-second timeout. Request-cached panel queries return discriminated errors rather than
+throwing.
 
-One caveat, from `scripts/sync-env.ts`: prod mode deliberately pairs production Supabase with
-**test** Stripe, because "`pnpm web:prod` is prod infrastructure on a laptop, not a customer-facing
-deployment." That does not affect the dashboard — every number it renders comes from the analytics
-tables, which the *real* production webhook and *real* installed clients wrote. Just don't expect
-Stripe API calls made from your laptop to hit live data.
+### 12.2 Keeping them off production
 
-So: `pnpm web:prod`, open `localhost:3000/insights`. No admin auth, no new infrastructure.
-
-### 12.2 Keeping it off production
-
-Two independent guards, because one is a typo away from leaking your whole funnel publicly:
-
-```tsx
-// apps/web/src/app/(dev)/insights/layout.tsx
-import { notFound } from "next/navigation";
-
-export default function InsightsLayout({ children }: { children: React.ReactNode }) {
-  // Vercel builds run with NODE_ENV=production, so the route 404s there regardless of env.
-  if (process.env.NODE_ENV === "production") notFound();
-  if (process.env.ANALYTICS_DASHBOARD !== "1") notFound();
-  return <>{children}</>;
-}
-```
-
-`NODE_ENV` alone is sufficient in practice; `ANALYTICS_DASHBOARD` is the belt to its braces, gated
-so `sync-env.ts` only writes it into the local `.env.local` and never into a Vercel environment.
-
-All pages are React Server Components querying `supabaseAdmin()` directly — no API routes, no
-client fetching, no auth. It is a local page reading a local env file.
+Both routes live under `src/app/(dev)` and are protected by two independent guards:
+`NODE_ENV === "production"` always returns 404 on a deployment, and the locally-synced
+`config.insights.enabled` flag must also be true. There are no route handlers under the group.
+The pages are force-dynamic server components, excluded from page-view tracking, robots, and the
+sitemap. `/insights/dev` has a sticky warning banner and stable `data-insights-target="dev"` hook;
+each dashboard links to the other.
 
 ### 12.3 Panels
 
@@ -1018,7 +1000,8 @@ not-yet-signed-in desktops are exactly the population being measured. So:
 - **Clamp `occurred_at`** into `received_at ± 24h`.
 - **Never trust client-supplied `anon_id` or `user_id`.** Read `anon_id` from the cookie; derive
   `user_id` from the bearer token. Only `device_id` is client-asserted, and it authorizes nothing.
-- **Filter bots** on `page_viewed` by user-agent before inserting.
+- **Classify bots** on `page_viewed` as `props.ua_class = 'bot'`, retain the raw row, and filter it
+  in funnel views so the decision remains reversible and countable.
 
 **Privacy.** This matters more than usual here, because you sell a privacy-respecting local
 blocker and daily telemetry is exactly the thing a skeptical user will look for.
@@ -1052,18 +1035,19 @@ no-op.
 
 Each phase is independently useful; stop after any of them and you are better off than today.
 
-**Phase 1 — foundation.** Migration `0006_analytics.sql`, `analytics_link`,
+**Phase 1 — foundation (complete).** Migration `0006_analytics.sql`, `analytics_link`,
 `analytics_report_usage`, the `track()` seam, `POST /api/analytics/track`, `tal_aid` in middleware,
 PostHog key in `.credentials`.
 
-**Phase 2 — the web funnel.** `page_viewed`, `download_clicked` (server-side in the redirect
+**Phase 2 — the web funnel (complete).** `page_viewed`, `download_clicked` (server-side in the redirect
 route), `signup_started`, `account_created`, `signed_in`. *Do the download route first — highest
 integrity signal you have, and about ten lines.*
 
-**Phase 3 — the dashboard.** `analytics_funnel` view, `/insights` with the funnel panel, channel
-table, and raw stream. Confirm phase 2 works before instrumenting anything harder.
+**Phase 3 — the dashboards (complete).** Migration `0007_analytics_views.sql`, dedicated prod/dev
+target clients, `/insights`, `/insights/dev`, all eight operational panels, migration state, and
+raw streams.
 
-**Phase 4 — billing.** Webhook events, `checkout_started`, and the `invoice.payment_succeeded`
+**Phase 4 — billing (complete).** Webhook events, `checkout_started`, and the `invoice.payment_succeeded`
 addition. Entirely server-side, so this is the most reliable data in the system.
 
 **Phase 5 — desktop milestones.** `device_id`, the offline queue, `app_installed`, the

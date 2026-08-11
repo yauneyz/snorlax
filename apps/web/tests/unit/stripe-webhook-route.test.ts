@@ -12,6 +12,7 @@ const mocks = vi.hoisted(() => ({
   syncSubscription: vi.fn(),
   sendEmail: vi.fn(),
   captureException: vi.fn(),
+  track: vi.fn(),
 }));
 
 vi.mock("@/lib/stripe/client", () => ({
@@ -31,6 +32,13 @@ vi.mock("@/lib/resend/send", () => ({
 
 vi.mock("@/lib/sentry", () => ({
   captureException: mocks.captureException,
+}));
+
+// The analytics seam is stubbed so these tests stay about billing. `trackBillingEvent` is
+// covered directly in tests/unit/analytics-billing.test.ts.
+vi.mock("@/server/analytics/track", () => ({
+  track: mocks.track,
+  reportUsage: vi.fn(),
 }));
 
 vi.mock("@/lib/supabase/admin", () => ({
@@ -237,6 +245,103 @@ describe("POST /api/stripe/webhook", () => {
     expect(duplicate.status).toBe(200);
     expect(await duplicate.json()).toMatchObject({ received: true, duplicate: true });
     expect(mocks.sendEmail).toHaveBeenCalledTimes(1);
+  });
+
+  it("reports a rejected email to Sentry but still settles the event", async () => {
+    // A notification failure must not 500: Stripe would retry the whole event, and a
+    // permanently undeliverable address could fail for days and get the endpoint disabled.
+    mocks.sendEmail.mockRejectedValueOnce(new Error("Resend rejected the PaymentFailed email"));
+
+    const response = await POST(
+      request(
+        event("invoice.payment_failed", "evt_email_failed", {
+          customer: "cus_123",
+          amount_due: 1000,
+          currency: "usd",
+        }),
+      ),
+    );
+
+    expect(response.status).toBe(200);
+    expect(state.processed.has("evt_email_failed")).toBe(true);
+    expect(mocks.captureException).toHaveBeenCalledWith(
+      expect.objectContaining({ message: "Resend rejected the PaymentFailed email" }),
+      expect.objectContaining({ eventId: "evt_email_failed", where: "notify" }),
+    );
+  });
+
+  it("keeps syncing when only the notification fails", async () => {
+    // The subscription row is authoritative; a failed cancellation email must not undo it.
+    mocks.sendEmail.mockRejectedValueOnce(new Error("Resend unavailable"));
+
+    const response = await POST(
+      request(event("customer.subscription.deleted", "evt_cancel_email_failed", subscription)),
+    );
+
+    expect(response.status).toBe(200);
+    expect(mocks.syncSubscription).toHaveBeenCalledTimes(1);
+    expect(mocks.captureException).toHaveBeenCalledOnce();
+  });
+
+  it("emits subscription_renewed for a cycle invoice without emailing or syncing", async () => {
+    // invoice.payment_succeeded is analytics-only. Renewals were previously invisible:
+    // customer.subscription.updated fires on renewal but does not say a payment cleared.
+    const response = await POST(
+      request(
+        event("invoice.payment_succeeded", "evt_renewal", {
+          id: "in_cycle",
+          billing_reason: "subscription_cycle",
+          customer: "cus_123",
+          amount_paid: 900,
+          currency: "usd",
+        }),
+      ),
+    );
+
+    expect(response.status).toBe(200);
+    expect(mocks.track).toHaveBeenCalledWith(
+      expect.objectContaining({ event: "subscription_renewed", source: "server" }),
+    );
+    // The subscription row is already accurate, and a renewal is not something to email about.
+    expect(mocks.syncSubscription).not.toHaveBeenCalled();
+    expect(mocks.sendEmail).not.toHaveBeenCalled();
+  });
+
+  it("does not count the first invoice of a new subscription as a renewal", async () => {
+    const response = await POST(
+      request(
+        event("invoice.payment_succeeded", "evt_first_invoice", {
+          id: "in_create",
+          billing_reason: "subscription_create",
+          customer: "cus_123",
+        }),
+      ),
+    );
+
+    expect(response.status).toBe(200);
+    expect(mocks.track).not.toHaveBeenCalled();
+  });
+
+  it("records the analytics event before the sync, so a 500 does not lose it", async () => {
+    // Tracking is payload-derived and runs before any Stripe round trip. Stripe retries the
+    // whole event, and the once-per-person idempotency keys make the replay a no-op.
+    mocks.syncSubscription.mockRejectedValueOnce(new Error("Supabase unavailable"));
+
+    const response = await POST(
+      request(
+        event("customer.subscription.created", "evt_track_before_sync", {
+          ...subscription,
+          status: "trialing",
+          trial_end: 1_800_000_000,
+          items: { data: [{ price: { id: "price_monthly" }, current_period_end: 1_800_000_000 }] },
+        }),
+      ),
+    );
+
+    expect(response.status).toBe(500);
+    expect(mocks.track).toHaveBeenCalledWith(
+      expect.objectContaining({ event: "trial_started", source: "server" }),
+    );
   });
 
   it("returns 500 on a handler failure and succeeds on Stripe's retry", async () => {

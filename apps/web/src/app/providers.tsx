@@ -2,13 +2,14 @@
 import { useState, useEffect } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
-import { usePathname, useSearchParams } from "next/navigation";
+import { usePathname } from "next/navigation";
 import posthog from "posthog-js";
 import { PostHogProvider } from "posthog-js/react";
 import { config } from "@/lib/config";
 import { captureException } from "@/lib/sentry";
 import { recoveryRedirectForAuthEvent } from "@/lib/auth/recovery";
 import { supabaseBrowser } from "@/lib/supabase/browser";
+import { trackEvent } from "@/lib/analytics/posthog-client";
 
 function makeQueryClient() {
   return new QueryClient({
@@ -23,14 +24,29 @@ function makeQueryClient() {
   });
 }
 
-function PostHogPageview() {
+function AnalyticsPageview({ posthogReady }: { posthogReady: boolean }) {
   const pathname = usePathname();
-  const searchParams = useSearchParams();
   useEffect(() => {
-    if (!config.posthog.key) return;
-    const url = window.location.origin + pathname + (searchParams.toString() ? `?${searchParams}` : "");
+    if (pathname.startsWith("/insights")) return;
+    let referrerHost: string | undefined;
+    try {
+      referrerHost = document.referrer ? new URL(document.referrer).hostname : undefined;
+    } catch {
+      referrerHost = undefined;
+    }
+    void trackEvent("page_viewed", {
+      path: pathname,
+      title: document.title,
+      ...(referrerHost ? { referrer_host: referrerHost } : {}),
+    });
+  }, [pathname]);
+
+  useEffect(() => {
+    if (!posthogReady || pathname.startsWith("/insights")) return;
+    const query = window.location.search.replace(/^\?/, "");
+    const url = window.location.origin + pathname + (query ? `?${query}` : "");
     posthog.capture("$pageview", { $current_url: url });
-  }, [pathname, searchParams]);
+  }, [pathname, posthogReady]);
   return null;
 }
 
@@ -50,7 +66,10 @@ function SupabaseAuthSync() {
       }
       if (event === "SIGNED_IN" && session?.user) {
         if (config.posthog.key) {
-          posthog.identify(session.user.id, { email: session.user.email });
+          // Identify by opaque user id only — deliberately no email. `analytics_events.user_id`
+          // joins to `profiles` when an address is actually needed, so copying one into a
+          // third-party analytics store buys nothing and puts PII somewhere we do not control.
+          posthog.identify(session.user.id);
         }
       } else if (event === "SIGNED_OUT") {
         if (config.posthog.key) posthog.reset();
@@ -78,6 +97,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
   const tree = (
     <QueryClientProvider client={queryClient}>
       <SupabaseAuthSync />
+      <AnalyticsPageview posthogReady={posthogReady} />
       {children}
       {config.app.environment === "development" ? <ReactQueryDevtools /> : null}
     </QueryClientProvider>
@@ -86,7 +106,6 @@ export function Providers({ children }: { children: React.ReactNode }) {
   if (!config.posthog.key) return tree;
   return (
     <PostHogProvider client={posthog}>
-      {posthogReady ? <PostHogPageview /> : null}
       {tree}
     </PostHogProvider>
   );

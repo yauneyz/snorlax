@@ -5,6 +5,7 @@ import Link from "next/link";
 import { supabaseBrowser } from "@/lib/supabase/browser";
 import { loginSchema } from "@/lib/zod/auth";
 import { safeInternalPath } from "@/lib/auth/redirects";
+import { trackEvent } from "@/lib/analytics/posthog-client";
 
 type Props = { next?: string; initialError?: string };
 
@@ -25,12 +26,17 @@ export function LoginForm({ next = "/app", initialError }: Props) {
     }
     setPending(true);
     const client = supabaseBrowser();
-    const { error: err } = await client.auth.signInWithPassword(parsed.data);
+    const { data, error: err } = await client.auth.signInWithPassword(parsed.data);
     setPending(false);
     if (err) {
       setError(err.message);
       return;
     }
+    await trackEvent(
+      "signed_in",
+      { method: "password", surface: "web" },
+      { accessToken: data.session.access_token },
+    );
     router.push(safeInternalPath(next));
     router.refresh();
   };

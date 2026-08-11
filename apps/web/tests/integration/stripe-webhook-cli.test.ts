@@ -34,6 +34,11 @@ const state = vi.hoisted(() => ({
   processedEvents: new Map<string, string>(),
   emails: [] as Array<{ to: string; template: string }>,
   errors: [] as unknown[],
+  // The analytics seam is NOT stubbed here: this suite drives real Stripe events through the
+  // real handler, so it is the only place the payload-derived billing mapping is exercised
+  // against payloads Stripe actually sends rather than hand-written fixtures.
+  analyticsEvents: [] as Array<Record<string, unknown>>,
+  linkedIdentifiers: [] as string[][],
 }));
 
 vi.mock("@/lib/supabase/admin", () => {
@@ -69,8 +74,20 @@ vi.mock("@/lib/supabase/admin", () => {
       if (name === "subscriptions") state.subscriptions.set(row.id, row);
       return { error: null };
     },
+    insert: async (row: Record<string, unknown>) => {
+      if (name === "analytics_events") state.analyticsEvents.push(row);
+      return { error: null };
+    },
   });
-  return { supabaseAdmin: () => ({ from: table }) };
+  const rpc = async (fn: string, args: Record<string, unknown>) => {
+    if (fn === "analytics_link") {
+      state.linkedIdentifiers.push(args.p_identifiers as string[]);
+      return { data: "person-cli-test", error: null };
+    }
+    if (fn === "analytics_report_usage") return { data: 0, error: null };
+    return { data: null, error: null };
+  };
+  return { supabaseAdmin: () => ({ from: table, rpc }) };
 });
 
 vi.mock("@/lib/resend/send", () => ({
@@ -250,6 +267,41 @@ describe.skipIf(!enabled)("stripe webhook via CLI", () => {
     );
     const email = state.emails.find((e) => e.template === "PaymentFailed");
     expect(email?.to).toBe("cli-test@example.com");
+  });
+
+  it("records analytics for real Stripe payloads, scoped to the resolved user", () => {
+    // Fixture-driven unit tests can only prove the mapping matches what we *think* Stripe
+    // sends. This is the one place it meets the real thing.
+    expect(state.analyticsEvents.length).toBeGreaterThan(0);
+
+    for (const row of state.analyticsEvents) {
+      expect(row.source).toBe("server");
+      // Identity must come from the payload metadata or the profiles lookup — never be left
+      // null, or the event cannot join to a person and the revenue panel reads empty.
+      expect(row.user_id).toBe("user-cli-test");
+      expect(row.occurred_at).toBeTruthy();
+    }
+
+    // Every billing signal is server-side and user-scoped, so the identity graph should only
+    // ever be asked to link a user identifier here.
+    for (const identifiers of state.linkedIdentifiers) {
+      expect(identifiers).toEqual(["user:user-cli-test"]);
+    }
+
+    const names = state.analyticsEvents.map((r) => r.event);
+    expect(names).toContain("payment_failed");
+    // Only the taxonomy's billing events may come from this route.
+    for (const name of names) {
+      expect([
+        "trial_started",
+        "subscription_started",
+        "subscription_renewed",
+        "subscription_canceled",
+        "subscription_ended",
+        "payment_failed",
+        "refund_issued",
+      ]).toContain(name);
+    }
   });
 
   it("processed every relevant delivery without handler failures", () => {
