@@ -3,8 +3,8 @@
  * Local NixOS release for the Talysman/snorlax desktop app.
  *
  * Builds the Linux artifacts with the repo's own toolchain, adds the AppImage to
- * /nix/store, and writes+stages
- * ~/nixos-config/pkgs/snorlax/release.nix so the next `nixos-rebuild` picks up the
+ * /nix/store, and writes+stages the current host's
+ * ~/nixos-config/pkgs/snorlax/releases/<host>.nix so `nixos-rebuild` picks up the
  * new version. pkgs/snorlax/default.nix wraps that AppImage via appimageTools.
  *
  * The privileged daemon is NOT shipped via this AppImage on NixOS — it is built from
@@ -190,14 +190,22 @@ function installIntoNixStore(version) {
     throw new Error(`${nixSnorlaxDir} not found — create pkgs/snorlax in nixos-config first`);
   }
   if (dryRun) {
-    console.log('🧪 [DRY RUN] would nix-store --add-fixed + write release.nix');
+    console.log('🧪 [DRY RUN] would nix-store --add-fixed + write the host release file');
     return;
   }
 
   const storePath = capture('nix-store', ['--add-fixed', 'sha256', stableAppImage]);
   const sha256 = capture('nix-hash', ['--type', 'sha256', '--flat', '--base32', stableAppImage]);
 
-  const releaseNix = join(nixSnorlaxDir, 'release.nix');
+  const releaseHost = hostname().split('.')[0];
+  if (!/^[A-Za-z0-9_-]+$/.test(releaseHost)) {
+    throw new Error(`Invalid release hostname: ${releaseHost}`);
+  }
+  const releasesDir = join(nixSnorlaxDir, 'releases');
+  if (!existsSync(releasesDir)) {
+    throw new Error(`${releasesDir} not found — update nixos-config before releasing`);
+  }
+  const releaseNix = join(releasesDir, `${releaseHost}.nix`);
   const body =
     `{\n` +
     `  version = "${version}";\n` +
@@ -212,7 +220,11 @@ function installIntoNixStore(version) {
 
   const repoRoot = capture('git', ['rev-parse', '--show-toplevel'], { cwd: nixSnorlaxDir });
   run('git', ['add', '-f', relative(repoRoot, releaseNix)], { cwd: repoRoot });
-  const visible = capture('nix', ['eval', '--raw', '.#snorlax.version'], { cwd: repoRoot });
+  const visible = capture(
+    'nix',
+    ['eval', '--raw', `.#nixosConfigurations.${releaseHost}.pkgs.snorlax.version`],
+    { cwd: repoRoot },
+  );
   if (visible !== version) {
     throw new Error(`flake sees snorlax ${visible}, expected ${version}`);
   }

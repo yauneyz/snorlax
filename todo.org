@@ -1,4 +1,10 @@
-- homepage media
+- test production email
+- finish analytics, be able to view dashboard
+- build production email lifescycle
+- finish live SEO pages
+- Thinky credentials
+- Thinky cancel heroku
+
 - get analytics
 Track these events:
 Landing page viewed
@@ -17,45 +23,13 @@ Subscription renewed
 Subscription canceled
 
 
-- Email: lifecycle first, newsletter second
--Installed but did not pair a key: help finish setup
--Paired but did not start a session: offer a preconfigured 25-minute block
--Completed first session: prompt them to schedule the next one
--Inactive for three days: bring them back with one-click session settings
--Trial ending: summarize sessions and focus time protected
--Weekly: show sessions completed, hours protected and the next scheduled block
-
-
-- Social Proof:
-Three strong testimonials
-One detailed developer case study
-One case study from a second segment
-Several weeks of actual use
-Specific results rather than general praise
-
-Your testimonial interviews should ask:
-
-Which blockers had you previously used?
-How did you override them?
-What work were you avoiding?
-What distraction did you open?
-What happened the first time Talysman stopped you?
-How many weeks have you continued using it?
-What did you complete during those sessions?
-What nearly caused you to stop using Talysman?
-
-
-
-
-For visitors who are not ready to install, offer something tightly connected to the product:
-
-The five-day Desktop Distraction Reset
-
-That sequence could help them identify their highest-cost distraction, remove obvious triggers, run a protected work block and create a recurring schedule. Talysman should be the natural implementation tool—not an advertisement awkwardly inserted into generic advice.
-
 - SEO pages media
 ======================================================
 - get a basic video runnign
+*
+
+*
+
 * part 1: demo
 - payments
 - web app is reasonable
