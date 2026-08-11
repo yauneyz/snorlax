@@ -1,0 +1,9 @@
+{
+  // Next compiles the app itself, so the base config leaves JSX untouched ("preserve").
+  // tsx has no such compiler behind it: scripts that render the email templates directly
+  // need the automatic runtime, or the templates hit `React is not defined` at render time.
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "jsx": "react-jsx"
+  }
+}

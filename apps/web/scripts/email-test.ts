@@ -220,6 +220,15 @@ async function main() {
       continue;
     }
 
+    // react-dom logs a failed component render and still resolves with salvaged HTML, so a
+    // broken template would otherwise "send" as an empty shell. Every template interpolates
+    // the app name, which makes its absence a reliable sign the body never rendered.
+    if (!html.includes(credentials.app.name)) {
+      console.error(`✗ ${template}: rendered HTML is missing "${credentials.app.name}" — not sending.`);
+      failures += 1;
+      continue;
+    }
+
     if (args.dryRun) {
       console.log(`✓ ${template}: rendered ${html.length} bytes — "${subject}" (not sent)`);
       continue;
