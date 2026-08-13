@@ -1,7 +1,7 @@
 /**
- * System tray. The icon mirrors the service's USB key presence (green = key present, red =
- * absent) by subscribing to keyPresenceChanged. In dev (mock) the menu offers a toggle so you
- * can flip the simulated key.
+ * System tray. The icon mirrors whether blocking is active (green = focus on, gray = focus off)
+ * by subscribing to focusChanged. In dev (mock) the menu offers a toggle so you can flip the
+ * simulated key.
  */
 
 import { join } from 'node:path';
@@ -14,8 +14,8 @@ import { showMainWindow } from './window.js';
 
 let tray: Tray | null = null;
 
-function iconFor(present: boolean): Electron.NativeImage {
-  const file = present ? 'tray-green.png' : 'tray-red.png';
+function iconFor(active: boolean): Electron.NativeImage {
+  const file = active ? 'tray-green.png' : 'tray-gray.png';
   const img = nativeImage.createFromPath(join(process.resourcesPath ?? __dirname, file));
   // Fall back to an empty image if the asset is missing so the app still runs in dev.
   return img.isEmpty()
@@ -27,9 +27,13 @@ export function createTray(service: ServiceConnection, mock?: MockServiceConnect
   tray = new Tray(iconFor(false));
   tray.setToolTip('Talysman');
 
-  const rebuildMenu = (present: boolean) => {
+  let keyPresent = false;
+  let blockingActive = false;
+
+  const rebuildMenu = () => {
     const items: Electron.MenuItemConstructorOptions[] = [
-      { label: present ? 'Key present ✅' : 'No key ❌', enabled: false },
+      { label: blockingActive ? 'Blocking active ✅' : 'Blocking disabled', enabled: false },
+      { label: keyPresent ? 'Key present' : 'No key', enabled: false },
       { type: 'separator' },
       { label: 'Open Talysman', click: () => showMainWindow() },
     ];
@@ -43,20 +47,31 @@ export function createTray(service: ServiceConnection, mock?: MockServiceConnect
     tray!.setContextMenu(Menu.buildFromTemplate(items));
   };
 
-  rebuildMenu(false);
-
-  const applyPresence = (present: boolean) => {
-    logger.debug(`[tray] key presence → ${present}`);
-    tray?.setImage(iconFor(present));
-    rebuildMenu(present);
+  const applyBlocking = (active: boolean) => {
+    logger.debug(`[tray] blocking active → ${active}`);
+    blockingActive = active;
+    tray?.setImage(iconFor(active));
+    rebuildMenu();
   };
 
-  service.on('stateChanged', ({ state }) => applyPresence(state.keyPresent));
-  service.on('keyPresenceChanged', ({ present }) => applyPresence(present));
+  rebuildMenu();
+
+  service.on('stateChanged', ({ state }) => {
+    keyPresent = state.keyPresent;
+    applyBlocking(state.focusActive);
+  });
+  service.on('keyPresenceChanged', ({ present }) => {
+    keyPresent = present;
+    rebuildMenu();
+  });
+  service.on('focusChanged', ({ active }) => applyBlocking(active));
   void service
-    .request('getKeyPresence', undefined)
-    .then(({ present }) => applyPresence(present))
-    .catch((error: Error) => logger.warn(`[tray] initial key presence failed: ${error.message}`));
+    .request('getState', undefined)
+    .then((state) => {
+      keyPresent = state.keyPresent;
+      applyBlocking(state.focusActive);
+    })
+    .catch((error: Error) => logger.warn(`[tray] initial state fetch failed: ${error.message}`));
 
   tray.on('click', () => showMainWindow());
 
