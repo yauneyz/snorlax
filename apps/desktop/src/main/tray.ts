@@ -1,7 +1,10 @@
 /**
- * System tray. The icon mirrors whether blocking is active (green = focus on, gray = focus off)
- * by subscribing to focusChanged. In dev (mock) the menu offers a toggle so you can flip the
- * simulated key.
+ * System tray for Windows/macOS. The icon mirrors whether blocking is active (green = focus on,
+ * gray = focus off), and honors `settings.trayIconEnabled`. Linux doesn't use this — the
+ * standalone `talysman-tray` helper (native/linux/src/bin/tray.rs) owns the tray icon there,
+ * talking to the daemon directly so it keeps working (and stays cheap) whether or not this
+ * Electron app is running. In dev (mock) the menu offers a toggle so you can flip the simulated
+ * key.
  */
 
 import { join } from 'node:path';
@@ -23,14 +26,12 @@ function iconFor(active: boolean): Electron.NativeImage {
     : img;
 }
 
-export function createTray(service: ServiceConnection, mock?: MockServiceConnection): Tray {
-  tray = new Tray(iconFor(false));
-  tray.setToolTip('Talysman');
-
+export function createTray(service: ServiceConnection, mock?: MockServiceConnection): void {
   let keyPresent = false;
   let blockingActive = false;
 
   const rebuildMenu = () => {
+    if (!tray) return;
     const items: Electron.MenuItemConstructorOptions[] = [
       { label: blockingActive ? 'Blocking active ✅' : 'Blocking disabled', enabled: false },
       { label: keyPresent ? 'Key present' : 'No key', enabled: false },
@@ -44,7 +45,19 @@ export function createTray(service: ServiceConnection, mock?: MockServiceConnect
       });
     }
     items.push({ type: 'separator' }, { role: 'quit' });
-    tray!.setContextMenu(Menu.buildFromTemplate(items));
+    tray.setContextMenu(Menu.buildFromTemplate(items));
+  };
+
+  const applyEnabled = (enabled: boolean) => {
+    if (enabled && !tray) {
+      tray = new Tray(iconFor(blockingActive));
+      tray.setToolTip('Talysman');
+      tray.on('click', () => showMainWindow());
+      rebuildMenu();
+    } else if (!enabled && tray) {
+      tray.destroy();
+      tray = null;
+    }
   };
 
   const applyBlocking = (active: boolean) => {
@@ -54,10 +67,9 @@ export function createTray(service: ServiceConnection, mock?: MockServiceConnect
     rebuildMenu();
   };
 
-  rebuildMenu();
-
   service.on('stateChanged', ({ state }) => {
     keyPresent = state.keyPresent;
+    applyEnabled(state.settings.trayIconEnabled);
     applyBlocking(state.focusActive);
   });
   service.on('keyPresenceChanged', ({ present }) => {
@@ -65,16 +77,15 @@ export function createTray(service: ServiceConnection, mock?: MockServiceConnect
     rebuildMenu();
   });
   service.on('focusChanged', ({ active }) => applyBlocking(active));
+  service.on('settingsChanged', ({ settings }) => applyEnabled(settings.trayIconEnabled));
   void service
     .request('getState', undefined)
     .then((state) => {
       keyPresent = state.keyPresent;
+      applyEnabled(state.settings.trayIconEnabled);
       applyBlocking(state.focusActive);
     })
     .catch((error: Error) => logger.warn(`[tray] initial state fetch failed: ${error.message}`));
 
-  tray.on('click', () => showMainWindow());
-
   if (mock && config.isDev) logger.debug('[tray] dev mode: simulated-key toggle available');
-  return tray;
 }

@@ -22,8 +22,14 @@ export interface Settings {
    * unsupported browsers are closed outright. Default off. Turning it **off** is key-gated.
    */
   browserHandshakeEnabled: boolean;
+  /**
+   * Whether the system tray icon should be shown. Purely cosmetic (not a security boundary), so
+   * unlike the other settings here, toggling it is never key-gated. Default on.
+   */
+  trayIconEnabled: boolean;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
   browserHandshakeEnabled: false,
+  trayIconEnabled: true,
 };

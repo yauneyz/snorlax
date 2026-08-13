@@ -39,7 +39,8 @@
       "$comment": "profileId switches the active blocking profile for the length of the window; omitted keeps whatever is already active."
     },
     "Settings": {
-      "browserHandshakeEnabled": "boolean"
+      "browserHandshakeEnabled": "boolean",
+      "trayIconEnabled": "boolean"
     },
     "BrowserHealth": {
       "canBlock": "boolean",
@@ -81,6 +82,11 @@
       "result": { "ok": true },
       "errors": ["KEY_REQUIRED", "LOCKED"],
       "$comment": "Enabling is free; disabling is key-gated exactly like disableFocus."
+    },
+    "setTrayIconEnabled": {
+      "params": { "enabled": "boolean" },
+      "result": { "ok": true },
+      "$comment": "Purely cosmetic (not a security boundary) — never gated, unlike the other settings."
     },
     "extHeartbeat": {
       "params": { "browserPid": "number", "browser": "string", "profileId": "string?", "extensionVersion": "string?", "lockedActive": "boolean?", "health": "BrowserHealth" },

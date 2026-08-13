@@ -99,6 +99,13 @@ export interface RequestMap {
    */
   setBrowserHandshake: { params: { enabled: boolean }; result: Ok };
   /**
+   * Toggle the system tray icon. Purely cosmetic — never key-gated, unlike the other settings
+   * above. The daemon-linked tray helper binaries (one per platform under native/) are the ones
+   * that actually read this; it lives here (rather than a local Electron preference) because they
+   * only ever talk to the daemon, never to Electron.
+   */
+  setTrayIconEnabled: { params: { enabled: boolean }; result: Ok };
+  /**
    * Liveness heartbeat from the browser extension, relayed by the native-messaging host
    * (talysman-natmsg). Fire-and-forget; the service records it for the watchdog. `browserPid` is
    * the host's parent process — the browser instance the extension runs in.

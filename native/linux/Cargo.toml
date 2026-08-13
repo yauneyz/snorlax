@@ -33,6 +33,10 @@ path = "src/bin/focus-enable.rs"
 name = "focus-disable"
 path = "src/bin/focus-disable.rs"
 
+[[bin]]
+name = "talysman-tray"
+path = "src/bin/tray.rs"
+
 [dependencies]
 anyhow = "1"
 chrono = { version = "0.4", default-features = false, features = ["clock"] }
@@ -46,6 +50,8 @@ sysinfo = "0.30"
 tokio = { version = "1", features = ["rt-multi-thread", "net", "time", "sync", "io-util", "io-std", "macros", "signal"] }
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+ksni = { version = "0.3", default-features = false, features = ["tokio"] }
+image = { version = "0.25", default-features = false, features = ["png"] }
 
 [profile.release]
 opt-level = 3

@@ -276,6 +276,14 @@ export class MockServiceConnection implements ServiceConnection {
         return OK;
       }
 
+      case 'setTrayIconEnabled': {
+        // Purely cosmetic — never gated, unlike the settings above.
+        const enabled = (params as Params<'setTrayIconEnabled'>).enabled;
+        this.state.settings = { ...this.state.settings, trayIconEnabled: enabled };
+        this.emit('settingsChanged', { settings: this.state.settings });
+        return OK;
+      }
+
       case 'extHeartbeat': {
         // The mock has no real browsers to watch, but it still announces the beat so the UI's
         // "extension is talking to us" signal behaves the same as against the real service.

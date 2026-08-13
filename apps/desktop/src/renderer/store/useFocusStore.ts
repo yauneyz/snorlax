@@ -98,6 +98,7 @@ interface FocusStore {
   setDevSubscriptionPlan: (plan: SubscriptionPlan) => Promise<void>;
   setLocalEntitlementEnabled: (enabled: boolean) => Promise<void>;
   setBrowserHandshake: (enabled: boolean) => Promise<void>;
+  setTrayIconEnabled: (enabled: boolean) => Promise<void>;
   clearWatchdogWarning: () => void;
   setError: (e?: { code: string; message: string }) => void;
   applySnapshot: (s: ServiceState) => void;
@@ -230,6 +231,11 @@ export const useFocusStore = create<FocusStore>((set, get) => ({
     await request('setBrowserHandshake', { enabled });
     // The service emits settingsChanged; optimistically reflect it so the toggle feels instant.
     set((s) => ({ settings: { ...s.settings, browserHandshakeEnabled: enabled } }));
+  },
+
+  setTrayIconEnabled: async (enabled) => {
+    await request('setTrayIconEnabled', { enabled });
+    set((s) => ({ settings: { ...s.settings, trayIconEnabled: enabled } }));
   },
 
   refresh: async () => {

@@ -106,12 +106,28 @@ pub struct Schedule {
 }
 
 /// Optional, opt-in enforcement settings (mirrors packages/shared/src/settings.ts).
-#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct Settings {
     /// Browser handshake dead-man's switch. Default off. Turning it off is key-gated.
     #[serde(default)]
     pub browser_handshake_enabled: bool,
+    /// Whether the tray helper should show its icon. Purely cosmetic — never key-gated. Default on.
+    #[serde(default = "default_true")]
+    pub tray_icon_enabled: bool,
+}
+
+fn default_true() -> bool {
+    true
+}
+
+impl Default for Settings {
+    fn default() -> Self {
+        Settings {
+            browser_handshake_enabled: false,
+            tray_icon_enabled: true,
+        }
+    }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]

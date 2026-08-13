@@ -433,6 +433,20 @@ impl Core {
         Ok(())
     }
 
+    /// Toggle the tray helper's icon. Purely cosmetic (not a security boundary) — unlike
+    /// `set_browser_handshake`, never gated.
+    fn set_tray_icon_enabled(&mut self, enabled: bool) {
+        if self.state.settings.tray_icon_enabled == enabled {
+            return;
+        }
+        self.state.settings.tray_icon_enabled = enabled;
+        self.persist_state();
+        self.emit(
+            "settingsChanged",
+            json!({ "settings": self.state.settings.clone() }),
+        );
+    }
+
     fn pair_key(&mut self, drive_id: &str, label: &str) -> Result<PairedKey, RpcError> {
         let drives = usb::list_removable_drives();
         let drive = drives
@@ -627,6 +641,14 @@ impl Core {
                     .and_then(|v| v.as_bool())
                     .ok_or_else(|| RpcError::new(err::BAD_REQUEST, "Missing field: enabled"))?;
                 self.set_browser_handshake(enabled)?;
+                Ok(ok())
+            }
+            "setTrayIconEnabled" => {
+                let enabled = params
+                    .get("enabled")
+                    .and_then(|v| v.as_bool())
+                    .ok_or_else(|| RpcError::new(err::BAD_REQUEST, "Missing field: enabled"))?;
+                self.set_tray_icon_enabled(enabled);
                 Ok(ok())
             }
             "extHeartbeat" => {

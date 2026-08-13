@@ -25,6 +25,8 @@ export function Settings() {
   const handshakeEnabled = useFocusStore((s) => s.settings.browserHandshakeEnabled);
   const keyPresent = useFocusStore((s) => s.keyPresent);
   const setBrowserHandshake = useFocusStore((s) => s.setBrowserHandshake);
+  const trayIconEnabled = useFocusStore((s) => s.settings.trayIconEnabled);
+  const setTrayIconEnabled = useFocusStore((s) => s.setTrayIconEnabled);
   const replayOnboarding = useFocusStore((s) => s.replayOnboarding);
   const [firstRunError, setFirstRunError] = useState<string | null>(null);
   const [planBusy, setPlanBusy] = useState(false);
@@ -33,6 +35,8 @@ export function Settings() {
   const [localEntitlementError, setLocalEntitlementError] = useState<string | null>(null);
   const [handshakeBusy, setHandshakeBusy] = useState(false);
   const [handshakeError, setHandshakeError] = useState<string | null>(null);
+  const [trayBusy, setTrayBusy] = useState(false);
+  const [trayError, setTrayError] = useState<string | null>(null);
   const [updateBusy, setUpdateBusy] = useState(false);
   const [updateStatus, setUpdateStatus] = useState<{
     message: string;
@@ -69,6 +73,18 @@ export function Settings() {
       }
     } finally {
       setHandshakeBusy(false);
+    }
+  }
+
+  async function toggleTrayIcon() {
+    setTrayBusy(true);
+    setTrayError(null);
+    try {
+      await setTrayIconEnabled(!trayIconEnabled);
+    } catch (e) {
+      setTrayError((e as Error).message);
+    } finally {
+      setTrayBusy(false);
     }
   }
 
@@ -203,6 +219,27 @@ export function Settings() {
             <p className="text-xs text-slate-500">Insert your paired USB key to turn this off.</p>
           )}
           {handshakeError && <p className="text-[12.5px] text-warn">{handshakeError}</p>}
+        </div>
+      </Card>
+
+      <Card>
+        <CardTitle hint="A small standalone helper (not this app) shows blocking status in your system tray.">
+          Tray icon
+        </CardTitle>
+        <div className="flex flex-col gap-3 text-sm text-slate-300">
+          <div className="flex items-center justify-between gap-3">
+            <span className="font-medium text-slate-200">
+              Status: <Badge tone={trayIconEnabled ? 'ok' : 'neutral'}>{trayIconEnabled ? 'On' : 'Off'}</Badge>
+            </span>
+            <Button
+              variant={trayIconEnabled ? 'ghost' : 'primary'}
+              disabled={trayBusy}
+              onClick={() => toggleTrayIcon()}
+            >
+              {trayIconEnabled ? 'Turn off' : 'Turn on'}
+            </Button>
+          </div>
+          {trayError && <p className="text-[12.5px] text-warn">{trayError}</p>}
         </div>
       </Card>
 

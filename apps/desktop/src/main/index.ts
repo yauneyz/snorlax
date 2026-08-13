@@ -3,6 +3,12 @@
  * service connection (real pipe, or an explicitly requested in-process mock),
  * IPC handlers, service version reconciliation, and guarded auto-update.
  *
+ * On Linux the tray icon is NOT owned by this process — the standalone `talysman-tray` helper
+ * (native/linux/src/bin/tray.rs) talks to the daemon directly and renders it, so it keeps working
+ * (and stays cheap) whether or not this Electron app is running. Windows/macOS don't have that
+ * helper yet, so this process still creates its own tray there (see tray.ts) — only while it's
+ * open, no persistence.
+ *
  * `pnpm dev` intentionally shares the installed service with the production desktop client so
  * both windows and the existing browser extensions observe one authoritative blocker state.
  * UI-only development and E2E tests opt into the mock explicitly.
@@ -80,7 +86,8 @@ async function bootstrap(): Promise<void> {
   await registerIpcHandlers({ service, mock });
 
   createWindow();
-  createTray(service, mock);
+  // Linux has its own standalone tray helper (see file header); avoid a duplicate icon there.
+  if (process.platform !== 'linux') createTray(service, mock);
   if (!mock) await ensureServiceCurrent(service);
   initUpdater(service);
 
@@ -113,7 +120,8 @@ if (!gotLock) {
 
   app.on('window-all-closed', () => {
     // Enforcement lives in the privileged daemon; keeping Chromium alive after its last window
-    // closes only burns resources and is not required for blocking or schedules.
+    // closes only burns resources and is not required for blocking or schedules. On Linux the
+    // standalone `talysman-tray` helper is what keeps a status indicator alive after this quits.
     app.quit();
   });
 
