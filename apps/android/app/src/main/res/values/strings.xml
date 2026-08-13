@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Talysman Insights</string>
+    <string name="widget_description">Talysman analytics at a glance</string>
+    <string name="widget_loading">Loading…</string>
+</resources>

@@ -1,0 +1,26 @@
+package app.talysman.insights.data
+
+import android.content.Context
+import kotlinx.serialization.json.Json
+
+class InsightsRepository(context: Context) {
+    private val prefs = context.applicationContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+    private val json = Json { ignoreUnknownKeys = true }
+
+    fun cached(): InsightsSummary? {
+        val raw = prefs.getString(KEY_JSON, null) ?: return null
+        return runCatching { json.decodeFromString(InsightsSummary.serializer(), raw) }.getOrNull()
+    }
+
+    suspend fun refresh(): Result<InsightsSummary> =
+        runCatching { InsightsApi.fetchSummary() }.onSuccess { summary ->
+            prefs.edit()
+                .putString(KEY_JSON, json.encodeToString(InsightsSummary.serializer(), summary))
+                .apply()
+        }
+
+    companion object {
+        private const val PREFS_NAME = "insights_cache"
+        private const val KEY_JSON = "summary_json"
+    }
+}

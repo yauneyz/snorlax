@@ -1,0 +1,7 @@
+# Copy to local.properties (gitignored) and fill in real values.
+sdk.dir=/path/to/Android/Sdk
+
+# Base URL of the deployed web app; /api/analytics/summary is appended by the client.
+insights.baseUrl=https://www.talysman.app
+# Same value as [insights].widget_api_key in the repo's .credentials.
+insights.apiKey=

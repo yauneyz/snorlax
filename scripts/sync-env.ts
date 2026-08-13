@@ -215,6 +215,12 @@ const credentialsSchema = z.object({
       message: "oauth_state_secret must be at least 32 characters",
     }),
   }),
+  insights: z
+    .object({
+      widget_api_key: z.string().optional().default(""),
+    })
+    .optional()
+    .default({ widget_api_key: "" }),
 });
 
 type Credentials = z.infer<typeof credentialsSchema>;
@@ -271,6 +277,8 @@ const SENSITIVE_VERCEL_VARIABLES = new Set([
   "LOCAL_LLM_API_KEY",
   "TOKEN_ENCRYPTION_KEY",
   "OAUTH_STATE_SECRET",
+  "ANALYTICS_PROD_SUPABASE_SECRET_KEY",
+  "INSIGHTS_WIDGET_API_KEY",
 ]);
 
 function resolveVercelEnvironment(): VercelEnvironment | null {
@@ -696,7 +704,20 @@ function main() {
 
   const webPairs = toWebEnvPairs(creds, mode);
   if (vercelEnvironment) {
-    pushToVercel(webPairs, vercelEnvironment);
+    // Production alone gets the analytics widget feed (analytics-arch.md §12.4): the prod
+    // Supabase target plus the bearer token that gates GET /api/analytics/summary. Preview and
+    // development deployments still get neither, so /insights-style DB access stays off every
+    // deployment except this one deliberate, read-only, token-gated exception.
+    const pairs: Array<[string, string]> =
+      vercelEnvironment === "production"
+        ? [
+            ...webPairs,
+            ["ANALYTICS_PROD_SUPABASE_URL", creds.supabase.prod.url],
+            ["ANALYTICS_PROD_SUPABASE_SECRET_KEY", creds.supabase.prod.secret_key],
+            ["INSIGHTS_WIDGET_API_KEY", creds.insights.widget_api_key],
+          ]
+        : webPairs;
+    pushToVercel(pairs, vercelEnvironment);
     return;
   }
 
@@ -709,7 +730,8 @@ function main() {
   // /insights (production) and /insights/dev (local postgres) both work from one locally
   // running server no matter which `--mode` it was started with. These are local-only by
   // construction rather than by policy: `pushToVercel` iterates `webPairs` and returns above,
-  // so nothing appended here can ever reach a deployment.
+  // so nothing appended here can ever reach a deployment — except the production carve-out
+  // above, which pushes ANALYTICS_PROD_* and INSIGHTS_WIDGET_API_KEY explicitly, by name.
   const localWebPairs: Array<[string, string]> = [
     ...webPairs,
     ["STRIPE_CLI_API_KEY", creds.stripe.secret_key_test],
@@ -719,6 +741,7 @@ function main() {
     ["ANALYTICS_PROD_SUPABASE_SECRET_KEY", creds.supabase.prod.secret_key],
     ["ANALYTICS_DEV_SUPABASE_URL", creds.supabase.dev.url],
     ["ANALYTICS_DEV_SUPABASE_SECRET_KEY", creds.supabase.dev.secret_key],
+    ["INSIGHTS_WIDGET_API_KEY", creds.insights.widget_api_key],
   ];
 
   writeEnvFile(WEB_ENV_OUT, localWebPairs, mode);

@@ -23,6 +23,12 @@ import {
   assertLiveStripeRelease,
   desktopStripeReleaseIssues,
 } from "./lib/stripe-mode.mjs";
+import {
+  TRUSTED_SIGNING_ACCOUNT,
+  TRUSTED_SIGNING_CERTIFICATE_PROFILE,
+  TRUSTED_SIGNING_ENDPOINT,
+  windowsSigningAvailable,
+} from "./lib/windows-release.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const args = process.argv.slice(2);
@@ -196,19 +202,25 @@ run("node", ["scripts/audit-extension.mjs"]);
 // 2. Electron bundles.
 run("pnpm", ["--filter", "@talysman/desktop", "build"]);
 
-// Windows has no Authenticode certificate yet, so electron-builder.yml's
-// forceCodeSigning is dropped for Windows when no certificate is configured: the build
-// produces an unsigned NSIS installer instead of failing. As soon as WIN_CSC_LINK (or
-// CSC_LINK) is set the flag stays on, so a misconfigured cert still fails closed rather
-// than silently shipping unsigned. macOS is never relaxed — an unsigned/un-notarized
-// mac build is hard-blocked by Gatekeeper, so it must never be produced by accident.
-const winSigningConfigured = Boolean(
-  process.env.WIN_CSC_LINK || process.env.CSC_LINK,
-);
+// Windows has no Authenticode certificate configured by default, so electron-builder.yml's
+// forceCodeSigning is dropped for Windows when nothing is configured: the build produces an
+// unsigned NSIS installer instead of failing. As soon as either the legacy CSC_LINK cert path
+// or the AZURE_* Trusted Signing vars are set, the flag stays on, so a misconfigured cert still
+// fails closed rather than silently shipping unsigned. macOS is never relaxed — an
+// unsigned/un-notarized mac build is hard-blocked by Gatekeeper, so it must never be produced
+// by accident.
+//
+// azureSignOptions is intentionally never declared in electron-builder.yml itself: unlike the
+// signtool/CSC_LINK path (which gracefully no-ops when unconfigured), a configured-but-
+// unauthenticated Azure signer throws and crashes the build. It's only ever passed here, as a
+// --config override, when windowsSigningAvailable() confirms full credentials are present.
+const azureSigningConfigured = windowsSigningAvailable();
+const winSigningConfigured =
+  azureSigningConfigured || Boolean(process.env.WIN_CSC_LINK || process.env.CSC_LINK);
 const allowUnsignedWin = target === "win" && !winSigningConfigured;
 if (allowUnsignedWin) {
   console.warn(
-    "\nWARNING No Windows signing certificate (WIN_CSC_LINK/CSC_LINK unset):\n" +
+    "\nWARNING No Windows signing certificate (WIN_CSC_LINK/CSC_LINK/AZURE_* unset):\n" +
       "        building an UNSIGNED installer. Windows SmartScreen will warn\n" +
       "        users on download and install.\n",
   );
@@ -224,6 +236,14 @@ run("pnpm", [
   "electron-builder.yml",
   `--config.electronVersion=${desktopElectronVersion()}`,
   ...(allowUnsignedWin ? ["--config.forceCodeSigning=false"] : []),
+  ...(azureSigningConfigured
+    ? [
+        `--config.win.azureSignOptions.publisherName=${process.env.AZURE_SIGNING_PUBLISHER_NAME}`,
+        `--config.win.azureSignOptions.endpoint=${TRUSTED_SIGNING_ENDPOINT}`,
+        `--config.win.azureSignOptions.certificateProfileName=${TRUSTED_SIGNING_CERTIFICATE_PROFILE}`,
+        `--config.win.azureSignOptions.codeSigningAccountName=${TRUSTED_SIGNING_ACCOUNT}`,
+      ]
+    : []),
 ]);
 
 console.log("\nOK Build complete. Installer is in dist/.");

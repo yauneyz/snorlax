@@ -16,6 +16,7 @@ import { fileURLToPath } from "node:url";
 import toml from "@iarna/toml";
 
 import { appleReleaseEnvironment } from "./lib/apple-release.mjs";
+import { windowsReleaseEnvironment } from "./lib/windows-release.mjs";
 import {
   assertLiveStripeRelease,
   desktopStripeReleaseIssues,
@@ -446,7 +447,9 @@ async function main() {
         credentials: localCredentials(),
         env: process.env,
       })
-    : process.env;
+    : buildable.includes("win")
+      ? windowsReleaseEnvironment({ credentials: localCredentials(), env: process.env })
+      : process.env;
   if (!noBuild) buildHostInstallers(buildable, buildEnvironment);
   const files = existsSync(distDir)
     ? readdirSync(distDir).map((name) => ({

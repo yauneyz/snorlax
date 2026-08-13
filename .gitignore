@@ -25,6 +25,11 @@ apps/desktop/resources/extension/
 apps/extension/keys/
 apps/extension/release/
 
+# Android (widget/companion app)
+apps/android/local.properties
+apps/android/.gradle/
+apps/android/**/.cxx/
+
 # Rust
 native/windows/target/
 native/linux/target/
@@ -54,7 +59,30 @@ Thumbs.db
 *:Zone.Identifier
 .idea/
 .vscode/
-*.swp
+
+# Emacs backup, autosave, lock, and temporary checker files
+*~
+\#*\#
+.\#*
+auto-save-list/
+.emacs.desktop.lock
+flycheck_*.el
+*_flymake.*
+
+# Vim swap, backup, undo, and netrw state files
+[._]*.s[a-v][a-z]
+!*.svg
+[._]*.sw[a-p]
+[._]s[a-rt-v][a-z]
+[._]ss[a-gi-z]
+[._]sw[a-p]
+[._]*.un~
+.netrwhist
+
+# LibreOffice lock and optional backup-copy files
+.~lock.*#
+~$*
+*.[Bb][Aa][Kk]
 
 # Claude Code machine-local permissions and command history
 .claude/settings.local.json

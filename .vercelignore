@@ -17,6 +17,7 @@ test-results/
 # Native build output
 native/windows/target/
 native/linux/target/
+native/macos/target/
 native/common/target/
 
 # Desktop and extension release artifacts

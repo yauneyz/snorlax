@@ -109,6 +109,15 @@ const serverSchemaBase = publicSchema.extend({
   ANALYTICS_PROD_SUPABASE_SECRET_KEY: optionalStripped,
   ANALYTICS_DEV_SUPABASE_URL: optionalSupabaseProjectUrl,
   ANALYTICS_DEV_SUPABASE_SECRET_KEY: optionalStripped,
+
+  // Bearer token for GET /api/analytics/summary (the mobile widget feed). Unlike the dashboard
+  // above, this route is meant to work in every deployed environment, so it needs its own
+  // credential set pushed to Vercel rather than reusing the local-only ANALYTICS_PROD_* pair.
+  INSIGHTS_WIDGET_API_KEY: optionalStripped,
+  // Where /insights (the `prod` target) fetches from instead of querying Supabase directly —
+  // the same deployed endpoint the Android widget uses. www, not the apex: the apex 308s to
+  // www and a fetch that follows that redirect drops the Authorization header cross-host.
+  INSIGHTS_API_BASE_URL: z.string().url().optional().default("https://www.talysman.app"),
 });
 
 /** "test" | "live" for a prefixed Stripe key; null for placeholders we shouldn't judge. */
@@ -323,6 +332,12 @@ export const config = {
         ? (parsed as z.infer<typeof serverSchema>).ANALYTICS_DEV_SUPABASE_SECRET_KEY
         : "",
     },
+    widgetApiKey: isServer
+      ? (parsed as z.infer<typeof serverSchema>).INSIGHTS_WIDGET_API_KEY
+      : "",
+    apiBaseUrl: isServer
+      ? (parsed as z.infer<typeof serverSchema>).INSIGHTS_API_BASE_URL
+      : "https://www.talysman.app",
   },
 } as const;
 

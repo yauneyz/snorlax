@@ -954,6 +954,28 @@ each dashboard links to the other.
 Keep it server-rendered HTML and CSS. Resist adding a charting library until panels 1–8 exist and
 you have found yourself genuinely wanting one.
 
+### 12.4 The one production exception: the widget feed
+
+`GET /api/analytics/summary` (not under `src/app/(dev)`) is a deliberate, narrower exception to
+§12.2, added for an Android home-screen widget: it needs to be reachable from a phone over the
+public internet, so it cannot be dev-only. It stays inside the hardening this section describes by
+construction, not by convention:
+
+- It reuses the same `queryFunnel` / `queryEngagement` / `queryRevenue` / `queryRetention` /
+  `queryInstallHealth` / `queryChannels` read-model functions the dashboard panels call — no new
+  query surface, no raw-table access, and it only ever reads the `prod` target.
+- It is gated by `INSIGHTS_WIDGET_API_KEY`, a single-purpose bearer token checked with
+  `timingSafeEqual`, not by Supabase auth or any DB-level credential. The Android app holds only
+  this token — never `ANALYTICS_PROD_SUPABASE_SECRET_KEY`.
+- `scripts/sync-env.ts` still refuses to push `ANALYTICS_PROD_SUPABASE_URL` /
+  `ANALYTICS_PROD_SUPABASE_SECRET_KEY` to Vercel preview or development — production is the one
+  environment carved out, and only for this route's sake.
+- The response sets `Cache-Control: private, no-store` so no CDN/edge layer ever caches an
+  authenticated payload across requesters.
+
+Rotate `insights.widget_api_key` in `.credentials` (and re-run `pnpm sync:env:prod`) if the token
+ever leaks — e.g. the sideloaded APK is lost or shared.
+
 ---
 
 ## 13. Volume, retention, compaction

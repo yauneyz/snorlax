@@ -5,14 +5,14 @@ import { Unavailable } from "./Unavailable";
 
 export async function EngagementPanel({ target }: { target: AnalyticsTarget }) {
   const result = await queryEngagement(target);
-  const latest = result.ok ? result.rows[0] : null;
+  const data = result.ok ? result.rows.engagement : null;
   return <PanelShell title="Engagement depth" description="Latest reported day, split by how focus began.">
-    {!result.ok ? <Unavailable message={result.message} /> : !latest ? <p className="insights-muted">No usage reported yet.</p> :
+    {!result.ok ? <Unavailable message={result.message} /> : !data ? <p className="insights-muted">No usage reported yet.</p> :
       <div className="insights-kpis">
-        <div><span>Median focus</span><strong>{latest.median_focus_minutes ?? 0}m</strong></div>
-        <div><span>Scheduled</span><strong>{latest.scheduled_focus_hours ?? 0}h</strong></div>
-        <div><span>Manual</span><strong>{latest.manual_focus_hours ?? 0}h</strong></div>
-        <div><span>Completed / aborted</span><strong>{latest.sessions_completed ?? 0} / {latest.sessions_aborted ?? 0}</strong></div>
+        <div><span>Median focus</span><strong>{data.medianFocusMinutes}m</strong></div>
+        <div><span>Scheduled</span><strong>{data.scheduledFocusHours}h</strong></div>
+        <div><span>Manual</span><strong>{data.manualFocusHours}h</strong></div>
+        <div><span>Completed / aborted</span><strong>{data.sessionsCompleted} / {data.sessionsAborted}</strong></div>
       </div>}
   </PanelShell>;
 }

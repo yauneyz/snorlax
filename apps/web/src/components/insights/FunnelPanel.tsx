@@ -43,8 +43,8 @@ export async function FunnelPanel({ target }: { target: AnalyticsTarget }) {
         })}
       </div>
       <div className="insights-inline-stats">
-        <span>Median visit → download <strong>{duration(row.median_visit_to_download_seconds)}</strong></span>
-        <span>Median install → value <strong>{duration(row.median_install_to_value_seconds)}</strong></span>
+        <span>Median visit → download <strong>{duration(row.medianVisitToDownloadSeconds)}</strong></span>
+        <span>Median install → value <strong>{duration(row.medianInstallToValueSeconds)}</strong></span>
       </div>
     </PanelShell>
   );

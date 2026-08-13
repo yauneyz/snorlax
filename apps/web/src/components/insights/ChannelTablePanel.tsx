@@ -15,7 +15,7 @@ export async function ChannelTablePanel({ target }: { target: AnalyticsTarget })
           <tbody>{result.rows.map((row) => <tr key={`${row.channel}:${row.medium}`}>
             <td><strong>{row.channel}</strong><small>{row.medium}</small></td>
             <td>{row.visitors}</td><td>{row.accounts}</td><td>{row.trials}</td><td>{row.paid}</td>
-            <td>{row.pct_visitor_to_paid ?? 0}%</td>
+            <td>{row.pctVisitorToPaid}%</td>
           </tr>)}</tbody>
         </table></div>
       )}

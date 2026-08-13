@@ -7,12 +7,17 @@
  *
  * Usage (from the repository root):
  *   pnpm comp grant  <email> [--note "mom"] [--expires 2027-01-01]
- *   pnpm comp code   [--note "mom"] [--uses N] [--expires 2027-01-01]
+ *   pnpm comp code   [count] [--note "mom"] [--uses N] [--expires 2027-01-01]
  *   pnpm comp revoke <email>
  *   pnpm comp list
  *
+ * `code` mints `count` codes (default 100), writes their plaintext one per
+ * line to ./comp_codes_<timestamp>.txt, and never prints them to the
+ * terminal — that file is the only copy, since only the hash is stored.
+ *
  * Commands target production by default. Add --dev to use local Supabase.
  */
+import { writeFile } from "node:fs/promises";
 import { createClient } from "@supabase/supabase-js";
 import { generateCompCode, hashCompCode } from "../src/lib/comp/code";
 import {
@@ -117,26 +122,37 @@ async function grant(db: Db, args: Args): Promise<void> {
   console.log(`✓ ${email} is on Pro${until ? ` until ${until}` : " for life"}.`);
 }
 
-async function code(db: Db, args: Args, appUrl: string): Promise<void> {
-  const plaintext = generateCompCode();
+async function code(db: Db, args: Args): Promise<void> {
+  const count = args.positional[0] !== undefined ? Number(args.positional[0]) : 100;
+  if (!Number.isInteger(count) || count < 1) die("count must be a positive integer.");
+
   const note = typeof args.flags.note === "string" ? args.flags.note : null;
   const uses = typeof args.flags.uses === "string" ? Number(args.flags.uses) : 1;
   if (!Number.isInteger(uses) || uses < 1) die("--uses must be a positive integer.");
+  const expiresAt = parseExpiry(args.flags.expires);
 
-  const { error } = await db.from("comp_codes").insert({
+  const plaintexts = new Set<string>();
+  while (plaintexts.size < count) plaintexts.add(generateCompCode());
+
+  const rows = [...plaintexts].map((plaintext) => ({
     code_hash: hashCompCode(plaintext),
     note,
     max_redemptions: uses,
-    expires_at: parseExpiry(args.flags.expires),
-  });
-  if (error) die(`Could not mint the code: ${error.message}`);
+    expires_at: expiresAt,
+  }));
 
-  console.log(`\n  ${plaintext}\n`);
-  console.log(`  ${appUrl}/redeem/${plaintext}`);
+  const { error } = await db.from("comp_codes").insert(rows);
+  if (error) die(`Could not mint the codes: ${error.message}`);
+
+  const filename = `comp_codes_${new Date().toISOString().replace(/[:.]/g, "-")}.txt`;
+  await writeFile(filename, [...plaintexts].join("\n") + "\n");
+
   console.log(
-    `\n  ${uses === 1 ? "Single use" : `${uses} uses`}${note ? ` · ${note}` : ""}.` +
-      " Only the hash is stored — copy it now, it can't be shown again.\n",
+    `✓ Minted ${count} code${count === 1 ? "" : "s"}${
+      uses === 1 ? "" : ` (${uses} uses each)`
+    }${note ? ` · ${note}` : ""} → ${filename}`,
   );
+  console.log("  Only hashes are stored — this file is the only copy of the plaintext codes.");
 }
 
 async function revoke(db: Db, args: Args): Promise<void> {
@@ -217,7 +233,8 @@ async function main(): Promise<void> {
     console.log(
       [
         "pnpm comp grant  <email> [--note …] [--expires YYYY-MM-DD] [--dev]  grant Pro to an existing account",
-        "pnpm comp code   [--note …] [--uses N] [--expires …] [--dev]        mint a redemption code",
+        "pnpm comp code   [count] [--note …] [--uses N] [--expires …] [--dev]",
+        "                 mint `count` codes (default 100) to ./comp_codes_<timestamp>.txt",
         "pnpm comp revoke <email> [--dev]                                    take a grant back",
         "pnpm comp list [--dev]                                              show grants and codes",
         "",
@@ -239,7 +256,7 @@ async function main(): Promise<void> {
     case "grant":
       return grant(db, args);
     case "code":
-      return code(db, args, environment.appUrl);
+      return code(db, args);
     case "revoke":
       return revoke(db, args);
     case "list":

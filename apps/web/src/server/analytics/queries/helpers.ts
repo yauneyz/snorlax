@@ -23,3 +23,6 @@ export async function withAnalyticsTarget<T>(
 export function queryError(message: string): Error {
   return new Error(message);
 }
+
+export const retentionPct = (active: number, eligible: number): number | null =>
+  eligible ? Math.round((active / eligible) * 100) : null;

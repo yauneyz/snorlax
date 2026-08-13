@@ -1,29 +1,15 @@
-- test production email
-- finish analytics, be able to view dashboard
-- build production email lifescycle
-- finish live SEO pages
+- smartscreen buy
+- chatgpt email upgrade
+- personalize emails
+  - include some sort of link to know where they came from.
+- send next emails
+
 - Thinky credentials
 - Thinky cancel heroku
 
-- get analytics
-Track these events:
-Landing page viewed
-Download clicked
-Installation completed
-Browser extension installed
-Account created
-USB key paired
-First session started
-First session completed
-Second session completed
-Schedule created
-Trial started
-Subscription started
-Subscription renewed
-Subscription canceled
-
 
 - SEO pages media
+
 ======================================================
 - get a basic video runnign
 *
