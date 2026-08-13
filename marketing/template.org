@@ -1,0 +1,28 @@
+Hey <first name>,
+
+I've been reading/watching your work on <specific topic>, especially <specific observation about their work/audience>. <1–2 sentences connecting what they talk about to the problem Talysman solves.>
+
+I built something I think you might genuinely find useful: **essentially Brick, but for your computer.**
+
+Talysman blocks distracting sites like YouTube, X, Instagram, etc., but the only way to unblock them is by plugging in a specific USB drive. So when you want to focus, you can leave the USB in another room and remove the easy “I'll just turn the blocker off” escape hatch that causes so many other focus apps to fail.
+
+I built it because Brick worked surprisingly well for my phone, but it didn't solve the bigger problem: most of my actual work happens on my computer, which also happens to contain the entire internet.
+
+I kept finding myself opening things I had already decided I didn't want to be doing. Not only was I not doing the work I should be doing—I wasn't even spending that time doing things I really enjoy doing.
+
+So I hacked together a crude version that would only let me disable my blockers when I physically plugged in a USB drive. It worked well enough for me that I turned it into a real product.
+
+It's called **Talysman**: talysman.app.
+
+I'd love for you to try it and tell me what you think. No obligation to post about it or promote it—I’m primarily looking for feedback from people who think seriously about <focus / ADHD / productivity / digital distraction>.
+
+Here's a code for lifetime Pro if you'd like to give it a shot:
+
+**<unique code>**
+
+You can redeem it under Account → Redeem a Code.
+
+If you'd like codes for <your clients/readers/community>, I'm happy to send as many as would be useful.
+
+Thanks,
+Zac

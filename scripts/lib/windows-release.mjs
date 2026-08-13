@@ -1,8 +1,11 @@
+import { homedir } from "node:os";
+import { join } from "node:path";
+
 // Fixed once the Trusted Signing account/profile exist — not secrets, safe to hardcode.
 // See az cli output from provisioning: resource group talysman-signing-rg, region eastus.
 export const TRUSTED_SIGNING_ENDPOINT = "https://eus.codesigning.azure.net/";
 export const TRUSTED_SIGNING_ACCOUNT = "talysman";
-export const TRUSTED_SIGNING_CERTIFICATE_PROFILE = "talysman-public";
+export const TRUSTED_SIGNING_CERTIFICATE_PROFILE = "Talysman";
 
 function configured(value) {
   return typeof value === "string" && value.trim().length > 0;
@@ -42,12 +45,19 @@ export function windowsReleaseEnvironment({ credentials = null, env = process.en
     );
   }
 
+  // The vendored Microsoft "TrustedSigning" pwsh module reads $env:localappdata — lowercase.
+  // pwsh's $env: is case-sensitive on Linux (unlike Windows), so cross-signing from Linux
+  // needs the exact-case var set or every NuGet-installed signing tool path resolves empty.
+  const localappdata =
+    env.localappdata || (process.platform === "linux" ? join(homedir(), ".cache", "trusted-signing") : "");
+
   return {
     ...env,
     AZURE_TENANT_ID: tenantId,
     AZURE_CLIENT_ID: clientId,
     AZURE_CLIENT_SECRET: clientSecret,
     AZURE_SIGNING_PUBLISHER_NAME: publisherName,
+    ...(localappdata ? { localappdata } : {}),
   };
 }
 

@@ -89,5 +89,9 @@ flycheck_*.el
 
 # Recovery codes must never be committed
 recovery-code.txt
+apps/web/comp_codes_*.txt
+
+# Marketing outreach drafts (not for version control)
+marketing/emails/
 .env.vercel
 .vercel
