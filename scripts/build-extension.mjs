@@ -97,6 +97,10 @@ function chromeIdentity() {
 }
 
 function bundledBackground() {
+  const heartbeatTiming = readFileSync(
+    resolve(srcDir, "heartbeat-timing.js"),
+    "utf8",
+  ).replace(/^export\s+/gm, "");
   const rules = readFileSync(resolve(srcDir, "rules.js"), "utf8").replace(
     /^export\s+/gm,
     "",
@@ -104,9 +108,14 @@ function bundledBackground() {
   const background = readFileSync(
     resolve(srcDir, "background.js"),
     "utf8",
-  ).replace(/^\s*import\s+\{[^}]*\}\s+from\s+['"]\.\/rules\.js['"];?\s*$/m, "");
+  ).replace(
+    /^\s*import\s+\{[^}]*\}\s+from\s+['"]\.\/(?:rules|heartbeat-timing)\.js['"];?\s*$/gm,
+    "",
+  );
   return (
-    "// Built by scripts/build-extension.mjs — rules.js + background.js bundled.\n\n" +
+    "// Built by scripts/build-extension.mjs — heartbeat-timing.js + rules.js + background.js bundled.\n\n" +
+    heartbeatTiming +
+    "\n" +
     rules +
     "\n" +
     background
@@ -300,9 +309,9 @@ The ${title} store package is generated at:
 apps/extension/dist/talysman-${browser}-${version}.zip
 \`\`\`
 
-The build script removes the ES module \`export\` and \`import\` statements from
-\`apps/extension/src/rules.js\` and \`apps/extension/src/background.js\`, then concatenates those
-two files into an unminified, unobfuscated \`background.js\`. It generates the browser-specific
+The build script removes the ES module \`export\` and \`import\` statements from the heartbeat,
+rules, and background modules, then concatenates those three files into an unminified, unobfuscated
+\`background.js\`. It generates the browser-specific
 \`manifest.json\`, copies the remaining JavaScript, HTML, CSS, SVG, and PNG files without code
 transformation, and writes an uncompressed ZIP.
 `;

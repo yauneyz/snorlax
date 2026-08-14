@@ -60,6 +60,12 @@ Thumbs.db
 .idea/
 .vscode/
 
+# Wine's NUL-device emulation drops a literal file named NUL in cwd when
+# signtool.exe runs under Wine during cross-signed Windows builds (see
+# scripts/lib/windows-release.mjs) — Windows reserves this name and it
+# breaks checkout/clone there, so never let it get committed.
+/NUL
+
 # Emacs backup, autosave, lock, and temporary checker files
 *~
 \#*\#

@@ -14,6 +14,7 @@
 // backoff. On reconnect the service re-pushes authoritative state.
 
 import { buildRules } from './rules.js';
+import { heartbeatDelayForState } from './heartbeat-timing.js';
 
 // Prefer the callback-compatible `chrome` namespace where both aliases exist (notably Firefox).
 // Safari exposes `browser`, which is also callback-compatible for native messaging.
@@ -21,9 +22,6 @@ const browserApi = globalThis.chrome || globalThis.browser;
 const HOST_NAME = 'com.talysman.host';
 const RECONNECT_MIN_MS = 1000;
 const RECONNECT_MAX_MS = 30000;
-const STRICT_HEARTBEAT_MS = 5000;
-const ACTIVE_HEARTBEAT_MS = 30000;
-const IDLE_HEARTBEAT_MS = 60000;
 
 let port = null;
 let reconnectTimer = null;
@@ -35,7 +33,8 @@ let hasReceivedState = false;
 
 // Health/diagnostic state reported in the heartbeat.
 let blockingActive = false; // last state.active the service pushed
-let handshakeEnabled = false;
+// Unknown is fail-safe while focus is active; only explicit false relaxes the cadence.
+let handshakeEnabled = null;
 let blockingMode = null; // last state.mode the service pushed; never includes configured domains
 let lastApplyOk = true; // last updateDynamicRules succeeded
 let appliedRuleCount = 0; // number of dynamic rules currently applied
@@ -72,7 +71,7 @@ console.info('[talysman] worker started', {
 async function applyState(state) {
   const previousHeartbeatDelay = heartbeatDelay();
   blockingActive = !!state.active;
-  handshakeEnabled = !!state.handshakeEnabled;
+  handshakeEnabled = typeof state.handshakeEnabled === 'boolean' ? state.handshakeEnabled : null;
   blockingMode = ['blacklist', 'whitelist', 'block-all'].includes(state.mode) ? state.mode : null;
   hasReceivedState = true;
   if (BROWSER !== 'safari' && heartbeatDelay() < previousHeartbeatDelay) {
@@ -212,12 +211,11 @@ function heartbeatFrame() {
 }
 
 function heartbeatDelay() {
-  // Safari's request/response bridge has no pushed state channel. Poll often enough to learn that
-  // the watchdog was enabled before its ten-second warning grace can expire (still 5x slower than
-  // the former one-second loop).
-  if (BROWSER === 'safari') return STRICT_HEARTBEAT_MS;
-  if (blockingActive && handshakeEnabled) return STRICT_HEARTBEAT_MS;
-  return blockingActive ? ACTIVE_HEARTBEAT_MS : IDLE_HEARTBEAT_MS;
+  return heartbeatDelayForState({
+    browser: BROWSER,
+    blockingActive,
+    handshakeEnabled,
+  });
 }
 
 // Safari native messaging is mediated by the containing app extension. A short request/response
