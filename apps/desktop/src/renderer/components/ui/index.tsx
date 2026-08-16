@@ -134,3 +134,7 @@ export function ProfileDot({
 export function Input(props: React.InputHTMLAttributes<HTMLInputElement>) {
   return <input {...props} className={cx(FIELD, props.className)} />;
 }
+
+export function Textarea(props: React.TextareaHTMLAttributes<HTMLTextAreaElement>) {
+  return <textarea {...props} className={cx(FIELD, 'resize-none', props.className)} />;
+}

@@ -6,7 +6,6 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use crate::enforce::{EnforceShared, ResolvedClass};
-use crate::model::Mode;
 
 pub const RESOLVER_SRC_PORT: u16 = 5354;
 
@@ -20,11 +19,8 @@ const UNFOCUSED_WAIT: Duration = Duration::from_secs(60 * 60 * 24);
 pub fn resolve_and_ingest(shared: &EnforceShared) {
     let targets = shared.resolver_targets();
     if targets.is_empty() {
-        match shared.mode() {
-            Mode::Blacklist => shared.set_blocked_ips(HashSet::new()),
-            Mode::Whitelist => shared.set_allowed_ips(HashSet::new()),
-            Mode::BlockAll => {}
-        }
+        shared.set_blocked_ips(HashSet::new());
+        shared.set_allowed_ips(HashSet::new());
         return;
     }
 
@@ -51,11 +47,8 @@ pub fn resolve_and_ingest(shared: &EnforceShared) {
             ResolvedClass::Ignore => {}
         }
     }
-    match shared.mode() {
-        Mode::Blacklist => shared.set_blocked_ips(blocked),
-        Mode::Whitelist => shared.set_allowed_ips(allowed),
-        Mode::BlockAll => {}
-    }
+    shared.set_blocked_ips(blocked);
+    shared.set_allowed_ips(allowed);
 }
 
 pub fn run_resolver(shared: Arc<EnforceShared>, shutdown: tokio::sync::watch::Receiver<bool>) {

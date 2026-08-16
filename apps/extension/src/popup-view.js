@@ -1,6 +1,7 @@
 function activeDescription(mode) {
   if (mode === 'whitelist') return 'Only the sites allowed by your focus policy can load.';
   if (mode === 'block-all') return 'Browser requests are blocked by your focus policy.';
+  if (mode === 'smart') return 'Talysman is judging pages against your focus intent as you browse.';
   return 'Sites in your focus blocklist are blocked in this browser.';
 }
 

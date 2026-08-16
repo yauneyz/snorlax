@@ -10,11 +10,17 @@
 // page; all other matching requests are blocked without entering the extension process.
 
 /**
- * @typedef {{ active: boolean, mode: 'blacklist'|'whitelist'|'block-all', domains: string[] }} State
+ * @typedef {{
+ *   active: boolean,
+ *   blockedDomains: string[],
+ *   allowedDomains: string[],
+ *   defaultAction: 'allow'|'block',
+ * }} State
  */
 
-// In whitelist mode an `allow` rule must outrank the catch-all `block`. DNR breaks ties by action
-// (allow > block) but we set explicit priorities so the intent survives any future tie-break change.
+// When defaultAction is 'block' an `allow` rule for `allowedDomains` must outrank the catch-all
+// `block`. DNR breaks ties by action (allow > block) but we set explicit priorities so the intent
+// survives any future tie-break change.
 export const BLOCK_PRIORITY = 1;
 export const ALLOW_PRIORITY = 2;
 
@@ -82,6 +88,20 @@ export function normalizeDomains(domains) {
 }
 
 /**
+ * Turn a normalized domain list into DNR match conditions for one policy list (either
+ * `blockedDomains` or `allowedDomains`). Safari's DNR implementation does not support Chromium's
+ * `requestDomains` condition, so it gets one `urlFilter` rule per domain (`||example.com^`)
+ * instead of a single condition covering the whole list.
+ * @param {string[]} domains
+ * @param {boolean} safari
+ * @returns {object[]}
+ */
+function domainConditionsFor(domains, safari) {
+  if (safari) return domains.map((domain) => ({ urlFilter: `||${domain}^` }));
+  return domains.length > 0 ? [{ requestDomains: domains }] : [];
+}
+
+/**
  * Build the dynamic DNR rules for a given service state. Returns `[]` when focus is inactive — the
  * extension blocks nothing while unlocked. Rule IDs are stable small integers; the worker
  * remove-alls before applying, so reuse across updates is fine.
@@ -89,13 +109,18 @@ export function normalizeDomains(domains) {
  * DNR conditions that omit `resourceTypes` apply to every type except `main_frame`, so each policy
  * deliberately emits a non-navigation rule plus an explicit top-level navigation rule.
  *
- *   * blacklist  — block requests to the listed domains (+ their subdomains), redirecting their
- *                  top-level navigations to the local blocked page.
- *   * whitelist  — default-deny: block everything, then `allow` the listed domains at higher
- *                  priority. Disallowed top-level navigations show the local blocked page.
- *                  (Sub-resources an allowed page pulls from other domains are blocked — same
- *                  semantics as the host-layer whitelist; expand CDN siblings upstream.)
- *   * block-all  — block all non-navigation requests and redirect top-level HTTP(S) navigations.
+ * There is no enforced "mode" anymore — `blockedDomains` and `allowedDomains` are independent hard
+ * lists, and `defaultAction` decides everything that falls through both:
+ *
+ *   * `blockedDomains` always gets a block rule (+ a redirect rule for their top-level
+ *     navigations), regardless of `defaultAction`. This is what the old "blacklist" mode did.
+ *   * `defaultAction: 'block'` additionally default-denies everything (block everything, then
+ *     `allow` the listed `allowedDomains` at higher priority; disallowed top-level navigations show
+ *     the local blocked page). This is what the old "whitelist" mode did — and with both lists
+ *     empty, it's what the old "block-all" mode did.
+ *   * `defaultAction: 'allow'` does NOT add a default-block-everything rule: pages must be able to
+ *     load normally so the Smart-filtering judge path in background.js can act on them after the
+ *     fact. Only `blockedDomains` is blocked via DNR in that case.
  *
  * Safari's DNR implementation does not support Chromium's `requestDomains` condition. Its
  * equivalent is one `urlFilter` rule per domain (`||example.com^`).
@@ -105,43 +130,28 @@ export function normalizeDomains(domains) {
  */
 export function buildRules(state, options = {}) {
   if (!state || !state.active) return [];
-  const domains = normalizeDomains(state.domains);
-  const domainConditions = options.safari
-    ? domains.map((domain) => ({ urlFilter: `||${domain}^` }))
-    : domains.length > 0
-      ? [{ requestDomains: domains }]
-      : [];
-  switch (state.mode) {
-    case 'blacklist': {
-      if (domains.length === 0) return [];
-      let id = 1;
-      return domainConditions.flatMap((condition) => [
-        blockRule(id++, condition),
-        redirectMainFrameRule(id++, condition),
-      ]);
-    }
-    case 'whitelist': {
-      const rules = [
-        blockRule(1, { urlFilter: '*' }),
-        redirectMainFrameRule(2, { regexFilter: '^https?://' }),
-      ];
-      if (domains.length > 0) {
-        let id = 3;
-        for (const condition of domainConditions) {
-          rules.push(
-            allowRule(id++, condition),
-            allowRule(id++, { ...condition, resourceTypes: MAIN_FRAME }),
-          );
-        }
-      }
-      return rules;
-    }
-    case 'block-all':
-      return [
-        blockRule(1, { urlFilter: '*' }),
-        redirectMainFrameRule(2, { regexFilter: '^https?://' }),
-      ];
-    default:
-      return [];
+
+  const blocked = normalizeDomains(state.blockedDomains);
+  const allowed = normalizeDomains(state.allowedDomains);
+  const blockedConditions = domainConditionsFor(blocked, !!options.safari);
+  const allowedConditions = domainConditionsFor(allowed, !!options.safari);
+
+  let id = 1;
+  const rules = [];
+
+  for (const condition of blockedConditions) {
+    rules.push(blockRule(id++, condition), redirectMainFrameRule(id++, condition));
   }
+
+  if (state.defaultAction === 'block') {
+    rules.push(blockRule(id++, { urlFilter: '*' }), redirectMainFrameRule(id++, { regexFilter: '^https?://' }));
+    for (const condition of allowedConditions) {
+      rules.push(
+        allowRule(id++, condition),
+        allowRule(id++, { ...condition, resourceTypes: MAIN_FRAME }),
+      );
+    }
+  }
+
+  return rules;
 }

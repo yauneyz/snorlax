@@ -24,6 +24,7 @@ import { MockServiceConnection } from './service/mockService.js';
 import type { ServiceConnection } from './service/connection.js';
 import { ensureServiceCurrent, ensureServiceInstalled } from './service/installer.js';
 import { initUpdater } from './updater.js';
+import { initSmartFiltering } from './smartFiltering.js';
 import { createTray } from './tray.js';
 import { createWindow, handleDeepLink, showMainWindow } from './window.js';
 
@@ -84,6 +85,7 @@ async function bootstrap(): Promise<void> {
 
   const { service, mock } = await connectService();
   await registerIpcHandlers({ service, mock });
+  initSmartFiltering(service);
 
   createWindow();
   // Linux has its own standalone tray helper (see file header); avoid a duplicate icon there.

@@ -11,7 +11,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use crate::enforce::EnforceShared;
-use crate::model::{Mode, Policy};
+use crate::model::Policy;
 
 pub(crate) const RUNTIME_CONFIG_PATH: &str = "/run/talysman/dnsmasq.conf";
 pub(crate) const DNSMASQ_INCLUDE_PATH: &str = "/etc/dnsmasq.d/talysman.conf";
@@ -43,7 +43,10 @@ pub fn run_manager(shared: Arc<EnforceShared>, shutdown: tokio::sync::watch::Rec
             match apply_policy(&policy) {
                 Ok(()) => {
                     installed_gen = Some(gen);
-                    tracing::info!("dnsmasq sinkhole applied for {:?}", policy.mode);
+                    tracing::info!(
+                        "dnsmasq sinkhole applied for {} blocked domain(s)",
+                        policy.blocked_domains.len()
+                    );
                 }
                 Err(e) => tracing::warn!("failed to apply dnsmasq sinkhole config: {e}"),
             }
@@ -73,8 +76,11 @@ pub fn remove_include() {
     let _ = std::fs::remove_file(DNSMASQ_INCLUDE_PATH);
 }
 
+/// dnsmasq only ever sinkholes `blockedDomains` — the hard block list. `allowedDomains` exemptions
+/// and the `defaultAction` fallback for everything else are enforced at the IP/port level by
+/// nftables (see `nft.rs`).
 pub fn apply_policy(policy: &Policy) -> std::io::Result<()> {
-    if policy.mode == Mode::Blacklist && policy.domains.is_empty() {
+    if policy.blocked_domains.is_empty() {
         return remove_config();
     }
 
@@ -119,15 +125,12 @@ fn dnsmasq_config(policy: &Policy) -> String {
         "# Talysman DNS sinkhole configuration.\n# Auto-generated; do not edit manually.\n\n",
     );
 
-    match policy.mode {
-        Mode::Blacklist => {
-            for domain in dnsmasq_domains(&policy.domains) {
-                let _ = writeln!(out, "address=/{domain}/0.0.0.0");
-                let _ = writeln!(out, "address=/{domain}/::");
-            }
-        }
-        Mode::Whitelist | Mode::BlockAll => {
-            out.push_str("# Whitelist and block-all are enforced by nftables IP rules.\n");
+    if policy.blocked_domains.is_empty() {
+        out.push_str("# No explicit blocked domains; enforced by nftables IP rules.\n");
+    } else {
+        for domain in dnsmasq_domains(&policy.blocked_domains) {
+            let _ = writeln!(out, "address=/{domain}/0.0.0.0");
+            let _ = writeln!(out, "address=/{domain}/::");
         }
     }
 
@@ -155,9 +158,9 @@ mod tests {
     use crate::model::Policy;
 
     #[test]
-    fn dnsmasq_config_sinkholes_blacklist_domains() {
+    fn dnsmasq_config_sinkholes_blocked_domains() {
         let mut p = Policy::default();
-        p.domains = vec![
+        p.blocked_domains = vec![
             "YouTube.com".into(),
             "*.reddit.com".into(),
             "youtube.com.".into(),
@@ -170,10 +173,10 @@ mod tests {
     }
 
     #[test]
-    fn dnsmasq_config_does_not_try_to_encode_whitelist() {
+    fn dnsmasq_config_does_not_try_to_encode_allowed_domains() {
         let mut p = Policy::default();
-        p.mode = crate::model::Mode::Whitelist;
-        p.domains = vec!["example.com".into()];
+        p.default_action = crate::model::DefaultAction::Block;
+        p.allowed_domains = vec!["example.com".into()];
         let config = dnsmasq_config(&p);
         assert!(!config.contains("address=/example.com/0.0.0.0"));
         assert!(config.contains("enforced by nftables"));

@@ -97,9 +97,12 @@ impl PersistentState {
 #[cfg(test)]
 mod migration_tests {
     use super::*;
-    use crate::model::{Mode, DEFAULT_PROFILE_ID};
+    use crate::model::{DefaultAction, DEFAULT_PROFILE_ID};
 
-    /// Pre-profile state files stored a single bare `policy` and no profiles at all.
+    /// Pre-profile state files stored a single bare `policy` and no profiles at all. That
+    /// legacy `policy` also predates `blockedDomains`/`allowedDomains`/`defaultAction`/`intent`:
+    /// it used a `mode` + flat `domains` list, which `Policy::deserialize` converts on the fly
+    /// (see model.rs) before `migrate` ever sees it.
     #[test]
     fn legacy_policy_becomes_the_default_profile() {
         let legacy = r#"{
@@ -117,11 +120,14 @@ mod migration_tests {
         assert_eq!(state.profiles.len(), 1);
         assert_eq!(state.profiles[0].id, DEFAULT_PROFILE_ID);
         assert_eq!(state.active_profile_id, DEFAULT_PROFILE_ID);
-        assert_eq!(state.active_policy().mode, Mode::Whitelist);
+        // whitelist -> allow only the listed domains, blocked by default.
+        assert_eq!(state.active_policy().default_action, DefaultAction::Block);
+        assert!(state.active_policy().blocked_domains.is_empty());
         assert_eq!(
-            state.active_policy().domains,
+            state.active_policy().allowed_domains,
             vec!["github.com".to_string()]
         );
+        assert!(state.active_policy().intent.is_none());
         // Unrelated fields survive the migration untouched.
         assert!(state.focus_active);
         assert!(state.settings.browser_handshake_enabled);
@@ -165,7 +171,84 @@ mod migration_tests {
             "top-level policy should be gone"
         );
         // …but it survives where it now belongs, inside the default profile.
-        assert_eq!(state.active_policy().mode, Mode::BlockAll);
+        assert_eq!(state.active_policy().default_action, DefaultAction::Block);
+        assert!(state.active_policy().blocked_domains.is_empty());
+        assert!(state.active_policy().allowed_domains.is_empty());
         assert!(json["profiles"].is_array());
+    }
+
+    /// Real-world state files: the pre-profile migration above already happened months ago, so
+    /// almost every file on disk has `profiles[].policy` in the *old* `{mode, domains, apps}`
+    /// shape, not a top-level `policy`. `Policy::deserialize` must convert those in place too —
+    /// this is the shape the Smart-filtering migration actually has to handle in practice.
+    #[test]
+    fn a_legacy_shaped_policy_inside_an_existing_profile_is_converted() {
+        let legacy = r##"{
+            "profiles": [
+                {
+                    "id": "profile-default",
+                    "name": "Default",
+                    "color": "#4fd6c0",
+                    "policy": { "mode": "blacklist", "domains": ["youtube.com"], "apps": [] }
+                },
+                {
+                    "id": "evening",
+                    "name": "Evening",
+                    "color": "#ff8f6b",
+                    "policy": { "mode": "block-all", "domains": [], "apps": [] }
+                }
+            ],
+            "activeProfileId": "profile-default"
+        }"##;
+
+        let mut state: PersistentState = serde_json::from_str(legacy).unwrap();
+        state.migrate();
+
+        assert_eq!(state.profiles.len(), 2);
+        let default = &state.profiles[0].policy;
+        assert_eq!(default.default_action, DefaultAction::Allow);
+        assert_eq!(default.blocked_domains, vec!["youtube.com".to_string()]);
+        assert!(default.allowed_domains.is_empty());
+        assert!(default.intent.is_none());
+
+        let evening = &state.profiles[1].policy;
+        assert_eq!(evening.default_action, DefaultAction::Block);
+        assert!(evening.blocked_domains.is_empty());
+        assert!(evening.allowed_domains.is_empty());
+    }
+
+    /// A state file already in the current shape (no `mode` key anywhere, `defaultAction`
+    /// present) round-trips untouched — the common case going forward.
+    #[test]
+    fn a_fresh_install_with_no_legacy_mode_key_is_unaffected() {
+        let current = r##"{
+            "profiles": [
+                {
+                    "id": "profile-default",
+                    "name": "Default",
+                    "color": "#4fd6c0",
+                    "policy": {
+                        "blockedDomains": ["youtube.com"],
+                        "allowedDomains": [],
+                        "defaultAction": "allow",
+                        "intent": { "positive": "finishing my thesis" },
+                        "apps": []
+                    }
+                }
+            ],
+            "activeProfileId": "profile-default"
+        }"##;
+
+        let mut state: PersistentState = serde_json::from_str(current).unwrap();
+        state.migrate();
+
+        let policy = state.active_policy();
+        assert_eq!(policy.default_action, DefaultAction::Allow);
+        assert_eq!(policy.blocked_domains, vec!["youtube.com".to_string()]);
+        assert!(policy.allowed_domains.is_empty());
+        assert_eq!(
+            policy.intent.as_ref().map(|i| i.positive.as_str()),
+            Some("finishing my thesis")
+        );
     }
 }

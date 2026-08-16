@@ -12,9 +12,16 @@
 //
 // Fail-safe stance: if the host disconnects we KEEP the last-applied rules and reconnect with
 // backoff. On reconnect the service re-pushes authoritative state.
+//
+// Smart filtering: when the pushed policy has a non-null `intent`, pages that fall through both
+// hard lists (`blockedDomains`/`allowedDomains`) are extracted and sent to the daemon for a
+// relevance judgment (`judge-request`/`judge-result`) rather than being statically allowed or
+// blocked. This is strictly additive on top of DNR — DNR still enforces the two hard lists — and
+// is a no-op (zero listeners doing real work) for classic, non-Smart profiles.
 
-import { buildRules } from './rules.js';
+import { buildRules, normalizeDomain } from './rules.js';
 import { heartbeatDelayForState } from './heartbeat-timing.js';
+import { extractPageContent } from './content-extract.js';
 
 // Prefer the callback-compatible `chrome` namespace where both aliases exist (notably Firefox).
 // Safari exposes `browser`, which is also callback-compatible for native messaging.
@@ -22,6 +29,12 @@ const browserApi = globalThis.chrome || globalThis.browser;
 const HOST_NAME = 'com.talysman.host';
 const RECONNECT_MIN_MS = 1000;
 const RECONNECT_MAX_MS = 30000;
+
+// Smart-filtering tuning. See the "Smart filtering" section below for how these are used.
+const SPA_DEBOUNCE_MS = 1500;
+const JUDGE_TIMEOUT_MS = 8000;
+const VERDICT_CACHE_TTL_MS = 10 * 60 * 1000;
+const MAX_JUDGE_TEXT_LENGTH = 2000;
 
 let port = null;
 let reconnectTimer = null;
@@ -35,13 +48,25 @@ let hasReceivedState = false;
 let blockingActive = false; // last state.active the service pushed
 // Unknown is fail-safe while focus is active; only explicit false relaxes the cadence.
 let handshakeEnabled = null;
-let blockingMode = null; // last state.mode the service pushed; never includes configured domains
+let blockingMode = null; // display-only label derived from policy shape; never includes domains/intent text
 let lastApplyOk = true; // last updateDynamicRules succeeded
 let appliedRuleCount = 0; // number of dynamic rules currently applied
 let heartbeatSequence = 0;
 let lastHeartbeatSentAt = null;
 let lastHeartbeatAckAt = null;
 let lastHeartbeatAckSequence = null;
+
+// Current policy, tracked for the Smart-filtering navigation path (webNavigation fires between
+// state pushes, so it needs somewhere to read the latest policy from). Never exposed to the popup
+// or heartbeat frames beyond the derived `blockingMode` label above — same stance the old
+// mode/domains split had ("never includes configured domains").
+let currentPolicy = {
+  active: false,
+  blockedDomains: [],
+  allowedDomains: [],
+  defaultAction: 'allow',
+  intent: null,
+};
 
 // Stable-ish identifiers for this worker session (best-effort; the service correlates by browser
 // PID, not these).
@@ -67,12 +92,31 @@ console.info('[talysman] worker started', {
   extensionVersion: EXTENSION_VERSION,
 });
 
+/** Display-only mode label for the popup. Derived, never leaks domain lists or intent text. */
+function deriveModeLabel(policy) {
+  if (policy.intent) return 'smart';
+  if (policy.defaultAction === 'block') {
+    return policy.allowedDomains.length > 0 ? 'whitelist' : 'block-all';
+  }
+  return 'blacklist';
+}
+
 /** Replace all dynamic rules with the ones derived from `state`. */
 async function applyState(state) {
   const previousHeartbeatDelay = heartbeatDelay();
   blockingActive = !!state.active;
   handshakeEnabled = typeof state.handshakeEnabled === 'boolean' ? state.handshakeEnabled : null;
-  blockingMode = ['blacklist', 'whitelist', 'block-all'].includes(state.mode) ? state.mode : null;
+  currentPolicy = {
+    active: blockingActive,
+    blockedDomains: Array.isArray(state.blockedDomains) ? state.blockedDomains : [],
+    allowedDomains: Array.isArray(state.allowedDomains) ? state.allowedDomains : [],
+    defaultAction: state.defaultAction === 'block' ? 'block' : 'allow',
+    intent:
+      state.intent && typeof state.intent.positive === 'string' && state.intent.positive
+        ? state.intent
+        : null,
+  };
+  blockingMode = deriveModeLabel(currentPolicy);
   hasReceivedState = true;
   if (BROWSER !== 'safari' && heartbeatDelay() < previousHeartbeatDelay) {
     scheduleHeartbeat(0);
@@ -166,8 +210,10 @@ function connect() {
       console.info('[talysman] native state received', {
         workerSessionId: PROFILE_ID,
         active: !!msg.active,
-        mode: msg.mode,
-        domainCount: Array.isArray(msg.domains) ? msg.domains.length : 0,
+        defaultAction: msg.defaultAction,
+        blockedDomainCount: Array.isArray(msg.blockedDomains) ? msg.blockedDomains.length : 0,
+        allowedDomainCount: Array.isArray(msg.allowedDomains) ? msg.allowedDomains.length : 0,
+        smartFilteringActive: !!(msg.intent && msg.intent.positive),
       });
       applyState(msg);
       return;
@@ -176,6 +222,11 @@ function connect() {
       lastHeartbeatAckAt = Date.now();
       lastHeartbeatAckSequence = msg.sequence ?? null;
       reconnectMs = RECONNECT_MIN_MS;
+      return;
+    }
+    if (msg && msg.type === 'judge-result') {
+      handleJudgeResult(msg);
+      return;
     }
   });
 
@@ -284,6 +335,219 @@ function scheduleHeartbeat(delay) {
     heartbeatTimer = null;
     heartbeat();
   }, delay);
+}
+
+// ---------------------------------------------------------------------------------------------
+// Smart filtering
+//
+// Activates only when currentPolicy.intent is non-null. For a qualifying main-frame navigation
+// that lands on neither hard list, we extract lightweight page content and ask the daemon whether
+// the page is relevant to the user's stated intent. Everything here is a no-op the moment
+// intent is null, so classic (non-Smart) profiles pay zero extra overhead.
+// ---------------------------------------------------------------------------------------------
+
+const spaDebounceTimers = new Map(); // tabId -> timeoutId
+const verdictCache = new Map(); // cacheKey -> { relevant, reason, expiresAt }
+const pendingJudgeRequests = new Map(); // requestId -> { tabId, url, timeoutId }
+
+function generateRequestId() {
+  if (globalThis.crypto && typeof crypto.randomUUID === 'function') return crypto.randomUUID();
+  return `judge-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
+
+/** Does `hostname` match `domain` (or one of its subdomains), mirroring rules.js's DNR semantics. */
+function hostnameMatchesDomain(hostname, domain) {
+  const normalized = normalizeDomain(domain);
+  if (!normalized) return false;
+  const h = hostname.toLowerCase();
+  return h === normalized || h.endsWith(`.${normalized}`);
+}
+
+function hostnameMatchesAny(hostname, domains) {
+  return (domains || []).some((domain) => hostnameMatchesDomain(hostname, domain));
+}
+
+function verdictCacheKey(url, intent) {
+  return JSON.stringify([url, intent.positive, intent.negative || '']);
+}
+
+function getCachedVerdict(url, intent) {
+  const key = verdictCacheKey(url, intent);
+  const entry = verdictCache.get(key);
+  if (!entry) return null;
+  if (entry.expiresAt <= Date.now()) {
+    verdictCache.delete(key);
+    return null;
+  }
+  return entry;
+}
+
+function setCachedVerdict(url, intent, relevant, reason) {
+  verdictCache.set(verdictCacheKey(url, intent), {
+    relevant,
+    reason,
+    expiresAt: Date.now() + VERDICT_CACHE_TTL_MS,
+  });
+}
+
+/** Same-page check used to guard against a verdict/timeout landing after the user navigated away. */
+function urlsRoughlyMatch(a, b) {
+  try {
+    const ua = new URL(a);
+    const ub = new URL(b);
+    return ua.hostname === ub.hostname && ua.pathname === ub.pathname;
+  } catch {
+    return a === b;
+  }
+}
+
+/** Redirect `tabId` to the local blocked page, but only if it's still on `expectedUrl`. */
+async function redirectIfStillOnUrl(tabId, expectedUrl, reason) {
+  try {
+    const tab = await browserApi.tabs.get(tabId);
+    if (!tab || !tab.url) return;
+    if (!urlsRoughlyMatch(tab.url, expectedUrl)) return; // user already navigated away
+    await browserApi.tabs.update(tabId, {
+      url: browserApi.runtime.getURL('blocked.html') + '?reason=' + encodeURIComponent(reason || ''),
+    });
+  } catch (e) {
+    // Tab likely closed mid-flight; nothing to do.
+  }
+}
+
+/** Client-side backstop when defaultAction is the only signal we have (timeout or extraction failure). */
+function applyDefaultActionFallback(tabId, url, reason) {
+  if (currentPolicy.defaultAction !== 'block') return; // fail-open: leave the tab alone
+  redirectIfStillOnUrl(tabId, url, reason);
+}
+
+function clearPendingJudgeRequest(requestId) {
+  const pending = pendingJudgeRequests.get(requestId);
+  if (!pending) return;
+  if (pending.timeoutId) clearTimeout(pending.timeoutId);
+  pendingJudgeRequests.delete(requestId);
+}
+
+/** Handle a `judge-result` frame, whether it arrived over the persistent port or Safari's sync call. */
+function handleJudgeResult(msg) {
+  const requestId = msg && msg.requestId;
+  if (!requestId) return;
+  const pending = pendingJudgeRequests.get(requestId);
+  if (!pending) return; // stale (already timed out) or unknown request id
+
+  clearPendingJudgeRequest(requestId);
+
+  const url = msg.url || pending.url;
+  const relevant = !!msg.relevant;
+  const reason = typeof msg.reason === 'string' ? msg.reason : '';
+
+  if (currentPolicy.intent) setCachedVerdict(url, currentPolicy.intent, relevant, reason);
+
+  if (!relevant) {
+    redirectIfStillOnUrl(pending.tabId, pending.url, reason);
+  }
+  // relevant === true → verdict is cached above; leave the tab alone.
+}
+
+function sendJudgeRequest(requestId, tabId, url, extractedText) {
+  const entry = { tabId, url, timeoutId: null };
+  pendingJudgeRequests.set(requestId, entry);
+  entry.timeoutId = setTimeout(() => {
+    if (!pendingJudgeRequests.has(requestId)) return;
+    pendingJudgeRequests.delete(requestId);
+    console.warn('[talysman] judge-request timed out', { requestId });
+    applyDefaultActionFallback(tabId, url, "Couldn't verify in time");
+  }, JUDGE_TIMEOUT_MS);
+
+  const frame = { type: 'judge-request', requestId, url, extractedText };
+  try {
+    if (BROWSER === 'safari') {
+      // Safari has no persistent port; reuse the same request/response native call the heartbeat
+      // sync uses.
+      browserApi.runtime.sendNativeMessage(HOST_NAME, frame, (response) => {
+        const error = browserApi.runtime.lastError;
+        if (error || !response || response.type !== 'judge-result') return; // timeout will fall back
+        handleJudgeResult(response);
+      });
+    } else if (port) {
+      port.postMessage(frame);
+    } else {
+      console.warn('[talysman] no native port available for judge-request', { requestId });
+    }
+  } catch (e) {
+    console.warn('[talysman] judge-request send failed', e && e.message);
+  }
+}
+
+/** Consider a completed main-frame navigation for Smart filtering. */
+async function handleQualifyingNavigation(tabId, url) {
+  if (!currentPolicy.active || !currentPolicy.intent) return; // classic mode: zero overhead
+  if (!/^https?:\/\//i.test(url)) return; // browser-internal pages etc. are out of scope
+
+  let hostname;
+  try {
+    hostname = new URL(url).hostname;
+  } catch {
+    return;
+  }
+
+  // Already authoritatively handled by DNR (blocked) or explicitly exempt (allowed).
+  if (hostnameMatchesAny(hostname, currentPolicy.blockedDomains)) return;
+  if (hostnameMatchesAny(hostname, currentPolicy.allowedDomains)) return;
+
+  const cached = getCachedVerdict(url, currentPolicy.intent);
+  if (cached) {
+    if (!cached.relevant) redirectIfStillOnUrl(tabId, url, cached.reason);
+    return;
+  }
+
+  let extraction = null;
+  try {
+    const results = await browserApi.scripting.executeScript({
+      target: { tabId },
+      func: extractPageContent,
+    });
+    extraction = results && results[0] && results[0].result;
+  } catch (e) {
+    console.warn('[talysman] content extraction failed', e && e.message);
+  }
+
+  if (!extraction) {
+    // Couldn't determine relevance at all — fall back to defaultAction, same as an unreachable judge.
+    applyDefaultActionFallback(tabId, url, "Couldn't verify in time");
+    return;
+  }
+
+  const combinedText = [extraction.title, extraction.description, extraction.text]
+    .filter(Boolean)
+    .join(' — ')
+    .slice(0, MAX_JUDGE_TEXT_LENGTH);
+
+  sendJudgeRequest(generateRequestId(), tabId, url, combinedText);
+}
+
+function debounceSpaNavigation(tabId, url) {
+  const existing = spaDebounceTimers.get(tabId);
+  if (existing) clearTimeout(existing);
+  spaDebounceTimers.set(
+    tabId,
+    setTimeout(() => {
+      spaDebounceTimers.delete(tabId);
+      handleQualifyingNavigation(tabId, url);
+    }, SPA_DEBOUNCE_MS),
+  );
+}
+
+if (browserApi.webNavigation) {
+  browserApi.webNavigation.onCompleted.addListener((details) => {
+    if (details.frameId !== 0) return;
+    handleQualifyingNavigation(details.tabId, details.url);
+  });
+
+  browserApi.webNavigation.onHistoryStateUpdated.addListener((details) => {
+    if (details.frameId !== 0) return;
+    debounceSpaNavigation(details.tabId, details.url);
+  });
 }
 
 // Register these listeners synchronously so Chrome wakes this worker when the profile starts or the

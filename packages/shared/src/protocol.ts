@@ -133,6 +133,21 @@ export interface RequestMap {
   ping: { params: void; result: { version: string; protocolVersion: number } };
 
   /**
+   * Extension → (via natmsg) → service: a page under an `intent`-enabled profile fell through
+   * both hard lists and needs judging. Fire-and-forget; the service broadcasts `judgeRequested`
+   * for Electron to pick up and answers (or times out to `defaultAction`) via `judgeResult`.
+   */
+  judgeRequest: { params: { requestId: string; url: string; extractedText: string }; result: Ok };
+  /**
+   * Electron main → service: the verdict for a pending `judgeRequested`. Unknown/already-resolved
+   * `requestId`s are ignored (the timeout sweep may have already answered fail-closed).
+   */
+  submitJudgeVerdict: {
+    params: { requestId: string; url: string; relevant: boolean; reason: string };
+    result: Ok;
+  };
+
+  /**
    * Privileged out-of-band killswitch. NOT surfaced in the UI — invoked by
    * talysman-recover.exe. Bypasses the USB and `locked` gates iff `code` matches the
    * recovery code stored at install time.

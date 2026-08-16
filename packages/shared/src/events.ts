@@ -38,6 +38,18 @@ export interface EventMap {
     /** The extension reports it holds the permissions **and** applied rules needed to block. */
     healthy: boolean;
   };
+  /**
+   * A page fell through both hard lists under a `Policy.intent`-enabled profile and needs an
+   * LLM relevance verdict. Broadcast so Electron main (the only client with entitlement/auth) can
+   * pick it up, call the judge endpoint, and answer with `submitJudgeVerdict`.
+   */
+  judgeRequested: { requestId: string; url: string; extractedText: string };
+  /**
+   * The verdict for a `judgeRequested` request — either from Electron's `submitJudgeVerdict` or
+   * synthesized by the daemon's own timeout sweep (fail-closed/open per `Policy.defaultAction`)
+   * when nothing answers in time. Relayed by natmsg back to the extension.
+   */
+  judgeResult: { requestId: string; url: string; relevant: boolean; reason: string };
 }
 
 export type EventName = keyof EventMap;

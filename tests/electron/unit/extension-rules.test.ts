@@ -28,15 +28,24 @@ describe('normalizeDomains', () => {
 
 describe('buildRules — focus off', () => {
   it('blocks nothing while unlocked', () => {
-    expect(buildRules({ active: false, mode: 'block-all', domains: [] })).toEqual([]);
+    expect(
+      buildRules({ active: false, blockedDomains: [], allowedDomains: [], defaultAction: 'block' }),
+    ).toEqual([]);
     // @ts-expect-error — verifies the runtime guard at the untyped extension boundary.
     expect(buildRules(undefined)).toEqual([]);
   });
 });
 
-describe('buildRules — blacklist', () => {
+// Equivalent to the old "blacklist" mode: only blockedDomains is populated, defaultAction stays
+// 'allow' so nothing outside the hard block list is touched.
+describe('buildRules — blockedDomains (classic blacklist equivalent)', () => {
   it('blocks subresources and redirects top-level navigation for listed domains', () => {
-    const rules = buildRules({ active: true, mode: 'blacklist', domains: ['reddit.com', '*.x.com'] });
+    const rules = buildRules({
+      active: true,
+      blockedDomains: ['reddit.com', '*.x.com'],
+      allowedDomains: [],
+      defaultAction: 'allow',
+    });
     expect(rules).toHaveLength(2);
     expect(rules[0]).toMatchObject({
       priority: BLOCK_PRIORITY,
@@ -52,14 +61,23 @@ describe('buildRules — blacklist', () => {
       },
     });
   });
-  it('produces no rules when the blocklist is empty (nothing to block)', () => {
-    expect(buildRules({ active: true, mode: 'blacklist', domains: [] })).toEqual([]);
+  it('produces no rules when every list is empty and the default is allow', () => {
+    expect(
+      buildRules({ active: true, blockedDomains: [], allowedDomains: [], defaultAction: 'allow' }),
+    ).toEqual([]);
   });
 });
 
-describe('buildRules — whitelist', () => {
+// Equivalent to the old "whitelist" mode: defaultAction 'block' default-denies everything, and
+// allowedDomains punches priority-2 allow holes through the priority-1 catch-all block.
+describe('buildRules — defaultAction block + allowedDomains (classic whitelist equivalent)', () => {
   it('default-denies all resource types and allows listed domains at higher priority', () => {
-    const rules = buildRules({ active: true, mode: 'whitelist', domains: ['gmail.com'] });
+    const rules = buildRules({
+      active: true,
+      blockedDomains: [],
+      allowedDomains: ['gmail.com'],
+      defaultAction: 'block',
+    });
     const block = rules.find((r) => r.action.type === 'block')!;
     const redirect = rules.find((r) => r.action.type === 'redirect')!;
     const allows = rules.filter((r) => r.action.type === 'allow');
@@ -82,7 +100,12 @@ describe('buildRules — whitelist', () => {
     expect(ALLOW_PRIORITY).toBeGreaterThan(BLOCK_PRIORITY);
   });
   it('with an empty allowlist blocks subresources and redirects top-level navigation', () => {
-    const rules = buildRules({ active: true, mode: 'whitelist', domains: [] });
+    const rules = buildRules({
+      active: true,
+      blockedDomains: [],
+      allowedDomains: [],
+      defaultAction: 'block',
+    });
     expect(rules).toHaveLength(2);
     expect(rules[0].action).toEqual({ type: 'block' });
     expect(rules[1].action).toEqual({
@@ -92,9 +115,15 @@ describe('buildRules — whitelist', () => {
   });
 });
 
-describe('buildRules — block-all', () => {
+// Equivalent to the old "block-all" mode: both lists empty, defaultAction 'block'.
+describe('buildRules — defaultAction block, empty lists (classic block-all equivalent)', () => {
   it('blocks non-navigation requests and redirects top-level HTTP(S) navigation', () => {
-    const rules = buildRules({ active: true, mode: 'block-all', domains: ['ignored.com'] });
+    const rules = buildRules({
+      active: true,
+      blockedDomains: [],
+      allowedDomains: [],
+      defaultAction: 'block',
+    });
     expect(rules).toHaveLength(2);
     expect(rules[0].action).toEqual({ type: 'block' });
     expect(rules[0].condition).toEqual({ urlFilter: '*' });
@@ -105,10 +134,49 @@ describe('buildRules — block-all', () => {
   });
 });
 
+// New combinations that only make sense post-Smart-filtering: blockedDomains and defaultAction
+// interact independently of allowedDomains.
+describe('buildRules — Smart filtering shapes', () => {
+  it('defaultAction allow blocks the hard blocklist but adds no rules for allowedDomains', () => {
+    const rules = buildRules({
+      active: true,
+      blockedDomains: ['reddit.com'],
+      allowedDomains: ['gmail.com'],
+      defaultAction: 'allow',
+    });
+    // Only the blockedDomains block+redirect pair — allowedDomains are already implicitly allowed
+    // by the default and must not generate DNR allow rules (there's nothing to punch a hole in).
+    expect(rules).toHaveLength(2);
+    expect(rules.every((r) => r.action.type !== 'allow')).toBe(true);
+    expect(rules[0].condition).toEqual({ requestDomains: ['reddit.com'] });
+  });
+
+  it('defaultAction block combines the hard blocklist with the default-deny + allow pattern', () => {
+    const rules = buildRules({
+      active: true,
+      blockedDomains: ['reddit.com'],
+      allowedDomains: ['gmail.com'],
+      defaultAction: 'block',
+    });
+    // blockedDomains pair, then catch-all block/redirect, then allowedDomains allow pair.
+    expect(rules).toHaveLength(6);
+    expect(rules[0].action).toEqual({ type: 'block' });
+    expect(rules[0].condition).toEqual({ requestDomains: ['reddit.com'] });
+    expect(rules[2].condition).toEqual({ urlFilter: '*' });
+    expect(rules.filter((r) => r.action.type === 'allow')).toHaveLength(2);
+  });
+});
+
 describe('buildRules — unique rule ids', () => {
   it('never emits duplicate ids within a ruleset', () => {
-    for (const mode of ['blacklist', 'whitelist', 'block-all'] as const) {
-      const rules = buildRules({ active: true, mode, domains: ['a.com', 'b.com'] });
+    const shapes = [
+      { blockedDomains: ['a.com', 'b.com'], allowedDomains: [], defaultAction: 'allow' as const },
+      { blockedDomains: [], allowedDomains: ['a.com', 'b.com'], defaultAction: 'block' as const },
+      { blockedDomains: [], allowedDomains: [], defaultAction: 'block' as const },
+      { blockedDomains: ['a.com'], allowedDomains: ['b.com'], defaultAction: 'block' as const },
+    ];
+    for (const shape of shapes) {
+      const rules = buildRules({ active: true, ...shape });
       const ids = rules.map((r) => r.id);
       expect(new Set(ids).size).toBe(ids.length);
     }
@@ -116,9 +184,14 @@ describe('buildRules — unique rule ids', () => {
 });
 
 describe('buildRules — Safari compatibility', () => {
-  it('uses one supported urlFilter pair per blacklist domain', () => {
+  it('uses one supported urlFilter pair per blocked domain', () => {
     const rules = buildRules(
-      { active: true, mode: 'blacklist', domains: ['reddit.com', '*.x.com'] },
+      {
+        active: true,
+        blockedDomains: ['reddit.com', '*.x.com'],
+        allowedDomains: [],
+        defaultAction: 'allow',
+      },
       { safari: true },
     );
     expect(rules).toHaveLength(4);
@@ -131,9 +204,14 @@ describe('buildRules — Safari compatibility', () => {
     expect(rules.every((rule) => !('requestDomains' in rule.condition))).toBe(true);
   });
 
-  it('uses per-domain Safari allow rules above the whitelist catch-all', () => {
+  it('uses per-domain Safari allow rules above the default-deny catch-all', () => {
     const rules = buildRules(
-      { active: true, mode: 'whitelist', domains: ['gmail.com', 'calendar.google.com'] },
+      {
+        active: true,
+        blockedDomains: [],
+        allowedDomains: ['gmail.com', 'calendar.google.com'],
+        defaultAction: 'block',
+      },
       { safari: true },
     );
     expect(rules).toHaveLength(6);

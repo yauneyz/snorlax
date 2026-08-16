@@ -10,12 +10,15 @@
  *  - de-duplicated, order-stable
  */
 
-import type { AppRef, Policy } from '@talysman/shared';
+import type { AppRef, Policy, PolicyIntent } from '@talysman/shared';
 
 export interface NormalizedPolicy extends Policy {
   /** Inputs that were dropped during normalization, with a reason. */
   rejected: { value: string; reason: string }[];
 }
+
+/** Prompt-budget cap for each intent field; also keeps the UI textarea sane. */
+export const INTENT_FIELD_MAX_LENGTH = 500;
 
 // A liberal hostname label check. Each label: alphanumeric + hyphen, not leading/trailing hyphen.
 const LABEL_RE = /^(?!-)[a-z0-9-]{1,63}(?<!-)$/;
@@ -72,13 +75,14 @@ function normalizeApp(app: AppRef): AppRef | null {
   };
 }
 
-/** Normalize and validate an entire policy. */
-export function normalizePolicy(policy: Policy): NormalizedPolicy {
-  const rejected: { value: string; reason: string }[] = [];
+/** Normalize a domain list against its own `normalizeDomain` rules, deduped, order-stable. */
+function normalizeDomainList(
+  input: string[] | undefined,
+  rejected: { value: string; reason: string }[],
+): string[] {
   const seen = new Set<string>();
   const domains: string[] = [];
-
-  for (const d of policy.domains ?? []) {
+  for (const d of input ?? []) {
     const res = normalizeDomain(d);
     if ('error' in res) {
       rejected.push({ value: d, reason: res.error });
@@ -89,6 +93,49 @@ export function normalizePolicy(policy: Policy): NormalizedPolicy {
       domains.push(res.domain);
     }
   }
+  return domains;
+}
+
+/**
+ * Normalize a user-authored intent. `positive` is required for a non-null result — an intent
+ * with a blank/whitespace-only description is dropped (Smart filtering stays off) rather than
+ * silently enforced against nothing.
+ */
+function normalizeIntent(
+  intent: PolicyIntent | null | undefined,
+  rejected: { value: string; reason: string }[],
+): PolicyIntent | null {
+  if (!intent) return null;
+
+  const positive = (intent.positive ?? '').trim().slice(0, INTENT_FIELD_MAX_LENGTH);
+  if (!positive) {
+    rejected.push({ value: intent.positive ?? '', reason: 'intent needs a non-empty description' });
+    return null;
+  }
+
+  const negative = (intent.negative ?? '').trim().slice(0, INTENT_FIELD_MAX_LENGTH);
+  return negative ? { positive, negative } : { positive };
+}
+
+/** Normalize and validate an entire policy. */
+export function normalizePolicy(policy: Policy): NormalizedPolicy {
+  const rejected: { value: string; reason: string }[] = [];
+
+  const blockedDomains = normalizeDomainList(policy.blockedDomains, rejected);
+  const blockedSet = new Set(blockedDomains);
+
+  const allowedCandidates = normalizeDomainList(policy.allowedDomains, rejected);
+  const allowedDomains: string[] = [];
+  for (const d of allowedCandidates) {
+    if (blockedSet.has(d)) {
+      rejected.push({ value: d, reason: 'also on the block list; block wins' });
+      continue;
+    }
+    allowedDomains.push(d);
+  }
+
+  const defaultAction: Policy['defaultAction'] = policy.defaultAction === 'block' ? 'block' : 'allow';
+  const intent = normalizeIntent(policy.intent, rejected);
 
   const appSeen = new Set<string>();
   const apps: AppRef[] = [];
@@ -108,5 +155,5 @@ export function normalizePolicy(policy: Policy): NormalizedPolicy {
     }
   }
 
-  return { mode: policy.mode, domains, apps, rejected };
+  return { blockedDomains, allowedDomains, defaultAction, intent, apps, rejected };
 }

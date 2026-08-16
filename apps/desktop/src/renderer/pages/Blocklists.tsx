@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import type { AppRef, Mode, Policy, Profile } from '@talysman/shared';
+import type { AppRef, Policy, Profile } from '@talysman/shared';
 import {
   EMPTY_POLICY,
   MAX_PROFILE_NAME_LENGTH,
@@ -9,20 +9,28 @@ import {
 import { siblingsFor } from '@talysman/core/browser';
 import { listInstalledApps, request } from '../lib/bridge.js';
 import { useFocusStore } from '../store/useFocusStore.js';
-import { Badge, Button, Input, Kicker, ProfileDot } from '../components/ui/index.js';
+import { Badge, Button, Input, Kicker, ProfileDot, Textarea } from '../components/ui/index.js';
 import { cx, profileSummary } from '../lib/utils.js';
 import type { AppPickerItem } from '../../shared/appPicker.js';
 import {
-  allowedPolicyModes,
+  maxAllowedDomains,
+  maxBlockedDomains,
   maxPolicyApps,
-  maxPolicyDomains,
   maxProfiles,
+  smartFilteringAllowed,
 } from '../../shared/productLimits.js';
 
-const MODES: { value: Mode; label: string; hint: string }[] = [
-  { value: 'blacklist', label: 'Blacklist', hint: 'Block only the sites you list.' },
-  { value: 'whitelist', label: 'Whitelist', hint: 'Block everything except your list.' },
-  { value: 'block-all', label: 'Block all', hint: 'No internet at all.' },
+/**
+ * One-click starting points over the generalized `{blockedDomains, allowedDomains,
+ * defaultAction, intent}` shape (see `packages/shared/src/policy.ts`) — not enforced modes,
+ * just prefills. "Smart" doesn't write a policy on click (an intent needs real text first); it
+ * just opens the Smart filtering section below.
+ */
+const PRESETS: { value: 'blacklist' | 'whitelist' | 'block-all' | 'smart'; label: string; hint: string }[] = [
+  { value: 'blacklist', label: 'Simple blocklist', hint: 'Block only the sites you list.' },
+  { value: 'whitelist', label: 'Strict allowlist', hint: 'Block everything except your list.' },
+  { value: 'block-all', label: 'Block everything', hint: 'No internet at all.' },
+  { value: 'smart', label: 'Smart', hint: 'Judge anything else against what you’re working on.' },
 ];
 
 function appKey(app: AppRef): string {
@@ -43,6 +51,93 @@ function appIdentifiers(app: AppRef): string {
     .join(' · ');
 }
 
+/** One "Always block" / "Always allow" list — same add/remove/sibling-hint UI, different binding. */
+function DomainListEditor({
+  kicker,
+  hint,
+  placeholder,
+  accent,
+  domains,
+  input,
+  onInputChange,
+  onAdd,
+  onRemove,
+  max,
+  limitReached,
+}: {
+  kicker: string;
+  hint: string;
+  placeholder: string;
+  accent: string;
+  domains: string[];
+  input: string;
+  onInputChange: (v: string) => void;
+  onAdd: () => void;
+  onRemove: (d: string) => void;
+  max: number | null;
+  limitReached: boolean;
+}) {
+  return (
+    <>
+      <div className="mt-4 flex items-baseline gap-2.5">
+        <Kicker>{kicker}</Kicker>
+        <span className="text-[11px] text-slate-600">
+          {max === null ? domains.length : `${domains.length}/${max}`}
+        </span>
+        <span className="ml-auto text-[11px] text-slate-450">{hint}</span>
+      </div>
+
+      <div className="mt-2 flex gap-2">
+        <Input
+          value={input}
+          onChange={(e) => onInputChange(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && onAdd()}
+          placeholder={placeholder}
+          disabled={limitReached}
+          className="font-mono"
+        />
+        <Button onClick={onAdd} disabled={limitReached} className="shrink-0 px-5">
+          Add
+        </Button>
+      </div>
+
+      <div className="mt-2.5 grid grid-cols-2 content-start gap-px overflow-hidden rounded-[10px] border border-white/[0.06] bg-white/[0.05]">
+        {domains.map((d) => {
+          const siblings = siblingsFor(d);
+          return (
+            <div key={d} className="flex items-center gap-2.5 bg-panel px-3.5 py-2">
+              <span
+                className="block h-[5px] w-[5px] shrink-0 rounded-full"
+                style={{ backgroundColor: accent }}
+              />
+              <span className="min-w-0 flex-1 truncate font-mono text-[12.5px] text-slate-200">
+                {d}
+              </span>
+              {siblings.length > 0 && (
+                <span
+                  className="hidden max-w-[40%] truncate text-[11px] text-slate-450 xl:block"
+                  title={siblings.join(', ')}
+                >
+                  also {siblings.join(', ')}
+                </span>
+              )}
+              <button
+                onClick={() => onRemove(d)}
+                className="shrink-0 text-[11px] font-medium text-slate-500 transition hover:text-dangerInk"
+              >
+                remove
+              </button>
+            </div>
+          );
+        })}
+        {domains.length === 0 && (
+          <p className="col-span-2 bg-panel px-3.5 py-3 text-[12px] text-slate-500">No sites yet.</p>
+        )}
+      </div>
+    </>
+  );
+}
+
 export function Blocklists({ onUpgrade }: { onUpgrade: () => void }) {
   const profiles = useFocusStore((s) => s.profiles);
   const activeProfileId = useFocusStore((s) => s.activeProfileId);
@@ -53,7 +148,10 @@ export function Blocklists({ onUpgrade }: { onUpgrade: () => void }) {
   // enforcing, so a scheduled profile switch carries the editor with it.
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
-  const [domain, setDomain] = useState('');
+  const [blockedInput, setBlockedInput] = useState('');
+  const [allowedInput, setAllowedInput] = useState('');
+  const [smartOpen, setSmartOpen] = useState(false);
+  const [negativeOpen, setNegativeOpen] = useState(false);
   const [appName, setAppName] = useState('');
   const [pickerOpen, setPickerOpen] = useState(false);
   const [pickerLoading, setPickerLoading] = useState(false);
@@ -70,11 +168,15 @@ export function Blocklists({ onUpgrade }: { onUpgrade: () => void }) {
   const profileLimit = maxProfiles(productLimits);
   const profileLimitReached = profileLimit !== null && profiles.length >= profileLimit;
 
-  const allowedModes = allowedPolicyModes(productLimits);
-  const maxDomains = maxPolicyDomains(productLimits, policy.mode);
+  const maxBlocked = maxBlockedDomains(productLimits);
+  const maxAllowed = maxAllowedDomains(productLimits);
   const maxApps = maxPolicyApps(productLimits);
-  const domainLimitReached = maxDomains !== null && policy.domains.length >= maxDomains;
+  const smartAllowed = smartFilteringAllowed(productLimits);
+  const blockedLimitReached = maxBlocked !== null && policy.blockedDomains.length >= maxBlocked;
+  const allowedLimitReached = maxAllowed !== null && policy.allowedDomains.length >= maxAllowed;
   const appBlockingLocked = maxApps === 0;
+  const smartSectionOpen = smartOpen || policy.intent !== null;
+  const negativeSectionOpen = negativeOpen || Boolean(policy.intent?.negative);
   const existingAppKeys = useMemo(
     () => new Set(policy.apps.map((app) => appKey(app))),
     [policy.apps],
@@ -165,16 +267,56 @@ export function Blocklists({ onUpgrade }: { onUpgrade: () => void }) {
   const activateProfile = (profileId: string) =>
     runProfileRequest(() => request('setActiveProfile', { profileId }));
 
-  const setMode = (mode: Mode) => save({ ...policy, mode });
-  const addDomain = () => {
-    if (!domain.trim()) return;
-    if (domainLimitReached) {
-      return setError(`Free supports up to ${maxDomains} blocked websites in blacklist mode.`);
+  function applyPreset(preset: 'blacklist' | 'whitelist' | 'block-all' | 'smart') {
+    if (preset === 'smart') {
+      if (!smartAllowed) return onUpgrade();
+      setSmartOpen(true);
+      return;
     }
-    void save({ ...policy, domains: [...policy.domains, domain.trim()] });
-    setDomain('');
+    if (preset === 'blacklist') return save({ ...policy, defaultAction: 'allow', intent: null });
+    if (preset === 'whitelist') return save({ ...policy, defaultAction: 'block', intent: null });
+    return save({ ...policy, blockedDomains: [], allowedDomains: [], defaultAction: 'block', intent: null });
+  }
+
+  const setDefaultAction = (defaultAction: Policy['defaultAction']) => save({ ...policy, defaultAction });
+
+  const addBlockedDomain = () => {
+    if (!blockedInput.trim()) return;
+    if (blockedLimitReached) {
+      return setError(`Free supports up to ${maxBlocked} always-blocked websites.`);
+    }
+    void save({ ...policy, blockedDomains: [...policy.blockedDomains, blockedInput.trim()] });
+    setBlockedInput('');
   };
-  const removeDomain = (d: string) => save({ ...policy, domains: policy.domains.filter((x) => x !== d) });
+  const removeBlockedDomain = (d: string) =>
+    save({ ...policy, blockedDomains: policy.blockedDomains.filter((x) => x !== d) });
+
+  const addAllowedDomain = () => {
+    if (!allowedInput.trim()) return;
+    if (allowedLimitReached) {
+      return setError(`Free supports up to ${maxAllowed} always-allowed websites.`);
+    }
+    void save({ ...policy, allowedDomains: [...policy.allowedDomains, allowedInput.trim()] });
+    setAllowedInput('');
+  };
+  const removeAllowedDomain = (d: string) =>
+    save({ ...policy, allowedDomains: policy.allowedDomains.filter((x) => x !== d) });
+
+  const setIntentPositive = (positive: string) => {
+    if (!smartAllowed) return onUpgrade();
+    void save({ ...policy, intent: { ...policy.intent, positive } });
+  };
+  const setIntentNegative = (negative: string) => {
+    void save({
+      ...policy,
+      intent: policy.intent ? { ...policy.intent, negative: negative || undefined } : null,
+    });
+  };
+  const clearIntent = () => {
+    setSmartOpen(false);
+    setNegativeOpen(false);
+    void save({ ...policy, intent: null });
+  };
   const addApp = () => {
     if (!appName.trim()) return;
     if (maxApps !== null && policy.apps.length >= maxApps) {
@@ -230,9 +372,6 @@ export function Blocklists({ onUpgrade }: { onUpgrade: () => void }) {
     setPickerOpen(false);
     setSelectedApps(new Set());
   }
-
-  const listKicker =
-    policy.mode === 'blacklist' ? 'Blocked sites' : policy.mode === 'whitelist' ? 'Allowed sites' : 'Sites';
 
   return (
     <div className="flex h-full min-h-0 flex-col pt-3">
@@ -399,124 +538,148 @@ export function Blocklists({ onUpgrade }: { onUpgrade: () => void }) {
         )}
       </div>
 
-      <section className="flex min-h-0 min-w-0 flex-1 flex-col">
+      <section className="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto">
+        {/* One-click starting points — each just prefills the fields below. */}
         <div className="mt-3 flex gap-2">
-          {MODES.map((m) => {
-            const on = policy.mode === m.value;
-            const locked = Boolean(allowedModes && !allowedModes.includes(m.value));
+          {PRESETS.map((p) => {
+            const locked = p.value === 'smart' && !smartAllowed;
             return (
               <button
-                key={m.value}
-                onClick={() => (locked ? onUpgrade() : setMode(m.value))}
+                key={p.value}
+                onClick={() => applyPreset(p.value)}
                 aria-disabled={locked}
                 className={cx(
                   'flex-1 rounded-[10px] border px-3 py-2.5 text-left transition',
-                  on
-                    ? 'border-seal/30 bg-seal/[0.09] shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_0_18px_rgba(199,204,212,0.10)]'
-                    : 'border-white/[0.07] bg-white/[0.025] hover:border-white/[0.14] hover:bg-white/[0.05]',
+                  'border-white/[0.07] bg-white/[0.025] hover:border-white/[0.14] hover:bg-white/[0.05]',
                   locked && 'opacity-65',
                 )}
               >
                 <span className="flex items-center gap-2">
-                  <span
-                    className={cx(
-                      'block h-2 w-2 rounded-full border',
-                      on
-                        ? 'border-seal bg-seal shadow-[0_0_7px_1px_rgba(199,204,212,0.6)]'
-                        : 'border-white/25 bg-transparent',
-                    )}
-                  />
-                  <span
-                    className={cx(
-                      'text-[12.5px] font-semibold',
-                      on ? 'text-slate-100' : 'text-slate-250',
-                    )}
-                  >
-                    {m.label}
-                  </span>
+                  <span className="text-[12.5px] font-semibold text-slate-250">{p.label}</span>
                   {locked && <Badge tone="neutral">Pro</Badge>}
                 </span>
-                <span className="mt-1 block pl-4 text-[11px] leading-snug text-slate-400">
-                  {m.hint}
-                </span>
+                <span className="mt-1 block text-[11px] leading-snug text-slate-400">{p.hint}</span>
               </button>
             );
           })}
         </div>
 
-        {policy.mode === 'block-all' ? (
-          <div className="mt-4 flex min-h-0 flex-1 flex-col items-center justify-center gap-1.5 rounded-[10px] border border-dashed border-[#ff8f6b]/30 bg-[#ff8f6b]/[0.05] p-6 text-center">
-            <span className="text-[14px] font-semibold text-[#ffb59d]">No list needed</span>
-            <span className="max-w-xs text-[12px] leading-relaxed text-slate-400">
-              Block-all cuts every outbound connection. Only loopback stays reachable.
-            </span>
+        <DomainListEditor
+          kicker="Always block"
+          hint="wildcards allowed as a leading “*.”"
+          placeholder="reddit.com"
+          accent={accent}
+          domains={policy.blockedDomains}
+          input={blockedInput}
+          onInputChange={setBlockedInput}
+          onAdd={addBlockedDomain}
+          onRemove={removeBlockedDomain}
+          max={maxBlocked}
+          limitReached={blockedLimitReached}
+        />
+
+        <DomainListEditor
+          kicker="Always allow"
+          hint="never blocked, never judged"
+          placeholder="mail.google.com"
+          accent={accent}
+          domains={policy.allowedDomains}
+          input={allowedInput}
+          onInputChange={setAllowedInput}
+          onAdd={addAllowedDomain}
+          onRemove={removeAllowedDomain}
+          max={maxAllowed}
+          limitReached={allowedLimitReached}
+        />
+
+        <div className="mt-4 flex items-baseline gap-2.5">
+          <Kicker>Default for everything else</Kicker>
+        </div>
+        <div className="mt-2 flex gap-2">
+          {(['allow', 'block'] as const).map((a) => {
+            const on = policy.defaultAction === a;
+            return (
+              <button
+                key={a}
+                onClick={() => setDefaultAction(a)}
+                className={cx(
+                  'flex-1 rounded-[10px] border px-3 py-2 text-left text-[12.5px] font-semibold transition',
+                  on
+                    ? 'border-seal/30 bg-seal/[0.09] text-slate-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_0_18px_rgba(199,204,212,0.10)]'
+                    : 'border-white/[0.07] bg-white/[0.025] text-slate-250 hover:border-white/[0.14] hover:bg-white/[0.05]',
+                )}
+              >
+                {a === 'allow' ? 'Allow' : 'Block'}
+              </button>
+            );
+          })}
+        </div>
+
+        <div className="mt-4 rounded-[10px] border border-white/[0.07] bg-white/[0.02] p-3.5">
+          <div className="flex items-baseline gap-2.5">
+            <Kicker>Smart filtering</Kicker>
+            <Badge tone="neutral">Pro</Badge>
+            {policy.intent && (
+              <button
+                onClick={clearIntent}
+                className="ml-auto text-[11px] font-medium text-slate-500 transition hover:text-dangerInk"
+              >
+                turn off
+              </button>
+            )}
           </div>
-        ) : (
-          <>
-            <div className="mt-4 flex items-baseline gap-2.5">
-              <Kicker>{listKicker}</Kicker>
-              <span className="text-[11px] text-slate-600">
-                {maxDomains === null
-                  ? policy.domains.length
-                  : `${policy.domains.length}/${maxDomains}`}
-              </span>
-              <span className="ml-auto text-[11px] text-slate-450">
-                wildcards allowed as a leading “*.”
-              </span>
-            </div>
 
-            <div className="mt-2 flex gap-2">
-              <Input
-                value={domain}
-                onChange={(e) => setDomain(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && addDomain()}
-                placeholder={policy.mode === 'whitelist' ? 'mail.google.com' : 'reddit.com'}
-                disabled={domainLimitReached}
-                className="font-mono"
-              />
-              <Button onClick={addDomain} disabled={domainLimitReached} className="shrink-0 px-5">
-                Add
-              </Button>
-            </div>
+          {!smartSectionOpen ? (
+            <button
+              onClick={() => (smartAllowed ? setSmartOpen(true) : onUpgrade())}
+              className="mt-2 text-[12px] font-medium text-slate-400 transition hover:text-slate-200"
+            >
+              Judge anything that isn’t on either list above, against what you’re working on →
+            </button>
+          ) : (
+            <div className="mt-2.5 flex flex-col gap-2.5">
+              <div>
+                <label className="mb-1 block text-[11px] text-slate-450">
+                  What are you working on?
+                </label>
+                <Textarea
+                  rows={2}
+                  value={policy.intent?.positive ?? ''}
+                  onChange={(e) => setIntentPositive(e.target.value)}
+                  placeholder="Researching flight prices for a trip to Japan"
+                  disabled={!smartAllowed}
+                />
+              </div>
 
-            {/* Two columns of hairline-separated rows: the 1px grid gap *is* the divider. */}
-            <div className="mt-2.5 grid min-h-0 flex-1 grid-cols-2 content-start gap-px overflow-y-auto rounded-[10px] border border-white/[0.06] bg-white/[0.05]">
-              {policy.domains.map((d) => {
-                const siblings = siblingsFor(d);
-                return (
-                  <div key={d} className="flex items-center gap-2.5 bg-panel px-3.5 py-2">
-                    <span
-                      className="block h-[5px] w-[5px] shrink-0 rounded-full"
-                      style={{ backgroundColor: accent }}
-                    />
-                    <span className="min-w-0 flex-1 truncate font-mono text-[12.5px] text-slate-200">
-                      {d}
-                    </span>
-                    {siblings.length > 0 && (
-                      <span
-                        className="hidden max-w-[40%] truncate text-[11px] text-slate-450 xl:block"
-                        title={siblings.join(', ')}
-                      >
-                        also {siblings.join(', ')}
-                      </span>
-                    )}
-                    <button
-                      onClick={() => removeDomain(d)}
-                      className="shrink-0 text-[11px] font-medium text-slate-500 transition hover:text-dangerInk"
-                    >
-                      remove
-                    </button>
-                  </div>
-                );
-              })}
-              {policy.domains.length === 0 && (
-                <p className="col-span-2 bg-panel px-3.5 py-3 text-[12px] text-slate-500">
-                  No sites yet.
-                </p>
+              {!negativeSectionOpen ? (
+                <button
+                  onClick={() => setNegativeOpen(true)}
+                  className="self-start text-[11px] font-medium text-slate-450 transition hover:text-slate-200"
+                >
+                  + Add exclusions
+                </button>
+              ) : (
+                <div>
+                  <label className="mb-1 block text-[11px] text-slate-450">
+                    Anything to avoid, even if related?
+                  </label>
+                  <Textarea
+                    rows={2}
+                    value={policy.intent?.negative ?? ''}
+                    onChange={(e) => setIntentNegative(e.target.value)}
+                    placeholder="General travel influencer content, unrelated shopping"
+                    disabled={!smartAllowed}
+                  />
+                </div>
               )}
+
+              <p className="text-[11px] leading-relaxed text-slate-450">
+                Pages that aren’t explicitly blocked or allowed above will load, then get checked
+                against your task — usually within a few seconds.
+              </p>
             </div>
-          </>
-        )}
+          )}
+        </div>
 
         <div className="mt-4 flex items-baseline gap-2.5">
           <Kicker>Apps blocked</Kicker>

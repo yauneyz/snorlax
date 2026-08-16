@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import type { Policy } from '@talysman/shared';
 import { resolveActiveProfile } from '@talysman/shared';
 import { useFocusStore } from './store/useFocusStore.js';
 import { Dashboard } from './pages/Dashboard.js';
@@ -23,11 +24,16 @@ const NAV: { route: Route; label: string }[] = [
   { route: 'settings', label: 'Settings' },
 ];
 
-const MODE_LABELS: Record<string, string> = {
-  blacklist: 'Blacklist',
-  whitelist: 'Whitelist',
-  'block-all': 'Block all',
-};
+/** A short label summarizing the sidebar's active policy — mirrors the presets in Blocklists.tsx. */
+function policyModeLabel(policy: Policy): string {
+  if (policy.intent) return 'Smart';
+  if (policy.defaultAction === 'block') {
+    return policy.blockedDomains.length === 0 && policy.allowedDomains.length === 0
+      ? 'Block all'
+      : 'Whitelist';
+  }
+  return 'Blacklist';
+}
 
 // Unlike Vite's DEV flag, APP_ENV remains "development" in packaged dev builds too.
 const IS_DEV = __APP_CONFIG__.APP_ENV !== 'production';
@@ -132,7 +138,7 @@ export default function App() {
           <div>
             <div className="font-mono text-[9.5px] tracking-[0.14em] text-slate-450">MODE</div>
             <div className="mt-0.5 text-[12.5px] font-medium text-slate-200">
-              {focusActive ? (MODE_LABELS[policy.mode] ?? policy.mode) : 'Off'}
+              {focusActive ? policyModeLabel(policy) : 'Off'}
             </div>
           </div>
         </div>

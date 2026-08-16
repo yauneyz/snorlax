@@ -1,7 +1,7 @@
 //! Pure domain/app matching used by the DNS sinkhole and the app blocker. Mirrors the intent
 //! of packages/core/src/policyNormalize.ts matching (wildcards are a leading "*.").
 
-use crate::model::{AppRef, Mode, Policy};
+use crate::model::{AppRef, DefaultAction, Policy};
 
 /// Does `host` match `pattern`? `pattern` may be exact ("youtube.com") or a leading wildcard
 /// ("*.reddit.com" matches reddit.com and any subdomain).
@@ -15,14 +15,20 @@ pub fn host_matches(host: &str, pattern: &str) -> bool {
     }
 }
 
-/// Should a DNS query for `host` be blocked under `policy`?
+/// Should a DNS query for `host` be blocked under `policy`? `blockedDomains` and `allowedDomains`
+/// are hard, never-judged lists (block wins if a domain is somehow on both — see
+/// `packages/core/src/policyNormalize.ts`); anything on neither list falls back to
+/// `defaultAction`. `intent`-based Smart-filtering judgments happen at the page level in the
+/// browser extension, not here — the OS-level DNS/nftables layer only ever sees the hard lists
+/// and the default.
 pub fn is_host_blocked(policy: &Policy, host: &str) -> bool {
-    let listed = policy.domains.iter().any(|p| host_matches(host, p));
-    match policy.mode {
-        Mode::Blacklist => listed,
-        Mode::Whitelist => !listed,
-        Mode::BlockAll => true,
+    if policy.blocked_domains.iter().any(|p| host_matches(host, p)) {
+        return true;
     }
+    if policy.allowed_domains.iter().any(|p| host_matches(host, p)) {
+        return false;
+    }
+    policy.default_action == DefaultAction::Block
 }
 
 /// A dot-less host that matches no realistic domain pattern (only an exact-equality pattern for
@@ -51,7 +57,13 @@ fn same_app(a: &AppRef, b: &AppRef) -> bool {
 /// (unblocking a site or app, or a mode change that frees traffic) returns false.
 pub fn is_at_least_as_restrictive(prev: &Policy, next: &Policy) -> bool {
     let mut hosts: Vec<String> = Vec::new();
-    for pattern in prev.domains.iter().chain(next.domains.iter()) {
+    for pattern in prev
+        .blocked_domains
+        .iter()
+        .chain(prev.allowed_domains.iter())
+        .chain(next.blocked_domains.iter())
+        .chain(next.allowed_domains.iter())
+    {
         let base = pattern
             .trim()
             .trim_start_matches("*.")
@@ -152,12 +164,37 @@ pub fn is_app_blocked(policy: &Policy, image_name: &str) -> bool {
 #[cfg(test)]
 mod restrictiveness_tests {
     use super::*;
-    use crate::model::{AppRef, Mode, Policy};
+    use crate::model::{AppRef, DefaultAction, Policy};
 
-    fn domains(mode: Mode, list: &[&str]) -> Policy {
+    /// Old "blacklist" preset: open by default, block only the listed domains.
+    fn blacklist(list: &[&str]) -> Policy {
         Policy {
-            mode,
-            domains: list.iter().map(|s| (*s).into()).collect(),
+            blocked_domains: list.iter().map(|s| (*s).into()).collect(),
+            allowed_domains: vec![],
+            default_action: DefaultAction::Allow,
+            intent: None,
+            apps: vec![],
+        }
+    }
+
+    /// Old "whitelist" preset: blocked by default, allow only the listed domains.
+    fn whitelist(list: &[&str]) -> Policy {
+        Policy {
+            blocked_domains: vec![],
+            allowed_domains: list.iter().map(|s| (*s).into()).collect(),
+            default_action: DefaultAction::Block,
+            intent: None,
+            apps: vec![],
+        }
+    }
+
+    /// Old "block-all" preset: blocked by default, nothing on either hard list.
+    fn block_all() -> Policy {
+        Policy {
+            blocked_domains: vec![],
+            allowed_domains: vec![],
+            default_action: DefaultAction::Block,
+            intent: None,
             apps: vec![],
         }
     }
@@ -173,15 +210,15 @@ mod restrictiveness_tests {
 
     #[test]
     fn identical_is_allowed() {
-        let p = domains(Mode::Blacklist, &["youtube.com", "reddit.com"]);
+        let p = blacklist(&["youtube.com", "reddit.com"]);
         assert!(is_at_least_as_restrictive(&p, &p.clone()));
     }
 
     #[test]
     fn blacklist_add_is_free_remove_is_gated() {
-        let prev = domains(Mode::Blacklist, &["youtube.com"]);
-        let added = domains(Mode::Blacklist, &["youtube.com", "reddit.com"]);
-        let removed = domains(Mode::Blacklist, &[]);
+        let prev = blacklist(&["youtube.com"]);
+        let added = blacklist(&["youtube.com", "reddit.com"]);
+        let removed = blacklist(&[]);
         assert!(is_at_least_as_restrictive(&prev, &added));
         assert!(!is_at_least_as_restrictive(&prev, &removed));
     }
@@ -189,28 +226,28 @@ mod restrictiveness_tests {
     #[test]
     fn blacklist_narrowing_wildcard_is_gated() {
         // *.reddit.com blocks every subdomain; old.reddit.com frees www.reddit.com etc.
-        let prev = domains(Mode::Blacklist, &["*.reddit.com"]);
-        let next = domains(Mode::Blacklist, &["old.reddit.com"]);
+        let prev = blacklist(&["*.reddit.com"]);
+        let next = blacklist(&["old.reddit.com"]);
         assert!(!is_at_least_as_restrictive(&prev, &next));
     }
 
     #[test]
     fn whitelist_add_is_permissive_remove_is_restrictive() {
         // Whitelist: listed hosts are the *only* allowed ones. Adding an entry frees traffic.
-        let prev = domains(Mode::Whitelist, &["work.com"]);
-        let widened = domains(Mode::Whitelist, &["work.com", "fun.com"]);
-        let narrowed = domains(Mode::Whitelist, &[]);
+        let prev = whitelist(&["work.com"]);
+        let widened = whitelist(&["work.com", "fun.com"]);
+        let narrowed = whitelist(&[]);
         assert!(!is_at_least_as_restrictive(&prev, &widened));
         assert!(is_at_least_as_restrictive(&prev, &narrowed));
     }
 
     #[test]
     fn block_all_is_the_ceiling() {
-        let block_all = domains(Mode::BlockAll, &[]);
-        let blacklist = domains(Mode::Blacklist, &["youtube.com"]);
+        let all = block_all();
+        let bl = blacklist(&["youtube.com"]);
         // Anything -> block-all only tightens; block-all -> anything looser is gated.
-        assert!(is_at_least_as_restrictive(&blacklist, &block_all));
-        assert!(!is_at_least_as_restrictive(&block_all, &blacklist));
+        assert!(is_at_least_as_restrictive(&bl, &all));
+        assert!(!is_at_least_as_restrictive(&all, &bl));
     }
 
     #[test]
@@ -235,7 +272,7 @@ mod restrictiveness_tests {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::model::AppRef;
+    use crate::model::{AppRef, DefaultAction};
 
     #[test]
     fn wildcard_matches_subdomains() {
@@ -251,16 +288,30 @@ mod tests {
     }
 
     #[test]
-    fn modes() {
+    fn blocked_and_allowed_lists_win_over_the_default() {
         let mut p = Policy::default();
-        p.domains = vec!["youtube.com".into()];
-        p.mode = Mode::Blacklist;
+        p.blocked_domains = vec!["youtube.com".into()];
+        p.default_action = DefaultAction::Allow;
         assert!(is_host_blocked(&p, "youtube.com"));
         assert!(!is_host_blocked(&p, "example.com"));
-        p.mode = Mode::Whitelist;
+
+        let mut p = Policy::default();
+        p.allowed_domains = vec!["youtube.com".into()];
+        p.default_action = DefaultAction::Block;
         assert!(!is_host_blocked(&p, "youtube.com"));
         assert!(is_host_blocked(&p, "example.com"));
-        p.mode = Mode::BlockAll;
+
+        let mut p = Policy::default();
+        p.default_action = DefaultAction::Block;
+        assert!(is_host_blocked(&p, "youtube.com"));
+    }
+
+    #[test]
+    fn blocked_domains_win_when_a_host_is_on_both_lists() {
+        let mut p = Policy::default();
+        p.blocked_domains = vec!["youtube.com".into()];
+        p.allowed_domains = vec!["youtube.com".into()];
+        p.default_action = DefaultAction::Allow;
         assert!(is_host_blocked(&p, "youtube.com"));
     }
 

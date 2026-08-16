@@ -7,7 +7,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use crate::enforce::EnforceShared;
-use crate::model::Mode;
+use crate::model::DefaultAction;
 
 const TABLE_NAME: &str = "talysman";
 const IDLE_WAIT: Duration = Duration::from_secs(60 * 60);
@@ -31,22 +31,14 @@ pub fn run_manager(shared: Arc<EnforceShared>, shutdown: tokio::sync::watch::Rec
 
         let gen = shared.generation();
         if installed_gen != Some(gen) {
-            let mode = shared.mode();
-            let blocked = if mode == Mode::Blacklist {
-                shared.blocked_ips()
-            } else {
-                Vec::new()
-            };
-            let allowed = if mode == Mode::Whitelist {
-                shared.allowed_ips()
-            } else {
-                Vec::new()
-            };
-            let script = ruleset(mode.clone(), &blocked, &allowed);
+            let default_action = shared.default_action();
+            let blocked = shared.blocked_ips();
+            let allowed = shared.allowed_ips();
+            let script = ruleset(default_action, &blocked, &allowed);
             remove_rules();
             if apply_script(&script) {
                 installed_gen = Some(gen);
-                tracing::info!("nftables rules applied for {:?}", mode);
+                tracing::info!("nftables rules applied for default_action={:?}", default_action);
             }
         }
         let wait = if installed_gen == Some(gen) {
@@ -100,7 +92,11 @@ fn apply_script(script: &str) -> bool {
     }
 }
 
-fn ruleset(mode: Mode, blocked: &[IpAddr], allowed: &[IpAddr]) -> String {
+/// `blocked`/`allowed` are the resolved IPs behind `blockedDomains`/`allowedDomains`
+/// (`resolve.rs`). `DefaultAction::Allow` only needs to drop the explicitly blocked IPs;
+/// `DefaultAction::Block` drops every web-port packet except the explicitly allowed IPs — with no
+/// allowed IPs that is the old "block-all" ceiling.
+fn ruleset(default_action: DefaultAction, blocked: &[IpAddr], allowed: &[IpAddr]) -> String {
     let (blocked_v4, blocked_v6) = split_ips(blocked);
     let (allowed_v4, allowed_v6) = split_ips(allowed);
     let mut s = String::new();
@@ -113,12 +109,12 @@ fn ruleset(mode: Mode, blocked: &[IpAddr], allowed: &[IpAddr]) -> String {
     s.push_str("    type filter hook output priority filter; policy accept;\n");
     s.push_str("    tcp dport 853 drop\n");
     s.push_str("    udp dport 853 drop\n");
-    match mode {
-        Mode::Blacklist => {
+    match default_action {
+        DefaultAction::Allow => {
             s.push_str("    ip daddr @blocked_ips_v4 drop\n");
             s.push_str("    ip6 daddr @blocked_ips_v6 drop\n");
         }
-        Mode::Whitelist => {
+        DefaultAction::Block => {
             if allowed_v4.is_empty() {
                 s.push_str("    ip protocol tcp tcp dport { 80, 443 } drop\n");
                 s.push_str("    ip protocol udp udp dport 443 drop\n");
@@ -133,10 +129,6 @@ fn ruleset(mode: Mode, blocked: &[IpAddr], allowed: &[IpAddr]) -> String {
                 s.push_str("    ip6 daddr != @allowed_ips_v6 tcp dport { 80, 443 } drop\n");
                 s.push_str("    ip6 daddr != @allowed_ips_v6 udp dport 443 drop\n");
             }
-        }
-        Mode::BlockAll => {
-            s.push_str("    tcp dport { 80, 443 } drop\n");
-            s.push_str("    udp dport 443 drop\n");
         }
     }
     s.push_str("  }\n");
@@ -171,12 +163,12 @@ mod tests {
     use std::net::{Ipv4Addr, Ipv6Addr};
 
     #[test]
-    fn blacklist_uses_focusd_style_ip_sets() {
+    fn allow_default_uses_focusd_style_ip_sets() {
         let ips = [
             IpAddr::V4(Ipv4Addr::new(151, 101, 1, 140)),
             IpAddr::V6(Ipv6Addr::LOCALHOST),
         ];
-        let s = ruleset(Mode::Blacklist, &ips, &[]);
+        let s = ruleset(DefaultAction::Allow, &ips, &[]);
         assert!(s.contains("table inet talysman"));
         assert!(s.contains("set blocked_ips_v4"));
         assert!(s.contains("151.101.1.140"));
@@ -185,9 +177,16 @@ mod tests {
     }
 
     #[test]
-    fn block_all_drops_web_egress() {
-        let s = ruleset(Mode::BlockAll, &[], &[]);
+    fn block_default_with_no_allowed_ips_drops_web_egress() {
+        let s = ruleset(DefaultAction::Block, &[], &[]);
         assert!(s.contains("tcp dport { 80, 443 } drop"));
         assert!(s.contains("udp dport 443 drop"));
+    }
+
+    #[test]
+    fn block_default_exempts_allowed_ips() {
+        let ips = [IpAddr::V4(Ipv4Addr::new(151, 101, 1, 140))];
+        let s = ruleset(DefaultAction::Block, &[], &ips);
+        assert!(s.contains("ip daddr != @allowed_ips_v4 tcp dport { 80, 443 } drop"));
     }
 }

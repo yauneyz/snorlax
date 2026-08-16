@@ -24,6 +24,14 @@ export type StripeEventRow = {
   processed_at: string;
 };
 
+/** Per-user, per-day counter enforcing the Smart filtering daily LLM judge cap. */
+export type SmartFilterJudgeUsageRow = {
+  user_id: string;
+  usage_date: string;
+  call_count: number;
+  updated_at: string;
+};
+
 /** Complimentary Pro grant — issued by the `pnpm comp:*` scripts or a redeemed code. */
 export type EntitlementGrantRow = {
   user_id: string;

@@ -58,6 +58,7 @@ const manifestIcons = {
 const extensionFiles = [
   "blocked.html",
   "blocked.css",
+  "blocked.js",
   "popup.html",
   "popup.css",
   "popup.js",
@@ -105,18 +106,24 @@ function bundledBackground() {
     /^export\s+/gm,
     "",
   );
+  const contentExtract = readFileSync(
+    resolve(srcDir, "content-extract.js"),
+    "utf8",
+  ).replace(/^export\s+/gm, "");
   const background = readFileSync(
     resolve(srcDir, "background.js"),
     "utf8",
   ).replace(
-    /^\s*import\s+\{[^}]*\}\s+from\s+['"]\.\/(?:rules|heartbeat-timing)\.js['"];?\s*$/gm,
+    /^\s*import\s+\{[^}]*\}\s+from\s+['"]\.\/(?:rules|heartbeat-timing|content-extract)\.js['"];?\s*$/gm,
     "",
   );
   return (
-    "// Built by scripts/build-extension.mjs — heartbeat-timing.js + rules.js + background.js bundled.\n\n" +
+    "// Built by scripts/build-extension.mjs — heartbeat-timing.js + rules.js + content-extract.js + background.js bundled.\n\n" +
     heartbeatTiming +
     "\n" +
     rules +
+    "\n" +
+    contentExtract +
     "\n" +
     background
   );

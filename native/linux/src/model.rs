@@ -3,20 +3,6 @@
 
 use serde::{Deserialize, Serialize};
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "kebab-case")]
-pub enum Mode {
-    Blacklist,
-    Whitelist,
-    BlockAll,
-}
-
-impl Default for Mode {
-    fn default() -> Self {
-        Mode::Blacklist
-    }
-}
-
 #[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct AppRef {
@@ -29,15 +15,126 @@ pub struct AppRef {
     pub label: String,
 }
 
-#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
+/// Mirrors `Policy['defaultAction']` in packages/shared/src/policy.ts: the fallback for domains
+/// on neither hard list, and the fail-closed/fail-open fallback when a Smart-filtering judge is
+/// unreachable (see `Core::sweep_expired_judges`).
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum DefaultAction {
+    Allow,
+    Block,
+}
+
+impl Default for DefaultAction {
+    /// Matches the old default (`Mode::Blacklist` with empty `domains`, i.e. nothing blocked) so
+    /// a brand-new default profile keeps behaving the same as before this migration.
+    fn default() -> Self {
+        DefaultAction::Allow
+    }
+}
+
+/// Mirrors `PolicyIntent` in packages/shared/src/policy.ts. Non-null on a `Policy` activates
+/// Smart filtering for domains that fall through both hard lists.
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct Intent {
+    pub positive: String,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub negative: Option<String>,
+}
+
+/// Mirrors `Policy` in packages/shared/src/policy.ts. There is no `mode` anymore: `blockedDomains`
+/// and `allowedDomains` are independent hard lists (never judged), `defaultAction` decides
+/// everything that hits neither list, and `intent` is an optional third layer.
+#[derive(Clone, Debug, Default, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct Policy {
-    #[serde(default)]
-    pub mode: Mode,
-    #[serde(default)]
-    pub domains: Vec<String>,
-    #[serde(default)]
+    pub blocked_domains: Vec<String>,
+    pub allowed_domains: Vec<String>,
+    pub default_action: DefaultAction,
+    pub intent: Option<Intent>,
     pub apps: Vec<AppRef>,
+}
+
+/// Only for backward-compatible deserialization: pre-Smart-filtering policies (persisted state
+/// files, or an old client's `setPolicy`/`setProfile` params) used a single `mode` selecting
+/// between three preset strategies over a flat `domains` list. Kept private to this module —
+/// nothing outside `Policy::deserialize` should ever construct one.
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "kebab-case")]
+enum LegacyMode {
+    Blacklist,
+    Whitelist,
+    BlockAll,
+}
+
+/// Permissive wire shape accepting both the current `Policy` fields and the legacy `mode`/
+/// `domains` pair, so `Policy::deserialize` can detect which shape it was handed and convert.
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct PolicyWire {
+    #[serde(default)]
+    mode: Option<LegacyMode>,
+    #[serde(default)]
+    domains: Vec<String>,
+    #[serde(default)]
+    blocked_domains: Vec<String>,
+    #[serde(default)]
+    allowed_domains: Vec<String>,
+    #[serde(default)]
+    default_action: Option<DefaultAction>,
+    #[serde(default)]
+    intent: Option<Intent>,
+    #[serde(default)]
+    apps: Vec<AppRef>,
+}
+
+impl<'de> Deserialize<'de> for Policy {
+    /// Detects the legacy `{mode, domains, apps}` shape by the presence of a `mode` key or the
+    /// absence of `defaultAction`, and converts: `blacklist` → block only `domains` (open by
+    /// default); `whitelist` → allow only `domains` (blocked by default); `block-all` → blocked by
+    /// default with no domains on either list. A current-shape payload passes through untouched.
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let wire = PolicyWire::deserialize(deserializer)?;
+        let is_legacy = wire.mode.is_some() || wire.default_action.is_none();
+        if is_legacy {
+            let policy = match wire.mode.unwrap_or(LegacyMode::Blacklist) {
+                LegacyMode::Blacklist => Policy {
+                    blocked_domains: wire.domains,
+                    allowed_domains: Vec::new(),
+                    default_action: DefaultAction::Allow,
+                    intent: None,
+                    apps: wire.apps,
+                },
+                LegacyMode::Whitelist => Policy {
+                    blocked_domains: Vec::new(),
+                    allowed_domains: wire.domains,
+                    default_action: DefaultAction::Block,
+                    intent: None,
+                    apps: wire.apps,
+                },
+                LegacyMode::BlockAll => Policy {
+                    blocked_domains: Vec::new(),
+                    allowed_domains: Vec::new(),
+                    default_action: DefaultAction::Block,
+                    intent: None,
+                    apps: wire.apps,
+                },
+            };
+            Ok(policy)
+        } else {
+            Ok(Policy {
+                blocked_domains: wire.blocked_domains,
+                allowed_domains: wire.allowed_domains,
+                default_action: wire.default_action.unwrap_or_default(),
+                intent: wire.intent,
+                apps: wire.apps,
+            })
+        }
+    }
 }
 
 /// A named policy the user can switch between (mirrors packages/shared/src/profile.ts). Focus

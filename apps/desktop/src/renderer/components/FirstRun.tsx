@@ -8,9 +8,8 @@
  */
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import type { Drive, Mode } from '@talysman/shared';
+import type { Drive, Policy } from '@talysman/shared';
 import { resolveActiveProfile } from '@talysman/shared';
-import { allowedPolicyModes } from '../../shared/productLimits.js';
 import { devSimulateExtension, openExternal, request } from '../lib/bridge.js';
 import { useFocusStore } from '../store/useFocusStore.js';
 import { cx } from '../lib/utils.js';
@@ -22,7 +21,26 @@ const CONTACT_STALE_MS = 15_000;
 const STEPS = ['welcome', 'profile', 'extension', 'key', 'ready'] as const;
 type Step = (typeof STEPS)[number];
 
-const MODES: { value: Mode; label: string; blurb: string }[] = [
+/**
+ * Onboarding-only preset labels — not part of the enforced `Policy` shape (see
+ * `packages/shared/src/policy.ts`). Each preset just sets `defaultAction`/list fields; Smart
+ * filtering is a Pro feature configured later from the Blocklists page, not offered here.
+ */
+type ModePreset = 'blacklist' | 'whitelist' | 'block-all';
+
+/** Map an onboarding preset onto the underlying generalized policy fields. */
+function applyPresetToPolicy(base: Policy, preset: ModePreset): Policy {
+  switch (preset) {
+    case 'blacklist':
+      return { ...base, defaultAction: 'allow', intent: null };
+    case 'whitelist':
+      return { ...base, defaultAction: 'block', intent: null };
+    case 'block-all':
+      return { ...base, blockedDomains: [], allowedDomains: [], defaultAction: 'block', intent: null };
+  }
+}
+
+const MODES: { value: ModePreset; label: string; blurb: string }[] = [
   {
     value: 'blacklist',
     label: 'Blacklist',
@@ -61,7 +79,7 @@ const EXTENSION_STORES: { key: string; name: string; note: string; url: string }
 
 const DOWNLOAD_PAGE = 'https://talysman.app/download';
 
-const MODE_LABELS: Record<Mode, string> = {
+const MODE_LABELS: Record<ModePreset, string> = {
   blacklist: 'Blacklist',
   whitelist: 'Whitelist',
   'block-all': 'Block all',
@@ -71,7 +89,6 @@ export function FirstRun({ onDone }: { onDone: () => void }) {
   const profiles = useFocusStore((s) => s.profiles);
   const activeProfileId = useFocusStore((s) => s.activeProfileId);
   const pairedKeys = useFocusStore((s) => s.pairedKeys);
-  const productLimits = useFocusStore((s) => s.productLimits);
   const usingMock = useFocusStore((s) => s.usingMock);
   const appEnv = useFocusStore((s) => s.appEnv);
   const extensionContact = useFocusStore((s) => s.extensionContact);
@@ -80,7 +97,8 @@ export function FirstRun({ onDone }: { onDone: () => void }) {
 
   const profile = resolveActiveProfile(profiles, activeProfileId);
   const [step, setStep] = useState(0);
-  const [mode, setMode] = useState<Mode>(profile?.policy.mode ?? 'blacklist');
+  // First-run profiles start empty, so there's nothing meaningful to derive the preset from yet.
+  const [mode, setMode] = useState<ModePreset>('blacklist');
   const [drives, setDrives] = useState<Drive[]>([]);
   const [driveId, setDriveId] = useState('');
   const [keyLabel, setKeyLabel] = useState('');
@@ -88,7 +106,6 @@ export function FirstRun({ onDone }: { onDone: () => void }) {
   const [error, setError] = useState<string | null>(null);
 
   const current: Step = STEPS[step] ?? 'welcome';
-  const allowedModes = allowedPolicyModes(productLimits);
 
   // Wake once when the current contact expires instead of ticking continuously.
   const [now, setNow] = useState(() => Date.now());
@@ -123,7 +140,10 @@ export function FirstRun({ onDone }: { onDone: () => void }) {
 
   const selectedDrive = drives.find((d) => d.id === driveId);
   const hasKey = pairedKeys.length > 0;
-  const hasList = (profile?.policy.domains.length ?? 0) > 0;
+  const hasList =
+    mode === 'whitelist'
+      ? (profile?.policy.allowedDomains.length ?? 0) > 0
+      : (profile?.policy.blockedDomains.length ?? 0) > 0;
   // Raising the shield on an empty whitelist would cut the network with no way back but the key,
   // and an empty blacklist blocks nothing at all. Neither is a good way to end setup.
   const canRaise = hasKey && (mode === 'block-all' || hasList);
@@ -141,10 +161,10 @@ export function FirstRun({ onDone }: { onDone: () => void }) {
     }
   }
 
-  /** Write the chosen mode onto the active profile before moving off the profile step. */
+  /** Write the chosen preset onto the active profile before moving off the profile step. */
   async function applyMode() {
-    if (!profile || profile.policy.mode === mode) return;
-    await request('setPolicy', { policy: { ...profile.policy, mode } });
+    if (!profile) return;
+    await request('setPolicy', { policy: applyPresetToPolicy(profile.policy, mode) });
     await refresh();
   }
 
@@ -239,17 +259,15 @@ export function FirstRun({ onDone }: { onDone: () => void }) {
             </StepBlurb>
             <div className="mt-[26px] flex gap-3">
               {MODES.map((m) => {
-                const locked = allowedModes !== null && !allowedModes.includes(m.value);
                 const on = mode === m.value;
                 return (
                   <button
                     key={m.value}
-                    disabled={locked}
                     onClick={() => setMode(m.value)}
                     className={cx(
                       // `flex flex-col` defeats the default vertical centring of button content,
                       // so cards with different blurb lengths still line their titles up.
-                      'flex w-[212px] flex-col rounded-xl border p-4 text-left transition disabled:cursor-not-allowed disabled:opacity-45',
+                      'flex w-[212px] flex-col rounded-xl border p-4 text-left transition',
                       on
                         ? 'border-seal/30 bg-seal/[0.09] shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_0_18px_rgba(199,204,212,0.10)]'
                         : 'border-white/[0.07] bg-white/[0.025] hover:border-white/[0.14]',
@@ -272,11 +290,6 @@ export function FirstRun({ onDone }: { onDone: () => void }) {
                       >
                         {m.label}
                       </span>
-                      {locked && (
-                        <span className="ml-auto font-mono text-[9px] tracking-[0.14em] text-slate-500">
-                          PRO
-                        </span>
-                      )}
                     </div>
                     <div className="mt-[7px] text-[12px] leading-relaxed text-slate-400">
                       {m.blurb}

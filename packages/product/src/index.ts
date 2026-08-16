@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import type { Mode, Policy, Profile, Schedule } from '@talysman/shared';
+import type { Policy, Profile, Schedule } from '@talysman/shared';
 import { resolveActiveProfile } from '@talysman/shared';
 
 export const SUBSCRIPTION_PLANS = ['free', 'pro'] as const;
@@ -8,6 +8,8 @@ export const FREE_BLOCKED_SITE_LIMIT = 5;
 /** Free keeps a single blocking profile; Pro is unlimited. */
 export const FREE_PROFILE_LIMIT = 1;
 export const ENTITLEMENT_GRACE_PERIOD_MS = 30 * 24 * 60 * 60 * 1000;
+/** Pro-only per-user daily cap on LLM judge calls, enforced by the web `judge-intent` route. */
+export const SMART_FILTER_DAILY_JUDGE_LIMIT = 500;
 
 /**
  * Length of the full-featured Pro trial started at Checkout. Stripe is the authority
@@ -93,9 +95,11 @@ type LimitedValue = number | null;
 
 export interface ProductLimits {
   policy?: {
-    modes?: readonly Mode[];
-    maxDomainsByMode?: Partial<Record<Mode, LimitedValue>>;
+    maxBlockedDomains?: LimitedValue;
+    maxAllowedDomains?: LimitedValue;
     maxApps?: LimitedValue;
+    /** Smart filtering (`Policy.intent`) has real per-page LLM cost — Pro-only. */
+    smartFilteringEnabled?: boolean;
   };
   profiles?: {
     max?: LimitedValue;
@@ -106,15 +110,17 @@ export interface ProductLimits {
 }
 
 export interface LimitViolation {
-  field: 'policy.mode' | 'policy.domains' | 'policy.apps' | 'profiles' | 'schedule';
+  field: 'policy.blockedDomains' | 'policy.allowedDomains' | 'policy.intent' | 'policy.apps' | 'profiles' | 'schedule';
   message: string;
 }
 
 const FREE_LIMITS: ProductLimits = {
   policy: {
-    modes: ['blacklist', 'whitelist', 'block-all'],
-    maxDomainsByMode: { blacklist: FREE_BLOCKED_SITE_LIMIT },
+    // Only the block list was ever rate-limited on Free; the allow list (old "whitelist" mode)
+    // has always been unlimited there — carried forward unchanged.
+    maxBlockedDomains: FREE_BLOCKED_SITE_LIMIT,
     maxApps: 0,
+    smartFilteringEnabled: false,
   },
   profiles: {
     max: FREE_PROFILE_LIMIT,
@@ -161,12 +167,16 @@ export function isScheduleEnabled(limits: ProductLimits | null): boolean {
   return limits?.schedule?.enabled !== false;
 }
 
-export function allowedPolicyModes(limits: ProductLimits | null): readonly Mode[] | null {
-  return limits?.policy?.modes ?? null;
+export function smartFilteringAllowed(limits: ProductLimits | null): boolean {
+  return limits?.policy?.smartFilteringEnabled !== false;
 }
 
-export function maxPolicyDomains(limits: ProductLimits | null, mode: Mode): LimitedValue {
-  return limits?.policy?.maxDomainsByMode?.[mode] ?? null;
+export function maxBlockedDomains(limits: ProductLimits | null): LimitedValue {
+  return limits?.policy?.maxBlockedDomains ?? null;
+}
+
+export function maxAllowedDomains(limits: ProductLimits | null): LimitedValue {
+  return limits?.policy?.maxAllowedDomains ?? null;
 }
 
 export function maxPolicyApps(limits: ProductLimits | null): LimitedValue {
@@ -185,21 +195,28 @@ export function validatePolicyForLimits(
   if (!limits?.policy) return [];
 
   const violations: LimitViolation[] = [];
-  const modes = allowedPolicyModes(limits);
-  const maxDomains = maxPolicyDomains(limits, policy.mode);
+  const maxBlocked = maxBlockedDomains(limits);
+  const maxAllowed = maxAllowedDomains(limits);
   const maxApps = maxPolicyApps(limits);
 
-  if (modes && !modes.includes(policy.mode)) {
+  if (maxBlocked !== null && policy.blockedDomains.length > maxBlocked) {
     violations.push({
-      field: 'policy.mode',
-      message: 'This policy mode is not available on Free.',
+      field: 'policy.blockedDomains',
+      message: `Free supports up to ${maxBlocked} always-blocked websites.`,
     });
   }
 
-  if (maxDomains !== null && policy.domains.length > maxDomains) {
+  if (maxAllowed !== null && policy.allowedDomains.length > maxAllowed) {
     violations.push({
-      field: 'policy.domains',
-      message: `Free supports up to ${maxDomains} blocked websites in blacklist mode.`,
+      field: 'policy.allowedDomains',
+      message: `Free supports up to ${maxAllowed} always-allowed websites.`,
+    });
+  }
+
+  if (policy.intent && !smartFilteringAllowed(limits)) {
+    violations.push({
+      field: 'policy.intent',
+      message: 'Smart filtering is a Pro feature.',
     });
   }
 
@@ -241,14 +258,17 @@ export function validateScheduleForLimits(
 export function constrainPolicyToLimits(policy: Policy, limits: ProductLimits | null): Policy {
   if (!limits?.policy) return policy;
 
-  const modes = allowedPolicyModes(limits);
+  const maxBlocked = maxBlockedDomains(limits);
+  const maxAllowed = maxAllowedDomains(limits);
   const maxApps = maxPolicyApps(limits);
-  const mode = modes?.includes(policy.mode) ? policy.mode : modes?.[0] ?? policy.mode;
-  const maxDomains = maxPolicyDomains(limits, mode);
 
   return {
-    mode,
-    domains: maxDomains === null ? policy.domains : policy.domains.slice(0, maxDomains),
+    ...policy,
+    blockedDomains:
+      maxBlocked === null ? policy.blockedDomains : policy.blockedDomains.slice(0, maxBlocked),
+    allowedDomains:
+      maxAllowed === null ? policy.allowedDomains : policy.allowedDomains.slice(0, maxAllowed),
+    intent: smartFilteringAllowed(limits) ? policy.intent : null,
     apps: maxApps === null ? policy.apps : policy.apps.slice(0, maxApps),
   };
 }

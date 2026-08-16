@@ -22,6 +22,7 @@ import type {
   CompCodeRow,
   EntitlementGrantRow,
   ProfileRow,
+  SmartFilterJudgeUsageRow,
   StripeEventRow,
   SubscriptionRow,
 } from "./types";
@@ -97,6 +98,13 @@ export type Database = {
         Update: Partial<AnalyticsUsageDailyRow>;
         Relationships: [];
       };
+      smart_filter_judge_usage: {
+        Row: SmartFilterJudgeUsageRow;
+        Insert: Pick<SmartFilterJudgeUsageRow, "user_id" | "usage_date"> &
+          Partial<SmartFilterJudgeUsageRow>;
+        Update: Partial<SmartFilterJudgeUsageRow>;
+        Relationships: [];
+      };
     };
     Views: {
       active_subscriptions: {
@@ -166,6 +174,15 @@ export type Database = {
       analytics_report_usage: {
         Args: { p_rows: Json };
         Returns: number;
+      };
+      /**
+       * Atomically checks + increments the caller's Smart filtering judge usage for a
+       * given date against a limit. Returns true (and increments) if allowed, false
+       * (no increment) if the cap was already reached.
+       */
+      smart_filter_check_and_increment_judge_usage: {
+        Args: { p_user_id: string; p_date: string; p_limit: number };
+        Returns: boolean;
       };
     };
     Enums: {

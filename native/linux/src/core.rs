@@ -13,13 +13,30 @@ use tokio::sync::broadcast;
 use crate::constants::{err, PROTOCOL_VERSION, SERVICE_VERSION};
 use crate::enforce::{self, EnforceShared};
 use crate::model::{
-    FocusSource, PairedKey, Policy, Profile, Schedule, ServiceState, MAX_PROFILE_NAME_LENGTH,
+    DefaultAction, FocusSource, PairedKey, Policy, Profile, Schedule, ServiceState,
+    MAX_PROFILE_NAME_LENGTH,
 };
 use crate::pairing;
 use crate::schedule;
 use crate::secure_store::{KeySecret, SecureStore};
 use crate::state::PersistentState;
 use crate::usb;
+
+/// How long a `judgeRequest` waits for `submitJudgeVerdict` before `Core::sweep_expired_judges`
+/// answers it with the requesting profile's `defaultAction` fallback. Kept a little longer than
+/// the extension's own ~8s client-side timeout so the daemon's authoritative answer normally
+/// wins the race.
+const JUDGE_TIMEOUT: Duration = Duration::from_secs(10);
+
+/// A `judgeRequest` awaiting `submitJudgeVerdict`. `default_action` is captured from the
+/// requesting profile at request time so the timeout sweep can answer fail-closed/fail-open
+/// without having to guess which profile (possibly since switched away from) asked.
+#[derive(Clone)]
+struct PendingJudge {
+    requested_at: Instant,
+    url: String,
+    default_action: DefaultAction,
+}
 
 /// An RPC error mapped to the wire `{ ok:false, code, message }`.
 pub struct RpcError {
@@ -44,6 +61,9 @@ pub struct Core {
     pub present_key_id: Option<String>,
     pub events: broadcast::Sender<Value>,
     extension_event_at: HashMap<u32, Instant>,
+    /// Judge requests relayed to Electron via `judgeRequested`, awaiting `submitJudgeVerdict`.
+    /// Swept on a timer (see `sweep_expired_judges`) so a request is always eventually answered.
+    pending_judges: HashMap<String, PendingJudge>,
 }
 
 impl Core {
@@ -57,6 +77,7 @@ impl Core {
             present_key_id: None,
             events,
             extension_event_at: HashMap::new(),
+            pending_judges: HashMap::new(),
         }
     }
 
@@ -447,6 +468,69 @@ impl Core {
         );
     }
 
+    /// Extension (via natmsg) → service: a page under an `intent`-enabled profile fell through
+    /// both hard lists. Record it as pending and broadcast `judgeRequested` for Electron to pick
+    /// up; the real answer comes back later as `submitJudgeVerdict` (or the timeout sweep).
+    /// Fire-and-forget from the RPC caller's perspective — always succeeds.
+    fn judge_request(&mut self, request_id: String, url: String, extracted_text: String) {
+        let default_action = self.state.active_policy().default_action;
+        self.pending_judges.insert(
+            request_id.clone(),
+            PendingJudge {
+                requested_at: Instant::now(),
+                url: url.clone(),
+                default_action,
+            },
+        );
+        self.emit(
+            "judgeRequested",
+            json!({ "requestId": request_id, "url": url, "extractedText": extracted_text }),
+        );
+    }
+
+    /// Electron main → service: the verdict for a pending `judgeRequested`. Unknown/already-
+    /// resolved `requestId`s are ignored — either the timeout sweep already answered fail-closed,
+    /// or this is a stale/duplicate report — so the extension is never answered twice.
+    fn submit_judge_verdict(&mut self, request_id: &str, url: String, relevant: bool, reason: String) {
+        if self.pending_judges.remove(request_id).is_none() {
+            return;
+        }
+        self.emit(
+            "judgeResult",
+            json!({ "requestId": request_id, "url": url, "relevant": relevant, "reason": reason }),
+        );
+    }
+
+    /// Answer every `judgeRequest` that has been pending longer than `JUDGE_TIMEOUT` with the
+    /// requesting profile's `defaultAction` fallback (`allow` -> relevant, `block` -> not
+    /// relevant), so a judge that never reports back (Electron not running, no auth session, the
+    /// web call failing) never leaves the extension hanging indefinitely. Called on a timer from
+    /// `service.rs`, independent of focus/monitoring state, so it always runs.
+    pub fn sweep_expired_judges(&mut self) {
+        let now = Instant::now();
+        let mut expired: Vec<(String, PendingJudge)> = Vec::new();
+        self.pending_judges.retain(|request_id, pending| {
+            if now.duration_since(pending.requested_at) >= JUDGE_TIMEOUT {
+                expired.push((request_id.clone(), pending.clone()));
+                false
+            } else {
+                true
+            }
+        });
+        for (request_id, pending) in expired {
+            tracing::warn!("judge request {request_id} timed out; answering with defaultAction fallback");
+            self.emit(
+                "judgeResult",
+                json!({
+                    "requestId": request_id,
+                    "url": pending.url,
+                    "relevant": pending.default_action == DefaultAction::Allow,
+                    "reason": "judge unavailable",
+                }),
+            );
+        }
+    }
+
     fn pair_key(&mut self, drive_id: &str, label: &str) -> Result<PairedKey, RpcError> {
         let drives = usb::list_removable_drives();
         let drive = drives
@@ -720,6 +804,24 @@ impl Core {
             "recover" => {
                 let code = str_field(params, "code")?;
                 self.recover(&code)?;
+                Ok(ok())
+            }
+            "judgeRequest" => {
+                let request_id = str_field(params, "requestId")?;
+                let url = str_field(params, "url")?;
+                let extracted_text = str_field(params, "extractedText")?;
+                self.judge_request(request_id, url, extracted_text);
+                Ok(ok())
+            }
+            "submitJudgeVerdict" => {
+                let request_id = str_field(params, "requestId")?;
+                let url = str_field(params, "url")?;
+                let relevant = params
+                    .get("relevant")
+                    .and_then(|v| v.as_bool())
+                    .ok_or_else(|| RpcError::new(err::BAD_REQUEST, "Missing field: relevant"))?;
+                let reason = str_field(params, "reason")?;
+                self.submit_judge_verdict(&request_id, url, relevant, reason);
                 Ok(ok())
             }
             other => Err(RpcError::new(

@@ -24,7 +24,15 @@ export function Dashboard() {
   const keyPresent = useFocusStore((s) => s.keyPresent);
   const pairedKeys = useFocusStore((s) => s.pairedKeys);
   const activeProfile = resolveActiveProfile(profiles, activeProfileId);
-  const listLabel = policy.mode === 'whitelist' ? 'sites allowed' : 'sites blocked';
+  // "block-all"-equivalent: block by default, nothing carved out.
+  const isBlockAll =
+    policy.defaultAction === 'block' &&
+    policy.blockedDomains.length === 0 &&
+    policy.allowedDomains.length === 0 &&
+    !policy.intent;
+  const listLabel = policy.defaultAction === 'block' ? 'sites allowed' : 'sites blocked';
+  const listCount =
+    policy.defaultAction === 'block' ? policy.allowedDomains.length : policy.blockedDomains.length;
 
   return (
     <div className="flex min-h-full flex-col items-center justify-center gap-9 py-6">
@@ -38,8 +46,8 @@ export function Dashboard() {
         />
         <Readout label="Profiles" value={String(profiles.length)} />
         <Readout
-          label={policy.mode === 'block-all' ? 'Everything' : listLabel}
-          value={policy.mode === 'block-all' ? 'blocked' : String(policy.domains.length)}
+          label={isBlockAll ? 'Everything' : listLabel}
+          value={isBlockAll ? 'blocked' : String(listCount)}
         />
         <Readout label="Schedule windows" value={String(schedule.windows.length)} />
       </div>

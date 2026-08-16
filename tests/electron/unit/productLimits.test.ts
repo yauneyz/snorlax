@@ -15,8 +15,10 @@ import {
 } from '../../../apps/desktop/src/shared/productLimits.js';
 
 const policy: Policy = {
-  mode: 'whitelist',
-  domains: ['one.com', 'two.com', 'three.com', 'four.com', 'five.com', 'six.com'],
+  blockedDomains: [],
+  allowedDomains: ['one.com', 'two.com', 'three.com', 'four.com', 'five.com', 'six.com'],
+  defaultAction: 'block',
+  intent: null,
   apps: [{ windowsImageName: 'chrome.exe', label: 'Chrome' }],
 };
 
@@ -26,7 +28,12 @@ const schedule: Schedule = {
 
 const profiles: Profile[] = [
   { id: 'deep', name: 'Deep Work', color: '#4fd6c0', policy: EMPTY_POLICY },
-  { id: 'evening', name: 'Evening', color: '#ff8f6b', policy: { ...EMPTY_POLICY, mode: 'block-all' } },
+  {
+    id: 'evening',
+    name: 'Evening',
+    color: '#ff8f6b',
+    policy: { ...EMPTY_POLICY, defaultAction: 'block' },
+  },
 ];
 
 describe('product limits', () => {
@@ -44,30 +51,35 @@ describe('product limits', () => {
     expect(constrainScheduleToLimits(schedule, limits)).toBe(schedule);
   });
 
-  it('gives Free unlimited whitelist websites while keeping apps and schedules gated', () => {
+  it('gives Free unlimited allow-list websites while keeping apps and schedules gated', () => {
     const limits = limitsForPlan('free');
 
     expect(validatePolicyForLimits(policy, limits).map((v) => v.field)).toEqual(['policy.apps']);
     expect(validateScheduleForLimits(schedule, limits).map((v) => v.field)).toEqual(['schedule']);
 
     expect(constrainPolicyToLimits(policy, limits)).toEqual({
-      mode: 'whitelist',
-      domains: policy.domains,
+      ...policy,
       apps: [],
     });
     expect(constrainScheduleToLimits(schedule, limits)).toEqual({ windows: [] });
   });
 
-  it(`limits only the Free blacklist to ${FREE_BLOCKED_SITE_LIMIT} websites`, () => {
+  it(`limits only the Free block list to ${FREE_BLOCKED_SITE_LIMIT} websites`, () => {
     const limits = limitsForPlan('free');
-    const blacklistPolicy: Policy = { ...policy, mode: 'blacklist', apps: [] };
+    const blockedPolicy: Policy = {
+      blockedDomains: policy.allowedDomains,
+      allowedDomains: [],
+      defaultAction: 'allow',
+      intent: null,
+      apps: [],
+    };
 
-    expect(validatePolicyForLimits(blacklistPolicy, limits).map((v) => v.field)).toEqual([
-      'policy.domains',
+    expect(validatePolicyForLimits(blockedPolicy, limits).map((v) => v.field)).toEqual([
+      'policy.blockedDomains',
     ]);
-    expect(constrainPolicyToLimits(blacklistPolicy, limits)).toEqual({
-      ...blacklistPolicy,
-      domains: blacklistPolicy.domains.slice(0, FREE_BLOCKED_SITE_LIMIT),
+    expect(constrainPolicyToLimits(blockedPolicy, limits)).toEqual({
+      ...blockedPolicy,
+      blockedDomains: blockedPolicy.blockedDomains.slice(0, FREE_BLOCKED_SITE_LIMIT),
     });
   });
 
@@ -102,11 +114,34 @@ describe('product limits', () => {
     ]);
   });
 
-  it('allows Free to use block-all mode', () => {
+  it('allows Free to block everything by default', () => {
     const limits = limitsForPlan('free');
-    const blockAllPolicy: Policy = { mode: 'block-all', domains: [], apps: [] };
+    const blockAllPolicy: Policy = {
+      blockedDomains: [],
+      allowedDomains: [],
+      defaultAction: 'block',
+      intent: null,
+      apps: [],
+    };
 
     expect(validatePolicyForLimits(blockAllPolicy, limits)).toEqual([]);
     expect(constrainPolicyToLimits(blockAllPolicy, limits)).toEqual(blockAllPolicy);
+  });
+
+  it('gates Smart filtering behind Pro', () => {
+    const limits = limitsForPlan('free');
+    const smartPolicy: Policy = {
+      blockedDomains: [],
+      allowedDomains: [],
+      defaultAction: 'block',
+      intent: { positive: 'Researching flights to Japan' },
+      apps: [],
+    };
+
+    expect(validatePolicyForLimits(smartPolicy, limits).map((v) => v.field)).toEqual([
+      'policy.intent',
+    ]);
+    expect(constrainPolicyToLimits(smartPolicy, limits).intent).toBeNull();
+    expect(validatePolicyForLimits(smartPolicy, limitsForPlan('pro'))).toEqual([]);
   });
 });

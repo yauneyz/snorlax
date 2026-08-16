@@ -248,7 +248,7 @@ mod restrictiveness_tests {
 #[cfg(test)]
 mod profile_tests {
     use super::*;
-    use crate::model::{Mode, Policy, ScheduleWindow};
+    use crate::model::{DefaultAction, Policy, ScheduleWindow};
 
     fn profile(id: &str, policy: Policy) -> Profile {
         Profile {
@@ -261,8 +261,10 @@ mod profile_tests {
 
     fn blacklist(domains: &[&str]) -> Policy {
         Policy {
-            mode: Mode::Blacklist,
-            domains: domains.iter().map(|d| (*d).to_string()).collect(),
+            blocked_domains: domains.iter().map(|d| (*d).to_string()).collect(),
+            allowed_domains: Vec::new(),
+            default_action: DefaultAction::Allow,
+            intent: None,
             apps: Vec::new(),
         }
     }

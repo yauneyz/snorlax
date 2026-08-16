@@ -20,8 +20,8 @@ use std::time::{Duration, Instant};
 
 use talysman_common::watchdog::Heartbeat;
 
-use crate::model::{Mode, Policy};
-use crate::policy_match::is_host_blocked;
+use crate::model::{DefaultAction, Policy};
+use crate::policy_match::host_matches;
 
 const MAX_FILTER_IPS: usize = 4000;
 
@@ -136,7 +136,8 @@ impl EnforceShared {
     }
 
     fn effective(mut policy: Policy) -> Policy {
-        policy.domains = crate::enforce::properties::expand_domains(&policy.domains);
+        policy.blocked_domains = crate::enforce::properties::expand_domains(&policy.blocked_domains);
+        policy.allowed_domains = crate::enforce::properties::expand_domains(&policy.allowed_domains);
         policy
     }
 
@@ -158,8 +159,8 @@ impl EnforceShared {
         self.policy.lock().unwrap().clone()
     }
 
-    pub fn mode(&self) -> Mode {
-        self.policy.lock().unwrap().mode.clone()
+    pub fn default_action(&self) -> DefaultAction {
+        self.policy.lock().unwrap().default_action
     }
 
     pub fn set_policy(&self, policy: Policy) {
@@ -210,21 +211,28 @@ impl EnforceShared {
         ips
     }
 
+    /// Classify a resolved hostname for the IP-set feeding `nft.rs`: a host on `blockedDomains`
+    /// needs its IPs in the drop set, a host on `allowedDomains` needs its IPs in the exemption
+    /// set, and anything else is irrelevant here — it is governed by `defaultAction` directly
+    /// (no per-IP set needed for "block/allow everything else").
     pub fn classify_resolved(&self, host: &str) -> ResolvedClass {
         let policy = self.policy_snapshot();
-        match policy.mode {
-            Mode::Blacklist if is_host_blocked(&policy, host) => ResolvedClass::Blocked,
-            Mode::Whitelist if !is_host_blocked(&policy, host) => ResolvedClass::Allowed,
-            _ => ResolvedClass::Ignore,
+        if policy.blocked_domains.iter().any(|p| host_matches(host, p)) {
+            ResolvedClass::Blocked
+        } else if policy.allowed_domains.iter().any(|p| host_matches(host, p)) {
+            ResolvedClass::Allowed
+        } else {
+            ResolvedClass::Ignore
         }
     }
 
+    /// Hostnames the resolver needs IPs for: the union of both hard lists. Domains covered only
+    /// by `defaultAction` need no resolution — `nft.rs` enforces the default at the port level.
     pub fn resolver_targets(&self) -> Vec<String> {
         let policy = self.policy_snapshot();
-        match policy.mode {
-            Mode::Blacklist | Mode::Whitelist => policy.domains.clone(),
-            Mode::BlockAll => Vec::new(),
-        }
+        let mut targets = policy.blocked_domains.clone();
+        targets.extend(policy.allowed_domains.iter().cloned());
+        targets
     }
 
     pub fn generation(&self) -> u64 {

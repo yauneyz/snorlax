@@ -87,7 +87,7 @@ const evening: Profile = {
   id: 'evening',
   name: 'Evening',
   color: '#ff8f6b',
-  policy: { ...EMPTY_POLICY, mode: 'block-all' },
+  policy: { ...EMPTY_POLICY, defaultAction: 'block' },
 };
 
 async function addEvening(svc: MockServiceConnection) {
@@ -106,11 +106,13 @@ describe('MockServiceConnection — blocking profiles', () => {
 
   it('edits the active profile when setPolicy is used', async () => {
     const svc = new MockServiceConnection();
-    await svc.request('setPolicy', { policy: { ...EMPTY_POLICY, domains: ['news.example.com'] } });
+    await svc.request('setPolicy', {
+      policy: { ...EMPTY_POLICY, blockedDomains: ['news.example.com'] },
+    });
 
     const state = await svc.request('getState', undefined);
-    expect(state.profiles[0]!.policy.domains).toEqual(['news.example.com']);
-    expect(state.policy.domains).toEqual(['news.example.com']);
+    expect(state.profiles[0]!.policy.blockedDomains).toEqual(['news.example.com']);
+    expect(state.policy.blockedDomains).toEqual(['news.example.com']);
   });
 
   it('adds a profile without disturbing which one is enforced', async () => {
@@ -120,21 +122,21 @@ describe('MockServiceConnection — blocking profiles', () => {
     const state = await svc.request('getState', undefined);
     expect(state.profiles.map((p) => p.id)).toEqual([DEFAULT_PROFILE_ID, 'evening']);
     expect(state.activeProfileId).toBe(DEFAULT_PROFILE_ID);
-    expect(state.policy.mode).toBe('blacklist');
+    expect(state.policy.defaultAction).toBe('allow');
   });
 
   it('switches the enforced policy when the active profile changes', async () => {
     const svc = new MockServiceConnection();
     await addEvening(svc);
     const seen: string[] = [];
-    svc.on('policyChanged', ({ policy }) => seen.push(policy.mode));
+    svc.on('policyChanged', ({ policy }) => seen.push(policy.defaultAction));
 
     await svc.request('setActiveProfile', { profileId: 'evening' });
 
     const state = await svc.request('getState', undefined);
     expect(state.activeProfileId).toBe('evening');
-    expect(state.policy.mode).toBe('block-all');
-    expect(seen).toEqual(['block-all']);
+    expect(state.policy.defaultAction).toBe('block');
+    expect(seen).toEqual(['block']);
   });
 
   it('requires the key to switch profiles while focus is on', async () => {

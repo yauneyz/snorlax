@@ -10,13 +10,20 @@ const distDir = resolve(extensionDir, "dist");
 const identities = readJson(
   resolve(root, "native/common/extension-identities.json"),
 );
-const expectedPermissions = ["declarativeNetRequest", "nativeMessaging"];
+const expectedPermissions = [
+  "declarativeNetRequest",
+  "nativeMessaging",
+  "scripting",
+  "tabs",
+  "webNavigation",
+];
 const expectedHostPermissions = ["<all_urls>"];
 const expectedFiles = [
   "background.js",
   "blocked-logo.svg",
   "blocked.css",
   "blocked.html",
+  "blocked.js",
   "icon-16.png",
   "icon-32.png",
   "icon-48.png",
@@ -124,6 +131,7 @@ for (const [store, directory] of Object.entries({
     "background.js",
     "blocked.html",
     "blocked.css",
+    "blocked.js",
     "popup.js",
     "popup-view.js",
     "popup.html",
