@@ -1,0 +1,68 @@
+Marketing plan:
+
+- reply guyx30; 20 X, 5 linkedin, 5 reddit, all google alerts
+- cold emails x 5
+- 1 cold email to podcast host
+- 1 X/linkedin real post
+- 1 X unrelated post
+- build in public log w/ daily metric shot
+- roast my landing page
+
+Reply guy tools:
+F5Bot (f5bot.com) — free, emails you every Reddit/HN mention of keywords. Add: brick app, cold turkey, freedom app, distraction blocker, app blocker, website blocker, "block youtube".
+
+Google Alerts for the same phrases
+
+X
+
+3. X/Twitter
+Use advanced search (search box, then filters, or type operators):
+
+brick app -filter:links (removes ads)
+"distraction blocker", "blocked youtube", "i keep opening twitter", "screen time" mac
+brick.app or getbrick
+Sort by Latest. Also search Brick's own @ replies and quote tweets — those are people already thinking about the problem.
+
+5. YouTube comments
+Go to popular Brick / Cold Turkey / Freedom review videos and read comments. Sort by Newest. People ask "does this work on Mac?" constantly. YouTube lets you reply directly.
+
+
+The feedback communities:
+Reddit (roast/feedback subs)
+
+r/roastmystartup — brutal, honest, exactly what you want for a landing page
+r/SideProject — friendly, allows launches, good for early users
+r/indiehackers — feedback and launch posts welcome
+r/startups — has a weekly feedback thread; read rules carefully
+r/Entrepreneur — large, mixed quality, feedback threads exist
+r/EntrepreneurRideAlong — more forgiving than r/Entrepreneur
+r/macapps — your actual users hang out here; allows dev posts with disclosure
+r/alphaandbetausers — literally for finding testers
+r/TestMyApp — small but on-topic
+r/betatests — same
+r/design_critiques — for the landing page visuals specifically
+r/web_design — feedback threads for landing pages
+r/UI_Design — same, for the app UI
+r/marketing — for critique of the copy/positioning
+r/SaaS — feedback on pricing and positioning
+
+Dedicated launch/feedback platforms
+16. Indie Hackers (indiehackers.com) — post in the "Feedback" group; also has product pages
+17. Product Hunt — don't launch yet, but the "Discussions" section is good for feedback, and you can post a "coming soon" page
+18. Hacker News "Show HN" — save this for when the product is solid; one shot at it. Read the Show HN guidelines.
+19. BetaList — submit for early adopters, they're used to rough products
+20. Peerlist — smaller PH-style community, friendlier
+21. Uneed / Launching Next / Microlaunch — small launch directories that also generate a trickle of feedback
+
+Discord/Slack communities
+22. Indie Hackers Discord — active #feedback channels
+23. Startup School (Y Combinator) — free program, has a community forum and cofounder matching; feedback is decent
+24. Small Bets community (Daniel Vassallo's) — paid, but very engaged with exactly this kind of product
+25. WIP.co — paid, build-in-public community, daily "shipped" logs, people give feedback
+26. Buildspace / similar cohort communities — check what's currently active
+
+Twitter/X and elsewhere
+27. #buildinpublic on X — post the landing page and ask; also search "roast my landing page" and reply to others first
+28. Designer News / Dribbble — for design critique of the visual layer
+29. Bluesky/Threads indie dev communities — smaller but less noise
+30. Focus/ADHD Discords and forums (r/ADHD's Discord, ADDitude forums, r/nosurf) — not for "roast my page" but for "would this help you and why not," which is the feedback that actually matters

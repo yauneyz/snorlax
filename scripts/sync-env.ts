@@ -198,13 +198,13 @@ const credentialsSchema = z.object({
   local_llm: z
     .object({
       endpoint: z.string().url().default("http://127.0.0.1:11434/v1/chat/completions"),
-      model: z.string().min(1).default("qwen3-14b-awq"),
+      model: z.string().min(1).default("qwen3.5-9b"),
       api_key: z.string().optional().default(""),
     })
     .optional()
     .default({
       endpoint: "http://127.0.0.1:11434/v1/chat/completions",
-      model: "qwen3-14b-awq",
+      model: "qwen3.5-9b",
       api_key: "",
     }),
   security: z.object({

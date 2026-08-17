@@ -92,7 +92,7 @@ const serverSchemaBase = publicSchema.extend({
   OPENAI_ORGANIZATION: z.string().optional().default(""),
   OPENAI_BASE_URL: z.string().optional().default(""),
   LOCAL_LLM_ENDPOINT: z.string().url().default("http://127.0.0.1:11434/v1/chat/completions"),
-  LOCAL_LLM_MODEL: z.string().min(1).default("qwen3-14b-awq"),
+  LOCAL_LLM_MODEL: z.string().min(1).default("qwen3.5-9b"),
   LOCAL_LLM_API_KEY: z.string().optional().default(""),
   TOKEN_ENCRYPTION_KEY: z
     .string()

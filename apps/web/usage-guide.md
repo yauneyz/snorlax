@@ -333,7 +333,7 @@ Copy `.credentials.example` to `.credentials` and fill in:
 - Supabase keys
 - Stripe keys and price IDs
 - Resend sender
-- LLM provider settings (`openai` or local `vllmserve`)
+- LLM provider settings (`openai` or local `llm-serve`)
 - optional Sentry, PostHog, and Google values
 
 ### 3. Generate env vars
@@ -384,9 +384,9 @@ The app expects:
 Set `[llm].provider` in `.credentials`:
 
 - `openai` uses `[openai].api_key`, `[openai].default_model`, and optional `[openai].base_url`
-- `local` uses the `vllmserve` OpenAI-compatible endpoint in `[local_llm]`
+- `local` uses the `llm-serve` OpenAI-compatible endpoint in `[local_llm]`
 
-The local defaults match the desktop `vllmserve` wrapper:
+The local defaults match the desktop `llm-serve` command:
 
 ```toml
 [llm]
@@ -394,7 +394,7 @@ provider = "local"
 
 [local_llm]
 endpoint = "http://127.0.0.1:11434/v1/chat/completions"
-model = "qwen3-14b-awq"
+model = "qwen3.5-9b"
 ```
 
 ### 7. Start the app

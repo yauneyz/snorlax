@@ -4,7 +4,7 @@ import { config } from "@/lib/config";
 
 export const DEFAULT_OPENAI_ENDPOINT = "https://api.openai.com/v1/chat/completions";
 export const DEFAULT_LOCAL_LLM_ENDPOINT = "http://127.0.0.1:11434/v1/chat/completions";
-export const DEFAULT_LOCAL_LLM_MODEL = "qwen3-14b-awq";
+export const DEFAULT_LOCAL_LLM_MODEL = "qwen3.5-9b";
 
 export type LlmProvider = typeof config.llm.provider;
 

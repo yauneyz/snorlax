@@ -41,7 +41,7 @@ The runtime pieces:
 | Release hosting  | None                                                    | `talysman-release-artifacts-prod` in `us-east-1`                                                         |
 | Database + auth  | Local Supabase stack (Docker, `supabase start`)         | Cloud project `lkanoehzgogtrxzycutl.supabase.co`                                                         |
 | Stripe           | Test mode + `stripe listen` webhook forwarding (no registered endpoint — by design) | Live mode + dashboard webhook endpoint `we_1TzB2xRN4BfSLyzwzq2fONlJ`                  |
-| LLM              | Local vLLM (`LLM_PROVIDER=local`)                       | OpenAI (`LLM_PROVIDER=openai`)                                                                           |
+| LLM              | Local `llm-serve` (`LLM_PROVIDER=local`)                 | OpenAI (`LLM_PROVIDER=openai`)                                                                           |
 | App URL          | `http://localhost:3000`                                 | **`https://www.talysman.app`** (canonical; the apex 308-redirects to it)                                 |
 | Email            | Inbucket (local mail catcher, port 54324)               | Resend                                                                                                   |
 | Sentry / PostHog | Disabled (placeholder values auto-detected and skipped) | Enabled when real values are in `.credentials`                                                           |

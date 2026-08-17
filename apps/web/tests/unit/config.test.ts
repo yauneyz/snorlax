@@ -168,7 +168,7 @@ describe("config schemas", () => {
     expect(r.success).toBe(true);
     if (r.success) {
       expect(r.data.LOCAL_LLM_ENDPOINT).toBe("http://127.0.0.1:11434/v1/chat/completions");
-      expect(r.data.LOCAL_LLM_MODEL).toBe("qwen3-14b-awq");
+      expect(r.data.LOCAL_LLM_MODEL).toBe("qwen3.5-9b");
     }
   });
 });

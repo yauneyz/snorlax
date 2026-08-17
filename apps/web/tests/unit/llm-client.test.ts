@@ -26,7 +26,7 @@ describe("llm client", () => {
       messages: LlmMessage[];
       stream: boolean;
     };
-    expect(body.model).toBe("qwen3-14b-awq");
+    expect(body.model).toBe("qwen3.5-9b");
     expect(body.messages).toEqual([{ role: "user", content: "Reply with pong." }]);
     expect(body.stream).toBe(false);
   });
