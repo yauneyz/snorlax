@@ -163,6 +163,18 @@ function limitError(message: string) {
   return { ok: false, code: ErrorCode.BAD_REQUEST, message };
 }
 
+function productionPolicyError(policy: Params<'setPolicy'>['policy']): string | undefined {
+  if (features.smartFiltering) return undefined;
+  if (policy.intent !== null) return 'Smart filtering is only available in development builds.';
+  if (policy.defaultAction === 'allow' && policy.allowedDomains.length > 0) {
+    return 'Blacklist mode cannot contain an allow list.';
+  }
+  if (policy.defaultAction === 'block' && policy.blockedDomains.length > 0) {
+    return 'Whitelist mode cannot contain a block list.';
+  }
+  return undefined;
+}
+
 async function applyCurrentPlanLimits(service: ServiceConnection): Promise<void> {
   const limits = limitsForPlan((await getEntitlement()).plan);
   if (!limits) return;
@@ -245,18 +257,16 @@ export async function registerIpcHandlers(ctx: HandlerContext): Promise<void> {
 
       if (arg.method === 'setPolicy') {
         const params = arg.params as Params<'setPolicy'>;
-        if (!features.smartFiltering && params.policy.intent !== null) {
-          return limitError('Smart filtering is only available in development builds.');
-        }
+        const featureError = productionPolicyError(params.policy);
+        if (featureError) return limitError(featureError);
         const violations = validatePolicyForLimits(params.policy, limits);
         if (violations[0]) return limitError(violations[0].message);
       }
 
       if (arg.method === 'setProfile') {
         const params = arg.params as Params<'setProfile'>;
-        if (!features.smartFiltering && params.profile.policy.intent !== null) {
-          return limitError('Smart filtering is only available in development builds.');
-        }
+        const featureError = productionPolicyError(params.profile.policy);
+        if (featureError) return limitError(featureError);
         const policyViolations = validatePolicyForLimits(params.profile.policy, limits);
         if (policyViolations[0]) return limitError(policyViolations[0].message);
 

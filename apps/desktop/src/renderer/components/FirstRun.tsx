@@ -10,6 +10,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import type { Drive, Policy } from '@talysman/shared';
 import { resolveActiveProfile } from '@talysman/shared';
+import { productFeaturesForEnvironment } from '@talysman/product';
 import { devSimulateExtension, openExternal, request } from '../lib/bridge.js';
 import { useFocusStore } from '../store/useFocusStore.js';
 import { cx } from '../lib/utils.js';
@@ -28,13 +29,27 @@ type Step = (typeof STEPS)[number];
  */
 type ModePreset = 'blacklist' | 'whitelist' | 'block-all';
 
+const SMART_FILTERING_ENABLED = productFeaturesForEnvironment(
+  __APP_CONFIG__.APP_ENV,
+).smartFiltering;
+
 /** Map an onboarding preset onto the underlying generalized policy fields. */
 function applyPresetToPolicy(base: Policy, preset: ModePreset): Policy {
   switch (preset) {
     case 'blacklist':
-      return { ...base, defaultAction: 'allow', intent: null };
+      return {
+        ...base,
+        allowedDomains: SMART_FILTERING_ENABLED ? base.allowedDomains : [],
+        defaultAction: 'allow',
+        intent: null,
+      };
     case 'whitelist':
-      return { ...base, defaultAction: 'block', intent: null };
+      return {
+        ...base,
+        blockedDomains: SMART_FILTERING_ENABLED ? base.blockedDomains : [],
+        defaultAction: 'block',
+        intent: null,
+      };
     case 'block-all':
       return { ...base, blockedDomains: [], allowedDomains: [], defaultAction: 'block', intent: null };
   }
@@ -51,11 +66,15 @@ const MODES: { value: ModePreset; label: string; blurb: string }[] = [
     label: 'Whitelist',
     blurb: 'Nothing is reachable except the handful you allow. The strict one.',
   },
-  {
-    value: 'block-all',
-    label: 'Block all',
-    blurb: 'Total network block. For writing days and deadlines.',
-  },
+  ...(SMART_FILTERING_ENABLED
+    ? [
+        {
+          value: 'block-all' as const,
+          label: 'Block all',
+          blurb: 'Total network block. For writing days and deadlines.',
+        },
+      ]
+    : []),
 ];
 
 /**

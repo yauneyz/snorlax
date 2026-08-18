@@ -37,20 +37,23 @@ const SMART_FILTERING_ENABLED = productFeaturesForEnvironment(
   __APP_CONFIG__.APP_ENV,
 ).smartFiltering;
 
-const PRESETS: Preset[] = [
-  { value: 'blacklist', label: 'Simple blocklist', hint: 'Block only the sites you list.' },
-  { value: 'whitelist', label: 'Strict allowlist', hint: 'Block everything except your list.' },
-  { value: 'block-all', label: 'Block everything', hint: 'No internet at all.' },
-  ...(SMART_FILTERING_ENABLED
-    ? [
-        {
-          value: 'smart',
-          label: 'Smart',
-          hint: 'Judge anything else against what you’re working on.',
-        } satisfies Preset,
-      ]
-    : []),
+const CLASSIC_PRESETS: Preset[] = [
+  { value: 'blacklist', label: 'Blacklist', hint: 'Block only the sites you list.' },
+  { value: 'whitelist', label: 'Whitelist', hint: 'Block everything except your list.' },
 ];
+
+const PRESETS: Preset[] = SMART_FILTERING_ENABLED
+  ? [
+      { value: 'blacklist', label: 'Simple blocklist', hint: 'Block only the sites you list.' },
+      { value: 'whitelist', label: 'Strict allowlist', hint: 'Block everything except your list.' },
+      { value: 'block-all', label: 'Block everything', hint: 'No internet at all.' },
+      {
+        value: 'smart',
+        label: 'Smart',
+        hint: 'Judge anything else against what you’re working on.',
+      },
+    ]
+  : CLASSIC_PRESETS;
 
 function appKey(app: AppRef): string {
   return [
@@ -191,6 +194,9 @@ export function Blocklists({ onUpgrade }: { onUpgrade: () => void }) {
   const maxAllowed = maxAllowedDomains(productLimits);
   const maxApps = maxPolicyApps(productLimits);
   const smartAllowed = SMART_FILTERING_ENABLED && smartFilteringAllowed(productLimits);
+  const classicMode = policy.defaultAction === 'allow' ? 'blacklist' : 'whitelist';
+  const classicDomains =
+    classicMode === 'blacklist' ? policy.blockedDomains : policy.allowedDomains;
   const blockedLimitReached = maxBlocked !== null && policy.blockedDomains.length >= maxBlocked;
   const allowedLimitReached = maxAllowed !== null && policy.allowedDomains.length >= maxAllowed;
   const appBlockingLocked = maxApps === 0;
@@ -292,34 +298,67 @@ export function Blocklists({ onUpgrade }: { onUpgrade: () => void }) {
       setSmartOpen(true);
       return;
     }
-    if (preset === 'blacklist') return save({ ...policy, defaultAction: 'allow', intent: null });
-    if (preset === 'whitelist') return save({ ...policy, defaultAction: 'block', intent: null });
+    if (preset === 'blacklist') {
+      return save({
+        ...policy,
+        blockedDomains: SMART_FILTERING_ENABLED ? policy.blockedDomains : classicDomains,
+        allowedDomains: SMART_FILTERING_ENABLED ? policy.allowedDomains : [],
+        defaultAction: 'allow',
+        intent: null,
+      });
+    }
+    if (preset === 'whitelist') {
+      return save({
+        ...policy,
+        blockedDomains: SMART_FILTERING_ENABLED ? policy.blockedDomains : [],
+        allowedDomains: SMART_FILTERING_ENABLED ? policy.allowedDomains : classicDomains,
+        defaultAction: 'block',
+        intent: null,
+      });
+    }
     return save({ ...policy, blockedDomains: [], allowedDomains: [], defaultAction: 'block', intent: null });
   }
 
-  const setDefaultAction = (defaultAction: Policy['defaultAction']) => save({ ...policy, defaultAction });
+  const setDefaultAction = (defaultAction: Policy['defaultAction']) =>
+    save({ ...policy, defaultAction });
 
   const addBlockedDomain = () => {
     if (!blockedInput.trim()) return;
     if (blockedLimitReached) {
-      return setError(`Free supports up to ${maxBlocked} always-blocked websites.`);
+      return setError(`Free supports up to ${maxBlocked} blocked websites.`);
     }
-    void save({ ...policy, blockedDomains: [...policy.blockedDomains, blockedInput.trim()] });
+    void save({
+      ...policy,
+      blockedDomains: [...policy.blockedDomains, blockedInput.trim()],
+      allowedDomains: SMART_FILTERING_ENABLED ? policy.allowedDomains : [],
+    });
     setBlockedInput('');
   };
   const removeBlockedDomain = (d: string) =>
-    save({ ...policy, blockedDomains: policy.blockedDomains.filter((x) => x !== d) });
+    save({
+      ...policy,
+      blockedDomains: policy.blockedDomains.filter((x) => x !== d),
+      allowedDomains: SMART_FILTERING_ENABLED ? policy.allowedDomains : [],
+    });
 
   const addAllowedDomain = () => {
     if (!allowedInput.trim()) return;
     if (allowedLimitReached) {
-      return setError(`Free supports up to ${maxAllowed} always-allowed websites.`);
+      return setError(`Free supports up to ${maxAllowed} allowed websites.`);
     }
-    void save({ ...policy, allowedDomains: [...policy.allowedDomains, allowedInput.trim()] });
+    void save({
+      ...policy,
+      blockedDomains: SMART_FILTERING_ENABLED ? policy.blockedDomains : [],
+      allowedDomains: [...policy.allowedDomains, allowedInput.trim()],
+    });
     setAllowedInput('');
   };
   const removeAllowedDomain = (d: string) =>
-    save({ ...policy, allowedDomains: policy.allowedDomains.filter((x) => x !== d) });
+    save({
+      ...policy,
+      blockedDomains: SMART_FILTERING_ENABLED ? policy.blockedDomains : [],
+      allowedDomains: policy.allowedDomains.filter((x) => x !== d),
+    });
 
   const setIntentPositive = (positive: string) => {
     if (!smartAllowed) return onUpgrade();
@@ -562,6 +601,10 @@ export function Blocklists({ onUpgrade }: { onUpgrade: () => void }) {
         <div className="mt-3 flex gap-2">
           {PRESETS.map((p) => {
             const locked = p.value === 'smart' && !smartAllowed;
+            const active =
+              !SMART_FILTERING_ENABLED &&
+              (p.value === 'blacklist' || p.value === 'whitelist') &&
+              p.value === classicMode;
             return (
               <button
                 key={p.value}
@@ -569,7 +612,9 @@ export function Blocklists({ onUpgrade }: { onUpgrade: () => void }) {
                 aria-disabled={locked}
                 className={cx(
                   'flex-1 rounded-[10px] border px-3 py-2.5 text-left transition',
-                  'border-white/[0.07] bg-white/[0.025] hover:border-white/[0.14] hover:bg-white/[0.05]',
+                  active
+                    ? 'border-seal/30 bg-seal/[0.09] shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_0_18px_rgba(199,204,212,0.10)]'
+                    : 'border-white/[0.07] bg-white/[0.025] hover:border-white/[0.14] hover:bg-white/[0.05]',
                   locked && 'opacity-65',
                 )}
               >
@@ -583,56 +628,66 @@ export function Blocklists({ onUpgrade }: { onUpgrade: () => void }) {
           })}
         </div>
 
-        <DomainListEditor
-          kicker="Always block"
-          hint="wildcards allowed as a leading “*.”"
-          placeholder="reddit.com"
-          accent={accent}
-          domains={policy.blockedDomains}
-          input={blockedInput}
-          onInputChange={setBlockedInput}
-          onAdd={addBlockedDomain}
-          onRemove={removeBlockedDomain}
-          max={maxBlocked}
-          limitReached={blockedLimitReached}
-        />
+        {(SMART_FILTERING_ENABLED || classicMode === 'blacklist') && (
+          <DomainListEditor
+            kicker={SMART_FILTERING_ENABLED ? 'Always block' : 'Block list'}
+            hint="wildcards allowed as a leading “*.”"
+            placeholder="reddit.com"
+            accent={accent}
+            domains={policy.blockedDomains}
+            input={blockedInput}
+            onInputChange={setBlockedInput}
+            onAdd={addBlockedDomain}
+            onRemove={removeBlockedDomain}
+            max={maxBlocked}
+            limitReached={blockedLimitReached}
+          />
+        )}
 
-        <DomainListEditor
-          kicker="Always allow"
-          hint="never blocked, never judged"
-          placeholder="mail.google.com"
-          accent={accent}
-          domains={policy.allowedDomains}
-          input={allowedInput}
-          onInputChange={setAllowedInput}
-          onAdd={addAllowedDomain}
-          onRemove={removeAllowedDomain}
-          max={maxAllowed}
-          limitReached={allowedLimitReached}
-        />
+        {(SMART_FILTERING_ENABLED || classicMode === 'whitelist') && (
+          <DomainListEditor
+            kicker={SMART_FILTERING_ENABLED ? 'Always allow' : 'Allow list'}
+            hint={
+              SMART_FILTERING_ENABLED ? 'never blocked, never judged' : 'everything else is blocked'
+            }
+            placeholder="mail.google.com"
+            accent={accent}
+            domains={policy.allowedDomains}
+            input={allowedInput}
+            onInputChange={setAllowedInput}
+            onAdd={addAllowedDomain}
+            onRemove={removeAllowedDomain}
+            max={maxAllowed}
+            limitReached={allowedLimitReached}
+          />
+        )}
 
-        <div className="mt-4 flex items-baseline gap-2.5">
-          <Kicker>Default for everything else</Kicker>
-        </div>
-        <div className="mt-2 flex gap-2">
-          {(['allow', 'block'] as const).map((a) => {
-            const on = policy.defaultAction === a;
-            return (
-              <button
-                key={a}
-                onClick={() => setDefaultAction(a)}
-                className={cx(
-                  'flex-1 rounded-[10px] border px-3 py-2 text-left text-[12.5px] font-semibold transition',
-                  on
-                    ? 'border-seal/30 bg-seal/[0.09] text-slate-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_0_18px_rgba(199,204,212,0.10)]'
-                    : 'border-white/[0.07] bg-white/[0.025] text-slate-250 hover:border-white/[0.14] hover:bg-white/[0.05]',
-                )}
-              >
-                {a === 'allow' ? 'Allow' : 'Block'}
-              </button>
-            );
-          })}
-        </div>
+        {SMART_FILTERING_ENABLED && (
+          <>
+            <div className="mt-4 flex items-baseline gap-2.5">
+              <Kicker>Default for everything else</Kicker>
+            </div>
+            <div className="mt-2 flex gap-2">
+              {(['allow', 'block'] as const).map((a) => {
+                const on = policy.defaultAction === a;
+                return (
+                  <button
+                    key={a}
+                    onClick={() => setDefaultAction(a)}
+                    className={cx(
+                      'flex-1 rounded-[10px] border px-3 py-2 text-left text-[12.5px] font-semibold transition',
+                      on
+                        ? 'border-seal/30 bg-seal/[0.09] text-slate-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_0_18px_rgba(199,204,212,0.10)]'
+                        : 'border-white/[0.07] bg-white/[0.025] text-slate-250 hover:border-white/[0.14] hover:bg-white/[0.05]',
+                    )}
+                  >
+                    {a === 'allow' ? 'Allow' : 'Block'}
+                  </button>
+                );
+              })}
+            </div>
+          </>
+        )}
 
         {SMART_FILTERING_ENABLED && (
           <div className="mt-4 rounded-[10px] border border-white/[0.07] bg-white/[0.02] p-3.5">

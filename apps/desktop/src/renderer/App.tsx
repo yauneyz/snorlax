@@ -29,7 +29,9 @@ const NAV: { route: Route; label: string }[] = [
 function policyModeLabel(policy: Policy): string {
   if (SMART_FILTERING_ENABLED && policy.intent) return 'Smart';
   if (policy.defaultAction === 'block') {
-    return policy.blockedDomains.length === 0 && policy.allowedDomains.length === 0
+    return SMART_FILTERING_ENABLED &&
+      policy.blockedDomains.length === 0 &&
+      policy.allowedDomains.length === 0
       ? 'Block all'
       : 'Whitelist';
   }

@@ -19,6 +19,7 @@ export function profileSummary(profile: Profile): string {
   const { blockedDomains, allowedDomains, defaultAction, intent, apps } = profile.policy;
   const hasSmartIntent = SMART_FILTERING_ENABLED && intent !== null;
   const isBlockAll =
+    SMART_FILTERING_ENABLED &&
     defaultAction === 'block' &&
     blockedDomains.length === 0 &&
     allowedDomains.length === 0 &&
