@@ -14,7 +14,6 @@ import {
   existsSync,
   mkdirSync,
   readdirSync,
-  rmSync,
 } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
@@ -162,7 +161,6 @@ const targetDir = resolve(
     : "target/release",
 );
 const platformOutDir = resolve(root, "apps/desktop/resources/bin", cfg.outName);
-rmSync(platformOutDir, { recursive: true, force: true });
 mkdirSync(platformOutDir, { recursive: true });
 
 for (const artifact of cfg.artifacts) {

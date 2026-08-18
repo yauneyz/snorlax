@@ -43,7 +43,12 @@ win:
     - from: apps/desktop/resources/bin/win
       to: bin
       filter:
-        - "**/*"
+        - talysman-svc.exe
+        - talysman-svcctl.exe
+        - talysman-recover.exe
+        - talysman-natmsg.exe
+        - WinDivert.dll
+        - WinDivert64.sys
   # Release builds fail closed when Authenticode credentials are unavailable.
 
 # electron-builder's own Windows signing pass never walks resources/bin (see
@@ -72,7 +77,10 @@ mac:
     - from: apps/desktop/resources/bin/mac
       to: bin
       filter:
-        - "**/*"
+        - talysman-svc
+        - talysman-svcctl
+        - talysman-recover
+        - talysman-natmsg
   category: public.app-category.productivity
   artifactName: ${productName}-${version}-${arch}.${ext}
   hardenedRuntime: true
@@ -98,7 +106,13 @@ linux:
     - from: apps/desktop/resources/bin/linux
       to: bin
       filter:
-        - "**/*"
+        - talysman-svc
+        - talysman-svcctl
+        - talysman-recover
+        - talysman-natmsg
+        - after-install.sh
+        - before-remove.sh
+        - after-remove.sh
   syncDesktopName: true
   category: Utility
   maintainer: Talysman <support@talysman.app>
