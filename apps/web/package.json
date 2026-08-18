@@ -39,6 +39,7 @@
     "@tanstack/react-query": "^5.62.8",
     "@tanstack/react-query-devtools": "^5.62.8",
     "googleapis": "^171.4.0",
+    "google-auth-library": "^10.7.0",
     "gray-matter": "^4.0.3",
     "mime-types": "^2.1.35",
     "next": "^15.1.3",

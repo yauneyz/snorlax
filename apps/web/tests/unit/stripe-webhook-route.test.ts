@@ -13,6 +13,7 @@ const mocks = vi.hoisted(() => ({
   sendEmail: vi.fn(),
   captureException: vi.fn(),
   track: vi.fn(),
+  sendInsightsPush: vi.fn(),
 }));
 
 vi.mock("@/lib/stripe/client", () => ({
@@ -39,6 +40,10 @@ vi.mock("@/lib/sentry", () => ({
 vi.mock("@/server/analytics/track", () => ({
   track: mocks.track,
   reportUsage: vi.fn(),
+}));
+
+vi.mock("@/server/insights/push", () => ({
+  sendInsightsPush: mocks.sendInsightsPush,
 }));
 
 vi.mock("@/lib/supabase/admin", () => ({
@@ -102,6 +107,7 @@ beforeEach(() => {
   mocks.syncSubscription.mockResolvedValue(undefined);
   mocks.sendEmail.mockResolvedValue({ id: "email_123" });
   mocks.captureException.mockResolvedValue(undefined);
+  mocks.sendInsightsPush.mockResolvedValue(undefined);
 });
 
 describe("POST /api/stripe/webhook", () => {
@@ -152,6 +158,33 @@ describe("POST /api/stripe/webhook", () => {
       expand: ["customer"],
     });
     expect(mocks.syncSubscription).toHaveBeenCalledWith(subscription);
+  });
+
+  it("sends a celebratory push only when a subscription becomes paid", async () => {
+    const paid = {
+      ...subscription,
+      status: "active",
+      trial_end: null,
+      items: { data: [{ price: { id: "price_monthly" } }] },
+    };
+    const response = await POST(
+      request(event("customer.subscription.created", "evt_paid", paid)),
+    );
+
+    expect(response.status).toBe(200);
+    expect(mocks.sendInsightsPush).toHaveBeenCalledWith({ type: "paid_conversion" });
+
+    mocks.sendInsightsPush.mockClear();
+    await POST(
+      request(
+        event("customer.subscription.created", "evt_trial_no_push", {
+          ...paid,
+          status: "trialing",
+          trial_end: 1_800_000_000,
+        }),
+      ),
+    );
+    expect(mocks.sendInsightsPush).not.toHaveBeenCalled();
   });
 
   it("sends payment-failure and refund emails with Stripe amounts", async () => {

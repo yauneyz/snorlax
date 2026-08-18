@@ -1,3 +1,4 @@
+import groovy.json.JsonSlurper
 import java.util.Properties
 
 plugins {
@@ -14,6 +15,55 @@ val localProperties = Properties().apply {
 
 fun localProp(key: String, fallback: String = ""): String =
     (localProperties.getProperty(key) ?: fallback)
+
+fun buildConfigString(key: String, fallback: String = ""): String =
+    "\"${localProp(key, fallback).replace("\\", "\\\\").replace("\"", "\\\"")}\""
+
+// Read the downloaded Firebase Android client directly from the gitignored credentials folder.
+// local.properties remains a fallback for builders that provision these public values another
+// way, but the normal setup requires no manual JSON-to-properties transcription.
+val firebaseClientFile = rootProject.file(
+    "../../local-credentials/talysman-insights-google-services.json",
+)
+val firebaseClientValues: Map<String, String> = if (firebaseClientFile.exists()) {
+    @Suppress("UNCHECKED_CAST")
+    val document = JsonSlurper().parse(firebaseClientFile) as Map<String, Any?>
+    val project = document["project_info"] as Map<*, *>
+    val clients = document["client"] as List<*>
+    val client = clients
+        .map { it as Map<*, *> }
+        .firstOrNull {
+            val info = it["client_info"] as Map<*, *>
+            val android = info["android_client_info"] as Map<*, *>
+            android["package_name"] == "app.talysman.insights"
+        }
+        ?: error("Firebase client file has no app.talysman.insights Android client")
+    val clientInfo = client["client_info"] as Map<*, *>
+    val apiKeys = client["api_key"] as List<*>
+    val apiKey = apiKeys.first() as Map<*, *>
+    mapOf(
+        "projectId" to project["project_id"].toString(),
+        "senderId" to project["project_number"].toString(),
+        "applicationId" to clientInfo["mobilesdk_app_id"].toString(),
+        "apiKey" to apiKey["current_key"].toString(),
+    )
+} else {
+    emptyMap()
+}
+
+fun firebaseBuildConfigString(jsonKey: String, localKey: String): String {
+    val value = firebaseClientValues[jsonKey] ?: localProp(localKey)
+    return "\"${value.replace("\\", "\\\\").replace("\"", "\\\"")}\""
+}
+
+// Android raw-resource names cannot contain hyphens. Keep the user-supplied source audio in the
+// shared assets directory and stage it under the stable name the notification channel resolves.
+val notificationSoundResDir = layout.buildDirectory.dir("generated/notification-sound/res")
+val stageNotificationSound by tasks.registering(Copy::class) {
+    from(rootProject.file("../../assets/zelda-secret.mp3"))
+    into(notificationSoundResDir.map { it.dir("raw") })
+    rename { "conversion_unlocked.mp3" }
+}
 
 android {
     namespace = "app.talysman.insights"
@@ -32,8 +82,15 @@ android {
         // The apex domain 308-redirects to www, and OkHttp strips Authorization on a
         // cross-host redirect — point at the canonical host directly so the bearer token
         // survives the request.
-        buildConfigField("String", "INSIGHTS_BASE_URL", "\"${localProp("insights.baseUrl", "https://www.talysman.app")}\"")
-        buildConfigField("String", "INSIGHTS_API_KEY", "\"${localProp("insights.apiKey")}\"")
+        buildConfigField("String", "INSIGHTS_BASE_URL", buildConfigString("insights.baseUrl", "https://www.talysman.app"))
+        buildConfigField("String", "INSIGHTS_API_KEY", buildConfigString("insights.apiKey"))
+        // Firebase's Android client values are public identifiers, not service-account secrets.
+        // Keeping them in local.properties lets this private sideloaded app build without a
+        // google-services.json file or the Google Services Gradle plugin.
+        buildConfigField("String", "FCM_PROJECT_ID", firebaseBuildConfigString("projectId", "fcm.projectId"))
+        buildConfigField("String", "FCM_APPLICATION_ID", firebaseBuildConfigString("applicationId", "fcm.applicationId"))
+        buildConfigField("String", "FCM_API_KEY", firebaseBuildConfigString("apiKey", "fcm.apiKey"))
+        buildConfigField("String", "FCM_SENDER_ID", firebaseBuildConfigString("senderId", "fcm.senderId"))
     }
 
     signingConfigs {
@@ -54,6 +111,8 @@ android {
         buildConfig = true
     }
 
+    sourceSets.getByName("main").res.srcDir(notificationSoundResDir)
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
@@ -62,6 +121,10 @@ android {
     kotlinOptions {
         jvmTarget = "17"
     }
+}
+
+tasks.named("preBuild").configure {
+    dependsOn(stageNotificationSound)
 }
 
 dependencies {
@@ -82,6 +145,9 @@ dependencies {
 
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
+
+    implementation(platform("com.google.firebase:firebase-bom:33.7.0"))
+    implementation("com.google.firebase:firebase-messaging")
 
     debugImplementation("androidx.compose.ui:ui-tooling")
 }

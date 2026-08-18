@@ -5,6 +5,7 @@ import { ANALYTICS_ANON_COOKIE, parseAnonId } from "@/lib/analytics/anon-id";
 import { attributionFromRequest, classifyUserAgent } from "@/server/analytics/ingest";
 import { track } from "@/server/analytics/track";
 import { supabaseServer } from "@/lib/supabase/server";
+import { sendInsightsPush } from "@/server/insights/push";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -60,5 +61,6 @@ export async function GET(request: NextRequest) {
     attribution: attributionFromRequest(request, props),
     props,
   });
+  await sendInsightsPush({ type: "download", platform });
   return NextResponse.redirect(s3Url, { status: 302 });
 }

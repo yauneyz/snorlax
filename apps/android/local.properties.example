@@ -5,3 +5,10 @@ sdk.dir=/path/to/Android/Sdk
 insights.baseUrl=https://www.talysman.app
 # Same value as [insights].widget_api_key in the repo's .credentials.
 insights.apiKey=
+
+# Optional fallback Firebase Android app settings. The normal build reads these public client
+# identifiers from local-credentials/talysman-insights-google-services.json instead.
+fcm.projectId=
+fcm.applicationId=
+fcm.apiKey=
+fcm.senderId=

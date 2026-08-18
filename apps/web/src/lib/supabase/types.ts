@@ -164,6 +164,14 @@ export type AnalyticsUsageDailyRow = {
   reported_at: string;
 };
 
+export type InsightsPushDeviceRow = {
+  token: string;
+  platform: "android";
+  enabled: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
 /** `analytics_events_resolved` / `analytics_usage_resolved`: base row + resolved person. */
 export type AnalyticsEventResolvedRow = AnalyticsEventRow & { person_id: string | null };
 export type AnalyticsUsageResolvedRow = AnalyticsUsageDailyRow & { person_id: string | null };

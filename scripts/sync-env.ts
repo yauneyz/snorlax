@@ -218,9 +218,19 @@ const credentialsSchema = z.object({
   insights: z
     .object({
       widget_api_key: z.string().optional().default(""),
+      fcm_service_account_file: z.string().optional().default(""),
+      fcm_project_id: z.string().optional().default(""),
+      fcm_client_email: z.string().optional().default(""),
+      fcm_private_key: z.string().optional().default(""),
     })
     .optional()
-    .default({ widget_api_key: "" }),
+    .default({
+      widget_api_key: "",
+      fcm_service_account_file: "",
+      fcm_project_id: "",
+      fcm_client_email: "",
+      fcm_private_key: "",
+    }),
 });
 
 type Credentials = z.infer<typeof credentialsSchema>;
@@ -241,6 +251,13 @@ const googleOAuthDownloadSchema = z
   .refine((value) => value.web || value.installed, {
     message: 'expected a "web" or "installed" OAuth client',
   });
+
+const fcmServiceAccountSchema = z.object({
+  type: z.literal("service_account"),
+  project_id: z.string().min(1),
+  client_email: z.string().email(),
+  private_key: z.string().min(1),
+});
 
 const isVercelBuild = process.env.VERCEL === "1";
 const isProductionPush = process.argv.includes("--production");
@@ -279,6 +296,8 @@ const SENSITIVE_VERCEL_VARIABLES = new Set([
   "OAUTH_STATE_SECRET",
   "ANALYTICS_PROD_SUPABASE_SECRET_KEY",
   "INSIGHTS_WIDGET_API_KEY",
+  "FCM_CLIENT_EMAIL",
+  "FCM_PRIVATE_KEY",
 ]);
 
 function resolveVercelEnvironment(): VercelEnvironment | null {
@@ -404,6 +423,33 @@ function hydrateGoogleOAuthFiles(credentials: Credentials): Credentials {
     );
     credentials.google_auth.client_id = client.client_id;
     credentials.google_auth.client_secret = client.client_secret;
+  }
+
+  if (credentials.insights.fcm_service_account_file) {
+    const configuredPath = credentials.insights.fcm_service_account_file;
+    if (path.isAbsolute(configuredPath)) {
+      console.error(".credentials insights.fcm_service_account_file must be relative to the repository root.");
+      process.exit(1);
+    }
+    const resolvedPath = path.resolve(ROOT, configuredPath);
+    const relativePath = path.relative(ROOT, resolvedPath);
+    if (relativePath === ".." || relativePath.startsWith(`..${path.sep}`) || path.isAbsolute(relativePath)) {
+      console.error(".credentials insights.fcm_service_account_file must stay within the repository root.");
+      process.exit(1);
+    }
+    try {
+      const account = fcmServiceAccountSchema.parse(JSON.parse(fs.readFileSync(resolvedPath, "utf8")));
+      credentials.insights.fcm_project_id = account.project_id;
+      credentials.insights.fcm_client_email = account.client_email;
+      credentials.insights.fcm_private_key = account.private_key;
+    } catch (error) {
+      if (!allowDummyCredentials) {
+        const message = error instanceof Error ? error.message : String(error);
+        console.error(`Invalid FCM service account ${relativePath}: ${message}`);
+        process.exit(1);
+      }
+      warnDummy(`FCM service account ${relativePath} is unavailable — push notifications are disabled.`);
+    }
   }
 
   return credentials;
@@ -709,6 +755,9 @@ function main() {
             ["ANALYTICS_PROD_SUPABASE_URL", creds.supabase.prod.url],
             ["ANALYTICS_PROD_SUPABASE_SECRET_KEY", creds.supabase.prod.secret_key],
             ["INSIGHTS_WIDGET_API_KEY", creds.insights.widget_api_key],
+            ["FCM_PROJECT_ID", creds.insights.fcm_project_id],
+            ["FCM_CLIENT_EMAIL", creds.insights.fcm_client_email],
+            ["FCM_PRIVATE_KEY", creds.insights.fcm_private_key],
           ]
         : webPairs;
     pushToVercel(pairs, vercelEnvironment);
@@ -736,6 +785,9 @@ function main() {
     ["ANALYTICS_DEV_SUPABASE_URL", creds.supabase.dev.url],
     ["ANALYTICS_DEV_SUPABASE_SECRET_KEY", creds.supabase.dev.secret_key],
     ["INSIGHTS_WIDGET_API_KEY", creds.insights.widget_api_key],
+    ["FCM_PROJECT_ID", creds.insights.fcm_project_id],
+    ["FCM_CLIENT_EMAIL", creds.insights.fcm_client_email],
+    ["FCM_PRIVATE_KEY", creds.insights.fcm_private_key],
   ];
 
   writeEnvFile(WEB_ENV_OUT, localWebPairs, mode);

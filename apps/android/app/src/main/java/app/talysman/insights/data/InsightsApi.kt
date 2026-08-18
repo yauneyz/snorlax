@@ -10,6 +10,8 @@ import okhttp3.Call
 import okhttp3.Callback
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.RequestBody.Companion.toRequestBody
 import okhttp3.Response
 
 class InsightsApiException(message: String, val httpCode: Int? = null) : Exception(message)
@@ -27,6 +29,17 @@ object InsightsApi {
 
         val body = await(request)
         return json.decodeFromString(InsightsSummary.serializer(), body)
+    }
+
+    suspend fun registerPushToken(token: String) {
+        val body = """{"token":"$token","platform":"android"}"""
+            .toRequestBody("application/json; charset=utf-8".toMediaType())
+        val request = Request.Builder()
+            .url("${BuildConfig.INSIGHTS_BASE_URL}/api/analytics/notifications/register")
+            .header("Authorization", "Bearer ${BuildConfig.INSIGHTS_API_KEY}")
+            .post(body)
+            .build()
+        await(request)
     }
 
     private suspend fun await(request: Request): String = suspendCancellableCoroutine { cont ->

@@ -1,7 +1,5 @@
 import "server-only";
-import { timingSafeEqual } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
-import { extractBearerToken } from "@talysman/auth-contracts";
 import { config } from "@/lib/config";
 import { queryChannelsFromDb } from "@/server/analytics/queries/channels";
 import { queryEngagementFromDb } from "@/server/analytics/queries/engagement";
@@ -11,6 +9,7 @@ import { queryInstallHealthFromDb } from "@/server/analytics/queries/install-hea
 import { queryRetentionFromDb } from "@/server/analytics/queries/retention";
 import { queryRevenueFromDb } from "@/server/analytics/queries/revenue";
 import type { PanelData } from "@/server/analytics/queries/types";
+import { hasValidInsightsBearer } from "@/server/insights/auth";
 
 // Unlike /insights (analytics-arch.md §12.2, deliberately dev-only), this route is meant to
 // be reachable from a deployed environment: it's the feed for the Android widget. It trades
@@ -18,12 +17,6 @@ import type { PanelData } from "@/server/analytics/queries/types";
 // (INSIGHTS_WIDGET_API_KEY) so the mobile app never holds DB-level credentials.
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-
-function timingSafeEqualStrings(a: string, b: string): boolean {
-  const bufA = Buffer.from(a);
-  const bufB = Buffer.from(b);
-  return bufA.length === bufB.length && timingSafeEqual(bufA, bufB);
-}
 
 function section<T, U>(result: PanelData<T>, map: (rows: T) => U): { ok: true; data: U } | { ok: false; message: string } {
   return result.ok ? { ok: true, data: map(result.rows) } : { ok: false, message: result.message };
@@ -35,8 +28,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "widget endpoint not configured" }, { status: 503 });
   }
 
-  const token = extractBearerToken(request.headers.get("authorization"));
-  if (!token || !timingSafeEqualStrings(token, expected)) {
+  if (!hasValidInsightsBearer(request.headers.get("authorization"))) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
 

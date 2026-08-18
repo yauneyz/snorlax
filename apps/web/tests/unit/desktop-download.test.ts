@@ -4,7 +4,14 @@ import { describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
 
 const track = vi.hoisted(() => vi.fn().mockResolvedValue(undefined));
+const sendInsightsPush = vi.hoisted(() => vi.fn().mockResolvedValue(undefined));
 vi.mock("@/server/analytics/track", () => ({ track }));
+vi.mock("@/server/insights/push", () => ({ sendInsightsPush }));
+vi.mock("@/lib/supabase/server", () => ({
+  supabaseServer: async () => ({
+    auth: { getUser: async () => ({ data: { user: null } }) },
+  }),
+}));
 
 import { GET } from "@/app/api/desktop/download/route";
 import { config } from "@/lib/config";
@@ -33,6 +40,7 @@ describe("GET /api/desktop/download", () => {
         source: "server",
         platform,
       }));
+      expect(sendInsightsPush).toHaveBeenCalledWith({ type: "download", platform });
     },
   );
 

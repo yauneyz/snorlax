@@ -114,6 +114,12 @@ const serverSchemaBase = publicSchema.extend({
   // above, this route is meant to work in every deployed environment, so it needs its own
   // credential set pushed to Vercel rather than reusing the local-only ANALYTICS_PROD_* pair.
   INSIGHTS_WIDGET_API_KEY: optionalStripped,
+  // Firebase Cloud Messaging service-account credentials. All three are optional so local
+  // development and preview deployments can run without push; sends become a no-op until the
+  // production environment is configured.
+  FCM_PROJECT_ID: optionalStripped,
+  FCM_CLIENT_EMAIL: optionalStripped,
+  FCM_PRIVATE_KEY: optionalStripped,
   // Where /insights (the `prod` target) fetches from instead of querying Supabase directly —
   // the same deployed endpoint the Android widget uses. www, not the apex: the apex 308s to
   // www and a fetch that follows that redirect drops the Authorization header cross-host.
@@ -342,6 +348,13 @@ export const config = {
     apiBaseUrl: isServer
       ? (parsed as z.infer<typeof serverSchema>).INSIGHTS_API_BASE_URL
       : "https://www.talysman.app",
+    fcm: {
+      projectId: isServer ? (parsed as z.infer<typeof serverSchema>).FCM_PROJECT_ID : "",
+      clientEmail: isServer ? (parsed as z.infer<typeof serverSchema>).FCM_CLIENT_EMAIL : "",
+      privateKey: isServer
+        ? (parsed as z.infer<typeof serverSchema>).FCM_PRIVATE_KEY.replace(/\\n/g, "\n")
+        : "",
+    },
   },
 } as const;
 

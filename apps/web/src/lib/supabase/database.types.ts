@@ -25,6 +25,7 @@ import type {
   SmartFilterJudgeUsageRow,
   StripeEventRow,
   SubscriptionRow,
+  InsightsPushDeviceRow,
 } from "./types";
 
 /** Matches what `supabase gen types` emits, so a future regeneration is a clean swap. */
@@ -64,6 +65,12 @@ export type Database = {
         Row: StripeEventRow;
         Insert: Omit<StripeEventRow, "processed_at"> & Partial<Pick<StripeEventRow, "processed_at">>;
         Update: Partial<StripeEventRow>;
+        Relationships: [];
+      };
+      insights_push_devices: {
+        Row: InsightsPushDeviceRow;
+        Insert: Pick<InsightsPushDeviceRow, "token"> & Partial<InsightsPushDeviceRow>;
+        Update: Partial<InsightsPushDeviceRow>;
         Relationships: [];
       };
       analytics_persons: {

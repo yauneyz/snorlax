@@ -986,6 +986,14 @@ construction, not by convention:
 Rotate `insights.widget_api_key` in `.credentials` (and re-run `pnpm sync:env:prod`) if the token
 ever leaks — e.g. the sideloaded APK is lost or shared.
 
+The same private Android companion uses that bearer token to register its Firebase Cloud
+Messaging token at `POST /api/analytics/notifications/register`. Registrations live in the
+RLS-locked `insights_push_devices` table; only the service role can read or write it. The desktop
+download route sends a data push for every valid installer redirect, and Stripe sends a
+celebratory data push when its authoritative webhook emits `subscription_started`. Both sends
+are best-effort and cannot fail the customer-facing download or billing flow. Firebase
+service-account credentials are server-only and are never embedded in the APK.
+
 ---
 
 ## 13. Volume, retention, compaction
