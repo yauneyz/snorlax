@@ -44,6 +44,12 @@ win:
   icon: assets/brand/generated/windows/icon.ico
   # Release builds fail closed when Authenticode credentials are unavailable.
 
+# electron-builder's own Windows signing pass never walks resources/bin (see
+# scripts/sign-windows-native-binaries.mjs for why), so the native service binaries staged there
+# would otherwise ship unsigned even in an Authenticode-signed installer. Windows-only; no-ops
+# on other platforms.
+afterPack: scripts/sign-windows-native-binaries.mjs
+
 nsis:
   installerIcon: assets/brand/generated/windows/icon.ico
   uninstallerIcon: assets/brand/generated/windows/icon.ico

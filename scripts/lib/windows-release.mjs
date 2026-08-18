@@ -1,3 +1,4 @@
+import { execFileSync } from "node:child_process";
 import { homedir } from "node:os";
 import { join } from "node:path";
 
@@ -69,4 +70,50 @@ export function windowsSigningAvailable(env = process.env) {
     configured(env.AZURE_CLIENT_SECRET) &&
     configured(env.AZURE_SIGNING_PUBLISHER_NAME)
   );
+}
+
+/**
+ * Sign arbitrary files via Azure Trusted Signing, the same PowerShell module
+ * (`Invoke-TrustedSigning`) electron-builder's own WindowsSignAzureManager uses for the app exe
+ * and NSIS installer. Needed because that built-in pass only walks the top-level app exe plus
+ * resources/app.asar.unpacked and resources/swiftshader — it never signs extraResources like
+ * resources/bin, where scripts/build-native.mjs stages the native service binaries. Always
+ * requests a timestamp: an unsigned-after-expiry binary is exactly the failure this exists to
+ * avoid, and Trusted Signing's leaf certs are short-lived (~3 days) by design.
+ */
+export async function signNativeWindowsBinaries(filePaths, env = process.env) {
+  if (filePaths.length === 0) return;
+  // Matches app-builder-lib's VmManager: prefer pwsh (PowerShell Core) when present, since
+  // that's what's available for Linux-hosted cross-signing; native Windows CI has both.
+  const ps = process.platform === "win32" ? "powershell.exe" : "pwsh";
+
+  execFileSync(
+    ps,
+    [
+      "-NoProfile",
+      "-NonInteractive",
+      "-Command",
+      "Install-PackageProvider -Name NuGet -MinimumVersion 2.8.5.201 -Force -Scope CurrentUser; " +
+        "Install-Module -Name TrustedSigning -MinimumVersion 0.5.0 -Force -Repository PSGallery -Scope CurrentUser",
+    ],
+    { stdio: "inherit", env },
+  );
+
+  for (const filePath of filePaths) {
+    execFileSync(
+      ps,
+      [
+        "-NoProfile",
+        "-NonInteractive",
+        "-Command",
+        `Invoke-TrustedSigning -Endpoint '${TRUSTED_SIGNING_ENDPOINT}' ` +
+          `-CodeSigningAccountName '${TRUSTED_SIGNING_ACCOUNT}' ` +
+          `-CertificateProfileName '${TRUSTED_SIGNING_CERTIFICATE_PROFILE}' ` +
+          `-Files '${filePath}' -TimestampRfc3161 'http://timestamp.acs.microsoft.com' ` +
+          "-TimestampDigest SHA256 -FileDigest SHA256",
+      ],
+      { stdio: "inherit", env },
+    );
+    console.log(`  signed ${filePath}`);
+  }
 }

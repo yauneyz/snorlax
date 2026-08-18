@@ -220,3 +220,37 @@ describe('MockServiceConnection — blocking profiles', () => {
     ).rejects.toMatchObject({ code: ErrorCode.BAD_REQUEST });
   });
 });
+
+describe('MockServiceConnection — drainUsage (architecture §7/Phase 7)', () => {
+  it('returns an empty log and latestSeq 0 before anything is pushed', async () => {
+    const svc = new MockServiceConnection();
+    const result = await svc.request('drainUsage', { afterSeq: 0 });
+    expect(result).toEqual({ transitions: [], latestSeq: 0 });
+  });
+
+  it('devPushUsageTransition assigns increasing seq numbers drainUsage can filter on', async () => {
+    const svc = new MockServiceConnection();
+    const first = svc.devPushUsageTransition('focusOn');
+    const second = svc.devPushUsageTransition('focusOff');
+
+    expect(first.seq).toBe(1);
+    expect(second.seq).toBe(2);
+
+    const all = await svc.request('drainUsage', { afterSeq: 0 });
+    expect(all.transitions).toEqual([first, second]);
+    expect(all.latestSeq).toBe(2);
+
+    const onlyNew = await svc.request('drainUsage', { afterSeq: 1 });
+    expect(onlyNew.transitions).toEqual([second]);
+    expect(onlyNew.latestSeq).toBe(2);
+  });
+
+  it('defaults devPushUsageTransition source to user but accepts an explicit one', async () => {
+    const svc = new MockServiceConnection();
+    const userDefault = svc.devPushUsageTransition('keyPresent');
+    const scheduleDriven = svc.devPushUsageTransition('scheduleFired', 'schedule');
+
+    expect(userDefault.source).toBe('user');
+    expect(scheduleDriven.source).toBe('schedule');
+  });
+});

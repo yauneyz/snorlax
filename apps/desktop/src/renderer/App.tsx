@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import type { Policy } from '@talysman/shared';
 import { resolveActiveProfile } from '@talysman/shared';
+import { productFeaturesForEnvironment } from '@talysman/product';
 import { useFocusStore } from './store/useFocusStore.js';
 import { Dashboard } from './pages/Dashboard.js';
 import { Blocklists } from './pages/Blocklists.js';
@@ -26,7 +27,7 @@ const NAV: { route: Route; label: string }[] = [
 
 /** A short label summarizing the sidebar's active policy — mirrors the presets in Blocklists.tsx. */
 function policyModeLabel(policy: Policy): string {
-  if (policy.intent) return 'Smart';
+  if (SMART_FILTERING_ENABLED && policy.intent) return 'Smart';
   if (policy.defaultAction === 'block') {
     return policy.blockedDomains.length === 0 && policy.allowedDomains.length === 0
       ? 'Block all'
@@ -37,6 +38,9 @@ function policyModeLabel(policy: Policy): string {
 
 // Unlike Vite's DEV flag, APP_ENV remains "development" in packaged dev builds too.
 const IS_DEV = __APP_CONFIG__.APP_ENV !== 'production';
+const SMART_FILTERING_ENABLED = productFeaturesForEnvironment(
+  __APP_CONFIG__.APP_ENV,
+).smartFiltering;
 
 export default function App() {
   const init = useFocusStore((s) => s.init);

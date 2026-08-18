@@ -11,6 +11,18 @@ export const ENTITLEMENT_GRACE_PERIOD_MS = 30 * 24 * 60 * 60 * 1000;
 /** Pro-only per-user daily cap on LLM judge calls, enforced by the web `judge-intent` route. */
 export const SMART_FILTER_DAILY_JUDGE_LIMIT = 500;
 
+export type ProductEnvironment = 'development' | 'production';
+
+/**
+ * Rollout flags shared by the desktop client and web backend. Keeping the decision here prevents
+ * a production UI from hiding a feature while its server-side implementation remains callable.
+ */
+export function productFeaturesForEnvironment(environment: ProductEnvironment) {
+  return {
+    smartFiltering: environment === 'development',
+  } as const;
+}
+
 /**
  * Length of the full-featured Pro trial started at Checkout. Stripe is the authority
  * once a subscription exists (`trial_end` is synced onto the row); this constant is

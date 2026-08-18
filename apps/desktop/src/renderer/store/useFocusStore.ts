@@ -38,6 +38,7 @@ interface FocusStore {
   appVersion: string;
   appEnv: string;
   isLocalRelease: boolean;
+  platform: NodeJS.Platform;
   localEntitlementEnabled: boolean;
   signedIn: boolean;
   email?: string;
@@ -112,6 +113,7 @@ export const useFocusStore = create<FocusStore>((set, get) => ({
   appVersion: 'unknown',
   appEnv: 'development',
   isLocalRelease: false,
+  platform: 'darwin',
   localEntitlementEnabled: false,
   signedIn: false,
   email: undefined,
@@ -258,6 +260,7 @@ export const useFocusStore = create<FocusStore>((set, get) => ({
         appEnv: info.appEnv,
         isLocalRelease: info.isLocalRelease,
         localEntitlementEnabled: info.localEntitlementEnabled,
+        platform: info.platform,
         onboardingComplete: onboarding.complete,
       });
       void get().refreshSubscriptionDetail();

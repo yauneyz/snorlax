@@ -14,6 +14,7 @@ import {
 } from '@talysman/auth-contracts';
 import { config } from './config.js';
 import { logger } from './logging.js';
+import { recordAppOpen } from './analytics.js';
 import { completeOAuth, reportAuthFlowError } from './auth/supabase.js';
 import { applyPlanLimitsNow, broadcastAppEvent } from './ipc/handlers.js';
 import { parseDeepLink } from './deepLink.js';
@@ -88,6 +89,8 @@ export function showMainWindow(): BrowserWindow | null {
     void app.whenReady().then(() => showMainWindow());
     return mainWindow;
   }
+
+  recordAppOpen();
 
   const existingWindow = mainWindow && !mainWindow.isDestroyed() ? mainWindow : null;
   const win = existingWindow ?? createWindow();

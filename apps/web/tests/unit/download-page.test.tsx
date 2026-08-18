@@ -28,4 +28,13 @@ describe("download page", () => {
     expect(html).not.toContain(config.extensionStores.edgeUrl);
     expect(html).not.toContain("Coming soon");
   });
+
+  it("sets expectations for Windows SmartScreen reputation warnings", () => {
+    expect(html).toContain("Windows might ask for confirmation");
+    expect(html).toContain("That is a reputation warning, not a malware finding");
+    expect(html).toContain("installer came from talysman.app before continuing");
+    expect(html).toContain(
+      'href="https://learn.microsoft.com/en-us/windows/apps/package-and-deploy/smartscreen-reputation"',
+    );
+  });
 });

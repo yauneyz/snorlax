@@ -128,11 +128,15 @@ function stripeKeyMode(key: string): "test" | "live" | null {
 }
 
 const serverSchema = serverSchemaBase.superRefine((value, ctx) => {
-  if (value.LLM_PROVIDER === "openai" && value.OPENAI_API_KEY.length === 0) {
+  if (
+    value.APP_ENVIRONMENT === "development" &&
+    value.LLM_PROVIDER === "openai" &&
+    value.OPENAI_API_KEY.length === 0
+  ) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
       path: ["OPENAI_API_KEY"],
-      message: "OPENAI_API_KEY is required when LLM_PROVIDER is openai.",
+      message: "OPENAI_API_KEY is required when development Smart filtering uses OpenAI.",
     });
   }
 

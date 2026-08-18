@@ -1,8 +1,13 @@
 import React from 'react';
 import { resolveActiveProfile } from '@talysman/shared';
+import { productFeaturesForEnvironment } from '@talysman/product';
 import { useFocusStore } from '../store/useFocusStore.js';
 import { FocusToggle } from '../components/FocusToggle.js';
 import { Kicker } from '../components/ui/index.js';
+
+const SMART_FILTERING_ENABLED = productFeaturesForEnvironment(
+  __APP_CONFIG__.APP_ENV,
+).smartFiltering;
 
 /** One compact instrument reading — kicker on top, value below. */
 function Readout({ label, value, tone }: { label: string; value: string; tone?: 'ok' | 'danger' }) {
@@ -29,7 +34,7 @@ export function Dashboard() {
     policy.defaultAction === 'block' &&
     policy.blockedDomains.length === 0 &&
     policy.allowedDomains.length === 0 &&
-    !policy.intent;
+    !(SMART_FILTERING_ENABLED && policy.intent);
   const listLabel = policy.defaultAction === 'block' ? 'sites allowed' : 'sites blocked';
   const listCount =
     policy.defaultAction === 'block' ? policy.allowedDomains.length : policy.blockedDomains.length;

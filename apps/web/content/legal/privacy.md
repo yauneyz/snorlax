@@ -2,7 +2,7 @@
 title: "Privacy Policy"
 ---
 
-_Last updated: July 22, 2026_
+_Last updated: August 18, 2026_
 
 This Privacy Policy explains how Talysman ("Talysman", "we", "us", or "our")
 collects, uses, and protects your information when you use our website,
@@ -71,6 +71,15 @@ preferences, and measure how the Service is used. You can control cookies throug
 your browser settings, though disabling them may affect how the Service functions.
 Our analytics providers help us understand aggregate usage patterns so we can
 improve the product.
+
+**Desktop app analytics.** The Talysman desktop application separately reports a
+small set of install and usage milestones — for example, that the app was
+installed, that a USB key was paired, and daily counts and durations such as how
+many times the app was opened and how many seconds Focus mode was active. This
+data contains counts and durations only: never the websites or apps you block,
+your blocklists, or any browsing content. It is on by default and can be turned
+off at any time from the app's Settings page, which stops all further reporting
+immediately.
 
 ## Data retention
 

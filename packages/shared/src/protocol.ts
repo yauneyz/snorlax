@@ -43,6 +43,19 @@ export interface PairedKey {
 /** Why focus changed, for UI messaging. */
 export type FocusSource = 'user' | 'schedule' | 'boot' | 'recover';
 
+/** One entry in the exact-usage transition log the service maintains (architecture §7/Phase 7). */
+export type TransitionKind = 'focusOn' | 'focusOff' | 'scheduleFired' | 'keyPresent' | 'keyAbsent';
+
+/** A single recorded focus/presence/schedule transition, for `drainUsage`. */
+export interface UsageTransition {
+  /** Monotonically increasing per device; used as the drain cursor. */
+  seq: number;
+  /** Epoch ms. */
+  at: number;
+  kind: TransitionKind;
+  source: FocusSource;
+}
+
 /** Full authoritative snapshot returned by `getState` and broadcast on changes. */
 export interface ServiceState {
   protocolVersion: number;
@@ -131,6 +144,17 @@ export interface RequestMap {
   unpairKey: { params: { keyId: string }; result: Ok };
   getKeyPresence: { params: void; result: { present: boolean; keyId?: string } };
   ping: { params: void; result: { version: string; protocolVersion: number } };
+
+  /**
+   * Drain the exact-usage transition log newer than `afterSeq` (architecture §7/Phase 7).
+   * Additive since PROTOCOL_VERSION 3 — an older service answers BAD_REQUEST, and the desktop
+   * client falls back to Phase 6's observed-usage approximation. Do NOT bump PROTOCOL_VERSION
+   * for this; it is purely additive.
+   */
+  drainUsage: {
+    params: { afterSeq: number };
+    result: { transitions: UsageTransition[]; latestSeq: number };
+  };
 
   /**
    * Extension → (via natmsg) → service: a page under an `intent`-enabled profile fell through

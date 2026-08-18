@@ -103,4 +103,11 @@
     MessageBox MB_OK|MB_ICONSTOP "The Talysman background service could not be removed (code $0).$\n$\nNo application files were deleted. Restart Windows and run the uninstaller again." /SD IDOK
     Abort
   ${EndIf}
+
+  ; Best-effort app_uninstalled (architecture §7-8/Phase 8). device-id.json lives in Electron's
+  ; userData (%APPDATA%\Talysman for the invoking user); no API_BASE_URL is available here (it's
+  ; baked into the Electron bundle at build time, not exported to the uninstaller), so the
+  ; production URL is hardcoded — packaged public builds always point at production. Runs
+  ; without checking its exit code: this must never block or fail the uninstall.
+  nsExec::ExecToLog 'powershell.exe -NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -Command "try { $p = Join-Path $env:APPDATA \"Talysman\\device-id.json\"; if (Test-Path $p) { $j = Get-Content $p -Raw | ConvertFrom-Json; $days = 0; if ($j.installedAt) { $days = [int]((Get-Date).ToUniversalTime() - [DateTime]::Parse($j.installedAt).ToUniversalTime()).TotalDays }; $body = @{ event=\"app_uninstalled\"; source=\"desktop\"; device_id=$j.deviceId; occurred_at=(Get-Date).ToUniversalTime().ToString(\"o\"); platform=\"win32\"; props=@{ platform=\"win32\"; days_installed=$days } } | ConvertTo-Json -Compress; Invoke-WebRequest -Uri \"https://www.talysman.app/api/analytics/track\" -Method Post -ContentType \"application/json\" -Body $body -TimeoutSec 3 | Out-Null } } catch {}"'
 !macroend

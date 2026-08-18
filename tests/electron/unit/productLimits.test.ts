@@ -9,6 +9,7 @@ import {
   FREE_PROFILE_LIMIT,
   limitsForPlan,
   maxProfiles,
+  productFeaturesForEnvironment,
   validatePolicyForLimits,
   validateProfilesForLimits,
   validateScheduleForLimits,
@@ -37,6 +38,11 @@ const profiles: Profile[] = [
 ];
 
 describe('product limits', () => {
+  it('keeps Smart filtering behind the development feature flag', () => {
+    expect(productFeaturesForEnvironment('development').smartFiltering).toBe(true);
+    expect(productFeaturesForEnvironment('production').smartFiltering).toBe(false);
+  });
+
   it('sets the Free blacklist allowance to five websites', () => {
     expect(FREE_BLOCKED_SITE_LIMIT).toBe(5);
   });

@@ -1,7 +1,7 @@
 //! Constants mirrored from packages/shared/src/constants.ts. Keep these in sync with the TS
 //! side — the pipe name in particular must match what the Electron client connects to.
 
-pub const PROTOCOL_VERSION: u32 = 2;
+pub const PROTOCOL_VERSION: u32 = 3;
 pub const SERVICE_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 /// Windows service registration name.

@@ -1,6 +1,6 @@
 {
   "$comment": "Language-neutral mirror of packages/shared/src/protocol.ts + events.ts. The TypeScript types are the source of truth; this file documents the same contract for the Rust service. Wire format: newline-delimited JSON, one message per line.",
-  "protocolVersion": 2,
+  "protocolVersion": 3,
   "transport": {
     "windows": "named pipe \\\\.\\pipe\\talysman (dev: talysman-dev)"
   },
@@ -46,6 +46,14 @@
       "canBlock": "boolean",
       "permissionsOk": "boolean",
       "dnrRulesApplied": "number?"
+    },
+    "TransitionKind": "focusOn|focusOff|scheduleFired|keyPresent|keyAbsent",
+    "UsageTransition": {
+      "seq": "number",
+      "at": "number",
+      "kind": "TransitionKind",
+      "source": "user|schedule|boot|recover",
+      "$comment": "One entry in the exact-usage transition log (architecture §7/Phase 7). seq is the monotonic drain cursor; at is epoch ms."
     }
   },
   "methods": {
@@ -95,6 +103,11 @@
     },
     "enableFocus": { "params": { "reason": "string?" }, "result": { "ok": true }, "errors": ["NO_PAIRED_KEY"] },
     "disableFocus": { "params": {}, "result": { "ok": true }, "errors": ["KEY_REQUIRED", "LOCKED"] },
+    "drainUsage": {
+      "params": { "afterSeq": "number" },
+      "result": { "transitions": "UsageTransition[]", "latestSeq": "number" },
+      "$comment": "Architecture §7/Phase 7. Additive since PROTOCOL_VERSION 3 — an older service answers BAD_REQUEST and the desktop client falls back to observed-usage."
+    },
     "listRemovableDrives": { "params": null, "result": { "drives": "Drive[]" } },
     "pairKey": { "params": { "driveId": "string", "label": "string" }, "result": { "key": "PairedKey" } },
     "unpairKey": { "params": { "keyId": "string" }, "result": { "ok": true }, "errors": ["KEY_REQUIRED", "LAST_PAIRED_KEY"] },

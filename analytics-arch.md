@@ -6,8 +6,14 @@
 > pre-aggregated rollups. Two dev-only dashboard routes read production and local Supabase from
 > `localhost:3000`.
 >
-> Status: **implemented through Phase 4**. See `analytics-plan.md` for the corrected runnable
-> design and remaining Phases 5–8.
+> Status: **implemented — Phases 1–4 and 6–8.** Phase 5 (the Playwright bot E2E suite) was
+> deliberately not built (user decision); everything downstream of it (desktop milestones, the
+> Rust exact-usage transition log, polish) was built without it. See `analytics-plan.md` for the
+> corrected runnable design and its §3 for the full list of corrections against this document —
+> the load-bearing ones for Phases 6–8 (`telemetryEnabled`'s actual location, the `TransitionKind`
+> gap) are folded in below at their original locations. One permanent, known gap: macOS has no
+> uninstall hook at all (DMG drag-install), so `app_uninstalled` is never captured on that
+> platform — Linux (`.deb` postrm) and Windows (NSIS uninstaller) both report it best-effort.
 
 ---
 
@@ -294,7 +300,11 @@ forward-compatible with no migration step:
 pub struct UsageTransition {
     pub seq: u64,          // monotonic, never reused
     pub at: u64,           // epoch ms, service clock
-    pub kind: TransitionKind,   // FocusOn | FocusOff | ScheduleFired
+    // Implemented as FocusOn | FocusOff | ScheduleFired | KeyPresent | KeyAbsent — the last two
+    // were missing from this list originally (correction, see analytics-plan.md §3.14): §10 below
+    // derives `key_present_seconds` from "keyPresenceChanged transitions in the same log", which
+    // is impossible without them.
+    pub kind: TransitionKind,
     pub source: FocusSource,    // already exists in model.rs
 }
 
@@ -1037,11 +1047,16 @@ blocker and daily telemetry is exactly the thing a skeptical user will look for.
   else.
 - Keep PII out of `props`. `user_id` joins to `profiles` when you need an email; there is no reason
   to copy one into an event row.
-- **Add `telemetryEnabled` to `Settings`** in `packages/shared/src/settings.ts`, default on, with a
-  visible toggle and a plain-language explanation of exactly what the daily row contains. Opt-out
-  rather than opt-in: opt-in telemetry typically sees single-digit adoption and the sample skews
-  hard toward enthusiasts, which makes the data worse than no data because it looks trustworthy.
-  Opt-out with honest disclosure is the defensible position, and being able to point at this
+- **`telemetryEnabled` (implemented — corrected from this section's original text).** Not on
+  `Settings` in `packages/shared/src/settings.ts`: that type is service-owned and mirrored in
+  Rust, and the only settings setter in the protocol is `setBrowserHandshake` — a TS-only field
+  would never round-trip through `getState`. It is instead a desktop-local `telemetry.json` next
+  to `onboarding.json` (`apps/desktop/src/main/analytics.ts`), same "losing it is safe" posture,
+  default on, with a visible toggle and a plain-language explanation of exactly what the daily row
+  contains (`renderer/pages/Settings.tsx`, "Product analytics" card). Opt-out rather than opt-in:
+  opt-in telemetry typically sees single-digit adoption and the sample skews hard toward
+  enthusiasts, which makes the data worse than no data because it looks trustworthy. Opt-out with
+  honest disclosure is the defensible position, and being able to point at this
   document's "counts and durations only" guarantee is what makes it defensible.
 - Add a product-analytics paragraph to the privacy policy before any of this ships.
 

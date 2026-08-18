@@ -3,10 +3,21 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
 
 const mocks = vi.hoisted(() => ({
+  appEnvironment: "development" as "development" | "production",
   requireBearerUser: vi.fn(),
   getUserEntitlement: vi.fn(),
   rpc: vi.fn(),
   completeChat: vi.fn(),
+}));
+
+vi.mock("@/lib/config", () => ({
+  config: {
+    app: {
+      get environment() {
+        return mocks.appEnvironment;
+      },
+    },
+  },
 }));
 
 vi.mock("@/lib/auth/require-bearer-user", () => ({
@@ -45,6 +56,7 @@ const validBody = {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mocks.appEnvironment = "development";
   mocks.requireBearerUser.mockResolvedValue({ id: "user-1", email: "user@example.com" });
   mocks.getUserEntitlement.mockResolvedValue({ active: true, plan: "pro", source: "server" });
   mocks.rpc.mockResolvedValue({ data: true, error: null });
@@ -52,6 +64,17 @@ beforeEach(() => {
 });
 
 describe("POST /api/desktop/judge-intent", () => {
+  it("is unavailable in production before authentication or LLM work", async () => {
+    mocks.appEnvironment = "production";
+
+    const response = await POST(request(validBody));
+
+    expect(response.status).toBe(404);
+    expect(await response.json()).toEqual({ error: "Not found" });
+    expect(mocks.requireBearerUser).not.toHaveBeenCalled();
+    expect(mocks.completeChat).not.toHaveBeenCalled();
+  });
+
   it("returns 401 when the bearer token is missing or invalid", async () => {
     mocks.requireBearerUser.mockRejectedValue(new UnauthorizedError("Missing bearer token"));
 

@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import type { AppRef, Policy, Profile } from '@talysman/shared';
+import { productFeaturesForEnvironment } from '@talysman/product';
 import {
   EMPTY_POLICY,
   MAX_PROFILE_NAME_LENGTH,
@@ -26,11 +27,29 @@ import {
  * just prefills. "Smart" doesn't write a policy on click (an intent needs real text first); it
  * just opens the Smart filtering section below.
  */
-const PRESETS: { value: 'blacklist' | 'whitelist' | 'block-all' | 'smart'; label: string; hint: string }[] = [
+type Preset = {
+  value: 'blacklist' | 'whitelist' | 'block-all' | 'smart';
+  label: string;
+  hint: string;
+};
+
+const SMART_FILTERING_ENABLED = productFeaturesForEnvironment(
+  __APP_CONFIG__.APP_ENV,
+).smartFiltering;
+
+const PRESETS: Preset[] = [
   { value: 'blacklist', label: 'Simple blocklist', hint: 'Block only the sites you list.' },
   { value: 'whitelist', label: 'Strict allowlist', hint: 'Block everything except your list.' },
   { value: 'block-all', label: 'Block everything', hint: 'No internet at all.' },
-  { value: 'smart', label: 'Smart', hint: 'Judge anything else against what you’re working on.' },
+  ...(SMART_FILTERING_ENABLED
+    ? [
+        {
+          value: 'smart',
+          label: 'Smart',
+          hint: 'Judge anything else against what you’re working on.',
+        } satisfies Preset,
+      ]
+    : []),
 ];
 
 function appKey(app: AppRef): string {
@@ -171,11 +190,11 @@ export function Blocklists({ onUpgrade }: { onUpgrade: () => void }) {
   const maxBlocked = maxBlockedDomains(productLimits);
   const maxAllowed = maxAllowedDomains(productLimits);
   const maxApps = maxPolicyApps(productLimits);
-  const smartAllowed = smartFilteringAllowed(productLimits);
+  const smartAllowed = SMART_FILTERING_ENABLED && smartFilteringAllowed(productLimits);
   const blockedLimitReached = maxBlocked !== null && policy.blockedDomains.length >= maxBlocked;
   const allowedLimitReached = maxAllowed !== null && policy.allowedDomains.length >= maxAllowed;
   const appBlockingLocked = maxApps === 0;
-  const smartSectionOpen = smartOpen || policy.intent !== null;
+  const smartSectionOpen = smartOpen || (SMART_FILTERING_ENABLED && policy.intent !== null);
   const negativeSectionOpen = negativeOpen || Boolean(policy.intent?.negative);
   const existingAppKeys = useMemo(
     () => new Set(policy.apps.map((app) => appKey(app))),
@@ -615,71 +634,71 @@ export function Blocklists({ onUpgrade }: { onUpgrade: () => void }) {
           })}
         </div>
 
-        <div className="mt-4 rounded-[10px] border border-white/[0.07] bg-white/[0.02] p-3.5">
-          <div className="flex items-baseline gap-2.5">
-            <Kicker>Smart filtering</Kicker>
-            <Badge tone="neutral">Pro</Badge>
-            {policy.intent && (
-              <button
-                onClick={clearIntent}
-                className="ml-auto text-[11px] font-medium text-slate-500 transition hover:text-dangerInk"
-              >
-                turn off
-              </button>
-            )}
-          </div>
-
-          {!smartSectionOpen ? (
-            <button
-              onClick={() => (smartAllowed ? setSmartOpen(true) : onUpgrade())}
-              className="mt-2 text-[12px] font-medium text-slate-400 transition hover:text-slate-200"
-            >
-              Judge anything that isn’t on either list above, against what you’re working on →
-            </button>
-          ) : (
-            <div className="mt-2.5 flex flex-col gap-2.5">
-              <div>
-                <label className="mb-1 block text-[11px] text-slate-450">
-                  What are you working on?
-                </label>
-                <Textarea
-                  rows={2}
-                  value={policy.intent?.positive ?? ''}
-                  onChange={(e) => setIntentPositive(e.target.value)}
-                  placeholder="Researching flight prices for a trip to Japan"
-                  disabled={!smartAllowed}
-                />
-              </div>
-
-              {!negativeSectionOpen ? (
+        {SMART_FILTERING_ENABLED && (
+          <div className="mt-4 rounded-[10px] border border-white/[0.07] bg-white/[0.02] p-3.5">
+            <div className="flex items-baseline gap-2.5">
+              <Kicker>Smart filtering</Kicker>
+              <Badge tone="neutral">Pro</Badge>
+              {policy.intent && (
                 <button
-                  onClick={() => setNegativeOpen(true)}
-                  className="self-start text-[11px] font-medium text-slate-450 transition hover:text-slate-200"
+                  onClick={clearIntent}
+                  className="ml-auto text-[11px] font-medium text-slate-500 transition hover:text-dangerInk"
                 >
-                  + Add exclusions
+                  turn off
                 </button>
-              ) : (
+              )}
+            </div>
+
+            {!smartSectionOpen ? (
+              <button
+                onClick={() => (smartAllowed ? setSmartOpen(true) : onUpgrade())}
+                className="mt-2 text-[12px] font-medium text-slate-400 transition hover:text-slate-200"
+              >
+                Judge anything that isn’t on either list above, against what you’re working on →
+              </button>
+            ) : (
+              <div className="mt-2.5 flex flex-col gap-2.5">
                 <div>
-                  <label className="mb-1 block text-[11px] text-slate-450">
-                    Anything to avoid, even if related?
-                  </label>
+                  <label className="mb-1 block text-[11px] text-slate-450">What are you working on?</label>
                   <Textarea
                     rows={2}
-                    value={policy.intent?.negative ?? ''}
-                    onChange={(e) => setIntentNegative(e.target.value)}
-                    placeholder="General travel influencer content, unrelated shopping"
+                    value={policy.intent?.positive ?? ''}
+                    onChange={(e) => setIntentPositive(e.target.value)}
+                    placeholder="Researching flight prices for a trip to Japan"
                     disabled={!smartAllowed}
                   />
                 </div>
-              )}
 
-              <p className="text-[11px] leading-relaxed text-slate-450">
-                Pages that aren’t explicitly blocked or allowed above will load, then get checked
-                against your task — usually within a few seconds.
-              </p>
-            </div>
-          )}
-        </div>
+                {!negativeSectionOpen ? (
+                  <button
+                    onClick={() => setNegativeOpen(true)}
+                    className="self-start text-[11px] font-medium text-slate-450 transition hover:text-slate-200"
+                  >
+                    + Add exclusions
+                  </button>
+                ) : (
+                  <div>
+                    <label className="mb-1 block text-[11px] text-slate-450">
+                      Anything to avoid, even if related?
+                    </label>
+                    <Textarea
+                      rows={2}
+                      value={policy.intent?.negative ?? ''}
+                      onChange={(e) => setIntentNegative(e.target.value)}
+                      placeholder="General travel influencer content, unrelated shopping"
+                      disabled={!smartAllowed}
+                    />
+                  </div>
+                )}
+
+                <p className="text-[11px] leading-relaxed text-slate-450">
+                  Pages that aren’t explicitly blocked or allowed above will load, then get checked
+                  against your task — usually within a few seconds.
+                </p>
+              </div>
+            )}
+          </div>
+        )}
 
         <div className="mt-4 flex items-baseline gap-2.5">
           <Kicker>Apps blocked</Kicker>

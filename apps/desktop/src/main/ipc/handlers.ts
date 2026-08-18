@@ -5,13 +5,16 @@
  */
 
 import { app, BrowserWindow, dialog, ipcMain, Notification, shell } from 'electron';
-import { ErrorCode, type EventName, type Method, type Params } from '@talysman/shared';
+import { ErrorCode, type EventName, type Method, type Params, type TransitionKind } from '@talysman/shared';
+import { productFeaturesForEnvironment } from '@talysman/product';
 import { config } from '../config.js';
 import { logger } from '../logging.js';
 import { listInstalledApps } from '../appDiscovery.js';
 import { checkForAppUpdates } from '../updater.js';
 import { isServiceError, type ServiceConnection } from '../service/connection.js';
 import type { MockServiceConnection } from '../service/mockService.js';
+import { uninstallService } from '../service/uninstaller.js';
+import { getTelemetryEnabled, setTelemetryEnabled, track } from '../analytics.js';
 import {
   getEntitlement,
   invalidateEntitlementCache,
@@ -56,6 +59,7 @@ import { Channels } from './channels.js';
 export type AppEvent = 'authChanged' | 'entitlementChanged';
 
 let activeService: ServiceConnection | undefined;
+const features = productFeaturesForEnvironment(config.appEnv);
 
 /** Broadcast an app-level event to every renderer window. */
 export function broadcastAppEvent(event: AppEvent): void {
@@ -241,12 +245,18 @@ export async function registerIpcHandlers(ctx: HandlerContext): Promise<void> {
 
       if (arg.method === 'setPolicy') {
         const params = arg.params as Params<'setPolicy'>;
+        if (!features.smartFiltering && params.policy.intent !== null) {
+          return limitError('Smart filtering is only available in development builds.');
+        }
         const violations = validatePolicyForLimits(params.policy, limits);
         if (violations[0]) return limitError(violations[0].message);
       }
 
       if (arg.method === 'setProfile') {
         const params = arg.params as Params<'setProfile'>;
+        if (!features.smartFiltering && params.profile.policy.intent !== null) {
+          return limitError('Smart filtering is only available in development builds.');
+        }
         const policyViolations = validatePolicyForLimits(params.profile.policy, limits);
         if (policyViolations[0]) return limitError(policyViolations[0].message);
 
@@ -270,8 +280,13 @@ export async function registerIpcHandlers(ctx: HandlerContext): Promise<void> {
       }
 
       const result = await service.request(arg.method, arg.params as Params<Method>);
+      if (arg.method === 'pairKey') track('usb_key_paired');
+      if (arg.method === 'setSchedule') track('schedule_created');
       return { ok: true, result };
     } catch (e) {
+      if (arg.method === 'pairKey') {
+        track('usb_pair_failed', { reason: e instanceof Error ? e.message : String(e) });
+      }
       if (isServiceError(e)) return { ok: false, code: e.code, message: e.message };
       logger.error('[ipc] unexpected service error', e);
       return { ok: false, code: 'INTERNAL', message: (e as Error).message };
@@ -285,9 +300,12 @@ export async function registerIpcHandlers(ctx: HandlerContext): Promise<void> {
     localEntitlementEnabled: config.isLocalRelease && isLocalEntitlementEnabled(),
     usingMock: Boolean(mock),
     serviceConnected: service.connected,
+    platform: process.platform,
   }));
 
   ipcMain.handle(Channels.checkForUpdates, () => checkForAppUpdates());
+
+  ipcMain.handle(Channels.uninstallService, () => uninstallService(service));
 
   ipcMain.handle(Channels.listInstalledApps, () => listInstalledApps());
 
@@ -305,6 +323,11 @@ export async function registerIpcHandlers(ctx: HandlerContext): Promise<void> {
     if (!mock) return { ok: false, message: 'Only available against the mock service.' };
     mock.devSimulateExtensionHeartbeat();
     return { ok: true };
+  });
+
+  ipcMain.handle(Channels.devPushUsageTransition, (_e, kind: TransitionKind) => {
+    if (!mock) return { ok: false, message: 'Only available against the mock service.' };
+    return { ok: true, transition: mock.devPushUsageTransition(kind) };
   });
 
   ipcMain.handle(Channels.entitlement, () => getEntitlement());
@@ -383,12 +406,26 @@ export async function registerIpcHandlers(ctx: HandlerContext): Promise<void> {
   });
   // --- first run ---
   ipcMain.handle(Channels.onboardingStatus, () => getOnboardingStatus());
-  ipcMain.handle(Channels.completeOnboarding, () => completeOnboarding());
+  ipcMain.handle(Channels.completeOnboarding, async () => {
+    const status = await completeOnboarding();
+    track('onboarding_completed');
+    return status;
+  });
   ipcMain.handle(Channels.resetOnboarding, async () => {
     if (config.appEnv === 'production' && !config.isLocalRelease) {
       return { ok: false, message: 'Only available in development builds.' };
     }
     return { ok: true, status: await resetOnboarding() };
+  });
+
+  // --- telemetry ---
+  ipcMain.handle(Channels.getTelemetryEnabled, () => getTelemetryEnabled());
+  ipcMain.handle(Channels.setTelemetryEnabled, async (_e, enabled: boolean) => {
+    if (typeof enabled !== 'boolean') {
+      return { ok: false, message: 'Expected an enabled state.' };
+    }
+    await setTelemetryEnabled(enabled);
+    return { ok: true, enabled };
   });
 
   ipcMain.handle(Channels.redeemCode, async (_e, args: { code: string }) => {

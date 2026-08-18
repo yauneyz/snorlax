@@ -16,8 +16,10 @@
 
 import { app } from 'electron';
 import { DEEP_LINK_SCHEME, PROTOCOL_VERSION } from '@talysman/shared';
+import { productFeaturesForEnvironment } from '@talysman/product';
 import { config } from './config.js';
 import { logger } from './logging.js';
+import { initAnalytics, recordAppOpen, shutdownFlush, trackAppInstalledIfFirstRun } from './analytics.js';
 import { registerIpcHandlers } from './ipc/handlers.js';
 import { PipeServiceConnection } from './service/client.js';
 import { MockServiceConnection } from './service/mockService.js';
@@ -29,6 +31,7 @@ import { createTray } from './tray.js';
 import { createWindow, handleDeepLink, showMainWindow } from './window.js';
 
 const CONNECT_TIMEOUT_MS = 2000;
+const features = productFeaturesForEnvironment(config.appEnv);
 
 // Required for reliable native toast attribution on Windows (and harmless elsewhere).
 app.setAppUserModelId('com.talysman.app');
@@ -80,14 +83,17 @@ function registerDeepLink(): void {
 }
 
 async function bootstrap(): Promise<void> {
+  await trackAppInstalledIfFirstRun();
   registerDeepLink();
   await ensureServiceInstalled();
 
   const { service, mock } = await connectService();
   await registerIpcHandlers({ service, mock });
-  initSmartFiltering(service);
+  initAnalytics(service);
+  if (features.smartFiltering) initSmartFiltering(service);
 
   createWindow();
+  recordAppOpen();
   // Linux has its own standalone tray helper (see file header); avoid a duplicate icon there.
   if (process.platform !== 'linux') createTray(service, mock);
   if (!mock) await ensureServiceCurrent(service);
@@ -125,6 +131,15 @@ if (!gotLock) {
     // closes only burns resources and is not required for blocking or schedules. On Linux the
     // standalone `talysman-tray` helper is what keeps a status indicator alive after this quits.
     app.quit();
+  });
+
+  // Best-effort, time-boxed flush of queued analytics before the process actually exits.
+  let quitFlushed = false;
+  app.on('before-quit', (e) => {
+    if (quitFlushed) return;
+    e.preventDefault();
+    quitFlushed = true;
+    void shutdownFlush().finally(() => app.quit());
   });
 
   app.on('activate', () => {

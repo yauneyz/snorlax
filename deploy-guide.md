@@ -41,7 +41,7 @@ The runtime pieces:
 | Release hosting  | None                                                    | `talysman-release-artifacts-prod` in `us-east-1`                                                         |
 | Database + auth  | Local Supabase stack (Docker, `supabase start`)         | Cloud project `lkanoehzgogtrxzycutl.supabase.co`                                                         |
 | Stripe           | Test mode + `stripe listen` webhook forwarding (no registered endpoint — by design) | Live mode + dashboard webhook endpoint `we_1TzB2xRN4BfSLyzwzq2fONlJ`                  |
-| LLM              | Local `llm-serve` (`LLM_PROVIDER=local`)                 | OpenAI (`LLM_PROVIDER=openai`)                                                                           |
+| LLM              | Local `llm-serve` (`LLM_PROVIDER=local`)                 | Disabled; production uses classic blocklist/allowlist filtering                                          |
 | App URL          | `http://localhost:3000`                                 | **`https://www.talysman.app`** (canonical; the apex 308-redirects to it)                                 |
 | Email            | Inbucket (local mail catcher, port 54324)               | Resend                                                                                                   |
 | Sentry / PostHog | Disabled (placeholder values auto-detected and skipped) | Enabled when real values are in `.credentials`                                                           |
@@ -91,7 +91,7 @@ here fails loudly at sync time, not at request time in production.
 | Command (from `apps/web`)      | What it does                                                                                                                                                                                           |
 | ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `pnpm sync:env`                | mode=dev → writes `apps/web/.env.local` (dev Supabase, local LLM) and root `.env.local` (desktop `VITE_*` vars). Runs automatically before `pnpm dev` (`predev` hook).                                 |
-| `pnpm sync:env -- --mode=prod` | Same two files but with prod values (cloud Supabase, OpenAI, `https://www.talysman.app`). This is what `pnpm prod` does before starting `next dev`.                                                        |
+| `pnpm sync:env -- --mode=prod` | Same two files but with prod values (cloud Supabase, classic filtering, `https://www.talysman.app`). This is what `pnpm prod` does before starting `next dev`.                                              |
 | `pnpm sync:env:build`          | Runs before `pnpm build` (`prebuild` hook). On a Vercel build (`VERCEL=1`) with no `.credentials` present it **skips entirely** and lets Vercel's own env vars win. Locally it writes prod-mode files. |
 | `pnpm sync:env:prod`           | **Upserts** every non-empty var to Vercel's _production_ environment. Does not write local files.                                                                                                      |
 | `pnpm sync:env:preview`        | Upserts the same prod-mode values to Vercel's _preview_ environment. Does not write local files.                                                                                                       |
@@ -106,7 +106,7 @@ Gotchas baked into the script (worth knowing, they will bite otherwise):
   stdin and are never printed by the script.
 - Empty values are skipped on push, so optional stuff (Sentry, PostHog) never creates
   empty vars on Vercel.
-- Prod mode **requires** `openai.api_key` to be set, because prod uses OpenAI.
+- Smart/LLM filtering is enabled only in development mode. Production does not require an OpenAI key.
 - Placeholder detection: values containing `...` (from the example file) are treated as
   "unset" for PostHog/Sentry, so a half-filled `.credentials` degrades gracefully.
 
@@ -190,9 +190,9 @@ and put the `whsec_...` it prints into `[stripe].webhook_secret_test`. (Re-run
 pnpm web:prod         # sync-env --mode=prod, then next dev on :3000
 ```
 
-This runs the local dev server against **cloud** Supabase and OpenAI. Useful for
-debugging prod data/config without deploying. Remember: you're now touching the real
-prod database.
+This runs the local dev server against **cloud** Supabase with production's classic
+blocklist/allowlist filtering. Useful for debugging prod data/config without deploying.
+Remember: you're now touching the real prod database.
 
 ### 3.5 Database iteration loop
 

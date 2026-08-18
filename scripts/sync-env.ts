@@ -493,7 +493,9 @@ function toWebEnvPairs(c: Credentials, mode: Mode): Array<[string, string]> {
   const supabase = c.supabase[mode];
   const appUrl = mode === "prod" ? c.app.url_prod : c.app.url_dev;
   const appEnvironment = mode === "prod" ? "production" : "development";
-  const llmProvider = mode === "prod" ? "openai" : "local";
+  // Smart filtering is a development-only feature for now. Keep development on the local model;
+  // production receives the value for schema compatibility, but never exposes or calls the LLM.
+  const llmProvider = "local";
 
   return [
     ["NEXT_PUBLIC_APP_URL", appUrl],
@@ -681,14 +683,6 @@ function main() {
   const mode = resolveMode();
   const creds = loadCredentials();
   if (!creds) return;
-
-  if (mode === "prod" && creds.openai.api_key.length === 0) {
-    if (!allowDummyCredentials) {
-      console.error("openai.api_key is required for prod mode because prod uses OpenAI.");
-      process.exit(1);
-    }
-    warnDummy("openai.api_key is missing; prod-mode LLM calls will fail.");
-  }
 
   // The production web deployment is the one target that charges real cards, so it is the
   // one that has to have a complete live configuration.

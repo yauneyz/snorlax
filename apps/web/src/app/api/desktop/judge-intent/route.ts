@@ -1,11 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
-import { SMART_FILTER_DAILY_JUDGE_LIMIT } from "@talysman/product";
+import {
+  productFeaturesForEnvironment,
+  SMART_FILTER_DAILY_JUDGE_LIMIT,
+} from "@talysman/product";
 import { getUserEntitlement } from "@talysman/billing-server";
 import { requireBearerUser, UnauthorizedError } from "@/lib/auth/require-bearer-user";
 import { captureException } from "@/lib/sentry";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { createLlmClient, type LlmMessage } from "@/lib/llm/client";
 import { judgeIntentSchema, JUDGE_INTENT_MAX_EXTRACTED_TEXT_LENGTH } from "@/lib/zod/judge-intent";
+import { config } from "@/lib/config";
 
 interface JudgeResult {
   relevant: boolean;
@@ -89,6 +93,10 @@ function parseJudgeResponse(raw: string): JudgeResult {
 }
 
 export async function POST(request: NextRequest) {
+  if (!productFeaturesForEnvironment(config.app.environment).smartFiltering) {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
+
   try {
     const user = await requireBearerUser(request);
 

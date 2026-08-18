@@ -9,6 +9,7 @@ import type {
   Method,
   Params,
   Result,
+  TransitionKind,
 } from '@talysman/shared';
 import type { CheckoutPrice, SubscriptionPlan } from '../../shared/productLimits.js';
 import type { AppPickerItem } from '../../shared/appPicker.js';
@@ -17,6 +18,7 @@ import type {
   AppUpdateCheckResult,
   OnboardingStatusInfo,
   SubscriptionDetailInfo,
+  UninstallServiceResult,
 } from '../../preload/index.js';
 
 export interface BridgeError extends Error {
@@ -50,10 +52,13 @@ export function onAppEvent(cb: (event: AppEventName) => void): () => void {
 
 export const appInfo = () => window.api.appInfo();
 export const checkForUpdates = (): Promise<AppUpdateCheckResult> => window.api.checkForUpdates();
+export const uninstallService = (): Promise<UninstallServiceResult> => window.api.uninstallService();
 export const listInstalledApps = (): Promise<AppPickerItem[]> => window.api.listInstalledApps();
 export const openExternal = (url: string) => window.api.openExternal(url);
 export const devToggleKey = () => window.api.devToggleKey();
 export const devSimulateExtension = () => window.api.devSimulateExtension();
+export const devPushUsageTransition = (kind: TransitionKind) =>
+  window.api.devPushUsageTransition(kind);
 export const entitlement = () => window.api.entitlement();
 export const devSetEntitlementPlan = (plan: SubscriptionPlan) =>
   window.api.devSetEntitlementPlan(plan);
@@ -80,10 +85,14 @@ export const onboardingStatus = () => window.api.onboardingStatus();
 export const completeOnboarding = () => window.api.completeOnboarding();
 export const resetOnboarding = () => window.api.resetOnboarding();
 
+export const getTelemetryEnabled = () => window.api.getTelemetryEnabled();
+export const setTelemetryEnabled = (enabled: boolean) => window.api.setTelemetryEnabled(enabled);
+
 export type {
   AppUpdateCheckResult,
   CheckoutPrice,
   OnboardingStatusInfo,
   SubscriptionPlan,
   SubscriptionDetailInfo,
+  UninstallServiceResult,
 };

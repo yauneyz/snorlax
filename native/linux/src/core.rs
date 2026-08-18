@@ -13,7 +13,7 @@ use tokio::sync::broadcast;
 use crate::constants::{err, PROTOCOL_VERSION, SERVICE_VERSION};
 use crate::enforce::{self, EnforceShared};
 use crate::model::{
-    DefaultAction, FocusSource, PairedKey, Policy, Profile, Schedule, ServiceState,
+    DefaultAction, FocusSource, PairedKey, Policy, Profile, Schedule, ServiceState, TransitionKind,
     MAX_PROFILE_NAME_LENGTH,
 };
 use crate::pairing;
@@ -139,6 +139,14 @@ impl Core {
         self.emit("stateChanged", json!({ "state": self.snapshot() }));
     }
 
+    /// Append one entry to the exact-usage transition log (architecture §7/Phase 7). Does not
+    /// save on its own — callers already persist state on their own cadence (`set_focus` calls
+    /// `persist_state()` right after; a presence-only change rides along on the next save
+    /// triggered elsewhere, which is an accepted tradeoff since the log only feeds `drainUsage`).
+    fn record_transition(&mut self, kind: TransitionKind, source: FocusSource) {
+        self.state.push_transition(kind, source);
+    }
+
     /// Re-enumerate USB and update the cached presence; emits keyPresenceChanged on a change.
     pub fn recompute_presence(&mut self) {
         let ids = usb::present_key_ids(&self.store);
@@ -147,6 +155,14 @@ impl Core {
         if present != self.key_present || present_id != self.present_key_id {
             self.key_present = present;
             self.present_key_id = present_id.clone();
+            self.record_transition(
+                if present {
+                    TransitionKind::KeyPresent
+                } else {
+                    TransitionKind::KeyAbsent
+                },
+                FocusSource::Boot,
+            );
             self.emit(
                 "keyPresenceChanged",
                 json!({ "present": present, "keyId": present_id }),
@@ -166,6 +182,14 @@ impl Core {
             self.shared.set_active(false);
             enforce::apply_network(false);
         }
+        self.record_transition(
+            if active {
+                TransitionKind::FocusOn
+            } else {
+                TransitionKind::FocusOff
+            },
+            source,
+        );
         self.persist_state();
         self.emit(
             "focusChanged",
@@ -663,6 +687,7 @@ impl Core {
         if eval.active && !self.state.focus_active && !self.state.paired_keys.is_empty() {
             self.set_focus(true, FocusSource::Schedule);
             if let Some(id) = eval.window_id {
+                self.record_transition(TransitionKind::ScheduleFired, FocusSource::Schedule);
                 self.emit("scheduleFired", json!({ "windowId": id, "active": true }));
             }
         } else if !eval.active
@@ -670,6 +695,7 @@ impl Core {
             && self.state.focus_source == FocusSource::Schedule
         {
             self.set_focus(false, FocusSource::Schedule);
+            self.record_transition(TransitionKind::ScheduleFired, FocusSource::Schedule);
             self.emit("scheduleFired", json!({ "windowId": "", "active": false }));
         }
     }
@@ -774,6 +800,20 @@ impl Core {
                         "healthy": healthy,
                     }
                 }))
+            }
+            "drainUsage" => {
+                let after_seq = params
+                    .get("afterSeq")
+                    .and_then(|v| v.as_u64())
+                    .ok_or_else(|| RpcError::new(err::BAD_REQUEST, "Missing field: afterSeq"))?;
+                let transitions: Vec<Value> = self
+                    .state
+                    .usage_log
+                    .iter()
+                    .filter(|t| t.seq > after_seq)
+                    .map(|t| serde_json::to_value(t).unwrap())
+                    .collect();
+                Ok(json!({ "transitions": transitions, "latestSeq": self.state.usage_seq }))
             }
             "listRemovableDrives" => {
                 let drives: Vec<Value> = usb::list_removable_drives()

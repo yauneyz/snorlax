@@ -110,6 +110,22 @@ export default function DownloadPage() {
             <DownloadCard key={target.platform} target={target} />
           ))}
         </div>
+        <aside className="download__windows-note" aria-labelledby="windows-download-note-title">
+          <h3 id="windows-download-note-title">Windows might ask for confirmation</h3>
+          <p>
+            Microsoft Defender SmartScreen may call {config.app.name} an &ldquo;unrecognized
+            app&rdquo; when you open it. That is a reputation warning, not a malware finding: this
+            is a new app, and Windows has not seen enough downloads yet. If you see it, confirm the
+            installer came from talysman.app before continuing.{" "}
+            <a
+              href="https://learn.microsoft.com/en-us/windows/apps/package-and-deploy/smartscreen-reputation"
+              target="_blank"
+              rel="noreferrer"
+            >
+              Why this happens
+            </a>
+          </p>
+        </aside>
       </div>
 
       <div className="download__group">

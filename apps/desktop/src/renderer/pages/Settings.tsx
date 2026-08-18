@@ -1,9 +1,13 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useFocusStore } from '../store/useFocusStore.js';
 import {
   checkForUpdates,
+  devPushUsageTransition,
   devSimulateExtension,
   devToggleKey,
+  getTelemetryEnabled,
+  setTelemetryEnabled as setTelemetryEnabledApi,
+  uninstallService,
   type SubscriptionPlan,
 } from '../lib/bridge.js';
 import { Badge, Button, Card, CardTitle } from '../components/ui/index.js';
@@ -28,7 +32,12 @@ export function Settings() {
   const trayIconEnabled = useFocusStore((s) => s.settings.trayIconEnabled);
   const setTrayIconEnabled = useFocusStore((s) => s.setTrayIconEnabled);
   const replayOnboarding = useFocusStore((s) => s.replayOnboarding);
+  const platform = useFocusStore((s) => s.platform);
   const [firstRunError, setFirstRunError] = useState<string | null>(null);
+  const [confirmingUninstall, setConfirmingUninstall] = useState(false);
+  const [uninstallBusy, setUninstallBusy] = useState(false);
+  const [uninstallDone, setUninstallDone] = useState(false);
+  const [uninstallError, setUninstallError] = useState<string | null>(null);
   const [planBusy, setPlanBusy] = useState(false);
   const [planError, setPlanError] = useState<string | null>(null);
   const [localEntitlementBusy, setLocalEntitlementBusy] = useState(false);
@@ -42,8 +51,35 @@ export function Settings() {
     message: string;
     error?: boolean;
   } | null>(null);
+  const [telemetryEnabled, setTelemetryEnabledState] = useState<boolean | null>(null);
+  const [telemetryBusy, setTelemetryBusy] = useState(false);
+  const [telemetryError, setTelemetryError] = useState<string | null>(null);
 
   const showDeveloper = appEnv !== 'production' || usingMock;
+
+  useEffect(() => {
+    getTelemetryEnabled()
+      .then(setTelemetryEnabledState)
+      .catch(() => setTelemetryEnabledState(true)); // fail open to the default, matches main
+  }, []);
+
+  async function runUninstall() {
+    setConfirmingUninstall(false);
+    setUninstallBusy(true);
+    setUninstallError(null);
+    try {
+      const res = await uninstallService();
+      if (res.ok) {
+        setUninstallDone(true);
+      } else {
+        setUninstallError(res.message);
+      }
+    } catch (e) {
+      setUninstallError((e as Error).message);
+    } finally {
+      setUninstallBusy(false);
+    }
+  }
 
   async function choosePlan(plan: SubscriptionPlan) {
     setPlanBusy(true);
@@ -97,6 +133,24 @@ export function Settings() {
       setLocalEntitlementError((e as Error).message);
     } finally {
       setLocalEntitlementBusy(false);
+    }
+  }
+
+  async function toggleTelemetry() {
+    if (telemetryEnabled === null) return;
+    setTelemetryBusy(true);
+    setTelemetryError(null);
+    try {
+      const res = await setTelemetryEnabledApi(!telemetryEnabled);
+      if (res.ok) {
+        setTelemetryEnabledState(!telemetryEnabled);
+      } else {
+        setTelemetryError(res.message ?? 'Could not update telemetry.');
+      }
+    } catch (e) {
+      setTelemetryError((e as Error).message);
+    } finally {
+      setTelemetryBusy(false);
     }
   }
 
@@ -243,6 +297,84 @@ export function Settings() {
         </div>
       </Card>
 
+      <Card>
+        <CardTitle hint="Counts and durations only — never domains, app names, or browsing content. Helps us see install/usage health and fix what's broken.">
+          Product analytics
+        </CardTitle>
+        <div className="flex flex-col gap-3 text-sm text-slate-300">
+          <p className="text-slate-400">
+            Talysman reports install milestones and daily usage counts (opens, focus time) so we can
+            tell whether the product is working for people. On by default; turning it off stops all
+            of it, immediately.
+          </p>
+          <div className="flex items-center justify-between gap-3">
+            <span className="font-medium text-slate-200">
+              Status:{' '}
+              <Badge tone={telemetryEnabled ? 'ok' : 'neutral'}>
+                {telemetryEnabled === null ? 'Loading…' : telemetryEnabled ? 'On' : 'Off'}
+              </Badge>
+            </span>
+            <Button
+              variant={telemetryEnabled ? 'ghost' : 'primary'}
+              disabled={telemetryBusy || telemetryEnabled === null}
+              onClick={() => toggleTelemetry()}
+            >
+              {telemetryEnabled ? 'Turn off' : 'Turn on'}
+            </Button>
+          </div>
+          {telemetryError && <p className="text-[12.5px] text-warn">{telemetryError}</p>}
+        </div>
+      </Card>
+
+      {platform === 'darwin' && (
+        <Card>
+          <CardTitle hint="Dragging Talysman to the Trash does not do this — the background service lives outside the app bundle.">
+            Uninstall
+          </CardTitle>
+          <div className="flex flex-col gap-3 text-sm text-slate-300">
+            {uninstallDone ? (
+              <p className="text-slate-300">
+                The background service and its enforcement have been removed. You can now delete
+                Talysman from Applications.
+              </p>
+            ) : (
+              <>
+                <p className="text-slate-400">
+                  Stops and removes the privileged background service, its LaunchDaemon, and any
+                  active network blocking. This does not delete Talysman.app itself — do that
+                  afterward from Applications.
+                </p>
+                <div className="flex flex-wrap items-center gap-2">
+                  {confirmingUninstall ? (
+                    <>
+                      <Button
+                        variant="danger"
+                        disabled={uninstallBusy}
+                        onClick={() => runUninstall()}
+                      >
+                        {uninstallBusy ? 'Removing…' : 'Confirm uninstall'}
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        disabled={uninstallBusy}
+                        onClick={() => setConfirmingUninstall(false)}
+                      >
+                        Cancel
+                      </Button>
+                    </>
+                  ) : (
+                    <Button variant="danger" onClick={() => setConfirmingUninstall(true)}>
+                      Uninstall Talysman…
+                    </Button>
+                  )}
+                </div>
+                {uninstallError && <p className="text-[12.5px] text-warn">{uninstallError}</p>}
+              </>
+            )}
+          </div>
+        </Card>
+      )}
+
       {showDeveloper && (
         <Card>
           <CardTitle hint="Development-only switches for exercising gated app states.">Developer</CardTitle>
@@ -296,6 +428,22 @@ export function Settings() {
                 </Button>
                 <Button variant="ghost" onClick={() => devSimulateExtension()}>
                   Simulate extension heartbeat
+                </Button>
+                <Button
+                  variant="ghost"
+                  onClick={() => {
+                    void devPushUsageTransition('focusOn');
+                  }}
+                >
+                  Push fake focus-on transition
+                </Button>
+                <Button
+                  variant="ghost"
+                  onClick={() => {
+                    void devPushUsageTransition('focusOff');
+                  }}
+                >
+                  Push fake focus-off transition
                 </Button>
               </div>
             </div>

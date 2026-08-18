@@ -1576,6 +1576,36 @@ input:-webkit-autofill:focus {
   font-size: 0.78rem;
 }
 
+.download__windows-note {
+  margin-top: 1rem;
+  padding: 1rem 1.15rem;
+  background: rgba(199, 204, 212, 0.055);
+  border: 1px solid rgba(199, 204, 212, 0.18);
+  border-radius: var(--r-lg);
+}
+
+.download__windows-note h3 {
+  margin: 0 0 0.35rem;
+  color: var(--fg-1);
+  font-size: 0.92rem;
+  font-weight: 600;
+}
+
+.download__windows-note p {
+  max-width: 760px;
+  margin: 0;
+  color: var(--fg-3);
+  font-size: 0.86rem;
+  line-height: 1.55;
+  text-wrap: pretty;
+}
+
+.download__windows-note a {
+  color: var(--accent-lo);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
 .download__footnote {
   margin: 2.5rem 0 0;
   color: var(--fg-3);

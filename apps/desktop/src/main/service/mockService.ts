@@ -27,8 +27,11 @@ import {
   type PairedKey,
   type Params,
   type Profile,
+  type FocusSource,
   type Result,
   type ServiceState,
+  type TransitionKind,
+  type UsageTransition,
   OK,
 } from '@talysman/shared';
 import { evaluateSchedule, normalizePolicy } from '@talysman/core';
@@ -53,6 +56,8 @@ export class MockServiceConnection implements ServiceConnection {
   private listeners = new Map<EventName, Set<Listener>>();
   private keyPresent = false;
   private presentKeyId: string | undefined;
+  private usageLog: UsageTransition[] = [];
+  private usageSeq = 0;
 
   private state: ServiceState = {
     protocolVersion: PROTOCOL_VERSION,
@@ -145,6 +150,17 @@ export class MockServiceConnection implements ServiceConnection {
     this.presentKeyId = this.keyPresent ? firstKey?.id : undefined;
     this.emit('keyPresenceChanged', { present: this.keyPresent, keyId: this.presentKeyId });
     return this.keyPresent;
+  }
+
+  /**
+   * Dev-only: push one fake exact-usage transition (architecture §7/Phase 7), so `pnpm dev:mock`
+   * can drive `drainUsage` without a real Rust service.
+   */
+  devPushUsageTransition(kind: TransitionKind, source: FocusSource = 'user'): UsageTransition {
+    this.usageSeq += 1;
+    const transition: UsageTransition = { seq: this.usageSeq, at: Date.now(), kind, source };
+    this.usageLog.push(transition);
+    return transition;
   }
 
   async request<M extends Method>(method: M, params: Params<M>): Promise<Result<M>> {
@@ -295,6 +311,12 @@ export class MockServiceConnection implements ServiceConnection {
           healthy: beat.health.canBlock && beat.health.permissionsOk,
         });
         return OK;
+      }
+
+      case 'drainUsage': {
+        const { afterSeq } = params as Params<'drainUsage'>;
+        const transitions = this.usageLog.filter((t) => t.seq > afterSeq);
+        return { transitions, latestSeq: this.usageSeq } as Result<M>;
       }
 
       case 'listRemovableDrives':

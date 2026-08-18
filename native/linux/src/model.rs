@@ -251,6 +251,32 @@ impl Default for FocusSource {
     }
 }
 
+/// Mirrors `TransitionKind` in packages/shared/src/protocol.ts (architecture §7/Phase 7).
+/// `camelCase` (not `lowercase`) so multi-word variants serialize as `scheduleFired` /
+/// `keyPresent` rather than collapsing to one unreadable token.
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub enum TransitionKind {
+    FocusOn,
+    FocusOff,
+    ScheduleFired,
+    KeyPresent,
+    KeyAbsent,
+}
+
+/// One entry in the exact-usage transition log (`PersistentState::usage_log`), drained by the
+/// `drainUsage` RPC and mirrored by `UsageTransition` in packages/shared/src/protocol.ts.
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct UsageTransition {
+    /// Monotonically increasing per device; the drain cursor.
+    pub seq: u64,
+    /// Epoch ms.
+    pub at: u64,
+    pub kind: TransitionKind,
+    pub source: FocusSource,
+}
+
 /// The authoritative snapshot returned by `getState` and broadcast on changes.
 #[derive(Clone, Debug, Serialize)]
 #[serde(rename_all = "camelCase")]

@@ -6,6 +6,7 @@ import { join } from 'node:path';
 import { promisify } from 'node:util';
 import { app, dialog } from 'electron';
 import { logger } from '../logging.js';
+import { track } from '../analytics.js';
 import type { ServiceConnection } from './connection.js';
 
 const execFileAsync = promisify(execFile);
@@ -13,11 +14,11 @@ const SERVICE_RECONNECT_TIMEOUT_MS = 60_000;
 const SERVICE_RECONNECT_POLL_MS = 1_000;
 const MAC_SERVICE_LABEL = 'system/app.talysman.svc';
 
-function bundledServiceController(): string {
+export function bundledServiceController(): string {
   return join(process.resourcesPath, 'bin', process.platform === 'win32' ? 'talysman-svcctl.exe' : 'talysman-svcctl');
 }
 
-async function commandSucceeds(command: string, args: string[]): Promise<boolean> {
+export async function commandSucceeds(command: string, args: string[]): Promise<boolean> {
   try {
     await execFileAsync(command, args, { windowsHide: true });
     return true;
@@ -31,7 +32,7 @@ function powershellSingleQuote(value: string): string {
 }
 
 /** Run the packaged controller with OS-native elevation and wait for it to finish. */
-async function runElevatedServiceInstall(): Promise<void> {
+export async function runElevatedServiceCommand(subcommand: 'install' | 'uninstall'): Promise<void> {
   const controller = bundledServiceController();
   if (!existsSync(controller)) {
     throw new Error(`Packaged service controller is missing: ${controller}`);
@@ -40,7 +41,7 @@ async function runElevatedServiceInstall(): Promise<void> {
   if (process.platform === 'win32') {
     const quoted = powershellSingleQuote(controller);
     const script =
-      `$process = Start-Process -FilePath '${quoted}' -ArgumentList 'install' ` +
+      `$process = Start-Process -FilePath '${quoted}' -ArgumentList '${subcommand}' ` +
       `-Verb RunAs -Wait -PassThru; exit $process.ExitCode`;
     await execFileAsync(
       'powershell.exe',
@@ -51,7 +52,7 @@ async function runElevatedServiceInstall(): Promise<void> {
   }
 
   if (process.platform === 'darwin') {
-    const shellCommand = `'${controller.replace(/'/g, `'"'"'`)}' install`;
+    const shellCommand = `'${controller.replace(/'/g, `'"'"'`)}' ${subcommand}`;
     const appleScript = `do shell script ${JSON.stringify(shellCommand)} with administrator privileges`;
     await execFileAsync('osascript', ['-e', appleScript]);
     return;
@@ -59,7 +60,7 @@ async function runElevatedServiceInstall(): Promise<void> {
 
   // Public Linux installations are owned by the package manager. This is a recovery path for a
   // failed post-install hook, not the routine update mechanism.
-  await execFileAsync('pkexec', [controller, 'install']);
+  await execFileAsync('pkexec', [controller, subcommand]);
 }
 
 async function waitForServiceVersion(service: ServiceConnection, expectedVersion: string): Promise<void> {
@@ -89,7 +90,17 @@ export async function ensureServiceInstalled(): Promise<void> {
   if (await commandSucceeds('launchctl', ['print', MAC_SERVICE_LABEL])) return;
 
   logger.info('[installer] macOS service is not installed; requesting administrator approval');
-  await runElevatedServiceInstall();
+  track('service_install_started', { platform: process.platform });
+  try {
+    await runElevatedServiceCommand('install');
+    track('service_installed', { platform: process.platform });
+  } catch (error) {
+    track('service_install_failed', {
+      platform: process.platform,
+      reason: error instanceof Error ? error.message : String(error),
+    });
+    throw error;
+  }
 }
 
 /**
@@ -114,12 +125,18 @@ export async function ensureServiceCurrent(service: ServiceConnection): Promise<
   }
 
   logger.warn(`[installer] service ${runningVersion} differs from app ${expectedVersion}; repairing`);
+  track('service_install_started', { platform: process.platform });
   try {
-    await runElevatedServiceInstall();
+    await runElevatedServiceCommand('install');
     await waitForServiceVersion(service, expectedVersion);
     logger.info(`[installer] service upgraded successfully to ${expectedVersion}`);
+    track('service_installed', { platform: process.platform });
   } catch (error) {
     logger.error('[installer] service upgrade failed', error);
+    track('service_install_failed', {
+      platform: process.platform,
+      reason: error instanceof Error ? error.message : String(error),
+    });
     await dialog.showMessageBox({
       type: 'error',
       title: 'Talysman service update failed',

@@ -9,6 +9,8 @@ export const Channels = {
   devToggleKey: 'app:devToggleKey',
   /** invoke: dev-only — emit one fake browser-extension heartbeat from the mock service. */
   devSimulateExtension: 'app:devSimulateExtension',
+  /** invoke: dev-only — push one fake exact-usage transition into the mock service's usage log. */
+  devPushUsageTransition: 'app:devPushUsageTransition',
   /** invoke: returns the current subscription entitlement snapshot. */
   entitlement: 'app:entitlement',
   /** invoke: dev-only - override the simulated subscription plan. */
@@ -21,6 +23,8 @@ export const Channels = {
   appInfo: 'app:info',
   /** invoke: manually run the configured desktop updater check. */
   checkForUpdates: 'app:checkForUpdates',
+  /** invoke: remove the privileged background service (macOS only; see uninstaller.ts). */
+  uninstallService: 'app:uninstallService',
   /** invoke: returns installed apps discovered on the local OS. */
   listInstalledApps: 'app:listInstalledApps',
   /** invoke: returns { signedIn, email? } from the main-process Supabase client. */
@@ -55,6 +59,10 @@ export const Channels = {
   completeOnboarding: 'app:completeOnboarding',
   /** invoke: dev-only — forget the first run so the walkthrough replays. */
   resetOnboarding: 'app:resetOnboarding',
+  /** invoke: returns whether local product-analytics telemetry is enabled (default on). */
+  getTelemetryEnabled: 'app:getTelemetryEnabled',
+  /** invoke: { enabled } → toggle local product-analytics telemetry. */
+  setTelemetryEnabled: 'app:setTelemetryEnabled',
   /** main→renderer push: { event } where event is 'authChanged' | 'entitlementChanged'. */
   appEvent: 'app:event',
 } as const;
