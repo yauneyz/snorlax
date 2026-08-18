@@ -48,12 +48,20 @@ const TARGETS = {
   mac: { hostPlatform: "darwin", builderFlag: "--mac", nativeTarget: "mac" },
 };
 
+// child_process's Windows shell mode joins argv with plain spaces before handing the line to
+// cmd.exe, so any argument containing whitespace (e.g. a Trusted Signing certificate subject
+// name like "CN=Foo Bar, O=..., L=...") must be quoted here or it silently splits apart.
+function windowsShellQuote(arg) {
+  return /[\s"]/.test(arg) ? `"${arg.replace(/"/g, '\\"')}"` : arg;
+}
+
 function run(cmd, cmdArgs, cwd = root) {
   console.log(`\n› ${cmd} ${cmdArgs.join(" ")}`);
-  execFileSync(cmd, cmdArgs, {
+  const useShell = process.platform === "win32";
+  execFileSync(cmd, useShell ? cmdArgs.map(windowsShellQuote) : cmdArgs, {
     cwd,
     stdio: "inherit",
-    shell: process.platform === "win32",
+    shell: useShell,
   });
 }
 

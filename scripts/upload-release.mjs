@@ -142,6 +142,7 @@ function buildHostInstallers(platforms, env = process.env) {
         cwd: root,
         env,
         stdio: "inherit",
+        shell: process.platform === "win32",
       });
     }
   }
