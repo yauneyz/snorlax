@@ -78,22 +78,10 @@ const paths = [
 
 /** Concrete situations, so the visitor can place themselves before reading capabilities. */
 const uses = [
-  {
-    title: "Finish the hard coding session",
-    body: "The bug takes three hours instead of one. YouTube, Reddit and Discord stay out of reach for all three.",
-  },
-  {
-    title: "Write past the part that isn't fun",
-    body: "Protect the two hours after the initial motivation wears off — the ones where the draft actually gets finished.",
-  },
-  {
-    title: "Study without renegotiating",
-    body: "Schedule the evening in advance so one impulsive break doesn't quietly become the whole evening.",
-  },
-  {
-    title: "Defend the same hours every week",
-    body: "Your best working hours arm themselves automatically, whether or not you remember to start a session.",
-  },
+  "Finish the hard coding session",
+  "Write past the part that isn't fun",
+  "Study without renegotiating",
+  "Defend the same hours every week",
 ];
 
 /** Capabilities, stated as the outcome rather than the mechanism. */
@@ -125,51 +113,40 @@ const faqs = [
     q: "Can I use any USB drive?",
     a: (
       <>
+        <p>Yes — a standard drive you already own. Nothing to buy, nothing to ship.</p>
         <p>
-          Yes — a standard drive you already own. Nothing to buy, nothing to ship.{" "}
-          {config.app.name} identifies the drive by the hardware serial or volume ID it already
-          has, so normally nothing is written to it at all. Only when a drive reports no usable
-          identifier does pairing write one small marker file so presence can still be detected.
-        </p>
-        <p>
-          You can pair as many drives as you like. Any one of them unlocks, which is also the
-          answer to losing one — pair a spare now and keep it somewhere safe.
+          You can pair as many drives as you like. Any one of them unlocks, which is also the answer
+          to losing one — pair a spare now and keep it somewhere safe.
         </p>
       </>
     ),
   },
+  // {
+  //   q: "What happens if I need to stop in an emergency?",
+  //   a: (
+  //     <>
+  //       <p>
+  //         You go get your key, plug it in, and turn focus off. That is the whole escape hatch. It is
+  //         meant to be a walk, not a wall — inconvenient enough to beat an impulse, fast enough that
+  //         a real emergency isn&apos;t a problem.
+  //       </p>
+  //       <p>
+  //         Two things worth knowing. A focus session only blocks what you put on the list, so
+  //         everything else on your computer keeps working the entire time. And if you deliberately
+  //         mark a scheduled window <em>locked</em>, even the key won&apos;t disable focus during that
+  //         window — it releases on its own when the window ends. Locked windows are opt-in.
+  //       </p>
+  //     </>
+  //   ),
+  // },
   {
-    q: "What happens if I need to stop in an emergency?",
+    q: "Can't I just quit the app, restart, or uninstall during a session?",
     a: (
       <>
         <p>
-          You go get your key, plug it in, and turn focus off. That is the whole escape hatch. It
-          is meant to be a walk, not a wall — inconvenient enough to beat an impulse, fast enough
-          that a real emergency isn&apos;t a problem.
-        </p>
-        <p>
-          Two things worth knowing. A focus session only blocks what you put on the list, so
-          everything else on your computer keeps working the entire time. And if you deliberately
-          mark a scheduled window <em>locked</em>, even the key won&apos;t disable focus during
-          that window — it releases on its own when the window ends. Locked windows are opt-in.
-        </p>
-      </>
-    ),
-  },
-  {
-    q: "Can I just quit the app, restart, or uninstall during a session?",
-    a: (
-      <>
-        <p>
-          No. Enforcement doesn&apos;t live in the window you see — it lives in a privileged
-          background service. Closing the app changes nothing. The service restarts itself if it
-          is killed, comes back after a reboot with the session intact, and the uninstaller
-          refuses to remove it while focus is active unless a paired key is present.
-        </p>
-        <p>
-          We won&apos;t oversell this: anyone with administrator rights on their own machine can
-          eventually force the issue. The goal is to make cheating cost more effort than doing the
-          work — not to defeat a determined sysadmin.
+          No. Closing the app changes nothing. The service restarts itself if it is killed, comes
+          back after a reboot with the session intact, and the uninstaller refuses to remove it
+          while focus is active unless a paired key is present.
         </p>
       </>
     ),
@@ -179,10 +156,10 @@ const faqs = [
     a: (
       <>
         <p>
-          No. The browser extension turns your blocklist into browser-native rules that the
-          browser evaluates internally. The extension never receives the URLs you visit, your
-          history, page content, search terms, cookies, or form data — and it makes no internet
-          requests of its own. The block page doesn&apos;t even see which address was blocked.
+          No. The browser extension turns your blocklist into browser-native rules that the browser
+          evaluates internally. The extension never receives the URLs you visit, your history, page
+          content, search terms, cookies, or form data — and it makes no internet requests of its
+          own. The block page doesn&apos;t even see which address was blocked.
         </p>
         <p>
           Your blocklist stays on your computer. Details are in the{" "}
@@ -190,27 +167,6 @@ const faqs = [
           <Link href="/privacy">main privacy policy</Link>.
         </p>
       </>
-    ),
-  },
-  {
-    q: "Does the USB drive store anything private?",
-    a: (
-      <p>
-        No. Your files, your blocklist, and your account never touch the drive. In the normal case{" "}
-        {config.app.name} only reads the identifier the drive already reports. The one exception is
-        a drive with no usable serial, where pairing writes a single small random marker file so
-        the drive can still be recognized.
-      </p>
-    ),
-  },
-  {
-    q: "What happens if my computer crashes or restarts?",
-    a: (
-      <p>
-        The session survives it. Focus state is held by the background service and written to
-        protected storage, and the service starts with the machine. A crash is not an escape
-        hatch — you come back to the same session you left.
-      </p>
     ),
   },
   {
@@ -223,27 +179,14 @@ const faqs = [
     ),
   },
   {
-    q: "Can I allow work YouTube videos while blocking the homepage?",
-    a: (
-      <p>
-        Not on the same domain — blocking works at the domain level, so youtube.com is either
-        blocked or it isn&apos;t. If you need a narrow set of tools and nothing else, allow-only
-        mode is the better fit: block everything, then list the handful of sites the work
-        genuinely needs.
-      </p>
-    ),
-  },
-  {
     q: "What does it cost?",
     a: (
       <p>
-        Free covers {FREE_BLOCKED_SITE_LIMIT} blocked websites and unlimited manual focus
-        sessions, with no card and no time limit. Pro is{" "}
-        {formatPriceUsd(PRO_ANNUAL_MONTHLY_EQUIVALENT_CENTS)}/month billed annually, or{" "}
-        {formatPriceUsd(PRO_PRICE_CENTS.monthly)} billed monthly, and adds app blocking, recurring
-        schedules, unlimited sites and unlimited profiles. New accounts get {PRO_TRIAL_DAYS} days
-        of Pro free — see{" "}
-        <Link href="/pricing">pricing</Link>.
+        Free covers {FREE_BLOCKED_SITE_LIMIT} blocked websites and unlimited manual focus sessions,
+        with no card and no time limit. Pro is {formatPriceUsd(PRO_ANNUAL_MONTHLY_EQUIVALENT_CENTS)}
+        /month billed annually, or {formatPriceUsd(PRO_PRICE_CENTS.monthly)} billed monthly, and
+        adds app blocking, recurring schedules, unlimited sites and unlimited profiles. New accounts
+        get {PRO_TRIAL_DAYS} days of Pro free — see <Link href="/pricing">pricing</Link>.
       </p>
     ),
   },
@@ -252,9 +195,7 @@ const faqs = [
     a: (
       <p>
         Windows 10 and 11, macOS on Apple Silicon and Intel, and Debian/Ubuntu Linux, with
-        extensions for Chrome and Firefox. Every browser you use needs the extension — during a
-        locked session, browsers without it get closed rather than left as an open door.{" "}
-        <Link href="/download">See the downloads</Link>.
+        extensions for Chrome and Firefox. <Link href="/download">See the downloads</Link>.
       </p>
     ),
   },
@@ -271,56 +212,49 @@ export default function LandingPage() {
   return (
     <>
       <section className="hero">
-        <div className="hero__copy">
-          <p className="hero__eyebrow">
-            For people whose work and distractions live on the same computer
-          </p>
-          <h1 className="hero__headline">A distraction blocker you can&apos;t turn off on impulse</h1>
-          <div className="hero__sub">
-            <p>
-              {config.app.name} blocks distracting websites and desktop apps. To end a focus
-              session early, you need the physical USB key you left across the room — so one hard
-              moment can&apos;t become a lost afternoon.
-            </p>
-          </div>
-          <p className="hero__claim">
-            Use any USB drive you already own. Nothing extra to buy or wait for in the mail.
-          </p>
-          <div className="hero__ctas">
-            <Link href="/download" className="landing__cta landing__cta--primary">
-              Start focusing free
-            </Link>
-            <a href="#demo" className="landing__cta landing__cta--secondary">
-              Watch the 30-second demo
-            </a>
-          </div>
-          <p className="hero__trial">
-            Free forever for {FREE_BLOCKED_SITE_LIMIT} sites · or try{" "}
-            <Link href="/pricing">Pro free for {PRO_TRIAL_DAYS} days</Link>
-          </p>
-          <ul className="compat" aria-label="Supported platforms">
-            {platforms.map(({ platform, label }) => (
-              <li key={platform} className="compat__item">
-                <PlatformIcon platform={platform} size={16} />
-                <span>{label}</span>
-              </li>
-            ))}
-          </ul>
-        </div>
+        <h1 className="hero__headline">Make your computer a place for work again</h1>
+        <p className="hero__eyebrow">
+          A distraction blocker that works on the device where you do real work
+        </p>
 
         <HeroDemo />
+
+        <div className="hero__sub">
+          <p>
+            {config.app.name} is a unique distraction blocker that only lets you turn it off if you
+            have a paired USB drive inserted. This lets you create a physical barrier between you
+            and everything else trying to steal your focus. Use any USB drive you already own.
+          </p>
+        </div>
+        <div className="hero__ctas">
+          <Link href="/download" className="landing__cta landing__cta--primary">
+            Start focusing for free
+          </Link>
+          <a href="#demo" className="landing__cta landing__cta--secondary">
+            Watch the 30-second demo
+          </a>
+        </div>
+        <p className="hero__trial">
+          Free forever for {FREE_BLOCKED_SITE_LIMIT} sites · or try{" "}
+          <Link href="/pricing">Pro free for {PRO_TRIAL_DAYS} days</Link>
+        </p>
+        <ul className="compat" aria-label="Supported platforms">
+          {platforms.map(({ platform, label }) => (
+            <li key={platform} className="compat__item">
+              <PlatformIcon platform={platform} size={16} />
+              <span>{label}</span>
+            </li>
+          ))}
+        </ul>
       </section>
 
       <section className="section recognition">
         <h2 className="section__title">You&apos;ve already tried blocking distractions</h2>
         <div className="recognition__copy">
+          <p>You installed the browser extensions. You set the timers. But they never stuck.</p>
           <p>
-            You installed the browser extensions. You set the timers. You promised yourself you
-            wouldn&apos;t press &ldquo;end session.&rdquo;
-          </p>
-          <p>
-            Then the work got hard, you disabled the blocker, and YouTube was open again before you
-            had consciously decided to stop working.
+            The work got hard, you disabled the blocker, and YouTube was open again before you had
+            consciously decided to stop working.
           </p>
           <p className="recognition__turn">
             The blocker did exactly what you told it to. The problem isn&apos;t that it can&apos;t
@@ -341,7 +275,7 @@ export default function LandingPage() {
               made ten minutes ago, with the same mouse, in the same three clicks.
             </p>
             <p>
-              {config.app.name} moves that decision into the physical world. Ending a session early
+              {config.app.name} moves that decision into the physical world. Turning off the blocker
               means going and getting your key — still possible when you genuinely need to stop, no
               longer effortless enough to happen on autopilot.
             </p>
@@ -375,11 +309,7 @@ export default function LandingPage() {
       </section>
 
       <section className="section" id="how">
-        <h2 className="section__title">Start. Unplug. Get back to work.</h2>
-        <p className="section__lede">
-          Three steps, once. After that the only thing standing between you and a lost hour is a
-          walk down the hall.
-        </p>
+        <h2 className="section__title">Easy to use</h2>
         <ol className="steps">
           {steps.map((step, index) => (
             <li key={step.title} className="step">
@@ -401,16 +331,15 @@ export default function LandingPage() {
       </section>
 
       <section className="section">
-        <h2 className="section__title">Make your computer a place for work again</h2>
+        <h2 className="section__title">Stay focused even when the work gets hard</h2>
         <p className="section__lede">
           Starting a focus session is easy. The hard part arrives twenty minutes later, when the
           work turns boring or frustrating and your hands start looking for an exit.
         </p>
         <ul className="uses">
           {uses.map((use) => (
-            <li key={use.title} className="use">
-              <h3>{use.title}</h3>
-              <p>{use.body}</p>
+            <li key={use} className="use">
+              {use}
             </li>
           ))}
         </ul>
@@ -435,12 +364,6 @@ export default function LandingPage() {
       {/* Set expectations here rather than letting the pricing page be the first place a
           visitor learns app blocking and scheduling are paid. */}
       <section className="section split">
-        <h2 className="section__title">What&apos;s free, and what isn&apos;t</h2>
-        <p className="section__lede">
-          The mechanism is free. You can pair a key, block sites, start a session, and find out
-          for yourself that you can&apos;t click your way out of it — without paying anything or
-          entering a card.
-        </p>
         <div className="split__grid">
           <div className="split__col">
             <h3>Free, forever</h3>
@@ -520,8 +443,7 @@ export default function LandingPage() {
       </section>
 
       <section className="cta-band">
-        <h2>Make your next focus session one you actually finish</h2>
-        <p>Pair a key, put it somewhere inconvenient, and get back to work.</p>
+        <h2>Take back your attention and go fulfill your destiny.</h2>
         <Link href="/download" className="landing__cta landing__cta--primary">
           Start focusing free
         </Link>

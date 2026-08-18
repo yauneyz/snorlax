@@ -90,6 +90,11 @@ export function Providers({ children }: { children: React.ReactNode }) {
       api_host: config.posthog.host,
       capture_pageview: false, // App Router: manual tracking via PostHogPageview
       person_profiles: "identified_only",
+      enable_heatmaps: true,
+      // maskAllInputs is PostHog's default, but set explicitly: this app has a documented
+      // no-PII-in-PostHog policy (analytics-plan.md §14) and signup/login forms share this
+      // same provider tree, so replay must never surface typed email/password values.
+      session_recording: { maskAllInputs: true },
     });
     setPosthogReady(true);
   }, []);

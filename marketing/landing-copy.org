@@ -1,0 +1,21 @@
+Here is what I want my landing page copy to actually say.
+
+Anything not mention remains unchanged.
+
+
+Eyebrow:
+A distraction blocker that works on the device where you do real work
+
+Main header:
+"Win the war for your attention and do your best work"
+
+Text below that:
+Talysman is a unique distraction blocker that only lets you turn off it off if you have a paired USB drive inserted. This lets you create a physical barrier between you and everything else trying to steal your focus. Use any USB drive you already own.
+
+CTA: Start focusing for free
+
+
+Also, make the demo larger - it should take the entire width, not half width. The order is title - eyebrow - demo - main text. Get rid of the "Use any USB drive you already own" box
+
+
+All of that should take up the entirety of the above-the-fold room, and exactly that amount of space.
