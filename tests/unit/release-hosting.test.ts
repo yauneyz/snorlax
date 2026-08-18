@@ -40,6 +40,14 @@ describe('release command boundaries', () => {
     resolve(__dirname, '../../scripts/release-local.mjs'),
     'utf8',
   );
+  const nativeBuildSource = readFileSync(
+    resolve(__dirname, '../../scripts/build-native.mjs'),
+    'utf8',
+  );
+  const electronBuilderConfig = readFileSync(
+    resolve(__dirname, '../../electron-builder.yml'),
+    'utf8',
+  );
 
   it('keeps release:local free of cloud publishing operations', () => {
     expect(localReleaseSource).not.toContain('scripts/upload-release.mjs');
@@ -51,6 +59,19 @@ describe('release command boundaries', () => {
     expect(localReleaseSource).toContain("capture('git', ['rev-parse', 'HEAD'])");
     expect(localReleaseSource).toContain("join(homedir(), '.snorlax-src')");
     expect(localReleaseSource).toContain("'--override-input'");
+  });
+
+  it('packages target-specific native binaries without rewriting the live development copy', () => {
+    expect(nativeBuildSource).not.toContain('const currentOutDir');
+    expect(nativeBuildSource).not.toContain('rmSync(currentOutDir');
+    expect(electronBuilderConfig).not.toMatch(
+      /from:\s*apps\/desktop\/resources\/bin\/current/,
+    );
+    for (const platform of ['win', 'mac', 'linux']) {
+      expect(electronBuilderConfig).toContain(
+        `from: apps/desktop/resources/bin/${platform}`,
+      );
+    }
   });
 });
 

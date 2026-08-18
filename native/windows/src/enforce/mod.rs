@@ -28,8 +28,8 @@ use std::time::{Duration, Instant};
 
 use talysman_common::watchdog::Heartbeat;
 
-use crate::model::{Mode, Policy};
-use crate::policy_match::is_host_blocked;
+use crate::model::{DefaultAction, Policy};
+use crate::policy_match::host_matches;
 
 /// Cap on the resolved blocked/allowed sets. Each member becomes a clause in a WinDivert filter
 /// string, so this bounds the filter length. Resolver sets are replaced wholesale (focusd-style)
@@ -156,10 +156,13 @@ impl EnforceShared {
     }
 
     /// Turn an authored policy into the form the service enforces: domains expanded with the
-    /// siblings of any known multi-domain property (properties::expand_domains). The authored
-    /// policy stays the user's clean input in PersistentState; only this enforced copy is expanded.
+    /// siblings of any known multi-domain property (properties::expand_domains). Both hard lists
+    /// are expanded — an allow-listed property must cover its siblings too, or a whitelisted site
+    /// would half-load. The authored policy stays the user's clean input in PersistentState; only
+    /// this enforced copy is expanded.
     fn effective(mut policy: Policy) -> Policy {
-        policy.domains = crate::enforce::properties::expand_domains(&policy.domains);
+        policy.blocked_domains = crate::enforce::properties::expand_domains(&policy.blocked_domains);
+        policy.allowed_domains = crate::enforce::properties::expand_domains(&policy.allowed_domains);
         policy
     }
 
@@ -181,9 +184,10 @@ impl EnforceShared {
         self.policy.lock().unwrap().clone()
     }
 
-    /// The enforced policy's mode (drives the drop-filter polarity).
-    pub fn mode(&self) -> Mode {
-        self.policy.lock().unwrap().mode.clone()
+    /// The enforced policy's fallback for anything on neither hard list (drives the drop-filter
+    /// polarity: `Allow` builds a block-list filter, `Block` builds an allow-list filter).
+    pub fn default_action(&self) -> DefaultAction {
+        self.policy.lock().unwrap().default_action
     }
 
     pub fn set_policy(&self, policy: Policy) {
@@ -241,26 +245,29 @@ impl EnforceShared {
         ips
     }
 
-    /// Ingest one resolved `host → ip` from the resolver into the per-pass accumulator the
-    /// caller will hand to `set_blocked_ips` / `set_allowed_ips`. Returns whether the IP belongs in
-    /// the blocked set (blacklist) or the allowed set (whitelist); block-all resolves nothing.
+    /// Classify a resolved hostname for the IP sets feeding the WinDivert filter: a host on
+    /// `blockedDomains` needs its IPs in the drop set, a host on `allowedDomains` needs its IPs in
+    /// the exemption set, and anything else is irrelevant here — it is governed by `defaultAction`
+    /// directly (no per-IP set is needed for "block/allow everything else").
     pub fn classify_resolved(&self, host: &str) -> ResolvedClass {
         let policy = self.policy_snapshot();
-        match policy.mode {
-            Mode::Blacklist if is_host_blocked(&policy, host) => ResolvedClass::Blocked,
-            Mode::Whitelist if !is_host_blocked(&policy, host) => ResolvedClass::Allowed,
-            _ => ResolvedClass::Ignore,
+        if policy.blocked_domains.iter().any(|p| host_matches(host, p)) {
+            ResolvedClass::Blocked
+        } else if policy.allowed_domains.iter().any(|p| host_matches(host, p)) {
+            ResolvedClass::Allowed
+        } else {
+            ResolvedClass::Ignore
         }
     }
 
-    /// The hosts the resolver should look up for the current policy: the blocked (expanded) domains
-    /// in blacklist mode, the allowed domains in whitelist mode, none in block-all.
+    /// Hostnames the resolver needs IPs for: the union of both (expanded) hard lists. Domains
+    /// covered only by `defaultAction` need no resolution — the drop filter enforces the default
+    /// at the port level.
     pub fn resolver_targets(&self) -> Vec<String> {
         let policy = self.policy_snapshot();
-        match policy.mode {
-            Mode::Blacklist | Mode::Whitelist => policy.domains.clone(),
-            Mode::BlockAll => Vec::new(),
-        }
+        let mut targets = policy.blocked_domains.clone();
+        targets.extend(policy.allowed_domains.iter().cloned());
+        targets
     }
 
     /// Monotonic counter of drop-set membership changes (poll-and-compare by the IP-drop manager).
@@ -365,13 +372,15 @@ mod tests {
         assert_eq!(s.blocked_ips(), vec![ip(2), ip(3)]);
     }
 
+    /// Classification keys off which hard list a host is on, not off a mode: blocked domains feed
+    /// the drop set, allowed domains the exemption set, and everything else is left to
+    /// `defaultAction`.
     #[test]
-    fn classify_resolved_by_mode() {
+    fn classify_resolved_by_hard_list_membership() {
         let s = EnforceShared::new(
             Policy {
-                mode: Mode::Blacklist,
-                domains: vec!["reddit.com".into()],
-                apps: Vec::new(),
+                blocked_domains: vec!["reddit.com".into()],
+                ..Policy::default()
             },
             true,
         );
@@ -379,12 +388,34 @@ mod tests {
         assert_eq!(s.classify_resolved("example.com"), ResolvedClass::Ignore);
 
         s.set_policy(Policy {
-            mode: Mode::Whitelist,
-            domains: vec!["gmail.com".into()],
-            apps: Vec::new(),
+            allowed_domains: vec!["gmail.com".into()],
+            default_action: DefaultAction::Block,
+            ..Policy::default()
         });
         assert_eq!(s.classify_resolved("gmail.com"), ResolvedClass::Allowed);
         assert_eq!(s.classify_resolved("youtube.com"), ResolvedClass::Ignore);
+    }
+
+    /// Both hard lists resolve in the same pass, so a policy that blocks some sites *and* exempts
+    /// others classifies each into its own set — something the old single-`domains` model could
+    /// not express.
+    #[test]
+    fn both_hard_lists_classify_independently() {
+        let s = EnforceShared::new(
+            Policy {
+                blocked_domains: vec!["reddit.com".into()],
+                allowed_domains: vec!["docs.rs".into()],
+                ..Policy::default()
+            },
+            true,
+        );
+        assert_eq!(s.classify_resolved("reddit.com"), ResolvedClass::Blocked);
+        assert_eq!(s.classify_resolved("docs.rs"), ResolvedClass::Allowed);
+        assert_eq!(s.classify_resolved("example.com"), ResolvedClass::Ignore);
+
+        let targets = s.resolver_targets();
+        assert!(targets.contains(&"reddit.com".to_string()));
+        assert!(targets.contains(&"docs.rs".to_string()));
     }
 
     #[test]
@@ -398,9 +429,8 @@ mod tests {
     fn effective_policy_expands_property_siblings() {
         let s = EnforceShared::new(
             Policy {
-                mode: Mode::Blacklist,
-                domains: vec!["x.com".into()],
-                apps: Vec::new(),
+                blocked_domains: vec!["x.com".into()],
+                ..Policy::default()
             },
             false,
         );
@@ -409,5 +439,24 @@ mod tests {
         assert!(targets.contains(&"twimg.com".to_string()));
         assert!(targets.contains(&"twitter.com".to_string()));
         assert!(targets.contains(&"t.co".to_string()));
+    }
+
+    /// The allow list is expanded too. Without this, allow-listing a multi-domain property under
+    /// block-by-default would exempt the main domain but not the sibling domains its assets load
+    /// from, so the site would half-load.
+    #[test]
+    fn effective_policy_expands_siblings_on_the_allow_list_too() {
+        let s = EnforceShared::new(
+            Policy {
+                allowed_domains: vec!["x.com".into()],
+                default_action: DefaultAction::Block,
+                ..Policy::default()
+            },
+            false,
+        );
+        let targets = s.resolver_targets();
+        assert!(targets.contains(&"x.com".to_string()));
+        assert!(targets.contains(&"twimg.com".to_string()));
+        assert_eq!(s.classify_resolved("twimg.com"), ResolvedClass::Allowed);
     }
 }

@@ -1,113 +1,14 @@
-//! Pure domain/app matching used by the DNS sinkhole and the app blocker. Mirrors the intent
-//! of packages/core/src/policyNormalize.ts matching (wildcards are a leading "*.").
+//! Windows-specific policy matching. The schema-dependent domain matching lives in
+//! `talysman_common::policy_match` so all three backends share one definition; this module
+//! re-exports it and adds the parts that are genuinely Windows-specific — the browser image-name
+//! table and app matching, which key off `.exe` names.
 
-use crate::model::{AppRef, Mode, Policy};
+pub use talysman_common::policy_match::{
+    host_matches, is_at_least_as_restrictive, is_doh_bypass_host, is_host_blocked,
+    DOH_BYPASS_HOSTS,
+};
 
-/// Does `host` match `pattern`? `pattern` may be exact ("youtube.com") or a leading wildcard
-/// ("*.reddit.com" matches reddit.com and any subdomain).
-pub fn host_matches(host: &str, pattern: &str) -> bool {
-    let host = host.trim_end_matches('.').to_ascii_lowercase();
-    let pattern = pattern.trim().to_ascii_lowercase();
-    if let Some(base) = pattern.strip_prefix("*.") {
-        host == base || host.ends_with(&format!(".{base}"))
-    } else {
-        host == pattern || host.ends_with(&format!(".{pattern}"))
-    }
-}
-
-/// Should a DNS query for `host` be blocked under `policy`?
-pub fn is_host_blocked(policy: &Policy, host: &str) -> bool {
-    let listed = policy.domains.iter().any(|p| host_matches(host, p));
-    match policy.mode {
-        Mode::Blacklist => listed,
-        Mode::Whitelist => !listed,
-        Mode::BlockAll => true,
-    }
-}
-
-/// A dot-less host that matches no realistic domain pattern (only an exact-equality pattern for
-/// this exact string could match it). It stands in for the "matches nothing listed" class when
-/// comparing block coverage.
-const NO_MATCH_SENTINEL: &str = "talysmannomatchsentinelhost";
-
-fn norm_app_field(value: &Option<String>) -> Option<String> {
-    value
-        .as_deref()
-        .map(|v| v.trim().trim_end_matches(".exe").to_ascii_lowercase())
-        .filter(|v| !v.is_empty())
-}
-
-/// Do two app references identify the same executable (ignoring the human label)?
-fn same_app(a: &AppRef, b: &AppRef) -> bool {
-    norm_app_field(&a.linux_process_name) == norm_app_field(&b.linux_process_name)
-        && norm_app_field(&a.windows_image_name) == norm_app_field(&b.windows_image_name)
-        && norm_app_field(&a.mac_bundle_id) == norm_app_field(&b.mac_bundle_id)
-}
-
-/// Whether `next` blocks at least everything `prev` blocked. Domains: every host `prev` sinkholes,
-/// `next` must sinkhole too — checked over the base of each listed pattern plus a non-matching
-/// sentinel, which is a sound and complete witness set for `is_host_blocked`. Apps: `next` must
-/// still block every app `prev` blocked. Equal or stricter policies return true; any relaxation
-/// (unblocking a site or app, or a mode change that frees traffic) returns false.
-pub fn is_at_least_as_restrictive(prev: &Policy, next: &Policy) -> bool {
-    let mut hosts: Vec<String> = Vec::new();
-    for pattern in prev.domains.iter().chain(next.domains.iter()) {
-        let base = pattern
-            .trim()
-            .trim_start_matches("*.")
-            .trim_end_matches('.')
-            .to_ascii_lowercase();
-        if !base.is_empty() {
-            hosts.push(base);
-        }
-    }
-    hosts.push(NO_MATCH_SENTINEL.to_string());
-
-    for host in &hosts {
-        if is_host_blocked(prev, host) && !is_host_blocked(next, host) {
-            return false;
-        }
-    }
-
-    prev.apps
-        .iter()
-        .all(|app| next.apps.iter().any(|candidate| same_app(candidate, app)))
-}
-
-/// Hostnames the sinkhole always refuses while focus is active, independent of the user's
-/// policy, because they exist to *bypass* the sinkhole: DoH resolver endpoints (a browser must
-/// resolve the endpoint hostname before it can speak DoH — hardcoded-IP endpoints are handled
-/// by the firewall blocklist in enforce::wfp instead) plus the Firefox canary domain, whose
-/// NXDOMAIN tells Firefox to keep auto-DoH off. Non-wildcard entries match subdomains too
-/// (host_matches), so "cloudflare-dns.com" covers mozilla.cloudflare-dns.com etc.
-pub const DOH_BYPASS_HOSTS: &[&str] = &[
-    "use-application-dns.net", // Firefox canary
-    "dns.google",
-    "dns.google.com",
-    "cloudflare-dns.com",
-    "one.one.one.one",
-    "dns.quad9.net",
-    "dns9.quad9.net",
-    "dns10.quad9.net",
-    "dns11.quad9.net",
-    "doh.opendns.com",
-    "familyshield.opendns.com",
-    "adguard-dns.com",
-    "dns.nextdns.io",
-    "doh.cleanbrowsing.org",
-    "dns.mullvad.net",
-    "doh.xfinity.com",
-    "dns0.eu",
-    "doh.dns.sb",
-    "dns.brave.com",
-    "doh.pub",
-    "dns.alidns.com",
-];
-
-/// Is `host` a DoH endpoint / canary that must be sinkholed while focus is active?
-pub fn is_doh_bypass_host(host: &str) -> bool {
-    DOH_BYPASS_HOSTS.iter().any(|p| host_matches(host, p))
-}
+use crate::model::Policy;
 
 /// Image names whose live TCP connections we reset on a focus/policy change, so a newly-blocked
 /// site dies immediately instead of riding an already-open socket (enforce::divert). Browsers
@@ -151,7 +52,7 @@ pub fn is_app_blocked(policy: &Policy, image_name: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::model::AppRef;
+    use crate::model::{AppRef, DefaultAction};
 
     #[test]
     fn wildcard_matches_subdomains() {
@@ -166,18 +67,35 @@ mod tests {
         assert!(host_matches("youtube.com", "youtube.com"));
     }
 
+    /// The three legacy presets, expressed in the current schema, still classify the same way.
+    /// This is the Windows-side guard on the migration that replaced `mode` with independent
+    /// hard lists plus `defaultAction`.
     #[test]
-    fn modes() {
-        let mut p = Policy::default();
-        p.domains = vec!["youtube.com".into()];
-        p.mode = Mode::Blacklist;
+    fn preset_equivalents_of_the_old_modes() {
+        // blacklist: block the listed domain, allow everything else.
+        let mut p = Policy {
+            blocked_domains: vec!["youtube.com".into()],
+            ..Policy::default()
+        };
         assert!(is_host_blocked(&p, "youtube.com"));
         assert!(!is_host_blocked(&p, "example.com"));
-        p.mode = Mode::Whitelist;
+
+        // whitelist: allow only the listed domain, block everything else.
+        p = Policy {
+            allowed_domains: vec!["youtube.com".into()],
+            default_action: DefaultAction::Block,
+            ..Policy::default()
+        };
         assert!(!is_host_blocked(&p, "youtube.com"));
         assert!(is_host_blocked(&p, "example.com"));
-        p.mode = Mode::BlockAll;
+
+        // block-all: nothing on either list, block by default.
+        p = Policy {
+            default_action: DefaultAction::Block,
+            ..Policy::default()
+        };
         assert!(is_host_blocked(&p, "youtube.com"));
+        assert!(is_host_blocked(&p, "example.com"));
     }
 
     #[test]
@@ -201,13 +119,15 @@ mod tests {
 
     #[test]
     fn app_match() {
-        let mut p = Policy::default();
-        p.apps = vec![AppRef {
-            windows_image_name: Some("chrome.exe".into()),
-            linux_process_name: None,
-            mac_bundle_id: None,
-            label: "Chrome".into(),
-        }];
+        let p = Policy {
+            apps: vec![AppRef {
+                windows_image_name: Some("chrome.exe".into()),
+                linux_process_name: None,
+                mac_bundle_id: None,
+                label: "Chrome".into(),
+            }],
+            ..Policy::default()
+        };
         assert!(is_app_blocked(&p, "Chrome.exe"));
         assert!(!is_app_blocked(&p, "firefox.exe"));
     }

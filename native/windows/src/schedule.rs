@@ -242,7 +242,7 @@ mod tests {
 #[cfg(test)]
 mod profile_tests {
     use super::*;
-    use crate::model::{Mode, Policy, ScheduleWindow};
+    use crate::model::{Policy, ScheduleWindow};
 
     fn profile(id: &str, policy: Policy) -> Profile {
         Profile {
@@ -253,11 +253,12 @@ mod profile_tests {
         }
     }
 
+    /// A policy that hard-blocks `domains` and leaves everything else open — the current-schema
+    /// equivalent of the old `Mode::Blacklist`.
     fn blacklist(domains: &[&str]) -> Policy {
         Policy {
-            mode: Mode::Blacklist,
-            domains: domains.iter().map(|d| (*d).to_string()).collect(),
-            apps: Vec::new(),
+            blocked_domains: domains.iter().map(|d| (*d).to_string()).collect(),
+            ..Policy::default()
         }
     }
 

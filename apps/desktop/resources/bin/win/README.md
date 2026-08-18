@@ -7,6 +7,7 @@ This directory is **populated by the build** (`scripts/build-native.mjs --target
 - `talysman-svcctl.exe` — elevated install/configure/recover CLI
 - `talysman-recover.exe` — the killswitch
 
-The build also mirrors the selected platform into `apps/desktop/resources/bin/current`, and
-electron-builder embeds that `current` folder into the app's `resources/bin/` at package time
-(see `electron-builder.yml` -> `extraResources`). The actual `.exe` files are gitignored.
+Electron Builder embeds this target-specific folder into the app's `resources/bin/` at package
+time (see `electron-builder.yml` -> `win.extraResources`). Release builds intentionally do not
+touch `apps/desktop/resources/bin/current`, because a development service may be running from
+that directory on Windows. The actual `.exe` files are gitignored.

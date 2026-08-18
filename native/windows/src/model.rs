@@ -3,42 +3,10 @@
 
 use serde::{Deserialize, Serialize};
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "kebab-case")]
-pub enum Mode {
-    Blacklist,
-    Whitelist,
-    BlockAll,
-}
-
-impl Default for Mode {
-    fn default() -> Self {
-        Mode::Blacklist
-    }
-}
-
-#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "camelCase")]
-pub struct AppRef {
-    #[serde(skip_serializing_if = "Option::is_none", default)]
-    pub windows_image_name: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none", default)]
-    pub linux_process_name: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none", default)]
-    pub mac_bundle_id: Option<String>,
-    pub label: String,
-}
-
-#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "camelCase")]
-pub struct Policy {
-    #[serde(default)]
-    pub mode: Mode,
-    #[serde(default)]
-    pub domains: Vec<String>,
-    #[serde(default)]
-    pub apps: Vec<AppRef>,
-}
+/// The policy model is defined once in `talysman_common::policy` and re-exported here so every
+/// backend accepts and emits byte-identical JSON. Re-exported (rather than referenced through
+/// its full path) to keep `crate::model::Policy` working for the rest of this crate.
+pub use talysman_common::policy::{AppRef, DefaultAction, Intent, Policy};
 
 /// A named policy the user can switch between (mirrors packages/shared/src/profile.ts). Focus
 /// enforces exactly one profile at a time; schedule windows may switch which one.
@@ -199,4 +167,63 @@ pub struct ServiceState {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub present_key_id: Option<String>,
     pub schedule_locked: bool,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn snapshot(policy: Policy) -> ServiceState {
+        ServiceState {
+            protocol_version: 1,
+            service_version: "test".into(),
+            focus_active: false,
+            focus_source: FocusSource::default(),
+            profiles: vec![Profile::from_policy(policy.clone())],
+            active_profile_id: DEFAULT_PROFILE_ID.into(),
+            policy,
+            schedule: Schedule::default(),
+            settings: Settings::default(),
+            paired_keys: Vec::new(),
+            key_present: false,
+            present_key_id: None,
+            schedule_locked: false,
+        }
+    }
+
+    /// The bug that made the 0.4.0 desktop app quit at bootstrap on Windows: `getState` emitted a
+    /// legacy `{mode, domains, apps}` policy, and the main process calls `.slice()` on
+    /// `blockedDomains` / `allowedDomains` / `apps` without guarding, so a missing key threw
+    /// `Cannot read properties of undefined (reading 'slice')`. Assert the wire snapshot carries
+    /// every key the app dereferences, at both the top level and inside each profile.
+    #[test]
+    fn get_state_emits_the_policy_keys_the_desktop_app_dereferences() {
+        let json = serde_json::to_value(snapshot(Policy::default())).unwrap();
+
+        for path in [&json["policy"], &json["profiles"][0]["policy"]] {
+            for key in ["blockedDomains", "allowedDomains", "apps"] {
+                assert!(
+                    path.get(key).map(|v| v.is_array()).unwrap_or(false),
+                    "`{key}` must be an array the app can .slice(); got {path}"
+                );
+            }
+            assert!(path.get("defaultAction").is_some());
+            assert!(path.get("intent").is_some());
+            assert!(path.get("mode").is_none(), "legacy `mode` must be gone");
+            assert!(path.get("domains").is_none(), "legacy `domains` must be gone");
+        }
+    }
+
+    /// A state file written by an older Windows service still deserializes, and converts to the
+    /// current shape rather than being silently dropped.
+    #[test]
+    fn a_legacy_policy_from_an_older_service_still_loads_and_converts() {
+        let legacy = r#"{"mode":"blacklist","domains":["reddit.com"],"apps":[]}"#;
+        let policy: Policy = serde_json::from_str(legacy).unwrap();
+        assert_eq!(policy.blocked_domains, vec!["reddit.com".to_string()]);
+        assert_eq!(policy.default_action, DefaultAction::Allow);
+
+        let json = serde_json::to_value(snapshot(policy)).unwrap();
+        assert_eq!(json["policy"]["blockedDomains"][0], "reddit.com");
+    }
 }

@@ -40,7 +40,7 @@ use crate::enforce::dns::{
 };
 use crate::enforce::resolve::RESOLVER_SRC_PORT;
 use crate::enforce::EnforceShared;
-use crate::model::{Mode, Policy};
+use crate::model::{DefaultAction, Policy};
 use crate::policy_match::{is_doh_bypass_host, is_host_blocked};
 
 const PROTO_TCP: u8 = 6;
@@ -334,15 +334,14 @@ pub fn run_ip_drop(shared: Arc<EnforceShared>, shutdown: tokio::sync::watch::Rec
             observed = shared.wait_for_change(observed, MANAGER_IDLE_WAIT);
             continue;
         }
-        // What each mode needs: blacklist drops the resolved blocked set; whitelist spares the
-        // resolved allowed set; block-all needs neither.
-        let mode = shared.mode();
-        let (blocked, allowed) = match mode {
-            Mode::Blacklist => (shared.blocked_ips(), Vec::new()),
-            Mode::Whitelist => (Vec::new(), shared.allowed_ips()),
-            Mode::BlockAll => (Vec::new(), Vec::new()),
+        // Allow-by-default only needs the resolved blocked set; block-by-default only needs the
+        // resolved allowed set to spare (no allowed IPs is the old "block-all" ceiling).
+        let default_action = shared.default_action();
+        let (blocked, allowed) = match default_action {
+            DefaultAction::Allow => (shared.blocked_ips(), Vec::new()),
+            DefaultAction::Block => (Vec::new(), shared.allowed_ips()),
         };
-        let want = build_drop_filter(mode, &blocked, &allowed);
+        let want = build_drop_filter(default_action, &blocked, &allowed);
         if want != installed {
             match &want {
                 None => {
@@ -374,27 +373,34 @@ pub fn run_ip_drop(shared: Arc<EnforceShared>, shutdown: tokio::sync::watch::Rec
     tracing::info!("IP drop manager exited");
 }
 
-/// Web egress we can safely default-deny in whitelist/block-all without cutting DNS, LAN, native
-/// messaging, or OS background plumbing. Blacklist drops are stricter and key on destination IP
-/// without a port predicate, mirroring focusd's nftables destination-IP set.
+/// Web egress we can safely default-deny under `DefaultAction::Block` without cutting DNS, LAN,
+/// native messaging, or OS background plumbing. Allow-by-default drops are stricter and key on
+/// destination IP without a port predicate, mirroring focusd's nftables destination-IP set.
 const WEB_EGRESS_SCOPE: &str =
     "((tcp and (tcp.DstPort == 80 or tcp.DstPort == 443)) or (udp and udp.DstPort == 443))";
 
-/// Build the focusd-style IP drop filter for the current mode, or `None` when blacklist mode has no
-/// blocked destination IPs yet (resolver has not produced any). Blacklist drops every outbound
-/// packet to a `blocked` destination. Whitelist and block-all default-deny web egress, sparing the
-/// resolved `allowed` set in whitelist mode.
-fn build_drop_filter(mode: Mode, blocked: &[IpAddr], allowed: &[IpAddr]) -> Option<String> {
-    let scope = match mode {
-        Mode::Blacklist => {
+/// Build the focusd-style IP drop filter for the current policy, or `None` when allow-by-default
+/// has no blocked destination IPs yet (resolver has not produced any).
+///
+/// Mirrors `native/linux/src/enforce/nft.rs::ruleset`: `DefaultAction::Allow` drops every outbound
+/// packet to a `blocked` destination and needs no allow set (a domain on both hard lists is
+/// blocked — block wins, per `policy_match::is_host_blocked`). `DefaultAction::Block` default-denies
+/// web egress while sparing the resolved `allowed` set; with no allowed IPs that is the old
+/// "block-all" ceiling.
+fn build_drop_filter(
+    default_action: DefaultAction,
+    blocked: &[IpAddr],
+    allowed: &[IpAddr],
+) -> Option<String> {
+    let scope = match default_action {
+        DefaultAction::Allow => {
             if blocked.is_empty() {
                 return None; // nothing blocked yet -> no handle
             }
             dst_in(blocked)
         }
         // Drop web egress that is NOT to an allowed destination (empty -> drop all web).
-        Mode::Whitelist => format!("({WEB_EGRESS_SCOPE} and {})", dst_not_in(allowed)),
-        Mode::BlockAll => WEB_EGRESS_SCOPE.to_string(),
+        DefaultAction::Block => format!("({WEB_EGRESS_SCOPE} and {})", dst_not_in(allowed)),
     };
     Some(format!("outbound and {scope}"))
 }
@@ -613,12 +619,12 @@ mod tests {
     }
 
     #[test]
-    fn blacklist_drop_filter_is_focusd_style_ip_drop() {
+    fn allow_by_default_drop_filter_is_focusd_style_ip_drop() {
         let ips = [
             Ipv4Addr::new(151, 101, 1, 140).into(),
             Ipv6Addr::LOCALHOST.into(),
         ];
-        let f = build_drop_filter(Mode::Blacklist, &ips, &[]).unwrap();
+        let f = build_drop_filter(DefaultAction::Allow, &ips, &[]).unwrap();
         assert!(f.contains("ip.DstAddr == 151.101.1.140"));
         assert!(f.contains("ipv6.DstAddr == ::1"));
         assert!(!f.contains("tcp.Payload"));
@@ -629,17 +635,17 @@ mod tests {
     }
 
     #[test]
-    fn blacklist_empty_blocked_set_means_no_handle() {
-        assert!(build_drop_filter(Mode::Blacklist, &[], &[]).is_none());
+    fn allow_by_default_empty_blocked_set_means_no_handle() {
+        assert!(build_drop_filter(DefaultAction::Allow, &[], &[]).is_none());
     }
 
     #[test]
-    fn whitelist_drop_filter_excludes_clean_set_per_family() {
+    fn block_by_default_drop_filter_excludes_allowed_set_per_family() {
         let clean = [
             Ipv4Addr::new(142, 250, 0, 1).into(),
             Ipv6Addr::new(0x2607, 0xf8b0, 0, 0, 0, 0, 0, 1).into(),
         ];
-        let f = build_drop_filter(Mode::Whitelist, &[], &clean).unwrap();
+        let f = build_drop_filter(DefaultAction::Block, &[], &clean).unwrap();
         // Drop everything NOT in the clean set, family-aware (!= chains, no parenthesized `not`).
         assert!(f.contains("ip.DstAddr != 142.250.0.1"));
         assert!(f.contains("ipv6.DstAddr != 2607:f8b0::1"));
@@ -651,8 +657,8 @@ mod tests {
     }
 
     #[test]
-    fn whitelist_empty_clean_set_drops_all_web_egress() {
-        let f = build_drop_filter(Mode::Whitelist, &[], &[]).unwrap();
+    fn block_by_default_with_no_allowed_ips_drops_all_web_egress() {
+        let f = build_drop_filter(DefaultAction::Block, &[], &[]).unwrap();
         // No clean exception -> all v4 + v6 web egress is in scope.
         assert!(!f.contains("DstAddr"));
         assert!(f.contains("(ip or ipv6)"));
@@ -662,8 +668,8 @@ mod tests {
     }
 
     #[test]
-    fn block_all_drops_all_web_egress() {
-        let f = build_drop_filter(Mode::BlockAll, &[], &[]).unwrap();
+    fn block_by_default_is_the_old_block_all_ceiling() {
+        let f = build_drop_filter(DefaultAction::Block, &[], &[]).unwrap();
         assert!(!f.contains("DstAddr"));
         assert!(f.contains("tcp.DstPort == 80"));
         assert!(f.contains("tcp.DstPort == 443"));
@@ -674,7 +680,7 @@ mod tests {
     #[test]
     fn network_drop_remains_the_only_ip_backstop() {
         let clean = [Ipv4Addr::new(142, 250, 0, 1).into()];
-        let f = build_drop_filter(Mode::Whitelist, &[], &clean).unwrap();
+        let f = build_drop_filter(DefaultAction::Block, &[], &clean).unwrap();
 
         // This is the pre-existing/pooled-socket killer: a NETWORK-layer DROP filter.
         assert!(f.starts_with("outbound and"));
@@ -718,11 +724,11 @@ mod tests {
         let v4: IpAddr = Ipv4Addr::new(1, 2, 3, 4).into();
         let v6: IpAddr = Ipv6Addr::new(0x2606, 0x4700, 0, 0, 0, 0, 0, 1).into();
         let mixed = [v4, v6];
-        assert_windivert_compiles(&build_drop_filter(Mode::Blacklist, &mixed, &[]).unwrap());
-        assert_windivert_compiles(&build_drop_filter(Mode::Whitelist, &[], &mixed).unwrap());
-        assert_windivert_compiles(&build_drop_filter(Mode::Whitelist, &[], &[v4]).unwrap());
-        assert_windivert_compiles(&build_drop_filter(Mode::Whitelist, &[], &[]).unwrap());
-        assert_windivert_compiles(&build_drop_filter(Mode::BlockAll, &[], &[]).unwrap());
+        assert_windivert_compiles(&build_drop_filter(DefaultAction::Allow, &mixed, &[]).unwrap());
+        assert_windivert_compiles(&build_drop_filter(DefaultAction::Block, &[], &mixed).unwrap());
+        assert_windivert_compiles(&build_drop_filter(DefaultAction::Block, &[], &[v4]).unwrap());
+        assert_windivert_compiles(&build_drop_filter(DefaultAction::Block, &[], &[]).unwrap());
+        assert_windivert_compiles(&build_drop_filter(DefaultAction::Block, &[], &[]).unwrap());
         assert_windivert_compiles(&engine_filter());
     }
 }

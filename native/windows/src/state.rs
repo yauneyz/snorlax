@@ -196,7 +196,7 @@ impl PersistentState {
 #[cfg(test)]
 mod migration_tests {
     use super::*;
-    use crate::model::{Mode, DEFAULT_PROFILE_ID};
+    use crate::model::{DefaultAction, DEFAULT_PROFILE_ID};
 
     /// Pre-profile state files stored a single bare `policy` and no profiles at all.
     #[test]
@@ -216,11 +216,16 @@ mod migration_tests {
         assert_eq!(state.profiles.len(), 1);
         assert_eq!(state.profiles[0].id, DEFAULT_PROFILE_ID);
         assert_eq!(state.active_profile_id, DEFAULT_PROFILE_ID);
-        assert_eq!(state.active_policy().mode, Mode::Whitelist);
+        // The legacy `whitelist` mode converts to: allow only the listed domains, block the rest.
         assert_eq!(
-            state.active_policy().domains,
+            state.active_policy().default_action,
+            DefaultAction::Block
+        );
+        assert_eq!(
+            state.active_policy().allowed_domains,
             vec!["github.com".to_string()]
         );
+        assert!(state.active_policy().blocked_domains.is_empty());
         // Unrelated fields survive the migration untouched.
         assert!(state.focus_active);
         assert!(state.settings.browser_handshake_enabled);
@@ -264,7 +269,12 @@ mod migration_tests {
             "top-level policy should be gone"
         );
         // …but it survives where it now belongs, inside the default profile.
-        assert_eq!(state.active_policy().mode, Mode::BlockAll);
+        assert_eq!(
+            state.active_policy().default_action,
+            DefaultAction::Block
+        );
+        assert!(state.active_policy().blocked_domains.is_empty());
+        assert!(state.active_policy().allowed_domains.is_empty());
         assert!(json["profiles"].is_array());
     }
 

@@ -5,8 +5,8 @@
 //! messaging** (4-byte little-endian length prefix + UTF-8 JSON on stdio) to this host, which the
 //! browser spawns. Two directions:
 //!   - service → extension: the minimal blocking state the extension needs:
-//!       { "type": "state", "active": bool, "mode": "blacklist"|"whitelist"|"block-all",
-//!         "domains": [..] }
+//!       { "type": "state", "active": bool, "blockedDomains": [..], "allowedDomains": [..],
+//!         "defaultAction": "allow"|"block", "intent": {positive, negative}|null }
 //!   - extension → service: liveness heartbeats (`{type:"heartbeat", ...}`) are relayed to the
 //!     service as `extHeartbeat` RPCs, tagged with the browser's **root PID** — resolved from this
 //!     host's startup ancestry — so the watchdog can correlate and, if needed, target that process.
@@ -48,8 +48,12 @@ static NEXT_ID: AtomicU64 = AtomicU64::new(2);
 #[derive(Clone, Default, PartialEq)]
 struct Blocking {
     active: bool,
-    mode: String,
-    domains: Vec<String>,
+    blocked_domains: Vec<String>,
+    allowed_domains: Vec<String>,
+    default_action: String,
+    /// Raw JSON so a `null` intent round-trips as JSON `null` rather than `{}`. `Value::Null` by
+    /// default, matching "no Smart filtering" for a freshly-constructed `Blocking`.
+    intent: Value,
     handshake_enabled: bool,
 }
 
@@ -58,23 +62,45 @@ impl Blocking {
         json!({
             "type": "state",
             "active": self.active,
-            "mode": if self.mode.is_empty() { "blacklist" } else { self.mode.as_str() },
-            "domains": self.domains,
+            "blockedDomains": self.blocked_domains,
+            "allowedDomains": self.allowed_domains,
+            "defaultAction": if self.default_action.is_empty() { "allow" } else { self.default_action.as_str() },
+            "intent": self.intent,
             "handshakeEnabled": self.handshake_enabled,
         })
     }
 }
 
+/// Mirrors the `Policy` shape onto the state frame the extension consumes
+/// (`apps/extension/src/background.js`'s `applyState`): independent `blockedDomains`/
+/// `allowedDomains` hard lists, a `defaultAction` fallback, and an optional `intent` that turns
+/// on Smart filtering for pages hitting neither hard list. This is a direct field-for-field
+/// passthrough — no legacy mode/domains synthesis.
 fn parse_policy(policy: &Value, b: &mut Blocking) {
-    if let Some(mode) = policy.get("mode").and_then(|v| v.as_str()) {
-        b.mode = mode.to_string();
-    }
-    if let Some(domains) = policy.get("domains").and_then(|v| v.as_array()) {
-        b.domains = domains
-            .iter()
-            .filter_map(|d| d.as_str().map(str::to_string))
-            .collect();
-    }
+    b.blocked_domains = policy
+        .get("blockedDomains")
+        .and_then(|v| v.as_array())
+        .map(|a| {
+            a.iter()
+                .filter_map(|d| d.as_str().map(str::to_string))
+                .collect()
+        })
+        .unwrap_or_default();
+    b.allowed_domains = policy
+        .get("allowedDomains")
+        .and_then(|v| v.as_array())
+        .map(|a| {
+            a.iter()
+                .filter_map(|d| d.as_str().map(str::to_string))
+                .collect()
+        })
+        .unwrap_or_default();
+    b.default_action = if policy.get("defaultAction").and_then(|v| v.as_str()) == Some("block") {
+        "block".to_string()
+    } else {
+        "allow".to_string()
+    };
+    b.intent = policy.get("intent").cloned().unwrap_or(Value::Null);
 }
 
 #[derive(Debug)]

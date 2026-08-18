@@ -2,11 +2,10 @@
 /**
  * Build and stage the native backend for one desktop platform.
  *
- * Every target stages its artifacts twice:
- *   - resources/bin/<target>/ for inspection/debugging
- *   - resources/bin/current/ for electron-builder packaging
- *
- * Electron Builder stays target-agnostic and always embeds resources/bin/current.
+ * Every target stages its artifacts in resources/bin/<target>/.
+ * Electron Builder packages that target-specific directory. In particular, release builds must
+ * never rewrite resources/bin/current: developers may be running a console service from there,
+ * and Windows does not allow a running executable to be deleted or replaced.
  */
 
 import { execFileSync } from "node:child_process";
@@ -163,22 +162,20 @@ const targetDir = resolve(
     : "target/release",
 );
 const platformOutDir = resolve(root, "apps/desktop/resources/bin", cfg.outName);
-const currentOutDir = resolve(root, "apps/desktop/resources/bin/current");
-rmSync(currentOutDir, { recursive: true, force: true });
+rmSync(platformOutDir, { recursive: true, force: true });
 mkdirSync(platformOutDir, { recursive: true });
-mkdirSync(currentOutDir, { recursive: true });
 
 for (const artifact of cfg.artifacts) {
   const src = resolve(targetDir, artifact);
   assertExists(src, "native artifact");
-  copyIntoDirs(src, [platformOutDir, currentOutDir]);
+  copyIntoDirs(src, [platformOutDir]);
 }
 
 for (const extra of cfg.extraFiles(crate)) {
   assertExists(extra, "native support file");
-  copyIntoDirs(extra, [platformOutDir, currentOutDir]);
+  copyIntoDirs(extra, [platformOutDir]);
 }
 
-const staged = readdirSync(currentOutDir);
-console.log(`\nOK native ${target} artifacts staged in resources/bin/current:`);
+const staged = readdirSync(platformOutDir);
+console.log(`\nOK native ${target} artifacts staged in resources/bin/${cfg.outName}:`);
 for (const name of staged) console.log(`  - ${name}`);

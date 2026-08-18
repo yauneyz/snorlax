@@ -23,7 +23,6 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use crate::enforce::{EnforceShared, ResolvedClass};
-use crate::model::Mode;
 
 /// Fixed local UDP source port our resolver binds to. `enforce::divert::ENGINE_FILTER` excludes
 /// this port so the sinkhole never captures our own queries while focus is active.
@@ -47,16 +46,15 @@ const RESOLVE_INTERVAL: Duration = Duration::from_secs(300);
 const UNFOCUSED_WAIT: Duration = Duration::from_secs(60 * 60 * 24);
 
 /// Resolve the policy's relevant domains and replace the drop-set IPs wholesale (focusd's atomic
-/// swap): in blacklist mode the blocked set, in whitelist mode the allowed set. Runs regardless of
-/// focus so the IP bank stays warm. Blocking; call from a dedicated thread or one-shot kick.
+/// swap). Both hard lists resolve every pass — `blockedDomains` feeds the drop set and
+/// `allowedDomains` the exemption set — and which one the filter actually consults is decided by
+/// `defaultAction` in `divert::build_drop_filter`. Runs regardless of focus so the IP bank stays
+/// warm. Blocking; call from a dedicated thread or one-shot kick.
 pub fn resolve_and_ingest(shared: &EnforceShared) {
     let targets = shared.resolver_targets();
     if targets.is_empty() {
-        match shared.mode() {
-            Mode::Blacklist => shared.set_blocked_ips(HashSet::new()),
-            Mode::Whitelist => shared.set_allowed_ips(HashSet::new()),
-            Mode::BlockAll => {}
-        }
+        shared.set_blocked_ips(HashSet::new());
+        shared.set_allowed_ips(HashSet::new());
         return;
     }
     let pairs = resolve_hosts(&targets);
@@ -83,11 +81,8 @@ pub fn resolve_and_ingest(shared: &EnforceShared) {
             ResolvedClass::Ignore => {}
         }
     }
-    match shared.mode() {
-        Mode::Blacklist => shared.set_blocked_ips(blocked),
-        Mode::Whitelist => shared.set_allowed_ips(allowed),
-        Mode::BlockAll => {}
-    }
+    shared.set_blocked_ips(blocked);
+    shared.set_allowed_ips(allowed);
 }
 
 /// Background resolver ticker: an initial pass, then every `RESOLVE_INTERVAL`, until shutdown.

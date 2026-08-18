@@ -24,13 +24,10 @@ files:
   - apps/desktop/out/**/*
   - package.json
 
-# Embed the native service binaries staged by scripts/build-native.mjs for the selected target.
+# Runtime brand images shared by every platform. Native binaries are configured under each
+# platform below so packaging never depends on the mutable resources/bin/current directory.
 extraResources:
-  - from: apps/desktop/resources/bin/current
-    to: bin
-    filter:
-      - "**/*"
-  # Runtime brand images. `files:` only ships apps/desktop/out, so without this the tray and the
+  # `files:` only ships apps/desktop/out, so without this the tray and the
   # window icon resolve to nothing in a packaged build. tray.ts looks them up flat under
   # process.resourcesPath, so they land at the resources root.
   - from: apps/desktop/resources
@@ -42,6 +39,11 @@ win:
   target:
     - nsis
   icon: assets/brand/generated/windows/icon.ico
+  extraResources:
+    - from: apps/desktop/resources/bin/win
+      to: bin
+      filter:
+        - "**/*"
   # Release builds fail closed when Authenticode credentials are unavailable.
 
 # electron-builder's own Windows signing pass never walks resources/bin (see
@@ -66,6 +68,11 @@ mac:
     - dmg
     - zip
   icon: assets/brand/generated/macos/icon.icns
+  extraResources:
+    - from: apps/desktop/resources/bin/mac
+      to: bin
+      filter:
+        - "**/*"
   category: public.app-category.productivity
   artifactName: ${productName}-${version}-${arch}.${ext}
   hardenedRuntime: true
@@ -87,6 +94,11 @@ linux:
   # A directory of NxN.png files: electron-builder installs each into the matching
   # hicolor icon theme size so desktop environments pick the right one.
   icon: assets/brand/generated/linux
+  extraResources:
+    - from: apps/desktop/resources/bin/linux
+      to: bin
+      filter:
+        - "**/*"
   syncDesktopName: true
   category: Utility
   maintainer: Talysman <support@talysman.app>

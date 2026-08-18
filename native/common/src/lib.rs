@@ -3,11 +3,14 @@
 //! close, process kill); this crate owns the **decisions** so they live in exactly one place and are
 //! unit-tested without touching the OS.
 //!
-//! Today this is the browser handshake "dead-man's switch": the browser classification table
-//! ([`browsers`]) and the escalation state machine ([`watchdog`]).
+//! Today this covers the browser handshake "dead-man's switch" — the browser classification table
+//! ([`browsers`]) and the escalation state machine ([`watchdog`]) — and the [`policy`] data model
+//! that every backend must accept and emit identically.
 
 pub mod browsers;
 pub mod extension_compat;
+pub mod policy;
+pub mod policy_match;
 pub mod watchdog;
 
 /// Browser-store and sideload identities generated from `extension-identities.json`.
