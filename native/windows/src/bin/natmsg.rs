@@ -7,6 +7,8 @@
 //!   - service → extension: the minimal blocking state the extension needs:
 //!       { "type": "state", "active": bool, "blockedDomains": [..], "allowedDomains": [..],
 //!         "defaultAction": "allow"|"block", "intent": {positive, negative}|null }
+//!   - extension → service: Smart-filtering `judge-request` frames are relayed as `judgeRequest`
+//!     RPCs and answered later by a `judgeResult` event (relayed back as `judge-result`).
 //!   - extension → service: liveness heartbeats (`{type:"heartbeat", ...}`) are relayed to the
 //!     service as `extHeartbeat` RPCs, tagged with the browser's **root PID** — resolved from this
 //!     host's startup ancestry — so the watchdog can correlate and, if needed, target that process.
@@ -59,12 +61,28 @@ struct Blocking {
 
 impl Blocking {
     fn to_msg(&self) -> Value {
+        let default_action = if self.default_action.is_empty() {
+            "allow"
+        } else {
+            self.default_action.as_str()
+        };
+        // `mode`/`domains` are the pre-Smart-filtering shape. The published 0.2.1 extension
+        // switches on them and applies zero DNR rules when they are missing, so it stops blocking
+        // entirely against a current daemon. Emit both shapes until that build has rolled over;
+        // current extensions read the fields below and ignore these two.
+        let (mode, domains) = talysman_common::extension_compat::legacy_state_fields(
+            default_action,
+            &self.blocked_domains,
+            &self.allowed_domains,
+        );
         json!({
             "type": "state",
             "active": self.active,
+            "mode": mode,
+            "domains": domains,
             "blockedDomains": self.blocked_domains,
             "allowedDomains": self.allowed_domains,
-            "defaultAction": if self.default_action.is_empty() { "allow" } else { self.default_action.as_str() },
+            "defaultAction": default_action,
             "intent": self.intent,
             "handshakeEnabled": self.handshake_enabled,
         })
@@ -195,6 +213,34 @@ fn heartbeat_ack(response: &Value) -> Option<Value> {
     }))
 }
 
+/// Build a `judgeRequest` RPC from the extension's `judge-request` frame. Fire-and-forget: the
+/// RPC just acks `Ok`, the real answer arrives later as a `judgeResult` event (see
+/// `judge_result_frame`). No id correlation needed — the daemon owns the pending-request state.
+fn judge_request(frame: &Value) -> Value {
+    json!({
+        "kind": "request",
+        "id": NEXT_ID.fetch_add(1, Ordering::Relaxed),
+        "method": "judgeRequest",
+        "params": {
+            "requestId": frame.get("requestId").cloned().unwrap_or(Value::Null),
+            "url": frame.get("url").cloned().unwrap_or(Value::Null),
+            "extractedText": frame.get("extractedText").cloned().unwrap_or(Value::Null),
+        },
+    })
+}
+
+/// Translate a `judgeResult` event straight into the outbound `judge-result` frame for the
+/// browser. Pure relay: no state cached, no id correlation.
+fn judge_result_frame(payload: &Value) -> Value {
+    json!({
+        "type": "judge-result",
+        "requestId": payload.get("requestId").cloned().unwrap_or(Value::Null),
+        "url": payload.get("url").cloned().unwrap_or(Value::Null),
+        "relevant": payload.get("relevant").cloned().unwrap_or(Value::Null),
+        "reason": payload.get("reason").cloned().unwrap_or(Value::Null),
+    })
+}
+
 #[tokio::main(flavor = "current_thread")]
 async fn main() {
     let browser_pid = browser_root_pid();
@@ -227,6 +273,9 @@ async fn main() {
                     Ok(Some(msg)) => match msg.get("type").and_then(|t| t.as_str()) {
                         Some("heartbeat") => {
                             let _ = to_service_tx.send(heartbeat_request(&msg, browser_pid));
+                        }
+                        Some("judge-request") => {
+                            let _ = to_service_tx.send(judge_request(&msg));
                         }
                         _ => {
                             if let Some(b) = last.lock().await.clone() {
@@ -272,6 +321,79 @@ mod tests {
         ]);
 
         assert_eq!(browser_root_from_snapshot(900, &processes), 37132);
+    }
+
+    fn blocking(default_action: &str, blocked: &[&str], allowed: &[&str]) -> Blocking {
+        Blocking {
+            active: true,
+            blocked_domains: blocked.iter().map(|d| d.to_string()).collect(),
+            allowed_domains: allowed.iter().map(|d| d.to_string()).collect(),
+            default_action: default_action.to_string(),
+            intent: Value::Null,
+            handshake_enabled: true,
+        }
+    }
+
+    /// The published 0.2.1 extension switches on `mode` and reads `domains`; dropping those fields
+    /// makes it apply zero DNR rules and silently stop blocking. Both shapes must ship together.
+    #[test]
+    fn the_state_frame_carries_both_the_legacy_and_current_shapes() {
+        let msg = blocking("allow", &["reddit.com"], &[]).to_msg();
+
+        assert_eq!(msg["mode"], "blacklist");
+        assert_eq!(msg["domains"][0], "reddit.com");
+        assert_eq!(msg["blockedDomains"][0], "reddit.com");
+        assert_eq!(msg["defaultAction"], "allow");
+    }
+
+    #[test]
+    fn a_default_deny_policy_reaches_the_old_extension_as_a_whitelist() {
+        let msg = blocking("block", &[], &["docs.rs"]).to_msg();
+
+        assert_eq!(msg["mode"], "whitelist");
+        assert_eq!(msg["domains"][0], "docs.rs");
+        assert_eq!(msg["allowedDomains"][0], "docs.rs");
+        assert_eq!(msg["defaultAction"], "block");
+    }
+
+    /// An unset `default_action` is the freshly-constructed `Blocking`, before any `getState`
+    /// response has landed. It must still read as the open-by-default preset, not an empty string.
+    #[test]
+    fn an_unset_default_action_falls_back_to_allow() {
+        let msg = Blocking::default().to_msg();
+
+        assert_eq!(msg["defaultAction"], "allow");
+        assert_eq!(msg["mode"], "blacklist");
+    }
+
+    #[test]
+    fn a_judge_request_frame_becomes_a_judge_request_rpc() {
+        let rpc = judge_request(&json!({
+            "type": "judge-request",
+            "requestId": "req-1",
+            "url": "https://example.com/a",
+            "extractedText": "some page text",
+        }));
+
+        assert_eq!(rpc["method"], "judgeRequest");
+        assert_eq!(rpc["params"]["requestId"], "req-1");
+        assert_eq!(rpc["params"]["url"], "https://example.com/a");
+        assert_eq!(rpc["params"]["extractedText"], "some page text");
+    }
+
+    #[test]
+    fn a_judge_result_event_becomes_the_extension_judge_result_frame() {
+        let frame = judge_result_frame(&json!({
+            "requestId": "req-1",
+            "url": "https://example.com/a",
+            "relevant": false,
+            "reason": "off task",
+        }));
+
+        assert_eq!(frame["type"], "judge-result");
+        assert_eq!(frame["requestId"], "req-1");
+        assert_eq!(frame["relevant"], false);
+        assert_eq!(frame["reason"], "off task");
     }
 }
 
@@ -356,6 +478,11 @@ async fn pump_pipe(
                             if let Some(enabled) = v.pointer("/payload/settings/browserHandshakeEnabled").and_then(Value::as_bool) {
                                 b.handshake_enabled = enabled;
                                 changed = true;
+                            }
+                        }
+                        Some("judgeResult") => {
+                            if let Some(payload) = v.get("payload") {
+                                let _ = out_tx.send(judge_result_frame(payload));
                             }
                         }
                         _ => {}

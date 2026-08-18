@@ -3,42 +3,10 @@
 
 use serde::{Deserialize, Serialize};
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "kebab-case")]
-pub enum Mode {
-    Blacklist,
-    Whitelist,
-    BlockAll,
-}
-
-impl Default for Mode {
-    fn default() -> Self {
-        Mode::Blacklist
-    }
-}
-
-#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "camelCase")]
-pub struct AppRef {
-    #[serde(skip_serializing_if = "Option::is_none", default)]
-    pub windows_image_name: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none", default)]
-    pub linux_process_name: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none", default)]
-    pub mac_bundle_id: Option<String>,
-    pub label: String,
-}
-
-#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "camelCase")]
-pub struct Policy {
-    #[serde(default)]
-    pub mode: Mode,
-    #[serde(default)]
-    pub domains: Vec<String>,
-    #[serde(default)]
-    pub apps: Vec<AppRef>,
-}
+/// The policy model is defined once in `talysman_common::policy` and re-exported here so every
+/// backend accepts and emits byte-identical JSON. Re-exported (rather than referenced through
+/// its full path) to keep `crate::model::Policy` working for the rest of this crate.
+pub use talysman_common::policy::{AppRef, DefaultAction, Intent, Policy};
 
 /// A named policy the user can switch between (mirrors packages/shared/src/profile.ts). Focus
 /// enforces exactly one profile at a time; schedule windows may switch which one.

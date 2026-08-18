@@ -13,7 +13,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use crate::enforce::EnforceShared;
-use crate::model::Mode;
+use crate::model::DefaultAction;
 
 pub const ANCHOR: &str = "com.apple/talysman";
 const IDLE_WAIT: Duration = Duration::from_secs(60 * 60);
@@ -37,22 +37,24 @@ pub fn run_manager(shared: Arc<EnforceShared>, shutdown: tokio::sync::watch::Rec
 
         let gen = shared.generation();
         if installed_gen != Some(gen) {
-            let mode = shared.mode();
-            let blocked = if mode == Mode::Blacklist {
+            let default_action = shared.default_action();
+            // Under `allow` only the blocked IP set matters; under `block` only the allow-list
+            // exemptions do. The other set is dead weight in the ruleset either way.
+            let blocked = if default_action == DefaultAction::Allow {
                 shared.blocked_ips()
             } else {
                 Vec::new()
             };
-            let allowed = if mode == Mode::Whitelist {
+            let allowed = if default_action == DefaultAction::Block {
                 shared.allowed_ips()
             } else {
                 Vec::new()
             };
-            let script = ruleset(mode.clone(), &blocked, &allowed);
+            let script = ruleset(default_action, &blocked, &allowed);
             ensure_pf_enabled();
             if apply_script(&script) {
                 installed_gen = Some(gen);
-                tracing::info!("pf rules applied for {:?}", mode);
+                tracing::info!("pf rules applied for {:?}", default_action);
             }
         }
         let wait = if installed_gen == Some(gen) {
@@ -132,13 +134,16 @@ fn apply_script(script: &str) -> bool {
     }
 }
 
-fn ruleset(mode: Mode, blocked: &[IpAddr], allowed: &[IpAddr]) -> String {
+/// `defaultAction: allow` drops only the resolved `blockedDomains` IPs. `defaultAction: block`
+/// default-denies web egress and passes the resolved `allowedDomains` IPs through — with an empty
+/// allow list that collapses to the old "block-all" ceiling, which is exactly what it means.
+fn ruleset(default_action: DefaultAction, blocked: &[IpAddr], allowed: &[IpAddr]) -> String {
     let mut s = String::new();
-    // DoT is always dropped while focus is active, whatever the mode.
+    // DoT is always dropped while focus is active, whatever the default is.
     let dot_block = "block drop out quick proto tcp to any port 853\n\
                      block drop out quick proto udp to any port 853\n";
-    match mode {
-        Mode::Blacklist => {
+    match default_action {
+        DefaultAction::Allow => {
             if !blocked.is_empty() {
                 s.push_str(&table("talysman_blocked", blocked));
             }
@@ -147,7 +152,7 @@ fn ruleset(mode: Mode, blocked: &[IpAddr], allowed: &[IpAddr]) -> String {
                 s.push_str("block drop out quick to <talysman_blocked>\n");
             }
         }
-        Mode::Whitelist => {
+        DefaultAction::Block => {
             if !allowed.is_empty() {
                 s.push_str(&table("talysman_allowed", allowed));
             }
@@ -158,13 +163,6 @@ fn ruleset(mode: Mode, blocked: &[IpAddr], allowed: &[IpAddr]) -> String {
                      pass out quick proto udp to <talysman_allowed> port 443\n",
                 );
             }
-            s.push_str(
-                "block drop out quick proto tcp to any port { 80, 443 }\n\
-                 block drop out quick proto udp to any port 443\n",
-            );
-        }
-        Mode::BlockAll => {
-            s.push_str(dot_block);
             s.push_str(
                 "block drop out quick proto tcp to any port { 80, 443 }\n\
                  block drop out quick proto udp to any port 443\n",
@@ -185,29 +183,29 @@ mod tests {
     use std::net::{Ipv4Addr, Ipv6Addr};
 
     #[test]
-    fn blacklist_builds_mixed_table_and_drop() {
+    fn an_open_default_builds_a_mixed_drop_table() {
         let ips = [
             IpAddr::V4(Ipv4Addr::new(151, 101, 1, 140)),
             IpAddr::V6(Ipv6Addr::LOCALHOST),
         ];
-        let s = ruleset(Mode::Blacklist, &ips, &[]);
+        let s = ruleset(DefaultAction::Allow, &ips, &[]);
         assert!(s.contains("table <talysman_blocked> { 151.101.1.140, ::1 }"));
         assert!(s.contains("block drop out quick to <talysman_blocked>"));
         assert!(s.contains("port 853"));
     }
 
     #[test]
-    fn blacklist_with_no_ips_still_blocks_dot() {
-        let s = ruleset(Mode::Blacklist, &[], &[]);
+    fn an_open_default_with_no_ips_still_blocks_dot() {
+        let s = ruleset(DefaultAction::Allow, &[], &[]);
         assert!(!s.contains("table <"));
         assert!(!s.contains("<talysman_blocked>"));
         assert!(s.contains("block drop out quick proto tcp to any port 853"));
     }
 
     #[test]
-    fn whitelist_passes_then_blocks_web_ports() {
+    fn a_closed_default_passes_the_allow_list_then_blocks_web_ports() {
         let ips = [IpAddr::V4(Ipv4Addr::new(1, 2, 3, 4))];
-        let s = ruleset(Mode::Whitelist, &[], &ips);
+        let s = ruleset(DefaultAction::Block, &[], &ips);
         assert!(s.contains("table <talysman_allowed> { 1.2.3.4 }"));
         let pass = s
             .find("pass out quick proto tcp to <talysman_allowed> port { 80, 443 }")
@@ -220,16 +218,16 @@ mod tests {
     }
 
     #[test]
-    fn whitelist_with_no_ips_blocks_all_web_egress() {
-        let s = ruleset(Mode::Whitelist, &[], &[]);
+    fn a_closed_default_with_no_ips_blocks_all_web_egress() {
+        let s = ruleset(DefaultAction::Block, &[], &[]);
         assert!(!s.contains("pass out"));
         assert!(s.contains("block drop out quick proto tcp to any port { 80, 443 }"));
         assert!(s.contains("block drop out quick proto udp to any port 443"));
     }
 
     #[test]
-    fn block_all_drops_web_egress() {
-        let s = ruleset(Mode::BlockAll, &[], &[]);
+    fn the_old_block_all_preset_still_drops_web_egress() {
+        let s = ruleset(DefaultAction::Block, &[], &[]);
         assert!(s.contains("block drop out quick proto tcp to any port { 80, 443 }"));
         assert!(s.contains("block drop out quick proto udp to any port 443"));
         assert!(!s.contains("table <"));

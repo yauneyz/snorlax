@@ -40,12 +40,28 @@ struct Blocking {
 
 impl Blocking {
     fn to_msg(&self) -> Value {
+        let default_action = if self.default_action.is_empty() {
+            "allow"
+        } else {
+            self.default_action.as_str()
+        };
+        // `mode`/`domains` are the pre-Smart-filtering shape. The published 0.2.1 extension
+        // switches on them and applies zero DNR rules when they are missing, so it stops blocking
+        // entirely against a current daemon. Emit both shapes until that build has rolled over;
+        // current extensions read the fields below and ignore these two.
+        let (mode, domains) = talysman_common::extension_compat::legacy_state_fields(
+            default_action,
+            &self.blocked_domains,
+            &self.allowed_domains,
+        );
         json!({
             "type": "state",
             "active": self.active,
+            "mode": mode,
+            "domains": domains,
             "blockedDomains": self.blocked_domains,
             "allowedDomains": self.allowed_domains,
-            "defaultAction": if self.default_action.is_empty() { "allow" } else { self.default_action.as_str() },
+            "defaultAction": default_action,
             "intent": self.intent,
             "handshakeEnabled": self.handshake_enabled,
         })

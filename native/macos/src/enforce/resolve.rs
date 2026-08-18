@@ -7,7 +7,6 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use crate::enforce::{EnforceShared, ResolvedClass};
-use crate::model::Mode;
 
 pub const RESOLVER_SRC_PORT: u16 = 5354;
 
@@ -21,11 +20,10 @@ const UNFOCUSED_WAIT: Duration = Duration::from_secs(60 * 60 * 24);
 pub fn resolve_and_ingest(shared: &EnforceShared) {
     let targets = shared.resolver_targets();
     if targets.is_empty() {
-        match shared.mode() {
-            Mode::Blacklist => shared.set_blocked_ips(HashSet::new()),
-            Mode::Whitelist => shared.set_allowed_ips(HashSet::new()),
-            Mode::BlockAll => {}
-        }
+        // Both hard lists are empty, so neither IP set can have members. Clear both rather
+        // than branching on the default: the default alone never populates a set.
+        shared.set_blocked_ips(HashSet::new());
+        shared.set_allowed_ips(HashSet::new());
         return;
     }
 
@@ -52,11 +50,11 @@ pub fn resolve_and_ingest(shared: &EnforceShared) {
             ResolvedClass::Ignore => {}
         }
     }
-    match shared.mode() {
-        Mode::Blacklist => shared.set_blocked_ips(blocked),
-        Mode::Whitelist => shared.set_allowed_ips(allowed),
-        Mode::BlockAll => {}
-    }
+    // Both sets are published unconditionally: `blockedDomains` and `allowedDomains` are
+    // independent hard lists now, so a policy can populate either one under either default.
+    // pf picks the set its `defaultAction` arm actually needs.
+    shared.set_blocked_ips(blocked);
+    shared.set_allowed_ips(allowed);
 }
 
 pub fn run_resolver(shared: Arc<EnforceShared>, shutdown: tokio::sync::watch::Receiver<bool>) {

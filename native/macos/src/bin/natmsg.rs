@@ -1,7 +1,11 @@
 //! Browser native-messaging host for macOS.
 //!
 //! Bridges the browser extension to the privileged service over the Unix socket. Two directions:
-//!   - service → extension: the minimal blocking state (`{type:"state", ...}`), as before.
+//!   - service → extension: the minimal blocking state (`{type:"state", ...}`), emitted in both
+//!     the legacy `mode`/`domains` shape and the current `blockedDomains`/`allowedDomains`/
+//!     `defaultAction`/`intent` shape so either extension generation can enforce it.
+//!   - extension → service: Smart-filtering `judge-request` frames are relayed as `judgeRequest`
+//!     RPCs and answered later by a `judgeResult` event (relayed back as `judge-result`).
 //!   - extension → service: liveness heartbeats (`{type:"heartbeat", ...}`) are relayed to the
 //!     service as `extHeartbeat` RPCs, tagged with this host's **parent PID** — the browser instance
 //!     the extension runs in — so the watchdog can correlate (and, if needed, target) that process.
@@ -29,33 +33,67 @@ static NEXT_ID: AtomicU64 = AtomicU64::new(2);
 #[derive(Clone, Default, PartialEq)]
 struct Blocking {
     active: bool,
-    mode: String,
-    domains: Vec<String>,
+    blocked_domains: Vec<String>,
+    allowed_domains: Vec<String>,
+    default_action: String,
+    /// Raw JSON so a `null` intent round-trips as JSON `null` rather than `{}`. `Value::Null` by
+    /// default, matching "no Smart filtering" for a freshly-constructed `Blocking`.
+    intent: Value,
     handshake_enabled: bool,
 }
 
 impl Blocking {
     fn to_msg(&self) -> Value {
+        let default_action = if self.default_action.is_empty() {
+            "allow"
+        } else {
+            self.default_action.as_str()
+        };
+        // `mode`/`domains` are the pre-Smart-filtering shape. The published 0.2.1 extension
+        // switches on them and applies zero DNR rules when they are missing, so it stops blocking
+        // entirely against a current daemon. Emit both shapes until that build has rolled over;
+        // current extensions read the fields below and ignore these two.
+        let (mode, domains) = talysman_common::extension_compat::legacy_state_fields(
+            default_action,
+            &self.blocked_domains,
+            &self.allowed_domains,
+        );
         json!({
             "type": "state",
             "active": self.active,
-            "mode": if self.mode.is_empty() { "blacklist" } else { self.mode.as_str() },
-            "domains": self.domains,
+            "mode": mode,
+            "domains": domains,
+            "blockedDomains": self.blocked_domains,
+            "allowedDomains": self.allowed_domains,
+            "defaultAction": default_action,
+            "intent": self.intent,
             "handshakeEnabled": self.handshake_enabled,
         })
     }
 }
 
+/// Mirrors `native/macos/src/model.rs`'s `Policy` shape onto the state frame the extension
+/// consumes (`apps/extension/src/background.js`'s `applyState`): independent `blockedDomains`/
+/// `allowedDomains` hard lists, a `defaultAction` fallback, and an optional `intent` that turns
+/// on Smart filtering for pages hitting neither hard list. This is a direct field-for-field
+/// passthrough — no legacy mode/domains synthesis.
 fn parse_policy(policy: &Value, b: &mut Blocking) {
-    if let Some(mode) = policy.get("mode").and_then(|v| v.as_str()) {
-        b.mode = mode.to_string();
-    }
-    if let Some(domains) = policy.get("domains").and_then(|v| v.as_array()) {
-        b.domains = domains
-            .iter()
-            .filter_map(|d| d.as_str().map(str::to_string))
-            .collect();
-    }
+    b.blocked_domains = policy
+        .get("blockedDomains")
+        .and_then(|v| v.as_array())
+        .map(|a| a.iter().filter_map(|d| d.as_str().map(str::to_string)).collect())
+        .unwrap_or_default();
+    b.allowed_domains = policy
+        .get("allowedDomains")
+        .and_then(|v| v.as_array())
+        .map(|a| a.iter().filter_map(|d| d.as_str().map(str::to_string)).collect())
+        .unwrap_or_default();
+    b.default_action = if policy.get("defaultAction").and_then(|v| v.as_str()) == Some("block") {
+        "block".to_string()
+    } else {
+        "allow".to_string()
+    };
+    b.intent = policy.get("intent").cloned().unwrap_or(Value::Null);
 }
 
 /// The PID of the process that launched us — the browser. macOS has no /proc, but getppid(2)
@@ -82,6 +120,34 @@ fn heartbeat_ack(response: &Value) -> Option<Value> {
         "browserPid": heartbeat.get("browserPid").cloned().unwrap_or(Value::Null),
         "healthy": heartbeat.get("healthy").cloned().unwrap_or(Value::Null),
     }))
+}
+
+/// Build a `judgeRequest` RPC from the extension's `judge-request` frame. Fire-and-forget: the
+/// RPC just acks `Ok`, the real answer arrives later as a `judgeResult` event (see
+/// `judge_result_frame`). No id correlation needed — the daemon owns the pending-request state.
+fn judge_request(frame: &Value) -> Value {
+    json!({
+        "kind": "request",
+        "id": NEXT_ID.fetch_add(1, Ordering::Relaxed),
+        "method": "judgeRequest",
+        "params": {
+            "requestId": frame.get("requestId").cloned().unwrap_or(Value::Null),
+            "url": frame.get("url").cloned().unwrap_or(Value::Null),
+            "extractedText": frame.get("extractedText").cloned().unwrap_or(Value::Null),
+        },
+    })
+}
+
+/// Translate a `judgeResult` event straight into the outbound `judge-result` frame for the
+/// browser. Pure relay: no state cached, no id correlation.
+fn judge_result_frame(payload: &Value) -> Value {
+    json!({
+        "type": "judge-result",
+        "requestId": payload.get("requestId").cloned().unwrap_or(Value::Null),
+        "url": payload.get("url").cloned().unwrap_or(Value::Null),
+        "relevant": payload.get("relevant").cloned().unwrap_or(Value::Null),
+        "reason": payload.get("reason").cloned().unwrap_or(Value::Null),
+    })
 }
 
 #[tokio::main(flavor = "current_thread")]
@@ -113,6 +179,9 @@ async fn main() {
                     Ok(Some(msg)) => match msg.get("type").and_then(|t| t.as_str()) {
                         Some("heartbeat") => {
                             let _ = to_service_tx.send(heartbeat_request(&msg, browser_pid));
+                        }
+                        Some("judge-request") => {
+                            let _ = to_service_tx.send(judge_request(&msg));
                         }
                         // `hello` (or anything else): resend the latest state to the browser.
                         _ => {
@@ -214,6 +283,11 @@ async fn pump_socket(
                             if let Some(enabled) = v.pointer("/payload/settings/browserHandshakeEnabled").and_then(Value::as_bool) {
                                 b.handshake_enabled = enabled;
                                 changed = true;
+                            }
+                        }
+                        Some("judgeResult") => {
+                            if let Some(payload) = v.get("payload") {
+                                let _ = out_tx.send(judge_result_frame(payload));
                             }
                         }
                         _ => {}

@@ -13,7 +13,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use crate::enforce::EnforceShared;
-use crate::model::{Mode, Policy};
+use crate::model::Policy;
 use crate::policy_match::DOH_BYPASS_HOSTS;
 
 const BEGIN_MARK: &str = "# >>> talysman begin — managed block, do not edit >>>";
@@ -52,7 +52,10 @@ pub fn run_manager(shared: Arc<EnforceShared>, shutdown: tokio::sync::watch::Rec
             match apply_policy(&policy) {
                 Ok(()) => {
                     installed_gen = Some(gen);
-                    tracing::info!("/etc/hosts sinkhole applied for {:?}", policy.mode);
+                    tracing::info!(
+                        "/etc/hosts sinkhole applied for {} blocked domain(s)",
+                        policy.blocked_domains.len()
+                    );
                 }
                 Err(e) => tracing::warn!("failed to apply /etc/hosts sinkhole: {e}"),
             }
@@ -107,10 +110,10 @@ fn flush_dns_cache() {
 
 /// Build the marker-delimited sinkhole block for `policy`, or "" when no block applies.
 fn sinkhole_block(policy: &Policy) -> String {
-    if policy.mode != Mode::Blacklist {
-        return String::new();
-    }
-    let mut names = sinkhole_names(&policy.domains);
+    // `blockedDomains` is a hard list under either `defaultAction`, so unlike the old
+    // blacklist-only sinkhole this applies even when the default is `block` — pf enforces the
+    // default itself at the packet layer.
+    let mut names = sinkhole_names(&policy.blocked_domains);
     if names.is_empty() {
         // No user domains → no sinkhole; DoH endpoints only matter as a bypass of one.
         return String::new();
@@ -195,10 +198,9 @@ fn splice_out(current: &str) -> String {
 mod tests {
     use super::*;
 
-    fn blacklist(domains: &[&str]) -> Policy {
+    fn blocking(domains: &[&str]) -> Policy {
         let mut p = Policy::default();
-        p.mode = Mode::Blacklist;
-        p.domains = domains.iter().map(|d| d.to_string()).collect();
+        p.blocked_domains = domains.iter().map(|d| d.to_string()).collect();
         p
     }
 
@@ -224,7 +226,7 @@ mod tests {
 
     #[test]
     fn block_has_v4_and_v6_lines_and_doh_hosts() {
-        let block = sinkhole_block(&blacklist(&["youtube.com"]));
+        let block = sinkhole_block(&blocking(&["youtube.com"]));
         assert!(block.starts_with(BEGIN_MARK));
         assert!(block.ends_with(&format!("{END_MARK}\n")));
         assert!(block.contains("0.0.0.0 youtube.com\n"));
@@ -233,26 +235,26 @@ mod tests {
         assert!(block.contains("0.0.0.0 dns.google\n"));
     }
 
+    /// A default-deny policy still sinkholes its explicit block list. Only the absence of
+    /// blocked domains produces no block — see `empty_block_list_produces_no_block`.
     #[test]
-    fn whitelist_and_block_all_produce_no_block() {
-        let mut p = blacklist(&["example.com"]);
-        p.mode = Mode::Whitelist;
-        assert!(sinkhole_block(&p).is_empty());
-        p.mode = Mode::BlockAll;
-        assert!(sinkhole_block(&p).is_empty());
+    fn a_default_deny_policy_still_sinkholes_its_block_list() {
+        let mut p = blocking(&["example.com"]);
+        p.default_action = crate::model::DefaultAction::Block;
+        assert!(sinkhole_block(&p).contains("0.0.0.0 example.com\n"));
     }
 
     #[test]
-    fn empty_blacklist_produces_no_block() {
+    fn empty_block_list_produces_no_block() {
         // No user domains → no hosts block, even though DoH hosts exist: DoH endpoints only
         // matter as a bypass of an actual sinkhole.
-        assert!(sinkhole_block(&blacklist(&[])).is_empty());
+        assert!(sinkhole_block(&blocking(&[])).is_empty());
     }
 
     #[test]
     fn splice_roundtrip_preserves_user_content() {
         let original = "127.0.0.1 localhost\n255.255.255.255 broadcasthost\n";
-        let block = sinkhole_block(&blacklist(&["youtube.com"]));
+        let block = sinkhole_block(&blocking(&["youtube.com"]));
         let spliced = splice_in(original, &block);
         assert!(spliced.starts_with(original));
         assert!(spliced.contains("0.0.0.0 youtube.com"));
@@ -262,8 +264,8 @@ mod tests {
     #[test]
     fn splice_in_is_idempotent_and_replaces() {
         let original = "127.0.0.1 localhost\n";
-        let a = splice_in(original, &sinkhole_block(&blacklist(&["a.com"])));
-        let b = splice_in(&a, &sinkhole_block(&blacklist(&["b.com"])));
+        let a = splice_in(original, &sinkhole_block(&blocking(&["a.com"])));
+        let b = splice_in(&a, &sinkhole_block(&blocking(&["b.com"])));
         assert!(!b.contains("a.com"));
         assert!(b.contains("0.0.0.0 b.com"));
         assert_eq!(b.matches(BEGIN_MARK).count(), 1);
@@ -272,7 +274,7 @@ mod tests {
     #[test]
     fn splice_in_handles_missing_trailing_newline() {
         let original = "127.0.0.1 localhost"; // no trailing newline
-        let spliced = splice_in(original, &sinkhole_block(&blacklist(&["a.com"])));
+        let spliced = splice_in(original, &sinkhole_block(&blocking(&["a.com"])));
         assert!(spliced.starts_with("127.0.0.1 localhost\n# >>>"));
     }
 
@@ -290,7 +292,7 @@ mod tests {
         std::fs::write(&path, "127.0.0.1 localhost\n").unwrap();
         std::env::set_var("TALYSMAN_HOSTS_FILE", &path);
 
-        apply_policy(&blacklist(&["youtube.com"])).unwrap();
+        apply_policy(&blocking(&["youtube.com"])).unwrap();
         let after = std::fs::read_to_string(&path).unwrap();
         assert!(after.contains("0.0.0.0 youtube.com"));
         assert!(after.starts_with("127.0.0.1 localhost\n"));
