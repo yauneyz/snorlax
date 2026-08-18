@@ -4,6 +4,7 @@ import { config } from "@/lib/config";
 import { ANALYTICS_ANON_COOKIE, parseAnonId } from "@/lib/analytics/anon-id";
 import { attributionFromRequest, classifyUserAgent } from "@/server/analytics/ingest";
 import { track } from "@/server/analytics/track";
+import { supabaseServer } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -42,10 +43,19 @@ export async function GET(request: NextRequest) {
     platform,
     ua_class: classifyUserAgent(request.headers.get("user-agent")),
   };
+
+  // Signed-in visitors get their download attributed to `user_id`, not just the anon cookie:
+  // the cookie can churn (cleared, different browser/device) across repeat downloads, which
+  // would otherwise fragment one person into several "visitors" in the funnel. `getUser()` is a
+  // no-op when there's no session cookie, so anonymous traffic pays no extra round trip.
+  const supabase = await supabaseServer();
+  const { data } = await supabase.auth.getUser();
+
   await track({
     event: "download_clicked",
     source: "server",
     anonId: parseAnonId(request.cookies.get(ANALYTICS_ANON_COOKIE)?.value),
+    userId: data.user?.id ?? null,
     platform,
     attribution: attributionFromRequest(request, props),
     props,

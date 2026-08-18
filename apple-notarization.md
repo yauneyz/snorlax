@@ -145,15 +145,33 @@ APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
 
 This setup intentionally fails closed rather than silently producing an unsigned macOS release.
 
+## Native service binaries
+
+`scripts/build-native.mjs` stages `talysman-svc`/`svcctl`/`recover`/`natmsg` into
+`Contents/Resources/bin` via `extraResources`. electron-builder's own signing pass only covers
+the app bundle and the Electron helpers/frameworks it recognizes — it never discovers those
+loose binaries, so they previously shipped unsigned and notarization rejected the whole bundle
+over them (`"code object is not signed at all"`). `electron-builder.yml` now registers
+`afterSign: scripts/after-sign.mjs`, which signs every file under `Resources/bin` with the same
+Developer ID identity plus hardened runtime and a timestamp, then re-signs and verifies the
+outer app so the change is folded into its seal. No extra entitlements are needed — per
+`native/macos/README.md` these are an "entitlement-free first cut" (pf/hosts/launchd only, no
+NetworkExtension/EndpointSecurity).
+
 ## Safari extension caveat
 
-The repository contains `scripts/after-pack.mjs` and `scripts/after-sign.mjs`, intended to embed and re-sign the Safari extension, but these files are not currently registered as electron-builder hooks.
+The repository contains `scripts/after-pack.mjs` (embeds the Safari extension) and
+`scripts/after-sign.mjs` (now registered, see above). `after-pack.mjs` is still **not**
+registered as an electron-builder hook, and `after-sign.mjs`'s Safari-signing branch only runs
+if the appex is already present — so it stays inert until Safari packaging is turned back on.
 
-That does not prevent the basic Electron application from being notarized because the current build explicitly excludes Safari support. However, the Safari extension README implies that embedding is active, so the repository is internally inconsistent.
+That does not prevent the basic Electron application from being notarized because the current
+build explicitly excludes Safari support. However, the Safari extension README implies that
+embedding is active, so the repository is internally inconsistent.
 
 Before enabling Safari in a release:
 
-1. Register the `afterPack` and `afterSign` hooks in electron-builder.
+1. Register the `afterPack` hook in electron-builder (`afterSign` is already registered).
 2. Confirm the extension bundle identifiers and signing identity.
 3. Confirm that its sandbox and socket-related entitlements are accepted by Developer ID signing and notarization.
 4. Verify the nested extension and enclosing application signatures.
@@ -171,4 +189,5 @@ To ship Talysman in a notarized form:
 6. Perform a controlled signing/notarization test.
 7. Verify Gatekeeper assessment, code signatures, and the stapled notarization ticket before publishing broadly.
 
-No fundamental notarization implementation is missing from Snorlax; the essential remaining work is credential provisioning and end-to-end verification.
+Credential provisioning and end-to-end verification are the essential remaining work; the native
+service binary signing gap above is now closed in the build itself.

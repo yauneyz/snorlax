@@ -67,6 +67,13 @@ mac:
   # A DMG has no install hooks; the app requests administrator approval on first run and after a
   # service-version change, then verifies the restarted LaunchDaemon.
 
+# electron-builder signs the app bundle plus the Electron helpers/frameworks it knows about, but
+# never discovers the talysman-svc/svcctl/recover/natmsg binaries staged into
+# Contents/Resources/bin by scripts/build-native.mjs (extraResources above). Apple's notary
+# service rejects the whole bundle over those unsigned nested executables, so afterSign signs
+# them explicitly and folds the change back into the outer app's seal. Mac-only; no-ops elsewhere.
+afterSign: scripts/after-sign.mjs
+
 linux:
   target:
     - deb
