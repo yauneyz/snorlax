@@ -282,3 +282,64 @@ describe("views", () => {
     expect(data?.person_id).toBe(merged);
   });
 });
+
+describe("analytics ignore list", () => {
+  it("drops an ignored person from analytics_funnel and analytics_events_resolved", async () => {
+    if (withStack()) return;
+    const anon = randomUUID();
+    const { data: person } = await db.rpc("analytics_link", { p_identifiers: [`anon:${anon}`] });
+    await db.from("analytics_events").insert({
+      event: "page_viewed",
+      occurred_at: new Date().toISOString(),
+      anon_id: anon,
+      source: "web",
+      props: {},
+    });
+
+    const { error: ignoreError } = await db
+      .from("analytics_ignored_persons")
+      .insert({ person_id: person as string });
+    expect(ignoreError).toBeNull();
+
+    const { data: funnelRow } = await db
+      .from("analytics_funnel")
+      .select("person_id")
+      .eq("person_id", person as string)
+      .maybeSingle();
+    expect(funnelRow).toBeNull();
+
+    const { data: eventRow } = await db
+      .from("analytics_events_resolved")
+      .select("person_id")
+      .eq("anon_id", anon)
+      .maybeSingle();
+    expect(eventRow).toBeNull();
+  });
+
+  it("auto-ignores a person once their account joins the user allowlist", async () => {
+    if (withStack()) return;
+    const { data: authUser, error: userError } = await db.auth.admin.createUser({
+      email: `ignore-test-${randomUUID()}@example.com`,
+      email_confirm: true,
+    });
+    expect(userError).toBeNull();
+    const userId = authUser!.user!.id;
+
+    await db.from("analytics_ignored_users").insert({ user_id: userId });
+
+    const anon = randomUUID();
+    await db.rpc("analytics_link", { p_identifiers: [`anon:${anon}`] });
+    const { data: person } = await db.rpc("analytics_link", {
+      p_identifiers: [`anon:${anon}`, `user:${userId}`],
+    });
+
+    const { data: ignoredRow } = await db
+      .from("analytics_ignored_persons")
+      .select("person_id")
+      .eq("person_id", person as string)
+      .maybeSingle();
+    expect(ignoredRow).toBeTruthy();
+
+    await db.auth.admin.deleteUser(userId);
+  });
+});
