@@ -129,8 +129,13 @@ mac:
     - dmg
     - zip
   hardenedRuntime: true
-  notarize: true
+  notarize: false
 ```
+
+`notarize: false` is deliberate: electron-builder's own notarize+staple step runs *before*
+`afterSign`, but `afterSign` still has to re-sign the outer app afterward to fold in the native
+service binaries (see below), which would orphan a ticket stapled earlier. `scripts/after-sign.mjs`
+does the actual notarization+stapling itself, last, after all signing is done.
 
 The macOS GitHub Actions job supplies:
 
@@ -154,9 +159,17 @@ loose binaries, so they previously shipped unsigned and notarization rejected th
 over them (`"code object is not signed at all"`). `electron-builder.yml` now registers
 `afterSign: scripts/after-sign.mjs`, which signs every file under `Resources/bin` with the same
 Developer ID identity plus hardened runtime and a timestamp, then re-signs and verifies the
-outer app so the change is folded into its seal. No extra entitlements are needed — per
-`native/macos/README.md` these are an "entitlement-free first cut" (pf/hosts/launchd only, no
-NetworkExtension/EndpointSecurity).
+outer app so the change is folded into its seal, then notarizes and staples. No extra
+entitlements are needed for the native binaries — per `native/macos/README.md` these are an
+"entitlement-free first cut" (pf/hosts/launchd only, no NetworkExtension/EndpointSecurity).
+
+`scripts/build.mjs` also now resolves Apple credentials via `appleReleaseEnvironment()` (from
+`scripts/lib/apple-release.mjs`) for any `--target mac` build, not only ones going through
+`scripts/upload-release.mjs`. Previously a bare `pnpm build:mac` left `notarizeIfProvided` with
+no credentials on the environment, and it only *warns and skips* in that case rather than
+failing — producing a validly Developer-ID-signed but never-submitted-to-Apple `.app` that
+Gatekeeper rejects (`spctl`: `rejected source=Unnotarized Developer ID`) with no build-time
+indication anything was wrong.
 
 ## Safari extension caveat
 

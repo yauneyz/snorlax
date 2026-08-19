@@ -29,6 +29,7 @@ import {
   TRUSTED_SIGNING_ENDPOINT,
   windowsSigningAvailable,
 } from "./lib/windows-release.mjs";
+import { appleReleaseEnvironment } from "./lib/apple-release.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const args = process.argv.slice(2);
@@ -55,14 +56,36 @@ function windowsShellQuote(arg) {
   return /[\s"]/.test(arg) ? `"${arg.replace(/"/g, '\\"')}"` : arg;
 }
 
-function run(cmd, cmdArgs, cwd = root) {
+function run(cmd, cmdArgs, cwd = root, env = process.env) {
   console.log(`\n› ${cmd} ${cmdArgs.join(" ")}`);
   const useShell = process.platform === "win32";
   execFileSync(cmd, useShell ? cmdArgs.map(windowsShellQuote) : cmdArgs, {
     cwd,
     stdio: "inherit",
     shell: useShell,
+    env,
   });
+}
+
+function macCredentialsPath() {
+  return [
+    resolve(root, ".credentials"),
+    resolve(root, "../indigo/.credentials"),
+  ].find((candidate) => existsSync(candidate));
+}
+
+/**
+ * electron-builder only *warns and skips* notarization when Apple credentials are absent from
+ * the environment -- it doesn't fail the build. Resolving credentials here (previously only
+ * scripts/upload-release.mjs did this) means a bare `pnpm build:mac` fails closed instead of
+ * silently producing a signed-but-Gatekeeper-rejected app.
+ */
+function macReleaseEnvironment() {
+  const credentialsPath = macCredentialsPath();
+  const credentials = credentialsPath
+    ? toml.parse(readFileSync(credentialsPath, "utf8"))
+    : null;
+  return appleReleaseEnvironment({ root, credentials, env: process.env });
 }
 
 function desktopElectronVersion() {
@@ -235,23 +258,28 @@ if (allowUnsignedWin) {
 }
 
 // 3. Package + NSIS installer.
-run("pnpm", [
-  "exec",
-  "electron-builder",
-  cfg.builderFlag,
-  ...(crossWindowsFromLinux ? ["--x64"] : []),
-  "--config",
-  "electron-builder.yml",
-  `--config.electronVersion=${desktopElectronVersion()}`,
-  ...(allowUnsignedWin ? ["--config.forceCodeSigning=false"] : []),
-  ...(azureSigningConfigured
-    ? [
-        `--config.win.azureSignOptions.publisherName=${process.env.AZURE_SIGNING_PUBLISHER_NAME}`,
-        `--config.win.azureSignOptions.endpoint=${TRUSTED_SIGNING_ENDPOINT}`,
-        `--config.win.azureSignOptions.certificateProfileName=${TRUSTED_SIGNING_CERTIFICATE_PROFILE}`,
-        `--config.win.azureSignOptions.codeSigningAccountName=${TRUSTED_SIGNING_ACCOUNT}`,
-      ]
-    : []),
-]);
+run(
+  "pnpm",
+  [
+    "exec",
+    "electron-builder",
+    cfg.builderFlag,
+    ...(crossWindowsFromLinux ? ["--x64"] : []),
+    "--config",
+    "electron-builder.yml",
+    `--config.electronVersion=${desktopElectronVersion()}`,
+    ...(allowUnsignedWin ? ["--config.forceCodeSigning=false"] : []),
+    ...(azureSigningConfigured
+      ? [
+          `--config.win.azureSignOptions.publisherName=${process.env.AZURE_SIGNING_PUBLISHER_NAME}`,
+          `--config.win.azureSignOptions.endpoint=${TRUSTED_SIGNING_ENDPOINT}`,
+          `--config.win.azureSignOptions.certificateProfileName=${TRUSTED_SIGNING_CERTIFICATE_PROFILE}`,
+          `--config.win.azureSignOptions.codeSigningAccountName=${TRUSTED_SIGNING_ACCOUNT}`,
+        ]
+      : []),
+  ],
+  root,
+  target === "mac" ? macReleaseEnvironment() : process.env,
+);
 
 console.log("\nOK Build complete. Installer is in dist/.");

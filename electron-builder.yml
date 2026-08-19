@@ -84,7 +84,10 @@ mac:
   category: public.app-category.productivity
   artifactName: ${productName}-${version}-${arch}.${ext}
   hardenedRuntime: true
-  notarize: true
+  # electron-builder's own notarize+staple runs *before* the afterSign hook below, but afterSign
+  # still needs to re-sign the outer app afterward (see its comment) -- re-signing after a staple
+  # orphans the ticket, so notarize is disabled here and afterSign does it itself, last.
+  notarize: false
   # A DMG has no install hooks; the app requests administrator approval on first run and after a
   # service-version change, then verifies the restarted LaunchDaemon.
 
@@ -92,7 +95,8 @@ mac:
 # never discovers the talysman-svc/svcctl/recover/natmsg binaries staged into
 # Contents/Resources/bin by scripts/build-native.mjs (extraResources above). Apple's notary
 # service rejects the whole bundle over those unsigned nested executables, so afterSign signs
-# them explicitly and folds the change back into the outer app's seal. Mac-only; no-ops elsewhere.
+# them explicitly, folds the change back into the outer app's seal, and only then notarizes and
+# staples (see its comment for why that order matters). Mac-only; no-ops elsewhere.
 afterSign: scripts/after-sign.mjs
 
 linux:
