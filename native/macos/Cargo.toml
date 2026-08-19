@@ -1,6 +1,6 @@
 [package]
 name = "talysman-macos"
-version = "0.4.3"
+version = "0.5.0"
 edition = "2021"
 description = "Talysman privileged macOS daemon + installer + recovery killswitch."
 publish = false
