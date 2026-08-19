@@ -51,18 +51,11 @@ async function connectService(): Promise<{ service: ServiceConnection; mock?: Mo
   ]);
 
   if (connected && pipe.connected) {
-    let ping: { version: string; protocolVersion: number };
     try {
-      ping = await pipe.request('ping', undefined);
+      await pipe.request('ping', undefined);
     } catch (error) {
       pipe.close();
       throw error;
-    }
-    if (ping.protocolVersion !== PROTOCOL_VERSION) {
-      pipe.close();
-      throw new Error(
-        `Talysman service protocol ${ping.protocolVersion} is incompatible with desktop protocol ${PROTOCOL_VERSION}.`,
-      );
     }
     logger.info('[main] using real privileged service over named pipe');
     return { service: pipe };
@@ -72,6 +65,25 @@ async function connectService(): Promise<{ service: ServiceConnection; mock?: Mo
   throw new Error(
     `Privileged service is not reachable at ${config.pipePath}. Start/install Talysman, or use pnpm dev:mock for UI-only development.`,
   );
+}
+
+/**
+ * A stale service (e.g. a LaunchDaemon/systemd unit that outlived several app updates without
+ * restarting) fails the protocol check below. ensureServiceCurrent's repair -- reinstall +
+ * restart -- is exactly what fixes that, so it must run, and be given the chance to succeed,
+ * before the protocol version is treated as fatal. Previously the protocol check lived inside
+ * connectService() and threw before ensureServiceCurrent ever ran, so a stale service just
+ * killed the app on every launch instead of self-healing.
+ */
+async function ensureProtocolCompatible(service: ServiceConnection, mock: MockServiceConnection | undefined): Promise<void> {
+  if (mock) return;
+  await ensureServiceCurrent(service);
+  const ping = await service.request('ping', undefined);
+  if (ping.protocolVersion !== PROTOCOL_VERSION) {
+    throw new Error(
+      `Talysman service protocol ${ping.protocolVersion} is incompatible with desktop protocol ${PROTOCOL_VERSION}.`,
+    );
+  }
 }
 
 function registerDeepLink(): void {
@@ -88,6 +100,7 @@ async function bootstrap(): Promise<void> {
   await ensureServiceInstalled();
 
   const { service, mock } = await connectService();
+  await ensureProtocolCompatible(service, mock);
   await registerIpcHandlers({ service, mock });
   initAnalytics(service);
   if (features.smartFiltering) initSmartFiltering(service);
@@ -96,7 +109,6 @@ async function bootstrap(): Promise<void> {
   recordAppOpen();
   // Linux has its own standalone tray helper (see file header); avoid a duplicate icon there.
   if (process.platform !== 'linux') createTray(service, mock);
-  if (!mock) await ensureServiceCurrent(service);
   initUpdater(service);
 
   // Cold start launched via a deep link (e.g. Windows protocol activation): the URL arrives
