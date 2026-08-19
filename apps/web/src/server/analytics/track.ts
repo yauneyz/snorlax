@@ -20,11 +20,17 @@ import { captureException } from "@/lib/sentry";
 import { getPosthogServer } from "@/lib/analytics/posthog-server";
 import {
   ONCE_PER_PERSON_EVENTS,
+  USER_FACING_ERROR_EVENTS,
   isPosthogFanoutEvent,
   type AnalyticsEventName,
   type AnalyticsPlatform,
   type AnalyticsSource,
 } from "@/lib/analytics/events";
+import { sendInsightsPush } from "@/server/insights/push";
+
+/** Caps app_error pushes at one per device+event in this window during a crash loop. Every
+ * occurrence still lands in analytics_events — this only throttles the notification. */
+const ERROR_PUSH_THROTTLE_MS = 15 * 60_000;
 
 /** Channel context for a request. Written to the person once, and onto each event row. */
 export type Attribution = {
@@ -249,8 +255,47 @@ export async function track(input: TrackInput): Promise<void> {
     }
 
     fanoutToPosthog(input);
+
+    if (USER_FACING_ERROR_EVENTS.has(input.event)) {
+      await alertOnUserFacingError(db, input);
+    }
   } catch (err) {
     await captureException(err, { scope: "analytics.track", event: input.event });
+  }
+}
+
+/**
+ * Real-time push for any error a user hit (analytics-arch.md's install-health panel already
+ * aggregates `service_install_failed` by reason; this covers every USER_FACING_ERROR_EVENTS
+ * member with a live alert instead of a dashboard count). Throttled per device+*message*, not
+ * just device+event — "identical errors" means the same failure repeating (a crash loop),
+ * which a plain event-name key would over-throttle: every distinct main_process_error, for
+ * instance, would otherwise share one budget. Every occurrence still lands in
+ * `analytics_events` regardless of whether this particular one pushes.
+ */
+async function alertOnUserFacingError(
+  db: ReturnType<typeof supabaseAdmin>,
+  input: TrackInput,
+): Promise<void> {
+  try {
+    const message = typeof input.props?.message === "string" ? input.props.message : input.event;
+
+    if (input.deviceId) {
+      const since = new Date(Date.now() - ERROR_PUSH_THROTTLE_MS).toISOString();
+      const { count, error } = await db
+        .from("analytics_events")
+        .select("id", { count: "exact", head: true })
+        .eq("event", input.event)
+        .eq("device_id", input.deviceId)
+        .eq("props->>message", message)
+        .gte("received_at", since);
+      if (error) throw new Error(`throttle check failed: ${error.message}`);
+      if ((count ?? 0) > 1) return;
+    }
+
+    void sendInsightsPush({ type: "app_error", platform: input.platform, message });
+  } catch (err) {
+    await captureException(err, { scope: "analytics.alertOnUserFacingError", event: input.event });
   }
 }
 

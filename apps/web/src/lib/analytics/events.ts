@@ -32,6 +32,12 @@ export const ANALYTICS_EVENT_NAMES = [
   "schedule_created",
   "focus_session_completed",
   "app_uninstalled",
+  "bootstrap_failed",
+  "window_load_failed",
+  "main_process_error",
+  "renderer_error",
+  "service_disconnected",
+  "ipc_handler_error",
 
   // --- Billing (all server-side, from the Stripe webhook) ------------------
   "checkout_started",
@@ -82,6 +88,28 @@ export const ANALYTICS_EVENT_PROPS = {
     reason: z.string().max(256),
   }),
   usb_pair_failed: z.object({ reason: z.string().max(256) }),
+  bootstrap_failed: z.object({
+    message: z.string().max(2000),
+    stack: z.string().max(4000).optional(),
+  }),
+  window_load_failed: z.object({
+    message: z.string().max(2000),
+    stack: z.string().max(4000).optional(),
+  }),
+  main_process_error: z.object({
+    message: z.string().max(2000),
+    stack: z.string().max(4000).optional(),
+    fatal: z.boolean().optional(),
+  }),
+  renderer_error: z.object({
+    message: z.string().max(2000),
+    stack: z.string().max(4000).optional(),
+  }),
+  service_disconnected: z.object({ message: z.string().max(2000) }),
+  ipc_handler_error: z.object({
+    channel: z.string().max(128),
+    message: z.string().max(2000),
+  }),
   onboarding_step_viewed: z.object({ step: z.number().int().min(0).max(64) }),
   focus_session_completed: z.object({
     duration_s: z.number().int().min(0).max(86_400),
@@ -141,6 +169,23 @@ export const ONCE_PER_PERSON_EVENTS = new Set<AnalyticsEventName>([
   "onboarding_completed",
   "trial_started",
   "subscription_started",
+]);
+
+/**
+ * Every event that represents a real error a user hit — install-blocking or not. Drives both
+ * the real-time push alert (server/analytics/track.ts, throttled per device+message so a
+ * crash loop can't spam the phone) and the full-text errors feed
+ * (server/analytics/queries/errors.ts, GET /api/analytics/errors) — one source of truth so
+ * the two never drift.
+ */
+export const USER_FACING_ERROR_EVENTS = new Set<AnalyticsEventName>([
+  "bootstrap_failed",
+  "service_install_failed",
+  "window_load_failed",
+  "main_process_error",
+  "renderer_error",
+  "service_disconnected",
+  "ipc_handler_error",
 ]);
 
 /**

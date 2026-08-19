@@ -4,6 +4,7 @@ import { resolveTarget, type AnalyticsTarget } from "@/server/analytics/db";
 import { ActiveUsersPanel } from "./ActiveUsersPanel";
 import { ChannelTablePanel } from "./ChannelTablePanel";
 import { EngagementPanel } from "./EngagementPanel";
+import { ErrorsPanel } from "./ErrorsPanel";
 import { FunnelPanel } from "./FunnelPanel";
 import { InstallHealthPanel } from "./InstallHealthPanel";
 import { MigrationStatePanel } from "./MigrationStatePanel";
@@ -23,7 +24,7 @@ const SuspenseBoundary = Suspense as unknown as (props: {
 const panels = [
   ["Funnel", FunnelPanel], ["Channels", ChannelTablePanel], ["Active users", ActiveUsersPanel],
   ["Engagement", EngagementPanel], ["Retention", RetentionPanel], ["Install health", InstallHealthPanel],
-  ["Revenue", RevenuePanel], ["Raw stream", RawStreamPanel], ["Migration state", MigrationStatePanel],
+  ["Revenue", RevenuePanel], ["Errors", ErrorsPanel], ["Raw stream", RawStreamPanel], ["Migration state", MigrationStatePanel],
 ] as const;
 
 export async function InsightsDashboard({ target }: { target: AnalyticsTarget }) {

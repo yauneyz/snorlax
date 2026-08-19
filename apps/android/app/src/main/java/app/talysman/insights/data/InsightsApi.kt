@@ -5,6 +5,7 @@ import java.io.IOException
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.Json
 import okhttp3.Call
 import okhttp3.Callback
@@ -29,6 +30,17 @@ object InsightsApi {
 
         val body = await(request)
         return json.decodeFromString(InsightsSummary.serializer(), body)
+    }
+
+    suspend fun fetchErrors(): List<ErrorReport> {
+        val request = Request.Builder()
+            .url("${BuildConfig.INSIGHTS_BASE_URL}/api/analytics/errors")
+            .header("Authorization", "Bearer ${BuildConfig.INSIGHTS_API_KEY}")
+            .get()
+            .build()
+
+        val body = await(request)
+        return json.decodeFromString(ListSerializer(ErrorReport.serializer()), body)
     }
 
     suspend fun registerPushToken(token: String) {

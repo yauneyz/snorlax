@@ -63,6 +63,8 @@ export const Channels = {
   getTelemetryEnabled: 'app:getTelemetryEnabled',
   /** invoke: { enabled } → toggle local product-analytics telemetry. */
   setTelemetryEnabled: 'app:setTelemetryEnabled',
+  /** invoke: { message, stack? } → report an uncaught renderer error/rejection for tracking. */
+  reportRendererError: 'app:reportRendererError',
   /** main→renderer push: { event } where event is 'authChanged' | 'entitlementChanged'. */
   appEvent: 'app:event',
 } as const;

@@ -9,7 +9,10 @@ import app.talysman.insights.widget.InsightsWidget
 
 class RefreshWorker(context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {
     override suspend fun doWork(): Result {
-        val outcome = InsightsRepository(applicationContext).refresh()
+        val repository = InsightsRepository(applicationContext)
+        val outcome = repository.refresh()
+        // Best-effort: an errors-fetch failure shouldn't fail the widget's own refresh/retry.
+        repository.refreshErrors()
         InsightsWidget.updateAll(applicationContext)
         return if (outcome.isSuccess) Result.success() else Result.retry()
     }

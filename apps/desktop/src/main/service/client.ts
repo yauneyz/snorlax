@@ -18,6 +18,7 @@ import {
   type RpcResponse,
 } from '@talysman/shared';
 import { logger } from '../logging.js';
+import { flushEvents, track } from '../analytics.js';
 import type { ServiceConnection, ServiceError } from './connection.js';
 
 const RECONNECT_DELAY_MS = 1500;
@@ -84,6 +85,14 @@ export class PipeServiceConnection implements ServiceConnection {
 
     socket.on('error', (e) => {
       logger.warn(`[service] socket error: ${(e).message}`);
+      // Only the case a fresh install can't see: a previously-working connection just broke
+      // mid-session. A not-yet-established connect attempt failing is already covered by
+      // bootstrap_failed from connectService()'s own throw — tracking every retry here too
+      // would just be noise on top of that.
+      if (this.connected) {
+        track('service_disconnected', { message: e.message });
+        void flushEvents();
+      }
     });
 
     socket.on('close', () => {

@@ -19,7 +19,7 @@ import { DEEP_LINK_SCHEME, PROTOCOL_VERSION } from '@talysman/shared';
 import { productFeaturesForEnvironment } from '@talysman/product';
 import { config } from './config.js';
 import { logger } from './logging.js';
-import { initAnalytics, recordAppOpen, shutdownFlush, trackAppInstalledIfFirstRun } from './analytics.js';
+import { flushEvents, initAnalytics, recordAppOpen, shutdownFlush, track, trackAppInstalledIfFirstRun } from './analytics.js';
 import { registerIpcHandlers } from './ipc/handlers.js';
 import { PipeServiceConnection } from './service/client.js';
 import { MockServiceConnection } from './service/mockService.js';
@@ -35,6 +35,23 @@ const features = productFeaturesForEnvironment(config.appEnv);
 
 // Required for reliable native toast attribution on Windows (and harmless elsewhere).
 app.setAppUserModelId('com.talysman.app');
+
+// Registered as early as possible so nothing after this point can die silently. An
+// uncaughtException leaves the process in an undefined state (Node's own guidance), so this
+// reports it and exits rather than trying to keep running; an unhandledRejection is generally
+// recoverable (a floating promise), so this only reports it and lets the app keep going —
+// upgrading Node's default silent-warning behavior into something we actually see.
+process.on('uncaughtException', (error) => {
+  logger.error('[main] uncaughtException', error);
+  track('main_process_error', { message: error.message, stack: error.stack?.slice(0, 4000), fatal: true });
+  void shutdownFlush().finally(() => process.exit(1));
+});
+process.on('unhandledRejection', (reason) => {
+  const error = reason instanceof Error ? reason : new Error(String(reason));
+  logger.error('[main] unhandledRejection', error);
+  track('main_process_error', { message: error.message, stack: error.stack?.slice(0, 4000), fatal: false });
+  void flushEvents();
+});
 
 async function connectService(): Promise<{ service: ServiceConnection; mock?: MockServiceConnection }> {
   if (config.useMockService) {
@@ -96,6 +113,9 @@ function registerDeepLink(): void {
 
 async function bootstrap(): Promise<void> {
   await trackAppInstalledIfFirstRun();
+  // Attempt delivery now, before connectService() — the service is exactly the step most
+  // likely to fail on a first real install, and initAnalytics()'s flush never runs if it does.
+  void flushEvents();
   registerDeepLink();
   await ensureServiceInstalled();
 
@@ -133,8 +153,14 @@ if (!gotLock) {
     void handleDeepLink(url);
   });
 
-  app.whenReady().then(bootstrap).catch((e) => {
+  app.whenReady().then(bootstrap).catch(async (e) => {
     logger.error('[main] bootstrap failed', e);
+    const error = e instanceof Error ? e : new Error(String(e));
+    track('bootstrap_failed', { message: error.message, stack: error.stack?.slice(0, 4000) });
+    // Bounded best-effort flush so this event (and any app_installed/service_install_failed
+    // queued earlier) still gets a delivery attempt even though bootstrap never reached
+    // initAnalytics().
+    await shutdownFlush();
     app.quit();
   });
 

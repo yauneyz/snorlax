@@ -111,6 +111,19 @@ data class PlatformFailure(val platform: String, val reason: String, val count: 
 @Serializable
 data class ChannelsSection(val ok: Boolean, val data: List<ChannelRow>? = null, val message: String? = null)
 
+// Mirrors GET /api/analytics/errors (apps/web/src/app/api/analytics/errors/route.ts).
+@Serializable
+data class ErrorReport(
+    val event: String,
+    val platform: String? = null,
+    val appVersion: String? = null,
+    val deviceId: String? = null,
+    val occurredAt: String,
+    val receivedAt: String,
+    val message: String,
+    val stack: String? = null,
+)
+
 @Serializable
 data class ChannelRow(
     val channel: String,

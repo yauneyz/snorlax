@@ -72,7 +72,13 @@ export type DesktopAnalyticsEvent =
   | 'usb_pair_failed'
   | 'schedule_created'
   | 'extension_connected'
-  | 'focus_session_completed';
+  | 'focus_session_completed'
+  | 'bootstrap_failed'
+  | 'window_load_failed'
+  | 'main_process_error'
+  | 'renderer_error'
+  | 'service_disconnected'
+  | 'ipc_handler_error';
 
 let deviceCache: DeviceIdentity | undefined;
 let telemetryCache: TelemetryState | undefined;
@@ -250,8 +256,11 @@ async function postTrackEvent(line: string): Promise<'sent' | 'retry' | 'drop'> 
       signal: AbortSignal.timeout(FLUSH_TIMEOUT_MS),
     });
     if (res.ok) return 'sent';
-    return res.status >= 500 ? 'retry' : 'drop';
-  } catch {
+    if (res.status >= 500) return 'retry';
+    logger.warn(`[analytics] event rejected (HTTP ${res.status}), dropping`, line);
+    return 'drop';
+  } catch (error) {
+    logger.warn('[analytics] flush request failed', error);
     return 'retry';
   }
 }

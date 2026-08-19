@@ -25,6 +25,7 @@ import java.util.concurrent.atomic.AtomicInteger
 object PushNotifications {
     private const val DOWNLOAD_CHANNEL = "downloads_v1"
     private const val CONVERSION_CHANNEL = "paid_conversions_v1"
+    private const val ERROR_CHANNEL = "app_errors_v1"
     private const val CONVERSION_SOUND_RESOURCE = "conversion_unlocked"
     private val nextNotificationId = AtomicInteger(1000)
 
@@ -91,6 +92,17 @@ object PushNotifications {
                 enableVibration(true)
             },
         )
+
+        manager.createNotificationChannel(
+            NotificationChannel(
+                ERROR_CHANNEL,
+                "App errors",
+                NotificationManager.IMPORTANCE_HIGH,
+            ).apply {
+                description = "An install-blocking error was reported by a real user"
+                enableVibration(true)
+            },
+        )
     }
 
     fun show(context: Context, data: Map<String, String>) {
@@ -101,8 +113,10 @@ object PushNotifications {
         ) return
 
         val conversion = data["type"] == "paid_conversion"
+        val isError = data["type"] == "app_error"
         val intent = Intent(context, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
+            if (isError) putExtra(MainActivity.EXTRA_OPEN_ERRORS, true)
         }
         val pendingIntent = PendingIntent.getActivity(
             context,
@@ -110,17 +124,21 @@ object PushNotifications {
             intent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
-        val notification = NotificationCompat.Builder(
-            context,
-            if (conversion) CONVERSION_CHANNEL else DOWNLOAD_CHANNEL,
-        )
+        val channel = when {
+            isError -> ERROR_CHANNEL
+            conversion -> CONVERSION_CHANNEL
+            else -> DOWNLOAD_CHANNEL
+        }
+        val notification = NotificationCompat.Builder(context, channel)
             .setSmallIcon(R.mipmap.ic_launcher)
             .setContentTitle(data["title"] ?: if (conversion) "A new paid user! 🎉" else "New download")
             .setContentText(data["body"] ?: "Talysman has a new event.")
             .setStyle(NotificationCompat.BigTextStyle().bigText(data["body"]))
             .setContentIntent(pendingIntent)
             .setAutoCancel(true)
-            .setPriority(if (conversion) NotificationCompat.PRIORITY_HIGH else NotificationCompat.PRIORITY_DEFAULT)
+            .setPriority(
+                if (conversion || isError) NotificationCompat.PRIORITY_HIGH else NotificationCompat.PRIORITY_DEFAULT,
+            )
             .build()
 
         NotificationManagerCompat.from(context)

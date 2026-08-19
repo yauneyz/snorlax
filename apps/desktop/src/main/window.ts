@@ -14,7 +14,7 @@ import {
 } from '@talysman/auth-contracts';
 import { config } from './config.js';
 import { logger } from './logging.js';
-import { recordAppOpen } from './analytics.js';
+import { flushEvents, recordAppOpen, track } from './analytics.js';
 import { completeOAuth, reportAuthFlowError } from './auth/supabase.js';
 import { applyPlanLimitsNow, broadcastAppEvent } from './ipc/handlers.js';
 import { parseDeepLink } from './deepLink.js';
@@ -54,6 +54,17 @@ export function createWindow(): BrowserWindow {
   });
 
   win.on('ready-to-show', () => win.show());
+
+  // "UI fails to open" case a bootstrap try/catch can't see: the window is created fine but
+  // the page inside it never loads, or the renderer dies after loading.
+  win.webContents.on('did-fail-load', (_e, errorCode, errorDescription) => {
+    track('window_load_failed', { message: `did-fail-load ${errorCode}: ${errorDescription}` });
+    void flushEvents();
+  });
+  win.webContents.on('render-process-gone', (_e, details) => {
+    track('window_load_failed', { message: `render-process-gone: ${details.reason}` });
+    void flushEvents();
+  });
 
   // Open target=_blank / external links in the system browser, never in-app.
   win.webContents.setWindowOpenHandler(({ url }) => {

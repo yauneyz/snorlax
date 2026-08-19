@@ -43,6 +43,7 @@ const Channels = {
   resetOnboarding: 'app:resetOnboarding',
   getTelemetryEnabled: 'app:getTelemetryEnabled',
   setTelemetryEnabled: 'app:setTelemetryEnabled',
+  reportRendererError: 'app:reportRendererError',
   appEvent: 'app:event',
 } as const;
 
@@ -220,6 +221,10 @@ const api = {
   /** Toggle local product-analytics telemetry. */
   setTelemetryEnabled: (enabled: boolean): Promise<ActionResult & { enabled?: boolean }> =>
     ipcRenderer.invoke(Channels.setTelemetryEnabled, enabled),
+
+  /** Report an uncaught renderer error/rejection so it's tracked and pushed like a main-process one. */
+  reportRendererError: (message: string, stack?: string): Promise<void> =>
+    ipcRenderer.invoke(Channels.reportRendererError, { message, stack }),
 
   /** Subscribe to main-pushed auth/entitlement change events. Returns an unsubscribe fn. */
   onAppEvent: (cb: (event: AppEventName) => void): (() => void) => {

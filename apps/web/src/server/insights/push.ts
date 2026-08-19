@@ -6,7 +6,8 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
 
 export type InsightsPush =
   | { type: "download"; platform: "win" | "mac" | "linux" }
-  | { type: "paid_conversion" };
+  | { type: "paid_conversion" }
+  | { type: "app_error"; platform?: "win" | "mac" | "linux" | null; message: string };
 
 const FCM_SCOPE = "https://www.googleapis.com/auth/firebase.messaging";
 
@@ -16,6 +17,15 @@ function payloadFor(message: InsightsPush): Record<string, string> {
       type: message.type,
       title: "A new paid user! 🎉",
       body: "Someone just became a paying Talysman customer.",
+    };
+  }
+
+  if (message.type === "app_error") {
+    return {
+      type: message.type,
+      title: "Talysman error",
+      body: message.message.slice(0, 180),
+      ...(message.platform ? { platform: message.platform } : {}),
     };
   }
 

@@ -14,7 +14,7 @@ import { checkForAppUpdates } from '../updater.js';
 import { isServiceError, type ServiceConnection } from '../service/connection.js';
 import type { MockServiceConnection } from '../service/mockService.js';
 import { uninstallService } from '../service/uninstaller.js';
-import { getTelemetryEnabled, setTelemetryEnabled, track } from '../analytics.js';
+import { flushEvents, getTelemetryEnabled, setTelemetryEnabled, track } from '../analytics.js';
 import {
   getEntitlement,
   invalidateEntitlementCache,
@@ -153,6 +153,29 @@ function notifyBrowserWatchdogKilled(browser: string): void {
   showWatchdogKilledDialog(title);
 }
 
+type IpcHandler = Parameters<typeof ipcMain.handle>[1];
+
+/**
+ * Thin wrapper around ipcMain.handle: any exception a handler throws (Electron already
+ * forwards it to the renderer as a rejection, so behavior is unchanged) is also tracked and
+ * flushed immediately, so a UI action failing repeatedly is visible instead of only ever
+ * reaching the renderer's own error state.
+ */
+function ipcHandle(channel: string, fn: IpcHandler): void {
+  ipcMain.handle(channel, async (...args) => {
+    try {
+      return await fn(...args);
+    } catch (error) {
+      track('ipc_handler_error', {
+        channel,
+        message: error instanceof Error ? error.message : String(error),
+      });
+      void flushEvents();
+      throw error;
+    }
+  });
+}
+
 export interface HandlerContext {
   service: ServiceConnection;
   /** Present only when running against the in-process mock (dev/WSL). */
@@ -251,7 +274,7 @@ export async function registerIpcHandlers(ctx: HandlerContext): Promise<void> {
     notifyBrowserWatchdogKilled(browser);
   });
 
-  ipcMain.handle(Channels.serviceRequest, async (_e, arg: { method: Method; params: unknown }) => {
+  ipcHandle(Channels.serviceRequest, async (_e, arg: { method: Method; params: unknown }) => {
     try {
       const limits = limitsForPlan((await getEntitlement()).plan);
 
@@ -303,7 +326,7 @@ export async function registerIpcHandlers(ctx: HandlerContext): Promise<void> {
     }
   });
 
-  ipcMain.handle(Channels.appInfo, () => ({
+  ipcHandle(Channels.appInfo, () => ({
     appVersion: app.getVersion(),
     appEnv: config.appEnv,
     isLocalRelease: config.isLocalRelease,
@@ -313,36 +336,36 @@ export async function registerIpcHandlers(ctx: HandlerContext): Promise<void> {
     platform: process.platform,
   }));
 
-  ipcMain.handle(Channels.checkForUpdates, () => checkForAppUpdates());
+  ipcHandle(Channels.checkForUpdates, () => checkForAppUpdates());
 
-  ipcMain.handle(Channels.uninstallService, () => uninstallService(service));
+  ipcHandle(Channels.uninstallService, () => uninstallService(service));
 
-  ipcMain.handle(Channels.listInstalledApps, () => listInstalledApps());
+  ipcHandle(Channels.listInstalledApps, () => listInstalledApps());
 
-  ipcMain.handle(Channels.openExternal, async (_e, url: string) => {
+  ipcHandle(Channels.openExternal, async (_e, url: string) => {
     await shell.openExternal(url);
     return { ok: true };
   });
 
-  ipcMain.handle(Channels.devToggleKey, () => {
+  ipcHandle(Channels.devToggleKey, () => {
     if (!mock) return { ok: false, message: 'Only available against the mock service.' };
     return { ok: true, present: mock.devToggleKey() };
   });
 
-  ipcMain.handle(Channels.devSimulateExtension, () => {
+  ipcHandle(Channels.devSimulateExtension, () => {
     if (!mock) return { ok: false, message: 'Only available against the mock service.' };
     mock.devSimulateExtensionHeartbeat();
     return { ok: true };
   });
 
-  ipcMain.handle(Channels.devPushUsageTransition, (_e, kind: TransitionKind) => {
+  ipcHandle(Channels.devPushUsageTransition, (_e, kind: TransitionKind) => {
     if (!mock) return { ok: false, message: 'Only available against the mock service.' };
     return { ok: true, transition: mock.devPushUsageTransition(kind) };
   });
 
-  ipcMain.handle(Channels.entitlement, () => getEntitlement());
+  ipcHandle(Channels.entitlement, () => getEntitlement());
 
-  ipcMain.handle(Channels.devSetEntitlementPlan, async (_e, plan: SubscriptionPlan) => {
+  ipcHandle(Channels.devSetEntitlementPlan, async (_e, plan: SubscriptionPlan) => {
     if (config.appEnv === 'production') {
       return { ok: false, message: 'Only available in development builds.' };
     }
@@ -356,7 +379,7 @@ export async function registerIpcHandlers(ctx: HandlerContext): Promise<void> {
     return { ok: true, entitlement };
   });
 
-  ipcMain.handle(Channels.setLocalEntitlementEnabled, async (_e, enabled: boolean) => {
+  ipcHandle(Channels.setLocalEntitlementEnabled, async (_e, enabled: boolean) => {
     if (!config.isLocalRelease) {
       return { ok: false, message: 'Only available in release:local builds.' };
     }
@@ -372,33 +395,33 @@ export async function registerIpcHandlers(ctx: HandlerContext): Promise<void> {
   });
 
   // --- auth ---
-  ipcMain.handle(Channels.authStatus, () => getAuthStatus());
-  ipcMain.handle(Channels.signInGoogle, () => signInWithGoogle());
-  ipcMain.handle(
+  ipcHandle(Channels.authStatus, () => getAuthStatus());
+  ipcHandle(Channels.signInGoogle, () => signInWithGoogle());
+  ipcHandle(
     Channels.signInPassword,
     (_e, creds: { email: string; password: string }) =>
       signInWithPassword(creds.email, creds.password),
   );
-  ipcMain.handle(
+  ipcHandle(
     Channels.signUpPassword,
     (_e, creds: { email: string; password: string; fullName?: string }) =>
       signUpWithPassword(creds.email, creds.password, creds.fullName),
   );
-  ipcMain.handle(Channels.sendPasswordReset, (_e, args: { email: string }) =>
+  ipcHandle(Channels.sendPasswordReset, (_e, args: { email: string }) =>
     sendPasswordReset(args.email),
   );
-  ipcMain.handle(Channels.updatePassword, async (_e, args: { password: string }) => {
+  ipcHandle(Channels.updatePassword, async (_e, args: { password: string }) => {
     const result = await updatePassword(args.password);
     if (result.ok) broadcastAppEvent('authChanged');
     return result;
   });
-  ipcMain.handle(Channels.signOut, () => signOut());
+  ipcHandle(Channels.signOut, () => signOut());
 
   // --- billing ---
-  ipcMain.handle(Channels.startCheckout, (_e, price: CheckoutPrice) => startCheckout(price));
-  ipcMain.handle(Channels.openBillingPortal, () => openBillingPortal());
-  ipcMain.handle(Channels.subscriptionDetail, () => fetchSubscriptionDetail());
-  ipcMain.handle(Channels.cancelSubscription, async () => {
+  ipcHandle(Channels.startCheckout, (_e, price: CheckoutPrice) => startCheckout(price));
+  ipcHandle(Channels.openBillingPortal, () => openBillingPortal());
+  ipcHandle(Channels.subscriptionDetail, () => fetchSubscriptionDetail());
+  ipcHandle(Channels.cancelSubscription, async () => {
     const result = await cancelSubscription();
     if (result.ok) {
       await applyPlanLimitsNow();
@@ -406,7 +429,7 @@ export async function registerIpcHandlers(ctx: HandlerContext): Promise<void> {
     }
     return result;
   });
-  ipcMain.handle(Channels.resumeSubscription, async () => {
+  ipcHandle(Channels.resumeSubscription, async () => {
     const result = await resumeSubscription();
     if (result.ok) {
       await applyPlanLimitsNow();
@@ -415,13 +438,13 @@ export async function registerIpcHandlers(ctx: HandlerContext): Promise<void> {
     return result;
   });
   // --- first run ---
-  ipcMain.handle(Channels.onboardingStatus, () => getOnboardingStatus());
-  ipcMain.handle(Channels.completeOnboarding, async () => {
+  ipcHandle(Channels.onboardingStatus, () => getOnboardingStatus());
+  ipcHandle(Channels.completeOnboarding, async () => {
     const status = await completeOnboarding();
     track('onboarding_completed');
     return status;
   });
-  ipcMain.handle(Channels.resetOnboarding, async () => {
+  ipcHandle(Channels.resetOnboarding, async () => {
     if (config.appEnv === 'production' && !config.isLocalRelease) {
       return { ok: false, message: 'Only available in development builds.' };
     }
@@ -429,8 +452,8 @@ export async function registerIpcHandlers(ctx: HandlerContext): Promise<void> {
   });
 
   // --- telemetry ---
-  ipcMain.handle(Channels.getTelemetryEnabled, () => getTelemetryEnabled());
-  ipcMain.handle(Channels.setTelemetryEnabled, async (_e, enabled: boolean) => {
+  ipcHandle(Channels.getTelemetryEnabled, () => getTelemetryEnabled());
+  ipcHandle(Channels.setTelemetryEnabled, async (_e, enabled: boolean) => {
     if (typeof enabled !== 'boolean') {
       return { ok: false, message: 'Expected an enabled state.' };
     }
@@ -438,7 +461,12 @@ export async function registerIpcHandlers(ctx: HandlerContext): Promise<void> {
     return { ok: true, enabled };
   });
 
-  ipcMain.handle(Channels.redeemCode, async (_e, args: { code: string }) => {
+  ipcHandle(Channels.reportRendererError, (_e, args: { message: string; stack?: string }) => {
+    track('renderer_error', { message: args.message, stack: args.stack?.slice(0, 4000) });
+    void flushEvents();
+  });
+
+  ipcHandle(Channels.redeemCode, async (_e, args: { code: string }) => {
     const result = await redeemCompCode(String(args?.code ?? ''));
     if (result.granted) {
       await applyPlanLimitsNow();
