@@ -35,6 +35,10 @@ fn init_tracing(to_file: bool) {
     } else {
         builder.init();
     }
+    // The subscriber exists now, so panics can be logged. Enforcement runs on dedicated threads
+    // and spawned tasks whose panics would otherwise be silent - see panic_log for why that is a
+    // fail-open rather than a nuisance.
+    talysman_common::panic_log::install();
 }
 
 fn main() -> anyhow::Result<()> {

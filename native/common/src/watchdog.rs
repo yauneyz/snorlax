@@ -67,6 +67,12 @@ impl Action {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum Phase {
+    /// Seen for the first time and not yet healthy. A browser that has just launched has not had
+    /// time to load the extension and connect its native-messaging port, so it looks identical to
+    /// one that is deliberately unprotected. Held here for `startup_grace` before escalating.
+    /// Only supported browsers start here — an unsupported one can never produce a heartbeat, so
+    /// giving it a grace period would just delay the close.
+    Starting,
     Ok,
     Warned,
     Closing,
@@ -83,6 +89,13 @@ struct Tracked {
 pub struct Config {
     /// A heartbeat older than this is stale (browser is considered dark).
     pub ttl: Duration,
+    /// How long a newly-seen supported browser may go without a heartbeat before we treat it as
+    /// unprotected. This covers browser start plus extension load plus the native-messaging
+    /// handshake; without it a cold start is warned on the very first tick and closed moments
+    /// later, which reads to the user as the app killing their browser at random. It applies only
+    /// before the first healthy heartbeat — once a browser has been protected, going dark
+    /// escalates immediately, with no second grace.
+    pub startup_grace: Duration,
     /// How long a warned browser has to recover before we start closing it.
     pub warn_grace: Duration,
     /// How long after a graceful close before we force-kill.
@@ -93,6 +106,10 @@ impl Default for Config {
     fn default() -> Self {
         Config {
             ttl: Duration::from_secs(15),
+            // Generous on purpose: a false positive closes the user's window, while the cost of
+            // waiting is bounded — website blocking is enforced at the IP layer independently of
+            // the extension, so this grace does not open a hole in the primary enforcement.
+            startup_grace: Duration::from_secs(30),
             warn_grace: Duration::from_secs(10),
             close_grace: Duration::from_secs(8),
         }
@@ -204,8 +221,16 @@ impl Watchdog {
                 BrowserClass::Unsupported => true,
             };
 
+            // A supported browser we have never seen healthy starts in `Starting` so it gets
+            // `startup_grace` to complete its handshake. An unsupported one starts in `Ok` and
+            // therefore escalates on this very tick, exactly as before.
+            let initial = if proc.class == BrowserClass::Supported {
+                Phase::Starting
+            } else {
+                Phase::Ok
+            };
             let entry = self.phases.entry(proc.pid).or_insert(Tracked {
-                phase: Phase::Ok,
+                phase: initial,
                 since: now,
             });
 
@@ -216,6 +241,22 @@ impl Watchdog {
             }
 
             match entry.phase {
+                Phase::Starting => {
+                    // The grace covers the handshake, nothing else. Once the extension has
+                    // reported at all — even to say it cannot block — the handshake is done and
+                    // there is no reason left to wait.
+                    let contacted = heartbeats.contains_key(&proc.pid);
+                    if contacted || now.duration_since(entry.since) >= self.cfg.startup_grace {
+                        *entry = Tracked {
+                            phase: Phase::Warned,
+                            since: now,
+                        };
+                        actions.push(Action::Warn {
+                            pid: proc.pid,
+                            browser: proc.key.clone(),
+                        });
+                    }
+                }
                 Phase::Ok => {
                     // Supported browsers get a warning grace first; unsupported go straight to close.
                     if proc.class == BrowserClass::Supported {
@@ -365,9 +406,122 @@ mod tests {
     }
 
     #[test]
+    fn starting_browser_is_not_warned_during_startup_grace() {
+        let cfg = Config {
+            ttl: Duration::from_secs(15),
+            startup_grace: Duration::from_secs(30),
+            warn_grace: Duration::from_secs(10),
+            close_grace: Duration::from_secs(8),
+        };
+        let mut wd = Watchdog::new(cfg);
+        let t0 = Instant::now();
+        let roots = vec![proc(100, BrowserClass::Supported, "chrome")];
+        let none = HashMap::new();
+
+        // A browser that just launched has no heartbeat yet: silence, not a warning.
+        assert!(wd.tick(t0, &roots, &none).is_empty());
+        assert!(wd.tick(t0 + Duration::from_secs(10), &roots, &none).is_empty());
+        assert!(wd.tick(t0 + Duration::from_secs(29), &roots, &none).is_empty());
+
+        // Extension finally connects inside the grace: no action, ever.
+        let mut hb = HashMap::new();
+        hb.insert(
+            100,
+            Heartbeat {
+                last_seen: t0 + Duration::from_secs(29),
+                healthy: true,
+            },
+        );
+        assert!(wd.tick(t0 + Duration::from_secs(30), &roots, &hb).is_empty());
+    }
+
+    #[test]
+    fn startup_grace_still_escalates_a_browser_that_never_connects() {
+        let cfg = Config {
+            ttl: Duration::from_secs(15),
+            startup_grace: Duration::from_secs(30),
+            warn_grace: Duration::from_secs(10),
+            close_grace: Duration::from_secs(8),
+        };
+        let mut wd = Watchdog::new(cfg);
+        let t0 = Instant::now();
+        let roots = vec![proc(100, BrowserClass::Supported, "chrome")];
+        let none = HashMap::new();
+
+        assert!(wd.tick(t0, &roots, &none).is_empty());
+        // Grace elapsed with no heartbeat: the ladder starts.
+        assert_eq!(
+            wd.tick(t0 + Duration::from_secs(30), &roots, &none),
+            vec![Action::Warn {
+                pid: 100,
+                browser: "chrome".into()
+            }]
+        );
+        assert_eq!(
+            wd.tick(t0 + Duration::from_secs(41), &roots, &none),
+            vec![Action::Close {
+                pid: 100,
+                browser: "chrome".into()
+            }]
+        );
+    }
+
+    #[test]
+    fn browser_that_goes_dark_after_being_healthy_warns_immediately() {
+        let cfg = Config {
+            ttl: Duration::from_secs(15),
+            startup_grace: Duration::from_secs(30),
+            warn_grace: Duration::from_secs(10),
+            close_grace: Duration::from_secs(8),
+        };
+        let mut wd = Watchdog::new(cfg);
+        let t0 = Instant::now();
+        let roots = vec![proc(100, BrowserClass::Supported, "chrome")];
+
+        // Healthy first — this browser has completed a handshake.
+        let mut hb = HashMap::new();
+        hb.insert(
+            100,
+            Heartbeat {
+                last_seen: t0,
+                healthy: true,
+            },
+        );
+        assert!(wd.tick(t0, &roots, &hb).is_empty());
+
+        // Extension is then disabled: the heartbeat goes stale. The startup grace must NOT apply
+        // a second time — this is the case the watchdog exists to catch.
+        assert_eq!(
+            wd.tick(t0 + Duration::from_secs(16), &roots, &hb),
+            vec![Action::Warn {
+                pid: 100,
+                browser: "chrome".into()
+            }]
+        );
+    }
+
+    #[test]
+    fn unsupported_browser_still_closes_without_grace() {
+        let mut wd = Watchdog::default();
+        let t0 = Instant::now();
+        let roots = vec![proc(100, BrowserClass::Unsupported, "safari")];
+        // No startup grace for a browser that can never report a heartbeat.
+        assert_eq!(
+            wd.tick(t0, &roots, &HashMap::new()),
+            vec![Action::Close {
+                pid: 100,
+                browser: "safari".into()
+            }]
+        );
+    }
+
+    #[test]
     fn missing_heartbeat_escalates_warn_close_kill() {
         let cfg = Config {
             ttl: Duration::from_secs(15),
+            // Zero here so this test covers the escalation ladder itself; the startup grace that
+            // precedes it has its own test below.
+            startup_grace: Duration::ZERO,
             warn_grace: Duration::from_secs(10),
             close_grace: Duration::from_secs(8),
         };
@@ -495,7 +649,11 @@ mod tests {
 
     #[test]
     fn exited_pid_state_is_forgotten() {
-        let mut wd = Watchdog::default();
+        // Zero startup grace so this stays a test about forgetting state, not about the grace.
+        let mut wd = Watchdog::new(Config {
+            startup_grace: Duration::ZERO,
+            ..Config::default()
+        });
         let t0 = Instant::now();
         let roots = vec![proc(100, BrowserClass::Supported, "chrome")];
         let _ = wd.tick(t0, &roots, &HashMap::new()); // Warn → tracked

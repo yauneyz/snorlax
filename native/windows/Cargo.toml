@@ -1,6 +1,6 @@
 [package]
 name = "talysman"
-version = "0.5.0"
+version = "0.5.1"
 edition = "2021"
 description = "Talysman privileged Windows service and installer."
 publish = false

@@ -11,6 +11,7 @@ pub mod browsers;
 pub mod extension_compat;
 pub mod model;
 pub mod pairing;
+pub mod panic_log;
 pub mod policy;
 pub mod policy_match;
 pub mod watchdog;

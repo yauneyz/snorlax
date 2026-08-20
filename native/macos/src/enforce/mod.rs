@@ -34,26 +34,34 @@ struct ChangeSignal {
 
 impl ChangeSignal {
     fn generation(&self) -> u64 {
-        *self.epoch.lock().unwrap()
+        *self.epoch.lock().unwrap_or_else(|e| e.into_inner())
     }
     fn notify(&self) {
-        let mut epoch = self.epoch.lock().unwrap();
+        let mut epoch = self.epoch.lock().unwrap_or_else(|e| e.into_inner());
         *epoch = epoch.wrapping_add(1);
         self.changed.notify_all();
     }
     fn wait(&self, observed: u64, timeout: Duration) -> u64 {
-        let epoch = self.epoch.lock().unwrap();
+        let epoch = self.epoch.lock().unwrap_or_else(|e| e.into_inner());
         if *epoch != observed {
             return *epoch;
         }
         let (epoch, _) = self
             .changed
             .wait_timeout_while(epoch, timeout, |value| *value == observed)
-            .unwrap();
+            .unwrap_or_else(|e| e.into_inner());
         *epoch
     }
 }
 
+/// Locking note: every `Mutex` in this module is taken with
+/// `.lock().unwrap_or_else(|e| e.into_inner())` rather than `.lock().unwrap()`. A plain
+/// `unwrap` turns one panic into a cascade: `std::sync::Mutex` poisons on panic, so after a
+/// single failure *every* later lock of that mutex panics too, and the resolver, the packet
+/// engines and the watchdog all fall over in sequence. For a blocker that is a fail-open. The
+/// data behind these locks is a policy snapshot and IP/heartbeat sets - recovering the guard
+/// and carrying on with a possibly-stale value keeps blocking up, which is the safer outcome.
+/// Panics themselves are not swallowed: `talysman_common::panic_log` logs every one.
 pub struct EnforceShared {
     pub policy: Mutex<Policy>,
     pub focus_active: AtomicBool,
@@ -98,7 +106,7 @@ impl EnforceShared {
     pub fn set_handshake_enabled(&self, enabled: bool) {
         let changed = self.handshake_enabled.swap(enabled, Ordering::SeqCst) != enabled;
         if !enabled {
-            self.heartbeats.lock().unwrap().clear();
+            self.heartbeats.lock().unwrap_or_else(|e| e.into_inner()).clear();
         }
         if changed {
             self.notify_change();
@@ -107,7 +115,7 @@ impl EnforceShared {
 
     /// Record an extension heartbeat for `pid` (the browser instance the extension runs in).
     pub fn record_heartbeat(&self, pid: u32, healthy: bool) -> bool {
-        let mut heartbeats = self.heartbeats.lock().unwrap();
+        let mut heartbeats = self.heartbeats.lock().unwrap_or_else(|e| e.into_inner());
         let changed = heartbeats
             .get(&pid)
             .is_none_or(|heartbeat| heartbeat.healthy != healthy);
@@ -123,14 +131,14 @@ impl EnforceShared {
 
     /// A snapshot of all recorded heartbeats, for the watchdog tick.
     pub fn heartbeats_snapshot(&self) -> HashMap<u32, Heartbeat> {
-        self.heartbeats.lock().unwrap().clone()
+        self.heartbeats.lock().unwrap_or_else(|e| e.into_inner()).clone()
     }
 
     /// Drop heartbeat entries for PIDs that are no longer running (keeps the map bounded).
     pub fn retain_heartbeats(&self, live: &HashSet<u32>) {
         self.heartbeats
             .lock()
-            .unwrap()
+            .unwrap_or_else(|e| e.into_inner())
             .retain(|pid, _| live.contains(pid));
     }
 
@@ -155,16 +163,16 @@ impl EnforceShared {
     }
 
     pub fn policy_snapshot(&self) -> Policy {
-        self.policy.lock().unwrap().clone()
+        self.policy.lock().unwrap_or_else(|e| e.into_inner()).clone()
     }
 
     pub fn default_action(&self) -> DefaultAction {
-        self.policy.lock().unwrap().default_action
+        self.policy.lock().unwrap_or_else(|e| e.into_inner()).default_action
     }
 
     pub fn set_policy(&self, policy: Policy) {
         let policy = Self::effective(policy);
-        let mut guard = self.policy.lock().unwrap();
+        let mut guard = self.policy.lock().unwrap_or_else(|e| e.into_inner());
         if *guard != policy {
             *guard = policy;
             self.gen.fetch_add(1, Ordering::SeqCst);
@@ -177,7 +185,7 @@ impl EnforceShared {
     pub fn set_blocked_ips(&self, ips: HashSet<IpAddr>) {
         let mut ips = ips;
         Self::cap(&mut ips);
-        let mut guard = self.blocked.lock().unwrap();
+        let mut guard = self.blocked.lock().unwrap_or_else(|e| e.into_inner());
         if *guard != ips {
             *guard = ips;
             self.gen.fetch_add(1, Ordering::SeqCst);
@@ -189,7 +197,7 @@ impl EnforceShared {
     pub fn set_allowed_ips(&self, ips: HashSet<IpAddr>) {
         let mut ips = ips;
         Self::cap(&mut ips);
-        let mut guard = self.allowed.lock().unwrap();
+        let mut guard = self.allowed.lock().unwrap_or_else(|e| e.into_inner());
         if *guard != ips {
             *guard = ips;
             self.gen.fetch_add(1, Ordering::SeqCst);
@@ -199,13 +207,13 @@ impl EnforceShared {
     }
 
     pub fn blocked_ips(&self) -> Vec<IpAddr> {
-        let mut ips: Vec<IpAddr> = self.blocked.lock().unwrap().iter().copied().collect();
+        let mut ips: Vec<IpAddr> = self.blocked.lock().unwrap_or_else(|e| e.into_inner()).iter().copied().collect();
         ips.sort();
         ips
     }
 
     pub fn allowed_ips(&self) -> Vec<IpAddr> {
-        let mut ips: Vec<IpAddr> = self.allowed.lock().unwrap().iter().copied().collect();
+        let mut ips: Vec<IpAddr> = self.allowed.lock().unwrap_or_else(|e| e.into_inner()).iter().copied().collect();
         ips.sort();
         ips
     }

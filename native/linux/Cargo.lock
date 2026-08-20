@@ -927,7 +927,7 @@ dependencies = [
 
 [[package]]
 name = "talysman-linux"
-version = "0.5.0"
+version = "0.5.1"
 dependencies = [
  "anyhow",
  "chrono",
@@ -945,13 +945,14 @@ dependencies = [
 
 [[package]]
 name = "talysman_common"
-version = "0.5.0"
+version = "0.5.1"
 dependencies = [
  "hex",
  "rand",
  "serde",
  "serde_json",
  "sha2",
+ "tracing",
 ]
 
 [[package]]
