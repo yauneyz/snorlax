@@ -50,8 +50,16 @@ fn main() -> anyhow::Result<()> {
             for line in stdin.lock().lines().map_while(Result::ok) {
                 if line.trim().eq_ignore_ascii_case("quit") {
                     let _ = tx.send(true);
-                    break;
+                    return;
                 }
+            }
+            // stdin ended without a "quit" — it was redirected, or no console is attached.
+            // Dropping `tx` here is not a no-op: with the sender gone every `shutdown.changed()`
+            // in the service resolves `Err` immediately and forever, so every `tokio::select!`
+            // waiting on it spins. The IPC accept loop stops waiting for clients entirely, which
+            // reads exactly like a hung service while burning a core. Park to keep `tx` alive.
+            loop {
+                std::thread::park();
             }
         });
         service::run_blocking(resolve_socket(PIPE_BASE_DEV), rx);

@@ -23,6 +23,12 @@ import type { ServiceConnection, ServiceError } from './connection.js';
 
 const RECONNECT_DELAY_MS = 1500;
 const RPC_TIMEOUT_MS = 15_000;
+/**
+ * `connect()` resolves only on success — it never rejects, because a dead service is expected to
+ * come back and the reconnect loop keeps trying. The cost is that a service which never arrives
+ * leaves the UI on "Connecting…" forever with nothing in the log to say why. Report it once.
+ */
+const CONNECT_STUCK_MS = 15_000;
 
 interface Pending {
   resolve: (value: unknown) => void;
@@ -48,6 +54,7 @@ export class PipeServiceConnection implements ServiceConnection {
   private listeners = new Map<EventName, Set<Listener>>();
   private closed = false;
   private connectWaiters: Array<() => void> = [];
+  private stuckTimer: NodeJS.Timeout | null = null;
 
   constructor(private readonly pipePath: string) {}
 
@@ -55,7 +62,27 @@ export class PipeServiceConnection implements ServiceConnection {
     this.closed = false;
     this.open();
     if (this.connected) return Promise.resolve();
+    if (this.stuckTimer === null) {
+      this.stuckTimer = setTimeout(() => {
+        this.stuckTimer = null;
+        if (!this.connected) {
+          logger.error(
+            `[service] still not connected to ${this.pipePath} after ${CONNECT_STUCK_MS}ms; ` +
+              'the UI stays on "Connecting…" until this succeeds. Check that the privileged ' +
+              'service is running and that the endpoint exists.',
+          );
+        }
+      }, CONNECT_STUCK_MS);
+      this.stuckTimer.unref?.();
+    }
     return new Promise((resolve) => this.connectWaiters.push(resolve));
+  }
+
+  private clearStuckTimer(): void {
+    if (this.stuckTimer !== null) {
+      clearTimeout(this.stuckTimer);
+      this.stuckTimer = null;
+    }
   }
 
   private open(): void {
@@ -74,6 +101,7 @@ export class PipeServiceConnection implements ServiceConnection {
         return;
       }
       this.connected = true;
+      this.clearStuckTimer();
       logger.info(`[service] connected to ${this.pipePath}`);
       this.connectWaiters.forEach((w) => w());
       this.connectWaiters = [];
@@ -189,6 +217,7 @@ export class PipeServiceConnection implements ServiceConnection {
 
   close(): void {
     this.closed = true;
+    this.clearStuckTimer();
     if (this.reconnectTimer !== null) {
       clearTimeout(this.reconnectTimer);
       this.reconnectTimer = null;

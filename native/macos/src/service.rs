@@ -1,7 +1,7 @@
 //! Service runtime for macOS.
 
 use std::sync::Arc;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use serde_json::Value;
 use tokio::sync::{broadcast, watch, Mutex};
@@ -85,7 +85,12 @@ pub async fn serve(socket_path: String, shutdown: watch::Receiver<bool>) {
         let mut events = core.lock().await.subscribe();
         tokio::spawn(async move {
             loop {
-                if !core.lock().await.has_paired_keys() {
+                // Read the flag into a local first. A temporary in an `if` condition lives until the
+                // end of the whole `if` statement, so locking inline would hold the Core guard across
+                // the park below - and with no paired keys that park only ends on a state change, which
+                // nothing can emit without this very lock. That is a hard deadlock of the whole service.
+                let paired = core.lock().await.has_paired_keys();
+                if !paired {
                     tokio::select! {
                         _ = sd.changed() => { if *sd.borrow() { break; } }
                         _ = wait_for_state_change(&mut events) => {}
@@ -130,7 +135,13 @@ pub async fn serve(socket_path: String, shutdown: watch::Receiver<bool>) {
         let mut events = core.lock().await.subscribe();
         tokio::spawn(async move {
             loop {
-                match core.lock().await.next_judge_delay() {
+                // Bind the delay in its own statement so the MutexGuard is dropped here. A
+                // `match` scrutinee temporary lives until the end of the match, so locking
+                // inline would hold the Core lock across the awaits below - and the only
+                // thing that can wake `events.recv()` is another task that needs that same
+                // lock, wedging IPC and every timer permanently.
+                let next = core.lock().await.next_judge_delay();
+                match next {
                     Some(delay) => tokio::select! {
                         _ = sd.changed() => { if *sd.borrow() { break; } }
                         _ = tokio::time::sleep(delay) => { core.lock().await.sweep_expired_judges(); }
@@ -140,6 +151,52 @@ pub async fn serve(socket_path: String, shutdown: watch::Receiver<bool>) {
                         _ = sd.changed() => { if *sd.borrow() { break; } }
                         _ = events.recv() => {}
                     },
+                }
+            }
+        });
+    }
+
+    // Core-lock health watchdog. The Core mutex is only ever taken for short synchronous
+    // mutations, so two consecutive probes finding it busy means a task is parked while holding
+    // the guard and the whole service is wedged: IPC still accepts connections and answers
+    // nothing, timers stop, presence polling stops. From the outside that is indistinguishable
+    // from a hung client, so name it in the log.
+    //
+    // Cost: one atomic try_lock every 30s. That is an order of magnitude less often than the
+    // presence poll above already runs, and it does no I/O, so it is not a wakeup source that
+    // shows up on battery.
+    {
+        let core = core.clone();
+        let mut sd = shutdown.clone();
+        tokio::spawn(async move {
+            const PROBE: Duration = Duration::from_secs(30);
+            const STUCK_AFTER: Duration = Duration::from_secs(30);
+            const REPEAT_EVERY: Duration = Duration::from_secs(300);
+            let mut busy_since: Option<Instant> = None;
+            let mut last_report: Option<Instant> = None;
+            loop {
+                tokio::select! {
+                    _ = sd.changed() => { if *sd.borrow() { break; } }
+                    _ = tokio::time::sleep(PROBE) => {}
+                }
+                if core.try_lock().is_ok() {
+                    // Only worth a line if we had actually reported it stuck.
+                    if let (Some(since), Some(_)) = (busy_since.take(), last_report.take()) {
+                        tracing::warn!("core lock recovered after {:?}", since.elapsed());
+                    }
+                } else {
+                    // One busy probe is just contention; it takes two 30s apart to report.
+                    let since = *busy_since.get_or_insert_with(Instant::now);
+                    let due = last_report
+                        .map_or(since.elapsed() >= STUCK_AFTER, |t| t.elapsed() >= REPEAT_EVERY);
+                    if due {
+                        last_report = Some(Instant::now());
+                        tracing::error!(
+                            "core lock has been held for {:?} - the service is wedged; clients \
+                             will connect to the IPC endpoint but every request will time out",
+                            since.elapsed()
+                        );
+                    }
                 }
             }
         });

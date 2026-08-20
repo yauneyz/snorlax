@@ -88,6 +88,44 @@ export function normalizeDomains(domains) {
 }
 
 /**
+ * Does `hostname` match `domain` (or one of its subdomains)? Mirrors the `requestDomains` semantics
+ * the DNR rules below rely on, for the code paths that have to re-check policy without DNR.
+ * @param {string} hostname
+ * @param {string} domain
+ * @returns {boolean}
+ */
+export function hostnameMatchesDomain(hostname, domain) {
+  const normalized = normalizeDomain(domain);
+  if (!normalized || !hostname) return false;
+  const h = String(hostname).toLowerCase();
+  return h === normalized || h.endsWith(`.${normalized}`);
+}
+
+/**
+ * @param {string} hostname
+ * @param {string[]} domains
+ * @returns {boolean}
+ */
+export function hostnameMatchesAny(hostname, domains) {
+  return (domains || []).some((domain) => hostnameMatchesDomain(hostname, domain));
+}
+
+/**
+ * Does the hard policy — the part `buildRules` enforces through DNR — forbid a top-level
+ * navigation to `hostname`? Used by the extension's navigation backstop for the requests DNR
+ * never sees (service-worker-served navigations, bfcache restores).
+ * @param {State} policy
+ * @param {string} hostname
+ * @returns {boolean}
+ */
+export function policyBlocksHostname(policy, hostname) {
+  if (!policy || !policy.active) return false;
+  if (hostnameMatchesAny(hostname, policy.blockedDomains)) return true;
+  if (policy.defaultAction !== 'block') return false;
+  return !hostnameMatchesAny(hostname, policy.allowedDomains);
+}
+
+/**
  * Turn a normalized domain list into DNR match conditions for one policy list.
  * @param {string[]} domains
  * @returns {object[]}

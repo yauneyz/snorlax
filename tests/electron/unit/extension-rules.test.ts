@@ -4,6 +4,8 @@ import {
   buildRules,
   normalizeDomain,
   normalizeDomains,
+  hostnameMatchesAny,
+  policyBlocksHostname,
   BLOCK_PRIORITY,
   ALLOW_PRIORITY,
 } from '../../../apps/extension/src/rules.js';
@@ -180,5 +182,49 @@ describe('buildRules — unique rule ids', () => {
       const ids = rules.map((r) => r.id);
       expect(new Set(ids).size).toBe(ids.length);
     }
+  });
+});
+
+describe('hostnameMatchesAny', () => {
+  it('matches the domain and its subdomains, mirroring requestDomains', () => {
+    expect(hostnameMatchesAny('x.com', ['x.com'])).toBe(true);
+    expect(hostnameMatchesAny('mobile.x.com', ['x.com'])).toBe(true);
+    expect(hostnameMatchesAny('X.com', ['*.x.com'])).toBe(true);
+    expect(hostnameMatchesAny('notx.com', ['x.com'])).toBe(false);
+    expect(hostnameMatchesAny('x.com.evil.test', ['x.com'])).toBe(false);
+    expect(hostnameMatchesAny('x.com', [])).toBe(false);
+  });
+});
+
+// The navigation backstop re-checks this policy for requests DNR never sees — a site's own service
+// worker answering a top-level navigation out of Cache Storage, or a bfcache restore.
+describe('policyBlocksHostname', () => {
+  const blacklist = {
+    active: true,
+    blockedDomains: ['x.com'],
+    allowedDomains: [],
+    defaultAction: 'allow' as const,
+  };
+
+  it('blocks nothing while focus is off', () => {
+    expect(policyBlocksHostname({ ...blacklist, active: false }, 'x.com')).toBe(false);
+  });
+
+  it('blocks listed domains and their subdomains, allows everything else', () => {
+    expect(policyBlocksHostname(blacklist, 'x.com')).toBe(true);
+    expect(policyBlocksHostname(blacklist, 'mobile.x.com')).toBe(true);
+    expect(policyBlocksHostname(blacklist, 'example.com')).toBe(false);
+  });
+
+  it('default-denies everything outside allowedDomains when defaultAction is block', () => {
+    const whitelist = {
+      active: true,
+      blockedDomains: ['x.com'],
+      allowedDomains: ['docs.example.com'],
+      defaultAction: 'block' as const,
+    };
+    expect(policyBlocksHostname(whitelist, 'docs.example.com')).toBe(false);
+    expect(policyBlocksHostname(whitelist, 'example.com')).toBe(true);
+    expect(policyBlocksHostname(whitelist, 'x.com')).toBe(true);
   });
 });

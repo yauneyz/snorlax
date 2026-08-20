@@ -13,13 +13,17 @@
 // Fail-safe stance: if the host disconnects we KEEP the last-applied rules and reconnect with
 // backoff. On reconnect the service re-pushes authoritative state.
 //
+// DNR is not the only enforcement point: a site's service worker can answer a top-level navigation
+// from Cache Storage without any network request, which DNR never sees. See the "Hard-policy
+// navigation backstop" section below for the webNavigation-based second line of defense.
+//
 // Smart filtering: when the pushed policy has a non-null `intent`, pages that fall through both
 // hard lists (`blockedDomains`/`allowedDomains`) are extracted and sent to the daemon for a
 // relevance judgment (`judge-request`/`judge-result`) rather than being statically allowed or
 // blocked. This is strictly additive on top of DNR — DNR still enforces the two hard lists — and
 // is a no-op (zero listeners doing real work) for classic, non-Smart profiles.
 
-import { buildRules, normalizeDomain } from './rules.js';
+import { buildRules, hostnameMatchesAny, policyBlocksHostname } from './rules.js';
 import { heartbeatDelayForState } from './heartbeat-timing.js';
 import { extractPageContent } from './content-extract.js';
 
@@ -136,6 +140,9 @@ function applyState(state) {
     scheduleHeartbeat(0);
   }
   void applyLatestRuleState();
+  // DNR only affects requests made from here on, so a tab already sitting on a now-blocked page
+  // would stay put. Re-check what's open against the new policy.
+  void enforceHardPolicyOnOpenTabs();
 }
 
 async function applyLatestRuleState() {
@@ -363,18 +370,6 @@ function generateRequestId() {
   return `judge-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 }
 
-/** Does `hostname` match `domain` (or one of its subdomains), mirroring rules.js's DNR semantics. */
-function hostnameMatchesDomain(hostname, domain) {
-  const normalized = normalizeDomain(domain);
-  if (!normalized) return false;
-  const h = hostname.toLowerCase();
-  return h === normalized || h.endsWith(`.${normalized}`);
-}
-
-function hostnameMatchesAny(hostname, domains) {
-  return (domains || []).some((domain) => hostnameMatchesDomain(hostname, domain));
-}
-
 function verdictCacheKey(url, intent) {
   return JSON.stringify([url, intent.positive, intent.negative || '']);
 }
@@ -427,12 +422,15 @@ async function redirectIfStillOnUrl(tabId, expectedUrl, reason, generation = pol
     const tab = await browserApi.tabs.get(tabId);
     if (!tab || !tab.url) return;
     if (!urlsRoughlyMatch(tab.url, expectedUrl)) return; // user already navigated away
-    await browserApi.tabs.update(tabId, {
-      url: browserApi.runtime.getURL('blocked.html') + '?reason=' + encodeURIComponent(reason || ''),
-    });
+    await browserApi.tabs.update(tabId, { url: blockedPageUrl(reason) });
   } catch (e) {
     // Tab likely closed mid-flight; nothing to do.
   }
+}
+
+function blockedPageUrl(reason) {
+  const base = browserApi.runtime.getURL('blocked.html');
+  return reason ? `${base}?reason=${encodeURIComponent(reason)}` : base;
 }
 
 /** Client-side backstop when defaultAction is the only signal we have (timeout or extraction failure). */
@@ -563,14 +561,70 @@ function debounceSpaNavigation(tabId, url) {
   );
 }
 
+// ---------------------------------------------------------------------------------------------
+// Hard-policy navigation backstop
+//
+// DNR only sees requests that reach the network stack. A site's OWN service worker can answer a
+// top-level navigation out of Cache Storage without issuing any request — Chromium runs the site's
+// fetch handler before DNR, so a precached app shell (x.com/twitter is the canonical example) still
+// paints even though every rule matches it and every XHR it fires is blocked. Back/forward cache
+// restores are the same blind spot. Firefox's request interception sits above the service worker,
+// which is why the DNR redirect appeared to work there and not in Chrome.
+//
+// So we re-check the hard lists per top-level navigation and drive the tab to the blocked page
+// ourselves. This mirrors what buildRules() enforces via DNR — it is a second line of defense for
+// the same policy, not a different one — and applies to every browser.
+// ---------------------------------------------------------------------------------------------
+
+/**
+ * Send `tabId` to the blocked page when the hard policy forbids `url`.
+ * @returns {boolean} true when the navigation is policy-blocked (caller should stop here).
+ */
+function enforceHardPolicy(tabId, url) {
+  if (!currentPolicy.active) return false;
+  if (typeof tabId !== 'number' || tabId < 0) return false;
+  if (!url || !/^https?:\/\//i.test(url)) return false; // extension/browser-internal pages
+  let hostname;
+  try {
+    hostname = new URL(url).hostname;
+  } catch {
+    return false;
+  }
+  if (!policyBlocksHostname(currentPolicy, hostname)) return false;
+  void redirectIfStillOnUrl(tabId, url, '', policyGeneration);
+  return true;
+}
+
+/** Re-check every open tab. Catches pages already on screen when a policy starts applying. */
+async function enforceHardPolicyOnOpenTabs() {
+  if (!currentPolicy.active) return;
+  try {
+    const tabs = await browserApi.tabs.query({});
+    for (const tab of tabs || []) {
+      if (tab && typeof tab.id === 'number') enforceHardPolicy(tab.id, tab.url);
+    }
+  } catch (e) {
+    console.warn('[talysman] tab sweep failed', e && e.message);
+  }
+}
+
 if (browserApi.webNavigation) {
+  // onCommitted fires before the document paints, including for service-worker-served and
+  // bfcache-restored navigations that never touch the network.
+  browserApi.webNavigation.onCommitted.addListener((details) => {
+    if (details.frameId !== 0) return;
+    enforceHardPolicy(details.tabId, details.url);
+  });
+
   browserApi.webNavigation.onCompleted.addListener((details) => {
     if (details.frameId !== 0) return;
+    if (enforceHardPolicy(details.tabId, details.url)) return;
     handleQualifyingNavigation(details.tabId, details.url);
   });
 
   browserApi.webNavigation.onHistoryStateUpdated.addListener((details) => {
     if (details.frameId !== 0) return;
+    if (enforceHardPolicy(details.tabId, details.url)) return;
     debounceSpaNavigation(details.tabId, details.url);
   });
 }

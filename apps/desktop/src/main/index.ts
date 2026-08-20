@@ -139,6 +139,16 @@ async function bootstrap(): Promise<void> {
   if (initialDeepLink) void handleDeepLink(initialDeepLink);
 }
 
+// A crash outside bootstrap's own catch (an async throw, a listener, a native callback) would
+// otherwise take the process down with nothing written anywhere — the packaged app has no console
+// attached to read. These two handlers are the difference between "it just closes" and a stack.
+process.on('uncaughtException', (e) => {
+  logger.error('[main] uncaught exception', e);
+});
+process.on('unhandledRejection', (reason) => {
+  logger.error('[main] unhandled rejection', reason);
+});
+
 // --- single instance ---
 const gotLock = app.requestSingleInstanceLock();
 if (!gotLock) {

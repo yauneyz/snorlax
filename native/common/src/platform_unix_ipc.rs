@@ -3,6 +3,7 @@
 use std::os::unix::fs::PermissionsExt;
 use std::path::Path;
 use std::sync::Arc;
+use std::time::{Duration, Instant};
 
 use serde_json::{json, Value};
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
@@ -12,6 +13,36 @@ use tokio::sync::{mpsc, watch, Mutex};
 use crate::core::Core;
 
 pub type SharedCore = Arc<Mutex<Core>>;
+
+/// How long to wait for the Core lock before declaring the service wedged. Acquiring it is
+/// normally instant — every holder does a short synchronous mutation and drops the guard. If we
+/// ever wait this long, some task is parked *while holding* the guard, which blocks every RPC,
+/// timer and poll behind it. That failure mode is invisible from the client side: the socket still
+/// accepts connections, requests just never get answered.
+const CORE_LOCK_STUCK: Duration = Duration::from_secs(5);
+
+/// Acquire the Core lock. Silent on the happy path, loud when it is stuck — the happy path is
+/// every request, so this must add no log volume at all when things are healthy.
+async fn lock_core<'a>(core: &'a SharedCore, what: &str) -> tokio::sync::MutexGuard<'a, Core> {
+    match tokio::time::timeout(CORE_LOCK_STUCK, core.lock()).await {
+        Ok(guard) => guard,
+        Err(_) => {
+            let waited = Instant::now();
+            tracing::error!(
+                "core lock for {what} not acquired after {}s — the service is wedged: another \
+                 task is holding the Core guard, so every RPC, timer and poll is blocked behind \
+                 it. Clients connect to the socket fine and then time out on every request.",
+                CORE_LOCK_STUCK.as_secs()
+            );
+            let guard = core.lock().await;
+            tracing::error!(
+                "core lock for {what} recovered after a further {}ms",
+                waited.elapsed().as_millis()
+            );
+            guard
+        }
+    }
+}
 
 pub async fn run_server(
     core: SharedCore,
@@ -78,7 +109,7 @@ async fn handle_connection(core: SharedCore, conn: UnixStream) {
         }
     });
 
-    let mut events = core.lock().await.subscribe();
+    let mut events = lock_core(&core, "event subscribe").await.subscribe();
     let event_core = core.clone();
     let ev_tx = tx.clone();
     let event_task = tokio::spawn(async move {
@@ -141,8 +172,19 @@ async fn process_line(core: &SharedCore, line: &str) -> Value {
     let empty = json!({});
     let params = parsed.get("params").unwrap_or(&empty);
 
-    let mut guard = core.lock().await;
-    match guard.dispatch(method, params) {
+    let mut guard = lock_core(core, method).await;
+    let dispatched = Instant::now();
+    let outcome = guard.dispatch(method, params);
+    drop(guard);
+    // dispatch is synchronous and runs with the Core lock held, so a slow one stalls the entire
+    // service. Rare by construction, so this costs nothing in a healthy process.
+    if dispatched.elapsed() >= Duration::from_secs(1) {
+        tracing::error!(
+            "{method} held the core lock for {}ms",
+            dispatched.elapsed().as_millis()
+        );
+    }
+    match outcome {
         Ok(result) => json!({ "kind": "response", "id": id, "ok": true, "result": result }),
         Err(e) => {
             json!({ "kind": "response", "id": id, "ok": false, "code": e.code, "message": e.message })

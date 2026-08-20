@@ -71,8 +71,19 @@ fn ctrlc_set_handler(tx: watch::Sender<bool>) {
         for line in stdin.lock().lines().map_while(Result::ok) {
             if line.trim().eq_ignore_ascii_case("quit") {
                 let _ = tx.send(true);
-                break;
+                return;
             }
+        }
+        // stdin ended without a "quit" — it was redirected, or there is no console attached.
+        // Dropping `tx` here would be a disaster rather than a no-op: with the sender gone,
+        // every `shutdown.changed()` in the service resolves `Err` *immediately and forever*,
+        // so every `tokio::select!` that waits on it spins. The IPC accept loop in particular
+        // stops waiting for clients — it creates a pipe instance, instantly takes the shutdown
+        // branch, drops the instance and loops — which reads exactly like a hung service (the
+        // client connects and is never answered) while burning a core and flooding the log.
+        // Nothing can ask for shutdown any more, so park and keep the sender alive.
+        loop {
+            std::thread::park();
         }
     });
 }
