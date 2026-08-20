@@ -70,17 +70,13 @@
 
 !macro customInstall
   DetailPrint "Registering and starting the Talysman service..."
-  ; svcctl install: creates the LocalSystem auto-start service, configures SCM restart
-  ; recovery, and generates the one-time recovery code (written to
-  ; %PROGRAMDATA%\Talysman\recovery-code.txt and printed to the install log).
+  ; svcctl install creates the LocalSystem auto-start service, configures SCM restart actions,
+  ; and repairs native-messaging registration.
   nsExec::ExecToLog '"$INSTDIR\resources\bin\talysman-svcctl.exe" install'
   Pop $0
   ${If} $0 != 0
     MessageBox MB_OK|MB_ICONSTOP "Talysman could not install its background service (code $0).$\n$\nRestart Windows and run the installer again. If this continues, contact Talysman support." /SD IDOK
     Abort
-  ${EndIf}
-  ${IfNot} ${Silent}
-    MessageBox MB_OK|MB_ICONINFORMATION "Your Talysman recovery code was saved to:$\n  %PROGRAMDATA%\Talysman\recovery-code.txt$\n$\nSave it somewhere safe. It can unlock focus if you ever lose your USB key."
   ${EndIf}
 !macroend
 
@@ -89,7 +85,7 @@
   nsExec::ExecToStack '"$INSTDIR\resources\bin\talysman-svcctl.exe" guard-uninstall'
   Pop $0
   ${If} $0 == 10
-    MessageBox MB_OK|MB_ICONSTOP "Talysman is currently enforcing focus and no paired USB key is present.$\n$\nInsert your key (or run talysman-recover.exe with your recovery code), then uninstall again." /SD IDOK
+    MessageBox MB_OK|MB_ICONSTOP "Talysman is currently enforcing focus and no paired USB key is present.$\n$\nInsert your key, then uninstall again." /SD IDOK
     Abort
   ${ElseIf} $0 != 0
     MessageBox MB_OK|MB_ICONSTOP "Talysman could not verify that uninstall is safe (code $0).$\n$\nRestart Windows and try again. If this continues, contact Talysman support." /SD IDOK

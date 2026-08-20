@@ -333,7 +333,7 @@ pub fn apply_network(active: bool) {
     }
 }
 
-/// Remove all focus-toggled machine-level network changes (focus-off and the killswitch).
+/// Remove all focus-toggled machine-level network changes (focus-off or authorized uninstall).
 pub fn teardown_network() {
     wfp::clear_rules();
 }

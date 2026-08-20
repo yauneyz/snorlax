@@ -45,7 +45,6 @@ win:
       filter:
         - talysman-svc.exe
         - talysman-svcctl.exe
-        - talysman-recover.exe
         - talysman-natmsg.exe
         - WinDivert.dll
         - WinDivert64.sys
@@ -79,7 +78,6 @@ mac:
       filter:
         - talysman-svc
         - talysman-svcctl
-        - talysman-recover
         - talysman-natmsg
   category: public.app-category.productivity
   artifactName: ${productName}-${version}-${arch}.${ext}
@@ -92,7 +90,7 @@ mac:
   # service-version change, then verifies the restarted LaunchDaemon.
 
 # electron-builder signs the app bundle plus the Electron helpers/frameworks it knows about, but
-# never discovers the talysman-svc/svcctl/recover/natmsg binaries staged into
+# never discovers the talysman-svc/svcctl/natmsg binaries staged into
 # Contents/Resources/bin by scripts/build-native.mjs (extraResources above). Apple's notary
 # service rejects the whole bundle over those unsigned nested executables, so afterSign signs
 # them explicitly, folds the change back into the outer app's seal, and only then notarizes and
@@ -112,7 +110,6 @@ linux:
       filter:
         - talysman-svc
         - talysman-svcctl
-        - talysman-recover
         - talysman-natmsg
         - after-install.sh
         - before-remove.sh

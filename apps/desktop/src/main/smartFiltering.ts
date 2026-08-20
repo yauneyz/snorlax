@@ -5,11 +5,9 @@
  * session, so it is the one that turns the request into a call to the web backend's judge
  * endpoint and reports the verdict back.
  *
- * State: profiles/activeProfileId are cached from `stateChanged` / `profilesChanged` (the same
- * events tray.ts and handlers.ts already rely on) purely so a `judgeRequested` handler doesn't
- * have to round-trip `getState` on every request. `activePolicy()` (the same helper the daemon's
- * own mock uses to derive `ServiceState.policy`) resolves the active profile's policy from that
- * cache.
+ * The daemon captures the active intent into each `judgeRequested` event. That keeps a request
+ * self-contained and prevents a profile switch racing with Electron from judging the page against
+ * the wrong intent.
  *
  * Failure handling is deliberately silent: if `intent` is null (the active profile changed out
  * from under the request), or the web call fails/times out, we simply never call
@@ -18,13 +16,14 @@
  * requests on the floor rather than retry them.
  */
 
-import { activePolicy, type PolicyIntent, type Profile } from '@talysman/shared';
+import type { PolicyIntent } from '@talysman/shared';
 import { config } from './config.js';
 import { logger } from './logging.js';
 import { getAccessToken } from './auth/supabase.js';
 import type { ServiceConnection } from './service/connection.js';
 
-const JUDGE_FETCH_TIMEOUT_MS = 10_000;
+// Leave time for the daemon to receive the result before its 8-second authoritative fallback.
+const JUDGE_FETCH_TIMEOUT_MS = 6_000;
 
 interface JudgeIntentResponse {
   relevant: boolean;
@@ -60,49 +59,18 @@ async function callJudgeEndpoint(
  * `createTray` / `registerIpcHandlers` (see index.ts).
  */
 export function initSmartFiltering(service: ServiceConnection): void {
-  let profiles: Profile[] = [];
-  let activeProfileId = '';
-
-  service.on('stateChanged', ({ state }) => {
-    profiles = state.profiles;
-    activeProfileId = state.activeProfileId;
-  });
-  service.on('profilesChanged', (payload) => {
-    profiles = payload.profiles;
-    activeProfileId = payload.activeProfileId;
-  });
-  void service
-    .request('getState', undefined)
-    .then((state) => {
-      profiles = state.profiles;
-      activeProfileId = state.activeProfileId;
-    })
-    .catch((error: Error) => {
-      logger.warn(`[smart-filtering] initial state fetch failed: ${error.message}`);
-    });
-
-  service.on('judgeRequested', ({ requestId, url, extractedText }) => {
-    void handleJudgeRequested(service, profiles, activeProfileId, requestId, url, extractedText);
+  service.on('judgeRequested', ({ requestId, url, extractedText, intent }) => {
+    void handleJudgeRequested(service, requestId, url, extractedText, intent);
   });
 }
 
 async function handleJudgeRequested(
   service: ServiceConnection,
-  profiles: Profile[],
-  activeProfileId: string,
   requestId: string,
   url: string,
   extractedText: string,
+  intent: PolicyIntent,
 ): Promise<void> {
-  // The active profile may have changed between the daemon sending the request and us handling
-  // it (e.g. a schedule window fired, or the user switched profiles). If the profile we'd judge
-  // against no longer has Smart filtering on, skip — the daemon's timeout sweep resolves it.
-  const intent = activePolicy(profiles, activeProfileId).intent;
-  if (!intent) {
-    logger.debug(`[smart-filtering] skipping judgeRequested ${requestId}: no active intent`);
-    return;
-  }
-
   const token = await getAccessToken();
   if (!token) {
     logger.warn(`[smart-filtering] skipping judgeRequested ${requestId}: no auth session`);
@@ -122,7 +90,6 @@ async function handleJudgeRequested(
   try {
     await service.request('submitJudgeVerdict', {
       requestId,
-      url,
       relevant: verdict.relevant,
       reason: verdict.reason,
     });

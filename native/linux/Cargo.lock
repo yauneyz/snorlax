@@ -931,13 +931,11 @@ version = "0.5.0"
 dependencies = [
  "anyhow",
  "chrono",
- "hex",
  "image",
  "ksni",
  "rand",
  "serde",
  "serde_json",
- "sha2",
  "sysinfo",
  "talysman_common",
  "tokio",
@@ -949,8 +947,11 @@ dependencies = [
 name = "talysman_common"
 version = "0.5.0"
 dependencies = [
+ "hex",
+ "rand",
  "serde",
  "serde_json",
+ "sha2",
 ]
 
 [[package]]

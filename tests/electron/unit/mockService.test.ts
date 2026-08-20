@@ -52,15 +52,6 @@ describe('MockServiceConnection — focus and key gates', () => {
     expect(seen).toEqual([true, false]);
   });
 
-  it('recover bypasses the key gate', async () => {
-    const svc = new MockServiceConnection();
-    await pairMockKey(svc);
-    await svc.request('enableFocus', { reason: 'test' });
-    await svc.request('recover', { code: 'TEST-CODE-HERE' });
-    const state = await svc.request('getState', undefined);
-    expect(state.focusActive).toBe(false);
-  });
-
   it('refuses to remove the last paired key', async () => {
     const svc = new MockServiceConnection();
     const { key } = await pairMockKey(svc);

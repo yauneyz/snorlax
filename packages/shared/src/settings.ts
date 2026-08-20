@@ -27,9 +27,12 @@ export interface Settings {
    * unlike the other settings here, toggling it is never key-gated. Default on.
    */
   trayIconEnabled: boolean;
+  /** Build/runtime capability gate. Production sets false and uses classic policy semantics. */
+  smartFilteringEnabled: boolean;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
   browserHandshakeEnabled: false,
   trayIconEnabled: true,
+  smartFilteringEnabled: false,
 };

@@ -5,10 +5,19 @@ systemctl disable --now talysman >/dev/null 2>&1 || true
 rm -f /etc/systemd/system/talysman.service
 systemctl daemon-reload >/dev/null 2>&1 || true
 nft delete table inet talysman >/dev/null 2>&1 || true
+# Mirrors dns::remove_include() in native/linux/src/enforce/dns.rs, which this script cannot call
+# directly: by the time postrm runs, dpkg has already removed the packaged svcctl binary. Left in
+# place, this include survives apt purge and points dnsmasq at a conf-file under /run that never
+# exists post-reboot.
+rm -f /etc/dnsmasq.d/talysman.conf
+systemctl reload dnsmasq >/dev/null 2>&1 || pkill -HUP dnsmasq >/dev/null 2>&1 || true
 rm -f /etc/opt/chrome/native-messaging-hosts/com.talysman.host.json
 rm -f /etc/opt/chrome_for_testing/native-messaging-hosts/com.talysman.host.json
 rm -f /etc/chromium/native-messaging-hosts/com.talysman.host.json
 rm -f /etc/opt/edge/native-messaging-hosts/com.talysman.host.json
+rm -f /etc/brave/native-messaging-hosts/com.talysman.host.json
+rm -f /etc/opt/vivaldi/native-messaging-hosts/com.talysman.host.json
+rm -f /etc/opt/opera/native-messaging-hosts/com.talysman.host.json
 rm -f /usr/lib/mozilla/native-messaging-hosts/com.talysman.host.json
 
 # Best-effort app_uninstalled (architecture §7-8/Phase 8). Electron's userData is per-user

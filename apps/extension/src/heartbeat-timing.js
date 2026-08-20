@@ -8,7 +8,6 @@ export const IDLE_HEARTBEAT_MS = 60000;
  * may select the slower active cadence.
  */
 export function heartbeatDelayForState({ browser, blockingActive, handshakeEnabled }) {
-  if (browser === 'safari') return STRICT_HEARTBEAT_MS;
   if (blockingActive && handshakeEnabled !== false) return STRICT_HEARTBEAT_MS;
   return blockingActive ? ACTIVE_HEARTBEAT_MS : IDLE_HEARTBEAT_MS;
 }

@@ -22,10 +22,12 @@ import { flushEvents, track } from '../analytics.js';
 import type { ServiceConnection, ServiceError } from './connection.js';
 
 const RECONNECT_DELAY_MS = 1500;
+const RPC_TIMEOUT_MS = 15_000;
 
 interface Pending {
   resolve: (value: unknown) => void;
   reject: (err: ServiceError) => void;
+  timeout: NodeJS.Timeout;
 }
 
 type Listener = (payload: unknown) => void;
@@ -40,7 +42,7 @@ export class PipeServiceConnection implements ServiceConnection {
   connected = false;
 
   private socket: net.Socket | null = null;
-  private buffer = '';
+  private reconnectTimer: NodeJS.Timeout | null = null;
   private nextId = 1;
   private pending = new Map<number, Pending>();
   private listeners = new Map<EventName, Set<Listener>>();
@@ -57,13 +59,20 @@ export class PipeServiceConnection implements ServiceConnection {
   }
 
   private open(): void {
-    if (this.closed) return;
+    // A socket object represents both an in-progress connect and a live connection. Keeping one
+    // here prevents repeated connect() calls and reconnect timers from opening parallel pipes.
+    if (this.closed || this.socket) return;
     const socket = net.connect({ path: this.pipePath });
     this.socket = socket;
+    let buffer = '';
 
     socket.setEncoding('utf8');
 
     socket.on('connect', () => {
+      if (this.socket !== socket || this.closed) {
+        socket.destroy();
+        return;
+      }
       this.connected = true;
       logger.info(`[service] connected to ${this.pipePath}`);
       this.connectWaiters.forEach((w) => w());
@@ -81,9 +90,25 @@ export class PipeServiceConnection implements ServiceConnection {
         });
     });
 
-    socket.on('data', (chunk: string) => this.onData(chunk));
+    socket.on('data', (chunk: string) => {
+      // NDJSON fragments are connection-local. Never carry a partial line across a daemon
+      // restart: it could be completed by unrelated bytes from the next socket.
+      buffer += chunk;
+      let nl: number;
+      while ((nl = buffer.indexOf('\n')) !== -1) {
+        const line = buffer.slice(0, nl).trim();
+        buffer = buffer.slice(nl + 1);
+        if (!line) continue;
+        try {
+          this.dispatch(JSON.parse(line));
+        } catch {
+          logger.warn(`[service] bad line: ${line}`);
+        }
+      }
+    });
 
     socket.on('error', (e) => {
+      if (this.socket !== socket) return;
       logger.warn(`[service] socket error: ${(e).message}`);
       // Only the case a fresh install can't see: a previously-working connection just broke
       // mid-session. A not-yet-established connect attempt failing is already covered by
@@ -96,28 +121,25 @@ export class PipeServiceConnection implements ServiceConnection {
     });
 
     socket.on('close', () => {
+      if (this.socket !== socket) return;
       this.connected = false;
       this.socket = null;
-      // Reject anything in flight; the caller can retry.
-      for (const [, p] of this.pending) p.reject(makeError('DISCONNECTED', 'Service disconnected.'));
-      this.pending.clear();
-      if (!this.closed) setTimeout(() => this.open(), RECONNECT_DELAY_MS);
+      this.rejectPending(makeError('DISCONNECTED', 'Service disconnected.'));
+      if (!this.closed && this.reconnectTimer === null) {
+        this.reconnectTimer = setTimeout(() => {
+          this.reconnectTimer = null;
+          this.open();
+        }, RECONNECT_DELAY_MS);
+      }
     });
   }
 
-  private onData(chunk: string): void {
-    this.buffer += chunk;
-    let nl: number;
-    while ((nl = this.buffer.indexOf('\n')) !== -1) {
-      const line = this.buffer.slice(0, nl).trim();
-      this.buffer = this.buffer.slice(nl + 1);
-      if (!line) continue;
-      try {
-        this.dispatch(JSON.parse(line));
-      } catch (e) {
-        logger.warn(`[service] bad line: ${line}`);
-      }
+  private rejectPending(error: ServiceError): void {
+    for (const pending of this.pending.values()) {
+      clearTimeout(pending.timeout);
+      pending.reject(error);
     }
+    this.pending.clear();
   }
 
   private dispatch(msg: RpcResponse | EventMessage): void {
@@ -125,6 +147,7 @@ export class PipeServiceConnection implements ServiceConnection {
       const pending = this.pending.get(msg.id);
       if (!pending) return;
       this.pending.delete(msg.id);
+      clearTimeout(pending.timeout);
       if (msg.ok) pending.resolve(msg.result);
       else pending.reject(makeError(msg.code, msg.message));
     } else if (msg.kind === 'event') {
@@ -139,10 +162,18 @@ export class PipeServiceConnection implements ServiceConnection {
     const id = this.nextId++;
     const req: RpcRequest<M> = { kind: 'request', id, method, params };
     return new Promise<Result<M>>((resolve, reject) => {
-      this.pending.set(id, { resolve: resolve as (v: unknown) => void, reject });
-      this.socket!.write(`${JSON.stringify(req)}\n`, (e) => {
+      const socket = this.socket!;
+      const timeout = setTimeout(() => {
+        if (!this.pending.delete(id)) return;
+        reject(makeError('TIMEOUT', `Service request ${method} timed out.`));
+      }, RPC_TIMEOUT_MS);
+      this.pending.set(id, { resolve: resolve as (v: unknown) => void, reject, timeout });
+      socket.write(`${JSON.stringify(req)}\n`, (e) => {
         if (e) {
+          const pending = this.pending.get(id);
+          if (!pending) return;
           this.pending.delete(id);
+          clearTimeout(pending.timeout);
           reject(makeError('WRITE_FAILED', e.message));
         }
       });
@@ -158,6 +189,12 @@ export class PipeServiceConnection implements ServiceConnection {
 
   close(): void {
     this.closed = true;
+    if (this.reconnectTimer !== null) {
+      clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = null;
+    }
+    this.rejectPending(makeError('DISCONNECTED', 'Service connection closed.'));
+    this.connectWaiters = [];
     this.socket?.destroy();
     this.socket = null;
     this.connected = false;

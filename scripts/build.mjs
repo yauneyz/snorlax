@@ -226,7 +226,7 @@ run("node", [
   ...(crossWindowsFromLinux ? ["--cross"] : []),
 ]);
 
-// 1b. Browser extensions. Safari support is intentionally excluded for now.
+// 1b. Browser store extensions (Chromium and Firefox).
 run("node", ["scripts/build-extension.mjs"]);
 run("node", ["scripts/audit-extension.mjs"]);
 

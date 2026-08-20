@@ -1,8 +1,10 @@
 {
-  "$comment": "Language-neutral mirror of packages/shared/src/protocol.ts + events.ts. The TypeScript types are the source of truth; this file documents the same contract for the Rust service. Wire format: newline-delimited JSON, one message per line.",
-  "protocolVersion": 3,
+  "$comment": "Language-neutral mirror of packages/shared/src/protocol.ts + events.ts. NDJSON carries one envelope per line.",
+  "protocolVersion": 4,
   "transport": {
-    "windows": "named pipe \\\\.\\pipe\\talysman (dev: talysman-dev)"
+    "windows": "named pipe \\\\.\\pipe\\talysman (dev: talysman-dev)",
+    "linux": "Unix socket /run/talysman/talysman.sock",
+    "macos": "Unix socket /var/run/talysman/talysman.sock"
   },
   "envelopes": {
     "request": { "kind": "request", "id": "number", "method": "string", "params": "object" },
@@ -11,123 +13,78 @@
     "event": { "kind": "event", "event": "string", "payload": "object" }
   },
   "types": {
-    "AppRef": {
-      "windowsImageName": "string?",
-      "linuxProcessName": "string?",
-      "macBundleId": "string?",
-      "label": "string"
-    },
+    "AppRef": { "windowsImageName": "string?", "linuxProcessName": "string?", "macBundleId": "string?", "label": "string" },
+    "PolicyIntent": { "positive": "string", "negative": "string?" },
     "Policy": {
-      "mode": "blacklist|whitelist|block-all",
-      "domains": "string[]",
-      "apps": "AppRef[]"
+      "blockedDomains": "string[]",
+      "allowedDomains": "string[]",
+      "defaultAction": "allow|block",
+      "intent": "PolicyIntent|null",
+      "apps": "AppRef[]",
+      "$comment": "The sole current policy shape. Production classic filtering uses intent:null; feature rollout does not change the wire contract. Legacy mode/domains are accepted only while reading old persisted state."
     },
-    "Profile": {
-      "id": "string",
-      "name": "string",
-      "color": "string",
-      "policy": "Policy",
-      "$comment": "A named policy. Focus enforces exactly one profile at a time; ServiceState.policy is the derived active profile's policy."
-    },
-    "ScheduleWindow": {
-      "id": "string",
-      "days": "string[]",
-      "start": "HH:MM",
-      "end": "HH:MM",
-      "profileId": "string?",
-      "locked": "boolean",
-      "$comment": "profileId switches the active blocking profile for the length of the window; omitted keeps whatever is already active."
-    },
-    "Settings": {
-      "browserHandshakeEnabled": "boolean",
-      "trayIconEnabled": "boolean"
-    },
-    "BrowserHealth": {
-      "canBlock": "boolean",
-      "permissionsOk": "boolean",
-      "dnrRulesApplied": "number?"
-    },
+    "Profile": { "id": "string", "name": "string", "color": "string", "policy": "Policy" },
+    "ScheduleWindow": { "id": "string", "days": "string[]", "start": "HH:MM", "end": "HH:MM", "profileId": "string?", "locked": "boolean" },
+    "Schedule": { "windows": "ScheduleWindow[]" },
+    "Settings": { "browserHandshakeEnabled": "boolean", "trayIconEnabled": "boolean", "smartFilteringEnabled": "boolean" },
+    "BrowserHealth": { "canBlock": "boolean", "permissionsOk": "boolean", "dnrRulesApplied": "number?" },
+    "FocusSource": "user|schedule|boot",
     "TransitionKind": "focusOn|focusOff|scheduleFired|keyPresent|keyAbsent",
-    "UsageTransition": {
-      "seq": "number",
-      "at": "number",
-      "kind": "TransitionKind",
-      "source": "user|schedule|boot|recover",
-      "$comment": "One entry in the exact-usage transition log (architecture §7/Phase 7). seq is the monotonic drain cursor; at is epoch ms."
+    "UsageTransition": { "seq": "number", "at": "number", "kind": "TransitionKind", "source": "FocusSource" },
+    "ServiceState": {
+      "protocolVersion": "number",
+      "serviceVersion": "string",
+      "focusActive": "boolean",
+      "focusSource": "FocusSource",
+      "profiles": "Profile[]",
+      "activeProfileId": "string",
+      "policy": "Policy",
+      "schedule": "Schedule",
+      "settings": "Settings",
+      "pairedKeys": "PairedKey[]",
+      "keyPresent": "boolean",
+      "presentKeyId": "string?",
+      "scheduleLocked": "boolean"
     }
   },
   "methods": {
     "getState": { "params": null, "result": "ServiceState" },
     "ping": { "params": null, "result": { "version": "string", "protocolVersion": "number" } },
     "getKeyPresence": { "params": null, "result": { "present": "boolean", "keyId": "string?" } },
-    "setPolicy": {
-      "params": { "policy": "Policy" },
-      "result": { "ok": true },
-      "errors": ["KEY_REQUIRED"],
-      "$comment": "Shorthand for setProfile on the active profile."
-    },
-    "setProfile": {
-      "params": { "profile": "Profile" },
-      "result": { "ok": true },
-      "errors": ["KEY_REQUIRED", "BAD_REQUEST"],
-      "$comment": "Create or replace one profile. Relaxing any profile's policy is key-gated, active or not — a locked window may switch to it later."
-    },
-    "deleteProfile": {
-      "params": { "profileId": "string" },
-      "result": { "ok": true },
-      "errors": ["KEY_REQUIRED", "LOCKED", "LAST_PROFILE", "BAD_REQUEST"],
-      "$comment": "Key-gated when the profile is active or referenced by a schedule window. Orphaned windows fall back to the active profile."
-    },
-    "setActiveProfile": {
-      "params": { "profileId": "string" },
-      "result": { "ok": true },
-      "errors": ["KEY_REQUIRED", "LOCKED", "BAD_REQUEST"],
-      "$comment": "Refused inside a locked window; key-gated when the switch loosens blocking and focus is active (or a locked window exists)."
-    },
+    "setPolicy": { "params": { "policy": "Policy" }, "result": { "ok": true }, "errors": ["KEY_REQUIRED"] },
+    "setProfile": { "params": { "profile": "Profile" }, "result": { "ok": true }, "errors": ["KEY_REQUIRED", "BAD_REQUEST"] },
+    "deleteProfile": { "params": { "profileId": "string" }, "result": { "ok": true }, "errors": ["KEY_REQUIRED", "LOCKED", "LAST_PROFILE", "BAD_REQUEST"] },
+    "setActiveProfile": { "params": { "profileId": "string" }, "result": { "ok": true }, "errors": ["KEY_REQUIRED", "LOCKED", "BAD_REQUEST"] },
     "setSchedule": { "params": { "schedule": "Schedule" }, "result": { "ok": true } },
-    "setBrowserHandshake": {
-      "params": { "enabled": "boolean" },
-      "result": { "ok": true },
-      "errors": ["KEY_REQUIRED", "LOCKED"],
-      "$comment": "Enabling is free; disabling is key-gated exactly like disableFocus."
-    },
-    "setTrayIconEnabled": {
-      "params": { "enabled": "boolean" },
-      "result": { "ok": true },
-      "$comment": "Purely cosmetic (not a security boundary) — never gated, unlike the other settings."
-    },
+    "setBrowserHandshake": { "params": { "enabled": "boolean" }, "result": { "ok": true }, "errors": ["KEY_REQUIRED", "LOCKED"] },
+    "setTrayIconEnabled": { "params": { "enabled": "boolean" }, "result": { "ok": true } },
+    "setSmartFilteringEnabled": { "params": { "enabled": "boolean" }, "result": { "ok": true } },
     "extHeartbeat": {
-      "params": { "browserPid": "number", "browser": "string", "profileId": "string?", "extensionVersion": "string?", "lockedActive": "boolean?", "health": "BrowserHealth" },
-      "result": { "ok": true },
-      "$comment": "Relayed by talysman-natmsg from the extension. Fire-and-forget; feeds the watchdog. browserPid is the host's parent process (the browser instance)."
+      "params": { "browserPid": "number", "browser": "string", "workerSessionId": "string?", "sequence": "number?", "sentAt": "number?", "extensionVersion": "string?", "lockedActive": "boolean?", "health": "BrowserHealth" },
+      "result": { "heartbeat": { "sequence": "number", "browserPid": "number", "healthy": "boolean" } }
     },
     "enableFocus": { "params": { "reason": "string?" }, "result": { "ok": true }, "errors": ["NO_PAIRED_KEY"] },
     "disableFocus": { "params": {}, "result": { "ok": true }, "errors": ["KEY_REQUIRED", "LOCKED"] },
-    "drainUsage": {
-      "params": { "afterSeq": "number" },
-      "result": { "transitions": "UsageTransition[]", "latestSeq": "number" },
-      "$comment": "Architecture §7/Phase 7. Additive since PROTOCOL_VERSION 3 — an older service answers BAD_REQUEST and the desktop client falls back to observed-usage."
-    },
+    "drainUsage": { "params": { "afterSeq": "number" }, "result": { "transitions": "UsageTransition[]", "latestSeq": "number" } },
     "listRemovableDrives": { "params": null, "result": { "drives": "Drive[]" } },
     "pairKey": { "params": { "driveId": "string", "label": "string" }, "result": { "key": "PairedKey" } },
     "unpairKey": { "params": { "keyId": "string" }, "result": { "ok": true }, "errors": ["KEY_REQUIRED", "LAST_PAIRED_KEY"] },
-    "recover": {
-      "params": { "code": "string" },
-      "result": { "ok": true },
-      "errors": ["BAD_RECOVERY_CODE"],
-      "$comment": "Privileged out-of-band killswitch — not surfaced in the UI; used by talysman-recover.exe. Bypasses the USB + locked gates when the code matches."
-    }
+    "judgeRequest": { "params": { "requestId": "string", "url": "string", "extractedText": "string" }, "result": { "ok": true } },
+    "submitJudgeVerdict": { "params": { "requestId": "string", "relevant": "boolean", "reason": "string" }, "result": { "ok": true } }
   },
   "events": {
+    "stateChanged": { "state": "ServiceState" },
     "keyPresenceChanged": { "present": "boolean", "keyId": "string?" },
-    "focusChanged": { "active": "boolean", "source": "user|schedule|boot|recover" },
+    "focusChanged": { "active": "boolean", "source": "FocusSource" },
     "policyChanged": { "policy": "Policy" },
     "profilesChanged": { "profiles": "Profile[]", "activeProfileId": "string" },
     "scheduleFired": { "windowId": "string", "active": "boolean" },
     "settingsChanged": { "settings": "Settings" },
     "browserWatchdogWarning": { "browser": "string", "pid": "number" },
     "browserWatchdogKilled": { "browser": "string", "pid": "number" },
-    "extensionHeartbeat": { "browser": "string", "pid": "number", "extensionVersion": "string?", "healthy": "boolean" }
+    "extensionHeartbeat": { "browser": "string", "pid": "number", "extensionVersion": "string?", "healthy": "boolean" },
+    "judgeRequested": { "requestId": "string", "url": "string", "extractedText": "string", "intent": "PolicyIntent" },
+    "judgeResult": { "requestId": "string", "url": "string", "relevant": "boolean", "reason": "string" }
   },
-  "errorCodes": ["KEY_REQUIRED", "NO_PAIRED_KEY", "LAST_PAIRED_KEY", "LAST_PROFILE", "LOCKED", "BAD_RECOVERY_CODE", "BAD_REQUEST", "INTERNAL"]
+  "errorCodes": ["KEY_REQUIRED", "NO_PAIRED_KEY", "LAST_PAIRED_KEY", "LAST_PROFILE", "LOCKED", "BAD_REQUEST", "INTERNAL"]
 }

@@ -1,17 +1,16 @@
-//! talysman-svcctl for macOS. Installs/removes the LaunchDaemon and manages recovery codes.
+//! talysman-svcctl for macOS. Installs/removes the LaunchDaemon.
 
 use std::io::{BufRead, BufReader, Write};
 use std::os::unix::net::UnixStream;
 use std::path::PathBuf;
 use std::process::Command;
+use std::time::Duration;
 
 use anyhow::{bail, Context, Result};
 
 use talysman::constants::{socket_path, PIPE_BASE_PROD, SERVICE_NAME};
 use talysman::launchd;
-use talysman::pairing;
 use talysman::paths;
-use talysman::secure_store::SecureStore;
 
 fn svc_exe_path() -> Result<PathBuf> {
     let dir = std::env::current_exe()?
@@ -43,9 +42,7 @@ fn install() -> Result<()> {
         launchd::plist_text(&exe.to_string_lossy()),
     )
     .context("write LaunchDaemon plist")?;
-    // Installation is also the repair/upgrade path. Preserve the original killswitch while
-    // replacing/restarting the daemon from the newly installed application bundle.
-    ensure_recovery_code()?;
+    // Installation is also the repair/upgrade path for the daemon and its manifest.
     // Reload cleanly if a previous copy is loaded; "not loaded" is fine.
     launchd::bootout();
     if !launchd::bootstrap().context("launchctl bootstrap")? {
@@ -86,60 +83,50 @@ fn status() -> Result<()> {
     )
 }
 
-fn gen_code() -> Result<()> {
-    let code = pairing::generate_recovery_code();
-    let mut store = SecureStore::load();
-    store.recovery = Some(pairing::hash_recovery_code(&code));
-    store.save().context("save secure store")?;
-
-    let path = paths::recovery_code_file();
-    let _ = std::fs::write(&path, format!("Talysman recovery code: {code}\n"));
-
-    println!("\n==================== Talysman RECOVERY CODE ====================");
-    println!("  {code}");
-    println!("  Save this somewhere safe. If you ever get locked out and can't");
-    println!("  use your USB key, run: talysman-recover --code {code}");
-    println!("  (also written to {})", path.display());
-    println!("================================================================\n");
-    Ok(())
-}
-
-fn ensure_recovery_code() -> Result<()> {
-    if SecureStore::load().recovery.is_some() {
-        println!(
-            "Existing Talysman recovery code preserved ({}).",
-            paths::recovery_code_file().display()
-        );
-        return Ok(());
-    }
-    gen_code()
-}
-
 fn guard_uninstall() -> Result<()> {
     let path = socket_path(PIPE_BASE_PROD);
     let mut stream = match UnixStream::connect(&path) {
         Ok(s) => s,
         Err(_) => return Ok(()),
     };
+    // A connected-but-unresponsive service must not hang the uninstaller indefinitely; fail
+    // closed after 5 seconds instead. Matches the Windows guard's timeout
+    // (native/windows/src/bin/svcctl.rs, query_uninstall_guard).
+    stream
+        .set_read_timeout(Some(Duration::from_secs(5)))
+        .context("set uninstall safety-check timeout")?;
     stream.write_all(b"{\"kind\":\"request\",\"id\":1,\"method\":\"getState\",\"params\":{}}\n")?;
     let mut reader = BufReader::new(stream);
     let mut line = String::new();
-    while reader.read_line(&mut line)? != 0 {
-        if let Ok(v) = serde_json::from_str::<serde_json::Value>(line.trim()) {
-            if v.get("kind").and_then(|k| k.as_str()) == Some("response") {
-                let r = &v["result"];
-                let focus = r["focusActive"].as_bool().unwrap_or(false);
-                let key = r["keyPresent"].as_bool().unwrap_or(false);
-                if focus && !key {
-                    eprintln!("uninstall blocked: focus active and no key present");
-                    std::process::exit(10);
+    loop {
+        match reader.read_line(&mut line) {
+            Ok(0) => return Ok(()),
+            Ok(_) => {
+                if let Ok(v) = serde_json::from_str::<serde_json::Value>(line.trim()) {
+                    if v.get("kind").and_then(|k| k.as_str()) == Some("response") {
+                        let r = &v["result"];
+                        let focus = r["focusActive"].as_bool().unwrap_or(false);
+                        let key = r["keyPresent"].as_bool().unwrap_or(false);
+                        if focus && !key {
+                            eprintln!("uninstall blocked: focus active and no key present");
+                            std::process::exit(10);
+                        }
+                        return Ok(());
+                    }
                 }
-                return Ok(());
+                line.clear();
             }
+            Err(e)
+                if matches!(
+                    e.kind(),
+                    std::io::ErrorKind::WouldBlock | std::io::ErrorKind::TimedOut
+                ) =>
+            {
+                bail!("service did not respond to the uninstall safety check within 5 seconds");
+            }
+            Err(e) => return Err(e.into()),
         }
-        line.clear();
     }
-    Ok(())
 }
 
 fn main() {
@@ -150,11 +137,10 @@ fn main() {
         "start" => start(),
         "stop" => stop(),
         "status" => status(),
-        "gen-code" => gen_code(),
         "guard-uninstall" => guard_uninstall(),
         _ => {
             eprintln!(
-                "usage: talysman-svcctl <install|uninstall|start|stop|status|gen-code|guard-uninstall>"
+                "usage: talysman-svcctl <install|uninstall|start|stop|status|guard-uninstall>"
             );
             std::process::exit(2);
         }

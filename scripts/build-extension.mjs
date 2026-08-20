@@ -407,7 +407,6 @@ writeFileSync(
       edgeDev: chromeSideloadId,
       edgeStore: identities.edgeStoreId || null,
       firefox: FIREFOX_ID,
-      safari: null,
     },
     null,
     2,

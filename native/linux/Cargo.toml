@@ -2,7 +2,7 @@
 name = "talysman-linux"
 version = "0.5.0"
 edition = "2021"
-description = "Talysman privileged Linux service + installer + recovery killswitch."
+description = "Talysman privileged Linux service and installer."
 publish = false
 
 [lib]
@@ -16,10 +16,6 @@ path = "src/main.rs"
 [[bin]]
 name = "talysman-svcctl"
 path = "src/bin/svcctl.rs"
-
-[[bin]]
-name = "talysman-recover"
-path = "src/bin/recover.rs"
 
 [[bin]]
 name = "talysman-natmsg"
@@ -41,11 +37,9 @@ path = "src/bin/tray.rs"
 anyhow = "1"
 chrono = { version = "0.4", default-features = false, features = ["clock"] }
 talysman_common = { path = "../common" }
-hex = "0.4"
 rand = "0.8"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-sha2 = "0.10"
 sysinfo = "0.30"
 tokio = { version = "1", features = ["rt-multi-thread", "net", "time", "sync", "io-util", "io-std", "macros", "signal"] }
 tracing = "0.1"

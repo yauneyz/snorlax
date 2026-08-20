@@ -32,7 +32,7 @@ export async function uninstallService(service: ServiceConnection): Promise<Unin
     };
   }
 
-  // Mirror talysman-svcctl's own killswitch guard so a blocked uninstall is reported before an
+  // Mirror talysman-svcctl's own focus/key guard so a blocked uninstall is reported before an
   // administrator prompt, not after one.
   if (service.connected) {
     try {
@@ -41,7 +41,7 @@ export async function uninstallService(service: ServiceConnection): Promise<Unin
         return {
           ok: false,
           blocked: true,
-          message: 'Focus is currently active and no paired USB key is present. Insert your key, or unlock with your recovery code, then try again.',
+          message: 'Focus is currently active and no paired USB key is present. Insert your key, then try again.',
         };
       }
     } catch (error) {
@@ -58,7 +58,7 @@ export async function uninstallService(service: ServiceConnection): Promise<Unin
     await runElevatedServiceCommand('uninstall');
   } catch (error) {
     // osascript folds a declined admin prompt and a genuine failure into one generic error, and
-    // talysman-svcctl's own killswitch guard exits nonzero too — don't guess which happened, just
+    // talysman-svcctl's own safety guard exits nonzero too — don't guess which happened, just
     // verify the actual launchd/plist state below instead of trusting this catch.
     logger.warn('[uninstaller] elevated uninstall command reported an error', error);
   }

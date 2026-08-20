@@ -171,12 +171,26 @@ async fn handle_connection(
 
     // Event task: forward pushed service events to this client.
     let mut events = core.lock().await.subscribe();
+    let event_core = core.clone();
     let ev_tx = tx.clone();
     let event_task = tokio::spawn(async move {
-        while let Ok(value) = events.recv().await {
-            let line = format!("{value}\n");
-            if ev_tx.send(line).await.is_err() {
-                break;
+        loop {
+            match events.recv().await {
+                Ok(value) => {
+                    if ev_tx.send(format!("{value}\n")).await.is_err() {
+                        break;
+                    }
+                }
+                Err(tokio::sync::broadcast::error::RecvError::Lagged(skipped)) => {
+                    tracing::warn!("IPC client lagged by {skipped} events");
+                    let state = event_core.lock().await.snapshot();
+                    let value = json!({ "kind": "event", "event": "stateChanged", "payload": { "state": state } });
+                    if ev_tx.send(format!("{value}\n")).await.is_err() {
+                        break;
+                    }
+                    continue;
+                }
+                Err(tokio::sync::broadcast::error::RecvError::Closed) => break,
             }
         }
     });

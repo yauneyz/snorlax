@@ -4,8 +4,7 @@ This directory is **populated by the build** (`scripts/build-native.mjs --target
 `cargo build --release` in `native/windows` and copies the binaries here:
 
 - `talysman-svc.exe` — the privileged service
-- `talysman-svcctl.exe` — elevated install/configure/recover CLI
-- `talysman-recover.exe` — the killswitch
+- `talysman-svcctl.exe` — elevated install/configure/remove CLI
 
 Electron Builder embeds this target-specific folder into the app's `resources/bin/` at package
 time (see `electron-builder.yml` -> `win.extraResources`). Release builds intentionally do not

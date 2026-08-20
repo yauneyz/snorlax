@@ -1,11 +1,11 @@
 //! Native-messaging registration for the user-installed Talysman browser extension.
 //!
-//! The extension is the browser request-layer blocker: it receives live `{active, mode, domains}`
+//! The extension is the browser request-layer blocker: it receives the canonical live policy
 //! state over native messaging (host: talysman-natmsg.exe) and applies declarativeNetRequest rules
 //! above TLS, so ECH/QUIC/VPN/connection reuse do not hide requests from it.
 //!
 //! Lifecycle is persistent, not focus-toggled. We register the local native host at service startup
-//! and remove that registration on a full recover/uninstall. Browser installation remains under the
+//! and remove that registration on uninstall. Browser installation remains under the
 //! user's control through each browser's official extension store.
 //!
 //! All registry writes are HKLM (LocalSystem can write; users cannot). Request-layer blocking lives
@@ -61,6 +61,18 @@ const CHROMIUM_BROWSERS: &[(&str, &str, &str, &str)] = &[
         r"SOFTWARE\Chromium",
         CHROME_EXT_ID,
     ),
+    (
+        "Vivaldi",
+        r"SOFTWARE\Policies\Vivaldi",
+        r"SOFTWARE\Vivaldi",
+        CHROME_EXT_ID,
+    ),
+    (
+        "Opera",
+        r"SOFTWARE\Policies\Opera Software\Opera Stable",
+        r"SOFTWARE\Opera Software\Opera Stable",
+        CHROME_EXT_ID,
+    ),
 ];
 
 /// Locate the shipped native-messaging host exe (sibling of the running service binary).
@@ -98,6 +110,13 @@ fn firefox_manifest(exe: &Path) -> String {
     .to_string()
 }
 
+fn write_if_changed(path: &Path, contents: &str) -> std::io::Result<()> {
+    if std::fs::read_to_string(path).ok().as_deref() == Some(contents) {
+        return Ok(());
+    }
+    std::fs::write(path, contents)
+}
+
 /// Write and register the native host for each browser. Idempotent — safe to call on every startup.
 /// Extension installation is deliberately not performed here: consumer browser-store installs must
 /// remain user initiated and removable through the browser's normal controls.
@@ -112,10 +131,10 @@ pub fn install() {
     }
     let chromium_path = nmh_dir().join("chromium.json");
     let firefox_path = nmh_dir().join("firefox.json");
-    if let Err(e) = std::fs::write(&chromium_path, chromium_manifest(&exe)) {
+    if let Err(e) = write_if_changed(&chromium_path, &chromium_manifest(&exe)) {
         tracing::warn!("extension_policy: write chromium manifest failed: {e}");
     }
-    if let Err(e) = std::fs::write(&firefox_path, firefox_manifest(&exe)) {
+    if let Err(e) = write_if_changed(&firefox_path, &firefox_manifest(&exe)) {
         tracing::warn!("extension_policy: write firefox manifest failed: {e}");
     }
 
@@ -143,7 +162,7 @@ pub fn install() {
     tracing::info!("extension_policy: native host registered");
 }
 
-/// Remove native-host registration on full recover / uninstall. The store extension remains under
+/// Remove native-host registration on uninstall. The store extension remains under
 /// the user's control and can be removed using the browser UI.
 pub fn uninstall() {
     for (_, _, app_root, _) in CHROMIUM_BROWSERS {

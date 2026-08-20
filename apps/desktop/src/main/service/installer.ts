@@ -5,6 +5,7 @@ import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
 import { app, dialog } from 'electron';
+import { PROTOCOL_VERSION } from '@talysman/shared';
 import { logger } from '../logging.js';
 import { track } from '../analytics.js';
 import type { ServiceConnection } from './connection.js';
@@ -65,20 +66,22 @@ export async function runElevatedServiceCommand(subcommand: 'install' | 'uninsta
 
 async function waitForServiceVersion(service: ServiceConnection, expectedVersion: string): Promise<void> {
   const deadline = Date.now() + SERVICE_RECONNECT_TIMEOUT_MS;
-  let lastVersion = 'unreachable';
+  let lastIdentity = 'unreachable';
   while (Date.now() < deadline) {
     if (service.connected) {
       try {
         const ping = await service.request('ping', undefined);
-        lastVersion = ping.version;
-        if (ping.version === expectedVersion) return;
+        lastIdentity = `${ping.version}/protocol-${ping.protocolVersion}`;
+        if (ping.version === expectedVersion && ping.protocolVersion === PROTOCOL_VERSION) return;
       } catch {
         // The pipe is expected to disappear briefly while the service restarts.
       }
     }
     await new Promise((resolve) => setTimeout(resolve, SERVICE_RECONNECT_POLL_MS));
   }
-  throw new Error(`Service did not report version ${expectedVersion} within 60 seconds (last: ${lastVersion}).`);
+  throw new Error(
+    `Service did not report ${expectedVersion}/protocol-${PROTOCOL_VERSION} within 60 seconds (last: ${lastIdentity}).`,
+  );
 }
 
 /**
@@ -105,26 +108,28 @@ export async function ensureServiceInstalled(): Promise<void> {
 
 /**
  * Reconcile the privileged service after an application update. Install/repair is idempotent:
- * native controllers preserve the existing recovery code and restart the service in place.
+ * native controllers repair registration and restart the service in place.
  */
 export async function ensureServiceCurrent(service: ServiceConnection): Promise<void> {
   if (!app.isPackaged) return;
 
-  let runningVersion: string;
+  let running: { version: string; protocolVersion: number };
   try {
-    runningVersion = (await service.request('ping', undefined)).version;
+    running = await service.request('ping', undefined);
   } catch (error) {
     logger.warn('[installer] cannot query service version', error);
     return;
   }
 
   const expectedVersion = app.getVersion();
-  if (runningVersion === expectedVersion) {
-    logger.info(`[installer] service is current (${runningVersion})`);
+  if (running.version === expectedVersion && running.protocolVersion === PROTOCOL_VERSION) {
+    logger.info(`[installer] service is current (${running.version}/protocol-${running.protocolVersion})`);
     return;
   }
 
-  logger.warn(`[installer] service ${runningVersion} differs from app ${expectedVersion}; repairing`);
+  logger.warn(
+    `[installer] service ${running.version}/protocol-${running.protocolVersion} differs from app ${expectedVersion}/protocol-${PROTOCOL_VERSION}; repairing`,
+  );
   track('service_install_started', { platform: process.platform });
   try {
     await runElevatedServiceCommand('install');
@@ -145,5 +150,8 @@ export async function ensureServiceCurrent(service: ServiceConnection): Promise<
       buttons: ['OK'],
       noLink: true,
     });
+    // Do not continue booting against the stale daemon. Protocol-v4 changed the authoritative
+    // policy shape; carrying on would turn a visible repair failure into undefined enforcement.
+    throw error;
   }
 }

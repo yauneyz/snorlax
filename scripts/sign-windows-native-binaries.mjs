@@ -12,7 +12,7 @@ import {
  * electron-builder's own Windows signing pass (app-builder-lib's WinPackager.signApp) only
  * signs the top-level app exe plus files under resources/app.asar.unpacked and
  * resources/swiftshader — it never walks resources/bin, where scripts/build-native.mjs stages
- * talysman-svc/svcctl/recover/natmsg.exe via extraResources. Sign those explicitly here, before
+ * talysman-svc/svcctl/natmsg.exe via extraResources. Sign those explicitly here, before
  * the NSIS installer bundles them.
  */
 export default async function afterPack(context) {

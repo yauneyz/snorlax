@@ -5,8 +5,7 @@ One crate, three binaries (see `Cargo.toml`):
 | Binary | Role |
 |---|---|
 | `talysman-svc.exe` | The privileged service. SCM-managed (LocalSystem, auto-start). Run `--console` for a foreground dev instance. |
-| `talysman-svcctl.exe` | Elevated install/configure/recover/remove CLI. Generates the recovery code at install. |
-| `talysman-recover.exe` | The killswitch — `--code XXXX-XXXX-XXXX` force-disables focus and tears down enforcement. |
+| `talysman-svcctl.exe` | Elevated install/configure/remove CLI. |
 | `talysman-natmsg.exe` | Browser native-messaging host. Bridges the Talysman extension ⇄ the service pipe, pushing live `{active, mode, domains}`. Spawned by the browser; not user-run. |
 
 ## Enforcement (v1 pragmatic subset)
@@ -39,7 +38,7 @@ documented in `apps/extension/README.md`.
 ## Build
 
 ```powershell
-cargo build --release   # produces target\release\talysman-{svc,svcctl,recover}.exe
+cargo build --release   # produces target\release\talysman-{svc,svcctl,natmsg}.exe
 ```
 
 `scripts/build-native-win.mjs` runs this and stages the binaries into

@@ -17,8 +17,8 @@ because:
 - **VPNs** tunnel the wire path; the extension still sees browser URLs and blocks before the request
   leaves the browser.
 
-The extension is the request-layer blocker for Safari, Firefox, and Chromium variants. We do not
-use Chromium enterprise `URLBlocklist` policy for this anymore.
+The extension is the request-layer blocker for Firefox and Chromium variants. Safari is currently
+classified as unsupported because no Safari extension is shipped.
 
 ## How it works
 
@@ -42,10 +42,7 @@ service (named pipe)  ──►  talysman-natmsg.exe  ──►  extension backg
   focus state, reconnect/fail-safe state, and rule-application health. It never receives or displays
   the user's configured domains; blocking remains controlled by the desktop app.
 - `talysman-natmsg` (`talysman-natmsg.exe` on Windows) — bridges browser stdio ⇄ the service IPC,
-  deriving `{active, mode, domains}` from `getState` plus the `focusChanged`/`policyChanged` events.
-- Safari uses the same JavaScript and DNR policy logic with Safari-compatible `urlFilter` domain
-  rules. Its `SafariWebExtensionHandler` performs short native-message synchronizations directly
-  against the macOS service socket and tags heartbeats with Safari's root process ID.
+  relaying the canonical protocol-v4 policy from `getState` and pushed events.
 
 ## Installation and native-host registration
 
@@ -75,11 +72,6 @@ talysman-chrome-source-<version>.zip
 talysman-edge-source-<version>.zip
 talysman-firefox-source-<version>.zip
 ```
-
-On macOS the same command additionally generates `talysman-safari-<version>.zip`, an Xcode project,
-and `dist/safari-appex/Talysman Safari Extension.appex`. Xcode's
-`safari-web-extension-packager` creates the wrapper; the committed Swift handler and entitlements
-are overlaid before `xcodebuild` compiles it. Windows and Linux omit these outputs without warning.
 
 `pnpm release:extension` rebuilds and audits those packages, then copies the store upload artifacts
 to `apps/extension/release/store/`:
@@ -129,8 +121,6 @@ The `HOST_NAME` (`com.talysman.host`) must match between `background.js` and
 2. **Build + load unpacked (dev/testers):** `pnpm build:extension`, then load
    `apps/extension/dist/chrome` in Chrome or `apps/extension/dist/edge-dev` in Edge. Open the toolbar
    action to verify the connection and focus status; the popup intentionally contains no controls.
-   On macOS, the same command also compiles Safari. A full `pnpm build:mac` embeds it in
-   `Talysman.app`; enable Talysman under Safari Settings > Extensions after installing the app.
 3. **Store release prep:** `pnpm release:extension`, then inspect
    `apps/extension/release/store/` and `apps/extension/release/store-submission.json`.
 4. **End-to-end:** run the service (`talysman-svc --console`), enable focus with `reddit.com`

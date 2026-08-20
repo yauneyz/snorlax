@@ -88,16 +88,11 @@ export function normalizeDomains(domains) {
 }
 
 /**
- * Turn a normalized domain list into DNR match conditions for one policy list (either
- * `blockedDomains` or `allowedDomains`). Safari's DNR implementation does not support Chromium's
- * `requestDomains` condition, so it gets one `urlFilter` rule per domain (`||example.com^`)
- * instead of a single condition covering the whole list.
+ * Turn a normalized domain list into DNR match conditions for one policy list.
  * @param {string[]} domains
- * @param {boolean} safari
  * @returns {object[]}
  */
-function domainConditionsFor(domains, safari) {
-  if (safari) return domains.map((domain) => ({ urlFilter: `||${domain}^` }));
+function domainConditionsFor(domains) {
   return domains.length > 0 ? [{ requestDomains: domains }] : [];
 }
 
@@ -122,19 +117,16 @@ function domainConditionsFor(domains, safari) {
  *     load normally so the Smart-filtering judge path in background.js can act on them after the
  *     fact. Only `blockedDomains` is blocked via DNR in that case.
  *
- * Safari's DNR implementation does not support Chromium's `requestDomains` condition. Its
- * equivalent is one `urlFilter` rule per domain (`||example.com^`).
  * @param {State} state
- * @param {{ safari?: boolean }} [options]
  * @returns {object[]}
  */
-export function buildRules(state, options = {}) {
+export function buildRules(state) {
   if (!state || !state.active) return [];
 
   const blocked = normalizeDomains(state.blockedDomains);
   const allowed = normalizeDomains(state.allowedDomains);
-  const blockedConditions = domainConditionsFor(blocked, !!options.safari);
-  const allowedConditions = domainConditionsFor(allowed, !!options.safari);
+  const blockedConditions = domainConditionsFor(blocked);
+  const allowedConditions = domainConditionsFor(allowed);
 
   let id = 1;
   const rules = [];

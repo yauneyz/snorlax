@@ -300,6 +300,13 @@ export class MockServiceConnection implements ServiceConnection {
         return OK;
       }
 
+      case 'setSmartFilteringEnabled': {
+        const enabled = (params as Params<'setSmartFilteringEnabled'>).enabled;
+        this.state.settings = { ...this.state.settings, smartFilteringEnabled: enabled };
+        this.emit('settingsChanged', { settings: this.state.settings });
+        return OK;
+      }
+
       case 'extHeartbeat': {
         // The mock has no real browsers to watch, but it still announces the beat so the UI's
         // "extension is talking to us" signal behaves the same as against the real service.
@@ -310,7 +317,13 @@ export class MockServiceConnection implements ServiceConnection {
           extensionVersion: beat.extensionVersion,
           healthy: beat.health.canBlock && beat.health.permissionsOk,
         });
-        return OK;
+        return {
+          heartbeat: {
+            sequence: beat.sequence ?? 0,
+            browserPid: beat.browserPid,
+            healthy: beat.health.canBlock && beat.health.permissionsOk,
+          },
+        } as Result<M>;
       }
 
       case 'drainUsage': {
@@ -352,14 +365,6 @@ export class MockServiceConnection implements ServiceConnection {
         }
         return OK;
       }
-
-      case 'recover':
-        // Mock accepts any non-empty code so dev/e2e can exercise the unlock path.
-        if (!(params as Params<'recover'>).code) throw err(ErrorCode.BAD_RECOVERY_CODE, 'Empty code.');
-        this.state.focusActive = false;
-        this.state.focusSource = 'recover';
-        this.emit('focusChanged', { active: false, source: 'recover' });
-        return OK;
 
       default:
         throw err(ErrorCode.BAD_REQUEST, `Unknown method: ${String(method)}`);

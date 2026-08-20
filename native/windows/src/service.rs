@@ -16,10 +16,6 @@ use crate::secure_store::SecureStore;
 use crate::state::PersistentState;
 
 const PRESENCE_POLL: Duration = Duration::from_secs(3);
-/// How often `Core::sweep_expired_judges` runs. Independent of focus/monitoring state — pending
-/// judge requests must always eventually get answered, even with focus off or the browser
-/// watchdog idle.
-const JUDGE_SWEEP_POLL: Duration = Duration::from_secs(2);
 
 async fn wait_for_state_change(events: &mut broadcast::Receiver<Value>) {
     loop {
@@ -36,6 +32,7 @@ async fn wait_for_state_change(events: &mut broadcast::Receiver<Value>) {
 /// Async entry point. Runs until `shutdown` flips to true.
 pub async fn serve(pipe_path: String, shutdown: watch::Receiver<bool>) {
     let _ = crate::paths::ensure_data_dir();
+    crate::enforce::extension_policy::install();
 
     let state = PersistentState::load();
     let store = SecureStore::load();
@@ -140,18 +137,23 @@ pub async fn serve(pipe_path: String, shutdown: watch::Receiver<bool>) {
         });
     }
 
-    // Answers every pending Smart-filtering judge request that Electron never got back to, so the
-    // extension is never left hanging. Runs unconditionally — not gated on focus being active.
+    // Park completely while no judge is pending, then wake exactly at the oldest deadline.
     {
         let core = core.clone();
         let mut sd = shutdown.clone();
+        let mut events = core.lock().await.subscribe();
         tokio::spawn(async move {
             loop {
-                tokio::select! {
-                    _ = sd.changed() => { if *sd.borrow() { break; } }
-                    _ = tokio::time::sleep(JUDGE_SWEEP_POLL) => {
-                        core.lock().await.sweep_expired_judges();
-                    }
+                match core.lock().await.next_judge_delay() {
+                    Some(delay) => tokio::select! {
+                        _ = sd.changed() => { if *sd.borrow() { break; } }
+                        _ = tokio::time::sleep(delay) => { core.lock().await.sweep_expired_judges(); }
+                        _ = events.recv() => {}
+                    },
+                    None => tokio::select! {
+                        _ = sd.changed() => { if *sd.borrow() { break; } }
+                        _ = events.recv() => {}
+                    },
                 }
             }
         });
@@ -161,8 +163,8 @@ pub async fn serve(pipe_path: String, shutdown: watch::Receiver<bool>) {
     ipc::run_server(core, pipe_path, shutdown).await;
 
     // NOTE: we intentionally do NOT tear down enforcement on a clean stop — if focus is active,
-    // blocking should persist (the SCM restarts us on kill). The killswitch / focus-off path is
-    // the sanctioned way to remove enforcement. See enforce::teardown_network.
+    // blocking should persist (the SCM restarts us on kill). Focus-off or an authorized uninstall
+    // removes enforcement. See enforce::teardown_network.
     let _ = enforce::teardown_network; // keep the symbol referenced for clarity
 }
 

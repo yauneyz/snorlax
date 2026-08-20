@@ -14,10 +14,6 @@ use crate::secure_store::SecureStore;
 use crate::state::PersistentState;
 
 const PRESENCE_POLL: Duration = Duration::from_secs(3);
-/// How often `Core::sweep_expired_judges` runs. Independent of focus/monitoring state — pending
-/// judge requests must always eventually get answered, even with focus off or the browser
-/// watchdog idle.
-const JUDGE_SWEEP_POLL: Duration = Duration::from_secs(2);
 
 async fn wait_for_state_change(events: &mut broadcast::Receiver<Value>) {
     loop {
@@ -33,6 +29,9 @@ async fn wait_for_state_change(events: &mut broadcast::Receiver<Value>) {
 
 pub async fn serve(socket_path: String, shutdown: watch::Receiver<bool>) {
     let _ = crate::paths::ensure_data_dir();
+    // Repair manifests on every daemon start. Package moves/upgrades and browser updates can
+    // remove or stale these files independently of service installation.
+    crate::enforce::extension_policy::install();
 
     let state = PersistentState::load();
     let store = SecureStore::load();
@@ -128,18 +127,23 @@ pub async fn serve(socket_path: String, shutdown: watch::Receiver<bool>) {
         });
     }
 
-    // Answers every pending Smart-filtering judge request that Electron never got back to, so the
-    // extension is never left hanging. Runs unconditionally — not gated on focus being active.
+    // Park completely while no judge is pending, then wake exactly at the oldest deadline.
     {
         let core = core.clone();
         let mut sd = shutdown.clone();
+        let mut events = core.lock().await.subscribe();
         tokio::spawn(async move {
             loop {
-                tokio::select! {
-                    _ = sd.changed() => { if *sd.borrow() { break; } }
-                    _ = tokio::time::sleep(JUDGE_SWEEP_POLL) => {
-                        core.lock().await.sweep_expired_judges();
-                    }
+                match core.lock().await.next_judge_delay() {
+                    Some(delay) => tokio::select! {
+                        _ = sd.changed() => { if *sd.borrow() { break; } }
+                        _ = tokio::time::sleep(delay) => { core.lock().await.sweep_expired_judges(); }
+                        _ = events.recv() => {}
+                    },
+                    None => tokio::select! {
+                        _ = sd.changed() => { if *sd.borrow() { break; } }
+                        _ = events.recv() => {}
+                    },
                 }
             }
         });

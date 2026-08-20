@@ -113,7 +113,7 @@ export const ANALYTICS_EVENT_PROPS = {
   onboarding_step_viewed: z.object({ step: z.number().int().min(0).max(64) }),
   focus_session_completed: z.object({
     duration_s: z.number().int().min(0).max(86_400),
-    source: z.enum(["user", "schedule", "boot", "recover"]),
+    source: z.enum(["user", "schedule", "boot"]),
     ended_by: z.enum(["completed", "key", "recovery", "shutdown"]),
     // Capped at the first 3 per device; beyond that, tier 2 rollups carry the signal.
     session_index: z.number().int().min(1).max(3),

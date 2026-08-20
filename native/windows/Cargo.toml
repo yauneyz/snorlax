@@ -2,13 +2,12 @@
 name = "talysman"
 version = "0.5.0"
 edition = "2021"
-description = "Talysman privileged Windows service + installer + recovery killswitch."
+description = "Talysman privileged Windows service and installer."
 publish = false
 
 # Three binaries share one library crate (src/lib.rs):
 #   talysman-svc      — the privileged service (SCM entry; --console for dev)
-#   talysman-svcctl   — elevated install/configure/recover/remove CLI
-#   talysman-recover  — the killswitch
+#   talysman-svcctl   — elevated install/configure/remove CLI
 [lib]
 name = "talysman"
 path = "src/lib.rs"
@@ -22,21 +21,15 @@ name = "talysman-svcctl"
 path = "src/bin/svcctl.rs"
 
 [[bin]]
-name = "talysman-recover"
-path = "src/bin/recover.rs"
-
-[[bin]]
 name = "talysman-natmsg"
 path = "src/bin/natmsg.rs"
 
 [dependencies]
 anyhow = "1"
 talysman_common = { path = "../common" }
-hex = "0.4"
 rand = "0.8"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-sha2 = "0.10"
 sysinfo = "0.30"
 tokio = { version = "1", features = ["rt-multi-thread", "net", "time", "sync", "io-util", "io-std", "macros"] }
 tracing = "0.1"

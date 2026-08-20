@@ -93,14 +93,16 @@ async function connectService(): Promise<{ service: ServiceConnection; mock?: Mo
  * killed the app on every launch instead of self-healing.
  */
 async function ensureProtocolCompatible(service: ServiceConnection, mock: MockServiceConnection | undefined): Promise<void> {
-  if (mock) return;
-  await ensureServiceCurrent(service);
-  const ping = await service.request('ping', undefined);
-  if (ping.protocolVersion !== PROTOCOL_VERSION) {
-    throw new Error(
-      `Talysman service protocol ${ping.protocolVersion} is incompatible with desktop protocol ${PROTOCOL_VERSION}.`,
-    );
+  if (!mock) {
+    await ensureServiceCurrent(service);
+    const ping = await service.request('ping', undefined);
+    if (ping.protocolVersion !== PROTOCOL_VERSION) {
+      throw new Error(
+        `Talysman service protocol ${ping.protocolVersion} is incompatible with desktop protocol ${PROTOCOL_VERSION}.`,
+      );
+    }
   }
+  await service.request('setSmartFilteringEnabled', { enabled: features.smartFiltering });
 }
 
 function registerDeepLink(): void {

@@ -4,6 +4,7 @@ import type { Policy } from './policy.js';
 import type { Profile } from './profile.js';
 import type { Settings } from './settings.js';
 import type { FocusSource, ServiceState } from './protocol.js';
+import type { PolicyIntent } from './policy.js';
 
 export interface EventMap {
   /** Complete authoritative snapshot after any persisted daemon state mutation. */
@@ -43,7 +44,7 @@ export interface EventMap {
    * LLM relevance verdict. Broadcast so Electron main (the only client with entitlement/auth) can
    * pick it up, call the judge endpoint, and answer with `submitJudgeVerdict`.
    */
-  judgeRequested: { requestId: string; url: string; extractedText: string };
+  judgeRequested: { requestId: string; url: string; extractedText: string; intent: PolicyIntent };
   /**
    * The verdict for a `judgeRequested` request — either from Electron's `submitJudgeVerdict` or
    * synthesized by the daemon's own timeout sweep (fail-closed/open per `Policy.defaultAction`)

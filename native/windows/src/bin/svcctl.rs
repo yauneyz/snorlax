@@ -1,12 +1,10 @@
-//! talysman-svcctl.exe — the elevated install/configure/recover/remove CLI (architecture
+//! talysman-svcctl.exe — the elevated install/configure/remove CLI (architecture
 //! §4, §13). Invoked by the NSIS installer (and usable by support). Must run as administrator.
 //!
 //! Subcommands:
-//!   install     create + auto-start the service, configure SCM restart recovery, and generate
-//!               the one-time recovery code (prints it + writes recovery-code.txt)
+//!   install     create + auto-start the service and configure SCM restart actions
 //!   uninstall   stop + delete the service
 //!   start | stop | status
-//!   gen-code    regenerate the recovery code
 
 use std::ffi::OsString;
 use std::time::{Duration, Instant};
@@ -14,9 +12,6 @@ use std::time::{Duration, Instant};
 use anyhow::{Context, Result};
 
 use talysman::constants::{pipe_path, PIPE_BASE_PROD, SERVICE_DISPLAY_NAME, SERVICE_NAME};
-use talysman::pairing;
-use talysman::paths;
-use talysman::secure_store::SecureStore;
 use windows::Win32::Foundation::{ERROR_SERVICE_DOES_NOT_EXIST, ERROR_SERVICE_EXISTS};
 
 use windows_service::service::{
@@ -63,9 +58,7 @@ fn install() -> Result<()> {
         Err(err) => return Err(err.into()),
     };
 
-    // Installation is also the repair/upgrade path. Never rotate the killswitch during an
-    // application update: generate it once, before the service first reads the store.
-    ensure_recovery_code()?;
+    // Installation is also the repair/upgrade path for the service and native-host manifest.
     talysman::enforce::extension_policy::install();
     configure_service(&service)?;
     start_if_needed(&service)?;
@@ -260,36 +253,6 @@ fn status() -> Result<()> {
     Ok(())
 }
 
-/// Generate a fresh recovery code, store its hash, and surface the plaintext once.
-fn gen_code() -> Result<()> {
-    let code = pairing::generate_recovery_code();
-    let mut store = SecureStore::load();
-    store.recovery = Some(pairing::hash_recovery_code(&code));
-    store.save().context("save secure store")?;
-
-    let path = paths::recovery_code_file();
-    let _ = std::fs::write(&path, format!("Talysman recovery code: {code}\n"));
-
-    println!("\n==================== Talysman RECOVERY CODE ====================");
-    println!("  {code}");
-    println!("  Save this somewhere safe. If you ever get locked out and can't");
-    println!("  use your USB key, run:  talysman-recover.exe --code {code}");
-    println!("  (also written to {})", path.display());
-    println!("================================================================\n");
-    Ok(())
-}
-
-fn ensure_recovery_code() -> Result<()> {
-    if SecureStore::load().recovery.is_some() {
-        println!(
-            "Existing Talysman recovery code preserved ({}).",
-            paths::recovery_code_file().display()
-        );
-        return Ok(());
-    }
-    gen_code()
-}
-
 /// Exit 10 if focus is active AND no paired key is present (so the NSIS uninstaller can abort).
 /// If the service can't be reached, allow uninstall (exit 0). A connected but unresponsive
 /// service fails closed after five seconds instead of hanging the uninstaller indefinitely.
@@ -346,11 +309,10 @@ fn main() {
         "start" => start(),
         "stop" => stop(),
         "status" => status(),
-        "gen-code" => gen_code(),
         "guard-uninstall" => guard_uninstall(),
         _ => {
             eprintln!(
-                "usage: talysman-svcctl <install|uninstall|start|stop|status|gen-code|guard-uninstall>"
+                "usage: talysman-svcctl <install|uninstall|start|stop|status|guard-uninstall>"
             );
             std::process::exit(2);
         }

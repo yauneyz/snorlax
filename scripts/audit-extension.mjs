@@ -181,13 +181,4 @@ if (edgeDevManifest.background?.service_worker !== "background.js") {
   fail("edge-dev: Chromium service worker background is required");
 }
 
-if (generatedIds.safari !== null) {
-  fail("safari: builds must omit Safari while support is disabled");
-}
-for (const path of ["safari", "safari-appex", "safari-xcode"]) {
-  if (existsSync(resolve(distDir, path))) {
-    fail(`safari: disabled build produced ${path}`);
-  }
-}
-
 console.log("OK Extension compliance audit passed");

@@ -41,7 +41,7 @@ export interface PairedKey {
 }
 
 /** Why focus changed, for UI messaging. */
-export type FocusSource = 'user' | 'schedule' | 'boot' | 'recover';
+export type FocusSource = 'user' | 'schedule' | 'boot';
 
 /** One entry in the exact-usage transition log the service maintains (architecture §7/Phase 7). */
 export type TransitionKind = 'focusOn' | 'focusOff' | 'scheduleFired' | 'keyPresent' | 'keyAbsent';
@@ -118,6 +118,8 @@ export interface RequestMap {
    * only ever talk to the daemon, never to Electron.
    */
   setTrayIconEnabled: { params: { enabled: boolean }; result: Ok };
+  /** Desktop build capability; false makes `intent` inert without changing the policy contract. */
+  setSmartFilteringEnabled: { params: { enabled: boolean }; result: Ok };
   /**
    * Liveness heartbeat from the browser extension, relayed by the native-messaging host
    * (talysman-natmsg). Fire-and-forget; the service records it for the watchdog. `browserPid` is
@@ -127,12 +129,14 @@ export interface RequestMap {
     params: {
       browserPid: number;
       browser: string;
-      profileId?: string;
+      workerSessionId?: string;
+      sequence?: number;
+      sentAt?: number;
       extensionVersion?: string;
       lockedActive?: boolean;
       health: BrowserHealth;
     };
-    result: Ok;
+    result: { heartbeat: { sequence: number; browserPid: number; healthy: boolean } };
   };
   /** Requires at least one paired key; may fail NO_PAIRED_KEY. */
   enableFocus: { params: { reason?: string }; result: Ok };
@@ -147,9 +151,7 @@ export interface RequestMap {
 
   /**
    * Drain the exact-usage transition log newer than `afterSeq` (architecture §7/Phase 7).
-   * Additive since PROTOCOL_VERSION 3 — an older service answers BAD_REQUEST, and the desktop
-   * client falls back to Phase 6's observed-usage approximation. Do NOT bump PROTOCOL_VERSION
-   * for this; it is purely additive.
+   * Introduced additively in protocol 3. Protocol 4 keeps the same drain contract.
    */
   drainUsage: {
     params: { afterSeq: number };
@@ -167,16 +169,10 @@ export interface RequestMap {
    * `requestId`s are ignored (the timeout sweep may have already answered fail-closed).
    */
   submitJudgeVerdict: {
-    params: { requestId: string; url: string; relevant: boolean; reason: string };
+    params: { requestId: string; relevant: boolean; reason: string };
     result: Ok;
   };
 
-  /**
-   * Privileged out-of-band killswitch. NOT surfaced in the UI — invoked by
-   * talysman-recover.exe. Bypasses the USB and `locked` gates iff `code` matches the
-   * recovery code stored at install time.
-   */
-  recover: { params: { code: string }; result: Ok };
 }
 
 export type Method = keyof RequestMap;

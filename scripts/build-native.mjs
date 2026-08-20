@@ -40,7 +40,6 @@ const TARGETS = {
     artifacts: [
       "talysman-svc.exe",
       "talysman-svcctl.exe",
-      "talysman-recover.exe",
       "talysman-natmsg.exe",
     ],
     extraFiles(crate) {
@@ -60,7 +59,6 @@ const TARGETS = {
     artifacts: [
       "talysman-svc",
       "talysman-svcctl",
-      "talysman-recover",
       "talysman-natmsg",
     ],
     extraFiles(crate) {
@@ -81,7 +79,6 @@ const TARGETS = {
     artifacts: [
       "talysman-svc",
       "talysman-svcctl",
-      "talysman-recover",
       "talysman-natmsg",
     ],
     extraFiles() {

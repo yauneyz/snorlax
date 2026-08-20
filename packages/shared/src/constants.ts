@@ -4,7 +4,7 @@
  */
 
 /** Protocol version negotiated on connect; bump on breaking RPC changes. */
-export const PROTOCOL_VERSION = 3;
+export const PROTOCOL_VERSION = 4;
 
 /** Deep-link scheme used for the billing return (Phase 3) and tray re-focus. */
 export const DEEP_LINK_SCHEME = 'talysman';
@@ -46,8 +46,6 @@ export const ErrorCode = {
   LAST_PROFILE: 'LAST_PROFILE',
   /** Disable refused: a `locked` schedule window is currently active. */
   LOCKED: 'LOCKED',
-  /** Recovery code did not match. */
-  BAD_RECOVERY_CODE: 'BAD_RECOVERY_CODE',
   /** Generic bad request / validation failure. */
   BAD_REQUEST: 'BAD_REQUEST',
   /** Service-internal failure. */

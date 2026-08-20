@@ -24,7 +24,6 @@ import { heartbeatDelayForState } from './heartbeat-timing.js';
 import { extractPageContent } from './content-extract.js';
 
 // Prefer the callback-compatible `chrome` namespace where both aliases exist (notably Firefox).
-// Safari exposes `browser`, which is also callback-compatible for native messaging.
 const browserApi = globalThis.chrome || globalThis.browser;
 const HOST_NAME = 'com.talysman.host';
 const RECONNECT_MIN_MS = 1000;
@@ -32,17 +31,24 @@ const RECONNECT_MAX_MS = 30000;
 
 // Smart-filtering tuning. See the "Smart filtering" section below for how these are used.
 const SPA_DEBOUNCE_MS = 1500;
-const JUDGE_TIMEOUT_MS = 8000;
+// The daemon falls back after 8s. Keep this client guard later so its authoritative result wins.
+const JUDGE_TIMEOUT_MS = 12_000;
 const VERDICT_CACHE_TTL_MS = 10 * 60 * 1000;
+const MAX_VERDICT_CACHE_ENTRIES = 500;
+const MAX_PENDING_JUDGES = 32;
 const MAX_JUDGE_TEXT_LENGTH = 2000;
 
 let port = null;
 let reconnectTimer = null;
-let safariSyncTimer = null;
 let heartbeatTimer = null;
-let safariConnected = false;
 let reconnectMs = RECONNECT_MIN_MS;
 let hasReceivedState = false;
+let desiredRuleState = null;
+let ruleApplyRunning = false;
+let ruleApplyRetryTimer = null;
+let ruleApplyRetryMs = RECONNECT_MIN_MS;
+let policyGeneration = 0;
+let lastAppliedGeneration = -1;
 
 // Health/diagnostic state reported in the heartbeat.
 let blockingActive = false; // last state.active the service pushed
@@ -78,7 +84,6 @@ function detectBrowser() {
   if (ua.includes('Edg/')) return 'edge';
   if (ua.includes('OPR/')) return 'opera';
   if (ua.includes('Vivaldi')) return 'vivaldi';
-  if (ua.includes('Safari/') && !ua.includes('Chrome/') && !ua.includes('Chromium/')) return 'safari';
   if (ua.includes('Chrome')) return 'chrome';
   return 'unknown';
 }
@@ -101,8 +106,8 @@ function deriveModeLabel(policy) {
   return 'blacklist';
 }
 
-/** Replace all dynamic rules with the ones derived from `state`. */
-async function applyState(state) {
+/** Accept the latest desired state synchronously, then serialize/coalesce DNR mutations. */
+function applyState(state) {
   const previousHeartbeatDelay = heartbeatDelay();
   blockingActive = !!state.active;
   handshakeEnabled = typeof state.handshakeEnabled === 'boolean' ? state.handshakeEnabled : null;
@@ -116,32 +121,67 @@ async function applyState(state) {
         ? state.intent
         : null,
   };
+  policyGeneration += 1;
+  invalidatePendingJudges();
   blockingMode = deriveModeLabel(currentPolicy);
   hasReceivedState = true;
-  if (BROWSER !== 'safari' && heartbeatDelay() < previousHeartbeatDelay) {
+  lastApplyOk = false;
+  if (ruleApplyRetryTimer !== null) {
+    clearTimeout(ruleApplyRetryTimer);
+    ruleApplyRetryTimer = null;
+    ruleApplyRetryMs = RECONNECT_MIN_MS;
+  }
+  desiredRuleState = { state, generation: policyGeneration };
+  if (heartbeatDelay() < previousHeartbeatDelay) {
     scheduleHeartbeat(0);
   }
-  let next;
+  void applyLatestRuleState();
+}
+
+async function applyLatestRuleState() {
+  if (ruleApplyRunning || ruleApplyRetryTimer !== null) return;
+  ruleApplyRunning = true;
   try {
-    next = buildRules(state, { safari: BROWSER === 'safari' });
-  } catch (e) {
-    console.error('[talysman] buildRules failed', e);
-    lastApplyOk = false;
-    return;
-  }
-  try {
-    const existing = await browserApi.declarativeNetRequest.getDynamicRules();
-    await browserApi.declarativeNetRequest.updateDynamicRules({
-      removeRuleIds: existing.map((r) => r.id),
-      addRules: next,
-    });
-    appliedRuleCount = next.length;
-    lastApplyOk = true;
-    // Do not log the configured domain list. It is local user data and is not needed for support.
-    console.info('[talysman] applied', next.length, 'rule(s)');
-  } catch (e) {
-    console.error('[talysman] updateDynamicRules failed', e);
-    lastApplyOk = false;
+    while (desiredRuleState) {
+      const desired = desiredRuleState;
+      desiredRuleState = null;
+      try {
+        const next = buildRules(desired.state);
+        const existing = await browserApi.declarativeNetRequest.getDynamicRules();
+        await browserApi.declarativeNetRequest.updateDynamicRules({
+          removeRuleIds: existing.map((r) => r.id),
+          addRules: next,
+        });
+        if (desired.generation === policyGeneration) {
+          appliedRuleCount = next.length;
+          lastAppliedGeneration = desired.generation;
+          lastApplyOk = true;
+          ruleApplyRetryMs = RECONNECT_MIN_MS;
+          scheduleHeartbeat(0);
+        }
+        // Do not log the configured domain list. It is local user data.
+        console.info('[talysman] applied', next.length, 'rule(s)');
+      } catch (e) {
+        console.error('[talysman] dynamic-rule update failed', e);
+        lastApplyOk = false;
+        // Preserve only the newest state. Retry with capped exponential backoff so a transient
+        // browser failure cannot leave focus-off rules stuck forever without burning battery.
+        if (!desiredRuleState && desired.generation === policyGeneration) {
+          desiredRuleState = desired;
+          const delay = ruleApplyRetryMs;
+          ruleApplyRetryMs = Math.min(ruleApplyRetryMs * 2, RECONNECT_MAX_MS);
+          ruleApplyRetryTimer = setTimeout(() => {
+            ruleApplyRetryTimer = null;
+            void applyLatestRuleState();
+          }, delay);
+          scheduleHeartbeat(0);
+        }
+        break;
+      }
+    }
+  } finally {
+    ruleApplyRunning = false;
+    if (desiredRuleState && ruleApplyRetryTimer === null) void applyLatestRuleState();
   }
 }
 
@@ -149,7 +189,7 @@ async function applyState(state) {
 function currentHealth() {
   const permissionsOk = typeof browserApi.declarativeNetRequest !== 'undefined';
   return {
-    canBlock: permissionsOk && lastApplyOk,
+    canBlock: permissionsOk && lastApplyOk && lastAppliedGeneration === policyGeneration,
     permissionsOk,
     dnrRulesApplied: appliedRuleCount,
   };
@@ -158,7 +198,7 @@ function currentHealth() {
 /** Read-only status exposed to the toolbar popup. Never include the configured domain list. */
 function currentPopupStatus() {
   const heartbeatAckAgeMs = lastHeartbeatAckAt === null ? null : Date.now() - lastHeartbeatAckAt;
-  const transportConnected = port !== null || safariConnected;
+  const transportConnected = port !== null;
   const roundTripConnected = transportConnected
     && heartbeatAckAgeMs !== null
     && heartbeatAckAgeMs <= heartbeatDelay() * 2.5;
@@ -188,10 +228,6 @@ browserApi.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 });
 
 function connect() {
-  if (BROWSER === 'safari') {
-    scheduleSafariSync(0);
-    return;
-  }
   if (port) return;
 
   console.info('[talysman] opening native port', { workerSessionId: PROFILE_ID });
@@ -269,43 +305,6 @@ function heartbeatDelay() {
   });
 }
 
-// Safari native messaging is mediated by the containing app extension. A short request/response
-// sync is more reliable there than holding Chromium's stdio-style native port open indefinitely.
-// The Swift handler returns both the current blocking state and the heartbeat acknowledgement.
-function scheduleSafariSync(delay) {
-  if (safariSyncTimer !== null) return;
-  safariSyncTimer = setTimeout(() => {
-    safariSyncTimer = null;
-    const frame = heartbeatFrame();
-    try {
-      browserApi.runtime.sendNativeMessage(HOST_NAME, frame, (response) => {
-        const error = browserApi.runtime.lastError;
-        if (error || !response || response.type === 'error') {
-          safariConnected = false;
-          console.warn('[talysman] Safari native sync failed', error?.message || response?.message);
-          scheduleSafariSync(Math.min(reconnectMs, RECONNECT_MAX_MS));
-          reconnectMs = Math.min(reconnectMs * 2, RECONNECT_MAX_MS);
-          return;
-        }
-
-        safariConnected = true;
-        reconnectMs = RECONNECT_MIN_MS;
-        if (response.state) applyState(response.state);
-        if (response.heartbeatAck) {
-          lastHeartbeatAckAt = Date.now();
-          lastHeartbeatAckSequence = response.heartbeatAck.sequence ?? null;
-        }
-        scheduleSafariSync(heartbeatDelay());
-      });
-    } catch (error) {
-      safariConnected = false;
-      console.warn('[talysman] Safari native sync threw', error && error.message);
-      scheduleSafariSync(Math.min(reconnectMs, RECONNECT_MAX_MS));
-      reconnectMs = Math.min(reconnectMs * 2, RECONNECT_MAX_MS);
-    }
-  }, delay);
-}
-
 function scheduleReconnect() {
   if (reconnectTimer !== null) return;
   const delay = reconnectMs;
@@ -350,6 +349,15 @@ const spaDebounceTimers = new Map(); // tabId -> timeoutId
 const verdictCache = new Map(); // cacheKey -> { relevant, reason, expiresAt }
 const pendingJudgeRequests = new Map(); // requestId -> { tabId, url, timeoutId }
 
+function invalidatePendingJudges() {
+  for (const timer of spaDebounceTimers.values()) clearTimeout(timer);
+  spaDebounceTimers.clear();
+  for (const pending of pendingJudgeRequests.values()) {
+    if (pending.timeoutId) clearTimeout(pending.timeoutId);
+  }
+  pendingJudgeRequests.clear();
+}
+
 function generateRequestId() {
   if (globalThis.crypto && typeof crypto.randomUUID === 'function') return crypto.randomUUID();
   return `judge-${Date.now()}-${Math.random().toString(36).slice(2)}`;
@@ -383,10 +391,21 @@ function getCachedVerdict(url, intent) {
 }
 
 function setCachedVerdict(url, intent, relevant, reason) {
-  verdictCache.set(verdictCacheKey(url, intent), {
+  const now = Date.now();
+  for (const [key, entry] of verdictCache) {
+    if (entry.expiresAt <= now) verdictCache.delete(key);
+  }
+  while (verdictCache.size >= MAX_VERDICT_CACHE_ENTRIES) {
+    const oldest = verdictCache.keys().next().value;
+    if (oldest === undefined) break;
+    verdictCache.delete(oldest);
+  }
+  const key = verdictCacheKey(url, intent);
+  verdictCache.delete(key);
+  verdictCache.set(key, {
     relevant,
     reason,
-    expiresAt: Date.now() + VERDICT_CACHE_TTL_MS,
+    expiresAt: now + VERDICT_CACHE_TTL_MS,
   });
 }
 
@@ -402,7 +421,8 @@ function urlsRoughlyMatch(a, b) {
 }
 
 /** Redirect `tabId` to the local blocked page, but only if it's still on `expectedUrl`. */
-async function redirectIfStillOnUrl(tabId, expectedUrl, reason) {
+async function redirectIfStillOnUrl(tabId, expectedUrl, reason, generation = policyGeneration) {
+  if (generation !== policyGeneration || !currentPolicy.active) return;
   try {
     const tab = await browserApi.tabs.get(tabId);
     if (!tab || !tab.url) return;
@@ -416,9 +436,10 @@ async function redirectIfStillOnUrl(tabId, expectedUrl, reason) {
 }
 
 /** Client-side backstop when defaultAction is the only signal we have (timeout or extraction failure). */
-function applyDefaultActionFallback(tabId, url, reason) {
-  if (currentPolicy.defaultAction !== 'block') return; // fail-open: leave the tab alone
-  redirectIfStillOnUrl(tabId, url, reason);
+function applyDefaultActionFallback(tabId, url, reason, generation, defaultAction) {
+  if (generation !== policyGeneration || !currentPolicy.active) return;
+  if (defaultAction !== 'block') return; // fail-open: leave the tab alone
+  void redirectIfStillOnUrl(tabId, url, reason, generation);
 }
 
 function clearPendingJudgeRequest(requestId) {
@@ -428,7 +449,7 @@ function clearPendingJudgeRequest(requestId) {
   pendingJudgeRequests.delete(requestId);
 }
 
-/** Handle a `judge-result` frame, whether it arrived over the persistent port or Safari's sync call. */
+/** Handle a `judge-result` frame from the native host. */
 function handleJudgeResult(msg) {
   const requestId = msg && msg.requestId;
   if (!requestId) return;
@@ -436,40 +457,38 @@ function handleJudgeResult(msg) {
   if (!pending) return; // stale (already timed out) or unknown request id
 
   clearPendingJudgeRequest(requestId);
+  if (pending.generation !== policyGeneration || !currentPolicy.active) return;
 
   const url = msg.url || pending.url;
   const relevant = !!msg.relevant;
   const reason = typeof msg.reason === 'string' ? msg.reason : '';
 
-  if (currentPolicy.intent) setCachedVerdict(url, currentPolicy.intent, relevant, reason);
+  setCachedVerdict(url, pending.intent, relevant, reason);
 
   if (!relevant) {
-    redirectIfStillOnUrl(pending.tabId, pending.url, reason);
+    void redirectIfStillOnUrl(pending.tabId, pending.url, reason, pending.generation);
   }
   // relevant === true → verdict is cached above; leave the tab alone.
 }
 
-function sendJudgeRequest(requestId, tabId, url, extractedText) {
-  const entry = { tabId, url, timeoutId: null };
+function sendJudgeRequest(requestId, tabId, url, extractedText, generation, intent, defaultAction) {
+  while (pendingJudgeRequests.size >= MAX_PENDING_JUDGES) {
+    const oldest = pendingJudgeRequests.keys().next().value;
+    if (oldest === undefined) break;
+    clearPendingJudgeRequest(oldest);
+  }
+  const entry = { tabId, url, generation, intent, defaultAction, timeoutId: null };
   pendingJudgeRequests.set(requestId, entry);
   entry.timeoutId = setTimeout(() => {
     if (!pendingJudgeRequests.has(requestId)) return;
     pendingJudgeRequests.delete(requestId);
     console.warn('[talysman] judge-request timed out', { requestId });
-    applyDefaultActionFallback(tabId, url, "Couldn't verify in time");
+    applyDefaultActionFallback(tabId, url, "Couldn't verify in time", generation, defaultAction);
   }, JUDGE_TIMEOUT_MS);
 
   const frame = { type: 'judge-request', requestId, url, extractedText };
   try {
-    if (BROWSER === 'safari') {
-      // Safari has no persistent port; reuse the same request/response native call the heartbeat
-      // sync uses.
-      browserApi.runtime.sendNativeMessage(HOST_NAME, frame, (response) => {
-        const error = browserApi.runtime.lastError;
-        if (error || !response || response.type !== 'judge-result') return; // timeout will fall back
-        handleJudgeResult(response);
-      });
-    } else if (port) {
+    if (port) {
       port.postMessage(frame);
     } else {
       console.warn('[talysman] no native port available for judge-request', { requestId });
@@ -482,6 +501,9 @@ function sendJudgeRequest(requestId, tabId, url, extractedText) {
 /** Consider a completed main-frame navigation for Smart filtering. */
 async function handleQualifyingNavigation(tabId, url) {
   if (!currentPolicy.active || !currentPolicy.intent) return; // classic mode: zero overhead
+  const generation = policyGeneration;
+  const intent = currentPolicy.intent;
+  const defaultAction = currentPolicy.defaultAction;
   if (!/^https?:\/\//i.test(url)) return; // browser-internal pages etc. are out of scope
 
   let hostname;
@@ -495,9 +517,9 @@ async function handleQualifyingNavigation(tabId, url) {
   if (hostnameMatchesAny(hostname, currentPolicy.blockedDomains)) return;
   if (hostnameMatchesAny(hostname, currentPolicy.allowedDomains)) return;
 
-  const cached = getCachedVerdict(url, currentPolicy.intent);
+  const cached = getCachedVerdict(url, intent);
   if (cached) {
-    if (!cached.relevant) redirectIfStillOnUrl(tabId, url, cached.reason);
+    if (!cached.relevant) void redirectIfStillOnUrl(tabId, url, cached.reason, generation);
     return;
   }
 
@@ -512,9 +534,12 @@ async function handleQualifyingNavigation(tabId, url) {
     console.warn('[talysman] content extraction failed', e && e.message);
   }
 
+  // Content extraction is asynchronous. A focus/profile change invalidates the work.
+  if (generation !== policyGeneration || !currentPolicy.active) return;
+
   if (!extraction) {
     // Couldn't determine relevance at all — fall back to defaultAction, same as an unreachable judge.
-    applyDefaultActionFallback(tabId, url, "Couldn't verify in time");
+    applyDefaultActionFallback(tabId, url, "Couldn't verify in time", generation, defaultAction);
     return;
   }
 
@@ -523,7 +548,7 @@ async function handleQualifyingNavigation(tabId, url) {
     .join(' — ')
     .slice(0, MAX_JUDGE_TEXT_LENGTH);
 
-  sendJudgeRequest(generateRequestId(), tabId, url, combinedText);
+  sendJudgeRequest(generateRequestId(), tabId, url, combinedText, generation, intent, defaultAction);
 }
 
 function debounceSpaNavigation(tabId, url) {

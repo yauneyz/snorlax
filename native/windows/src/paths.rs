@@ -27,10 +27,6 @@ pub fn secure_store_file() -> PathBuf {
     data_dir().join("secure-store.json")
 }
 
-pub fn recovery_code_file() -> PathBuf {
-    data_dir().join("recovery-code.txt")
-}
-
 pub fn log_file() -> PathBuf {
     data_dir().join("service.log")
 }

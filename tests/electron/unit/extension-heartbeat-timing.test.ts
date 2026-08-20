@@ -39,13 +39,4 @@ describe('extension heartbeat timing', () => {
     ).toBe(IDLE_HEARTBEAT_MS);
   });
 
-  it('keeps Safari on the strict request-response cadence', () => {
-    expect(
-      heartbeatDelayForState({
-        browser: 'safari',
-        blockingActive: false,
-        handshakeEnabled: false,
-      }),
-    ).toBe(STRICT_HEARTBEAT_MS);
-  });
 });

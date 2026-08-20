@@ -89,8 +89,9 @@ pub const BROWSERS: &[BrowserDef] = &[
     },
     BrowserDef {
         key: "safari",
-        class: BrowserClass::Supported,
-        // Safari is macOS-only. Empty non-macOS identities are ignored by the lookup helpers.
+        // There is no shipped Safari extension/native bridge. Treat it like other unsupported
+        // browsers so strict mode never waits for a heartbeat it cannot produce.
+        class: BrowserClass::Unsupported,
         windows_image: "",
         linux_process: "",
         mac_bundle: "com.apple.safari",
