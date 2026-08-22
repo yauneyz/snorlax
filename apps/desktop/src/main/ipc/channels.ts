@@ -59,10 +59,6 @@ export const Channels = {
   completeOnboarding: 'app:completeOnboarding',
   /** invoke: dev-only — forget the first run so the walkthrough replays. */
   resetOnboarding: 'app:resetOnboarding',
-  /** invoke: returns whether local product-analytics telemetry is enabled (default on). */
-  getTelemetryEnabled: 'app:getTelemetryEnabled',
-  /** invoke: { enabled } → toggle local product-analytics telemetry. */
-  setTelemetryEnabled: 'app:setTelemetryEnabled',
   /** invoke: { message, stack? } → report an uncaught renderer error/rejection for tracking. */
   reportRendererError: 'app:reportRendererError',
   /** main→renderer push: { event } where event is 'authChanged' | 'entitlementChanged'. */

@@ -1,6 +1,6 @@
 /**
- * Desktop-side analytics (architecture §7-8/Phases 6-7): device identity, the telemetry
- * opt-out, and best-effort delivery of milestone + usage events to the web ingest API
+ * Desktop-side analytics (architecture §7-8/Phases 6-7): device identity and best-effort
+ * delivery of milestone + usage events (always on) to the web ingest API
  * (`apps/web/src/server/analytics`). Mirrors `onboarding.ts`'s persistence idiom throughout —
  * `app.getPath('userData')`, `mode: 0o600`, an in-memory cache, and a try/catch that degrades
  * to a safe default and never throws. Losing any file here is safe: it only means missing
@@ -46,7 +46,6 @@ interface DeviceIdentity {
 }
 
 interface TelemetryState {
-  enabled: boolean;
   lastExtensionConnectedDate?: string;
   focusSessionsTracked?: number;
   drainUsageSupported?: boolean;
@@ -137,7 +136,7 @@ async function loadDeviceIdentity(): Promise<{ identity: DeviceIdentity; firstRu
 }
 
 // ---------------------------------------------------------------------------
-// telemetry opt-out (§3.12 — deliberately local-only, not in packages/shared/src/settings.ts)
+// telemetry state (always on — counts/durations only, never domains, app names, or content)
 // ---------------------------------------------------------------------------
 
 async function loadTelemetry(): Promise<TelemetryState> {
@@ -145,14 +144,13 @@ async function loadTelemetry(): Promise<TelemetryState> {
   try {
     const parsed = JSON.parse(await readFile(await pathFor(TELEMETRY_FILE), 'utf8')) as Partial<TelemetryState>;
     telemetryCache = {
-      enabled: parsed.enabled !== false,
       lastExtensionConnectedDate: parsed.lastExtensionConnectedDate,
       focusSessionsTracked: parsed.focusSessionsTracked ?? 0,
       lastUsageSeq: parsed.lastUsageSeq ?? 0,
       // drainUsageSupported is intentionally not restored from disk — cached per session only.
     };
   } catch {
-    telemetryCache = { enabled: true, focusSessionsTracked: 0, lastUsageSeq: 0 };
+    telemetryCache = { focusSessionsTracked: 0, lastUsageSeq: 0 };
   }
   return telemetryCache;
 }
@@ -165,17 +163,6 @@ async function saveTelemetry(state: TelemetryState): Promise<void> {
   } catch (error) {
     logger.warn('[analytics] could not persist telemetry state', error);
   }
-}
-
-export async function getTelemetryEnabled(): Promise<boolean> {
-  return (await loadTelemetry()).enabled;
-}
-
-export async function setTelemetryEnabled(enabled: boolean): Promise<void> {
-  await chain(async () => {
-    const state = await loadTelemetry();
-    await saveTelemetry({ ...state, enabled });
-  });
 }
 
 // ---------------------------------------------------------------------------
@@ -218,12 +205,10 @@ async function saveQueue(lines: string[]): Promise<void> {
 
 /**
  * Queue a milestone event for delivery. Fire-and-forget from the caller's perspective — never
- * throws, and drops silently (never enqueues) when telemetry is disabled.
+ * throws.
  */
 export function track(event: DesktopAnalyticsEvent, props?: Record<string, unknown>): void {
   void chain(async () => {
-    const telemetry = await loadTelemetry();
-    if (!telemetry.enabled) return;
     const { identity } = await loadDeviceIdentity();
     const line = JSON.stringify({
       event,
@@ -266,8 +251,6 @@ async function postTrackEvent(line: string): Promise<'sent' | 'retry' | 'drop'> 
 }
 
 export async function flushEvents(): Promise<void> {
-  const telemetry = await loadTelemetry();
-  if (!telemetry.enabled) return;
   await chain(async () => {
     let queue = await loadQueue();
     let processed = 0;
@@ -395,9 +378,8 @@ async function postUsageRows(deviceId: string, rows: readonly unknown[]): Promis
 }
 
 async function flushUsage(service: ServiceConnection | undefined): Promise<void> {
-  const telemetry = await loadTelemetry();
-  if (!telemetry.enabled) return;
   const { identity } = await loadDeviceIdentity();
+  const telemetry = await loadTelemetry();
 
   if (service && telemetry.drainUsageSupported !== false) {
     await flushUsageExact(service, identity.deviceId);

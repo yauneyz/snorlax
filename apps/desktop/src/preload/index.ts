@@ -41,8 +41,6 @@ const Channels = {
   onboardingStatus: 'app:onboardingStatus',
   completeOnboarding: 'app:completeOnboarding',
   resetOnboarding: 'app:resetOnboarding',
-  getTelemetryEnabled: 'app:getTelemetryEnabled',
-  setTelemetryEnabled: 'app:setTelemetryEnabled',
   reportRendererError: 'app:reportRendererError',
   appEvent: 'app:event',
 } as const;
@@ -214,13 +212,6 @@ const api = {
   resetOnboarding: (): Promise<
     ActionResult & { status?: OnboardingStatusInfo }
   > => ipcRenderer.invoke(Channels.resetOnboarding),
-
-  // --- telemetry ---
-  /** Whether local product-analytics telemetry is enabled (default on). */
-  getTelemetryEnabled: (): Promise<boolean> => ipcRenderer.invoke(Channels.getTelemetryEnabled),
-  /** Toggle local product-analytics telemetry. */
-  setTelemetryEnabled: (enabled: boolean): Promise<ActionResult & { enabled?: boolean }> =>
-    ipcRenderer.invoke(Channels.setTelemetryEnabled, enabled),
 
   /** Report an uncaught renderer error/rejection so it's tracked and pushed like a main-process one. */
   reportRendererError: (message: string, stack?: string): Promise<void> =>

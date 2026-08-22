@@ -1,2 +1,11 @@
+We want to edit the paywall. Right now we have our smart filtering that is only enabled in dev mode? Well we want that smart filtering to be the thing that is behind the paywall.
 
-q
+All the existing "classic mode" filtering is to be available for free to anyone.
+
+This means that they paywall's very existence (in the Account tab) should be limited to dev mode, not prod mode.
+
+So currently in prod a user should not be able to tell that there is even a paid version.
+
+This includes editing our landing page.
+
+Our pricing page under the "pro version" should say something to the effect of "AI enabled smart blocking coming soon" for the pro card. The free version now has everything that is currently fully built out - schedules, unlimited blocklist, apps, etc.

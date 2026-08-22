@@ -85,9 +85,6 @@ export const onboardingStatus = () => window.api.onboardingStatus();
 export const completeOnboarding = () => window.api.completeOnboarding();
 export const resetOnboarding = () => window.api.resetOnboarding();
 
-export const getTelemetryEnabled = () => window.api.getTelemetryEnabled();
-export const setTelemetryEnabled = (enabled: boolean) => window.api.setTelemetryEnabled(enabled);
-
 export type {
   AppUpdateCheckResult,
   CheckoutPrice,

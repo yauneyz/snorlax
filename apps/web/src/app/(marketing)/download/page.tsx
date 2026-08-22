@@ -132,8 +132,10 @@ export default function DownloadPage() {
         <div className="download__group-head">
           <h2>Make sure you also get the browser extension</h2>
           <p>
-            Required for web blocking. When the dead-man&apos;s switch is on, browsers without the
-            extension are closed during a locked session.
+            The extension improves web blocking accuracy. In addition, it allows you to enable
+            &ldquo;strict mode&rdquo; where any browser that isn&apos;t running the extension gets
+            automatically closed. Forcing the extension to be active closes off various ways to
+            sneak around {config.app.name}&apos;s filtering.
           </p>
         </div>
         <div className="download-grid">

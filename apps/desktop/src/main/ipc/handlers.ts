@@ -14,7 +14,7 @@ import { checkForAppUpdates } from '../updater.js';
 import { isServiceError, type ServiceConnection } from '../service/connection.js';
 import type { MockServiceConnection } from '../service/mockService.js';
 import { uninstallService } from '../service/uninstaller.js';
-import { flushEvents, getTelemetryEnabled, setTelemetryEnabled, track } from '../analytics.js';
+import { flushEvents, track } from '../analytics.js';
 import {
   getEntitlement,
   invalidateEntitlementCache,
@@ -449,16 +449,6 @@ export async function registerIpcHandlers(ctx: HandlerContext): Promise<void> {
       return { ok: false, message: 'Only available in development builds.' };
     }
     return { ok: true, status: await resetOnboarding() };
-  });
-
-  // --- telemetry ---
-  ipcHandle(Channels.getTelemetryEnabled, () => getTelemetryEnabled());
-  ipcHandle(Channels.setTelemetryEnabled, async (_e, enabled: boolean) => {
-    if (typeof enabled !== 'boolean') {
-      return { ok: false, message: 'Expected an enabled state.' };
-    }
-    await setTelemetryEnabled(enabled);
-    return { ok: true, enabled };
   });
 
   ipcHandle(Channels.reportRendererError, (_e, args: { message: string; stack?: string }) => {

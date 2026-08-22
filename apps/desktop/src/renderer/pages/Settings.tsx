@@ -1,12 +1,10 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { useFocusStore } from '../store/useFocusStore.js';
 import {
   checkForUpdates,
   devPushUsageTransition,
   devSimulateExtension,
   devToggleKey,
-  getTelemetryEnabled,
-  setTelemetryEnabled as setTelemetryEnabledApi,
   uninstallService,
   type SubscriptionPlan,
 } from '../lib/bridge.js';
@@ -51,17 +49,7 @@ export function Settings() {
     message: string;
     error?: boolean;
   } | null>(null);
-  const [telemetryEnabled, setTelemetryEnabledState] = useState<boolean | null>(null);
-  const [telemetryBusy, setTelemetryBusy] = useState(false);
-  const [telemetryError, setTelemetryError] = useState<string | null>(null);
-
   const showDeveloper = appEnv !== 'production' || usingMock;
-
-  useEffect(() => {
-    getTelemetryEnabled()
-      .then(setTelemetryEnabledState)
-      .catch(() => setTelemetryEnabledState(true)); // fail open to the default, matches main
-  }, []);
 
   async function runUninstall() {
     setConfirmingUninstall(false);
@@ -133,24 +121,6 @@ export function Settings() {
       setLocalEntitlementError((e as Error).message);
     } finally {
       setLocalEntitlementBusy(false);
-    }
-  }
-
-  async function toggleTelemetry() {
-    if (telemetryEnabled === null) return;
-    setTelemetryBusy(true);
-    setTelemetryError(null);
-    try {
-      const res = await setTelemetryEnabledApi(!telemetryEnabled);
-      if (res.ok) {
-        setTelemetryEnabledState(!telemetryEnabled);
-      } else {
-        setTelemetryError(res.message ?? 'Could not update telemetry.');
-      }
-    } catch (e) {
-      setTelemetryError((e as Error).message);
-    } finally {
-      setTelemetryBusy(false);
     }
   }
 
@@ -294,35 +264,6 @@ export function Settings() {
             </Button>
           </div>
           {trayError && <p className="text-[12.5px] text-warn">{trayError}</p>}
-        </div>
-      </Card>
-
-      <Card>
-        <CardTitle hint="Counts and durations only — never domains, app names, or browsing content. Helps us see install/usage health and fix what's broken.">
-          Product analytics
-        </CardTitle>
-        <div className="flex flex-col gap-3 text-sm text-slate-300">
-          <p className="text-slate-400">
-            Talysman reports install milestones and daily usage counts (opens, focus time) so we can
-            tell whether the product is working for people. On by default; turning it off stops all
-            of it, immediately.
-          </p>
-          <div className="flex items-center justify-between gap-3">
-            <span className="font-medium text-slate-200">
-              Status:{' '}
-              <Badge tone={telemetryEnabled ? 'ok' : 'neutral'}>
-                {telemetryEnabled === null ? 'Loading…' : telemetryEnabled ? 'On' : 'Off'}
-              </Badge>
-            </span>
-            <Button
-              variant={telemetryEnabled ? 'ghost' : 'primary'}
-              disabled={telemetryBusy || telemetryEnabled === null}
-              onClick={() => toggleTelemetry()}
-            >
-              {telemetryEnabled ? 'Turn off' : 'Turn on'}
-            </Button>
-          </div>
-          {telemetryError && <p className="text-[12.5px] text-warn">{telemetryError}</p>}
         </div>
       </Card>
 
