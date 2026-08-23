@@ -171,17 +171,45 @@ function bounded(value: string | null, max: number): string | undefined {
   return trimmed ? trimmed.slice(0, max) : undefined;
 }
 
+function hostOf(value: string | null | undefined): string | undefined {
+  if (!value) return undefined;
+  try {
+    return new URL(value).hostname || undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function withoutWww(host: string): string {
+  return host.replace(/^www\./i, "").toLowerCase();
+}
+
+/**
+ * The referrer host that earned the visit, or undefined when we only know it was us.
+ *
+ * The client's `document.referrer` (sent as a prop on `page_viewed`) is the authoritative
+ * one: the `Referer` header on a beacon POST is the page that fired the beacon, which is
+ * always our own site. Same for the download route, where the header is our `/download`
+ * page. Recording either would file the person under `talysman.app` forever, since
+ * first-touch attribution is immutable -- so a self-referral is dropped and the person
+ * stays open for a real channel (or lands in `direct`).
+ */
+function referrerHostFor(
+  request: NextRequest,
+  props: Record<string, unknown>,
+): string | undefined {
+  const host =
+    hostOf(typeof props.referrer_host === "string" ? `https://${props.referrer_host}` : null) ??
+    hostOf(request.headers.get("referer"));
+  if (!host) return undefined;
+  return withoutWww(host) === withoutWww(request.nextUrl.hostname) ? undefined : host;
+}
+
 export function attributionFromRequest(
   request: NextRequest,
   props: Record<string, unknown>,
 ): Attribution {
-  const referer = request.headers.get("referer");
-  let referrerHost: string | undefined;
-  try {
-    referrerHost = referer ? new URL(referer).hostname : undefined;
-  } catch {
-    referrerHost = undefined;
-  }
+  const referrerHost = referrerHostFor(request, props);
   const path = typeof props.path === "string" ? props.path : undefined;
   return {
     utm_source: bounded(request.nextUrl.searchParams.get("utm_source"), 128),

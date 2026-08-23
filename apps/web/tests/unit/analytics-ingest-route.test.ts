@@ -19,7 +19,10 @@ vi.mock("@/lib/auth/require-bearer-user", () => ({
 
 import { POST as trackPost } from "@/app/api/analytics/track/route";
 import { POST as usagePost } from "@/app/api/analytics/usage/route";
-import { resetAnalyticsRateLimitsForTests } from "@/server/analytics/ingest";
+import {
+  attributionFromRequest,
+  resetAnalyticsRateLimitsForTests,
+} from "@/server/analytics/ingest";
 
 const anonId = "00000000-0000-4000-8000-000000000001";
 const deviceId = "00000000-0000-4000-8000-000000000002";
@@ -116,5 +119,54 @@ describe("POST /api/analytics/usage", () => {
       rows: [{ local_date: "2020-01-01", tz_offset_minutes: 0, platform: "linux" }],
     }));
     expect(old.status).toBe(400);
+  });
+});
+
+describe("attributionFromRequest", () => {
+  function attrRequest(headers: Record<string, string>) {
+    return new NextRequest("https://talysman.app/api/analytics/track", {
+      method: "POST",
+      headers,
+    });
+  }
+
+  it("prefers the client's document.referrer over the beacon's own Referer header", () => {
+    const attribution = attributionFromRequest(
+      attrRequest({ referer: "https://talysman.app/pricing" }),
+      { path: "/", referrer_host: "old.reddit.com" },
+    );
+    expect(attribution.referrer_host).toBe("old.reddit.com");
+  });
+
+  it("drops a self-referral so first-touch stays open for a real channel", () => {
+    const attribution = attributionFromRequest(
+      attrRequest({ referer: "https://www.talysman.app/download" }),
+      { path: "/" },
+    );
+    expect(attribution.referrer_host).toBeUndefined();
+  });
+
+  it("drops a self-referral reported by the client too", () => {
+    const attribution = attributionFromRequest(attrRequest({}), {
+      path: "/",
+      referrer_host: "talysman.app",
+    });
+    expect(attribution.referrer_host).toBeUndefined();
+  });
+
+  it("keeps a cross-site Referer header when the client sent no referrer", () => {
+    const attribution = attributionFromRequest(
+      attrRequest({ referer: "https://chatgpt.com/c/abc" }),
+      { path: "/" },
+    );
+    expect(attribution.referrer_host).toBe("chatgpt.com");
+  });
+
+  it("ignores an unparseable client referrer_host", () => {
+    const attribution = attributionFromRequest(
+      attrRequest({ referer: "https://chatgpt.com/c/abc" }),
+      { path: "/", referrer_host: "not a host" },
+    );
+    expect(attribution.referrer_host).toBe("chatgpt.com");
   });
 });
