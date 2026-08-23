@@ -112,6 +112,18 @@ export type AnalyticsIdentityRow = {
   first_seen_at: string;
 };
 
+export type AnalyticsIgnoredUserRow = {
+  user_id: string;
+  reason: string;
+  created_at: string;
+};
+
+export type AnalyticsIgnoredPersonRow = {
+  person_id: string;
+  reason: string;
+  ignored_at: string;
+};
+
 /**
  * Tier 1: one row per milestone per person, ~30 per person for a lifetime. Stores RAW
  * identifiers — person resolution happens in `analytics_events_resolved` at query time,

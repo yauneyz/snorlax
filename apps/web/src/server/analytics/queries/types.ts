@@ -1,8 +1,9 @@
 export type PanelData<T> = { ok: true; rows: T } | { ok: false; message: string };
 
 // Unified metric shapes. Both /insights (prod target) and the Android widget read these same
-// fields — /insights (prod) via fetchProdSummary(), /insights/dev via direct Supabase queries
-// mapped into this shape, and the widget via GET /api/analytics/summary, which is the source
+// fields — /insights (marketing audience) via fetchProdSummary(), /insights/dev via direct
+// production-Supabase queries over analytics_dev_* views, and the widget via
+// GET /api/analytics/summary, which is the source
 // these types were modeled on (see apps/android/.../data/InsightsModels.kt for its mirror).
 
 export interface FunnelMetrics {

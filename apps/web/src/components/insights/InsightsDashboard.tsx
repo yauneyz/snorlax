@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Suspense } from "react";
+import type { AnalyticsAudience } from "@/server/analytics/audience";
 import { resolveTarget, type AnalyticsTarget } from "@/server/analytics/db";
 import { ActiveUsersPanel } from "./ActiveUsersPanel";
 import { ChannelTablePanel } from "./ChannelTablePanel";
@@ -22,19 +23,49 @@ const SuspenseBoundary = Suspense as unknown as (props: {
 }) => React.ReactElement;
 
 const panels = [
-  ["Funnel", FunnelPanel], ["Channels", ChannelTablePanel], ["Active users", ActiveUsersPanel],
-  ["Engagement", EngagementPanel], ["Retention", RetentionPanel], ["Install health", InstallHealthPanel],
-  ["Revenue", RevenuePanel], ["Errors", ErrorsPanel], ["Raw stream", RawStreamPanel], ["Migration state", MigrationStatePanel],
+  ["Funnel", FunnelPanel],
+  ["Channels", ChannelTablePanel],
+  ["Active users", ActiveUsersPanel],
+  ["Engagement", EngagementPanel],
+  ["Retention", RetentionPanel],
+  ["Install health", InstallHealthPanel],
+  ["Revenue", RevenuePanel],
+  ["Errors", ErrorsPanel],
+  ["Raw stream", RawStreamPanel],
+  ["Migration state", MigrationStatePanel],
 ] as const;
 
-export async function InsightsDashboard({ target }: { target: AnalyticsTarget }) {
+export async function InsightsDashboard({
+  target,
+  audience,
+}: {
+  target: AnalyticsTarget;
+  audience: AnalyticsAudience;
+}) {
   const resolved = await resolveTarget(target);
-  const other = target === "dev" ? "/insights" : "/insights/dev";
-  return <main className="insights-root" data-insights-target={target}>
-    <TargetBanner target={target} result={resolved} />
-    <div className="insights-container">
-      <header className="insights-heading"><div><span className="insights-eyebrow">Talysman analytics</span><h1>Insights</h1><p>Operational funnel, usage, retention, install health, and billing signals.</p></div><Link href={other}>Open {target === "dev" ? "production" : "local dev"} →</Link></header>
-      <div className="insights-grid">{panels.map(([title, Panel]) => <SuspenseBoundary key={title} fallback={<PanelLoading title={title} />}><Panel target={target} /></SuspenseBoundary>)}</div>
-    </div>
-  </main>;
+  const other = audience === "dev" ? "/insights" : "/insights/dev";
+  return (
+    <main className="insights-root" data-insights-target={target} data-insights-audience={audience}>
+      <TargetBanner target={target} audience={audience} result={resolved} />
+      <div className="insights-container">
+        <header className="insights-heading">
+          <div>
+            <span className="insights-eyebrow">
+              Talysman analytics · {audience === "dev" ? "internal traffic" : "marketing audience"}
+            </span>
+            <h1>Insights</h1>
+            <p>Operational funnel, usage, retention, install health, and billing signals.</p>
+          </div>
+          <Link href={other}>Open {audience === "dev" ? "production" : "dev"} dashboard →</Link>
+        </header>
+        <div className="insights-grid">
+          {panels.map(([title, Panel]) => (
+            <SuspenseBoundary key={title} fallback={<PanelLoading title={title} />}>
+              <Panel target={target} audience={audience} />
+            </SuspenseBoundary>
+          ))}
+        </div>
+      </div>
+    </main>
+  );
 }

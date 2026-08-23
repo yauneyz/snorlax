@@ -54,7 +54,7 @@ const supabaseProjectUrl = z
     return url.toString().replace(/\/$/, "");
   });
 
-const optionalPosthogKey = z
+const optionalPosthogValue = z
   .string()
   .optional()
   .default("")
@@ -62,6 +62,16 @@ const optionalPosthogKey = z
     const trimmed = value.trim();
     return trimmed.includes("...") ? "" : trimmed;
   });
+
+const optionalPosthogProjectKey = optionalPosthogValue.refine(
+  (value) => value === "" || /^phc_[A-Za-z0-9_-]+$/.test(value),
+  'must be a PostHog project token beginning with "phc_" or empty',
+);
+
+const optionalPosthogPersonalApiKey = optionalPosthogValue.refine(
+  (value) => value === "" || /^phx_[A-Za-z0-9_-]+$/.test(value),
+  'must be a PostHog personal API key beginning with "phx_" or empty',
+);
 
 function normalizeOptionalSentryDsn(value: string | undefined): string {
   const dsn = value?.trim() ?? "";
@@ -148,7 +158,11 @@ const credentialsSchema = z.object({
     auth_token: z.string().optional().default(""),
   }),
   posthog: z.object({
-    key: optionalPosthogKey,
+    project_key: optionalPosthogProjectKey,
+    personal_api_key: optionalPosthogPersonalApiKey.optional().default(""),
+    // Backward-compatible only. Old files called the project token `key`; a `phx_`
+    // value here is treated as an API/MCP credential and is never exported.
+    key: optionalPosthogValue.optional().default(""),
     host: z.string().optional().default("https://us.i.posthog.com"),
   }),
   google: z.object({
@@ -573,7 +587,10 @@ function toWebEnvPairs(c: Credentials, mode: Mode): Array<[string, string]> {
     ["SENTRY_PROJECT", c.sentry.project],
     ["SENTRY_AUTH_TOKEN", c.sentry.auth_token],
 
-    ["NEXT_PUBLIC_POSTHOG_KEY", c.posthog.key],
+    [
+      "NEXT_PUBLIC_POSTHOG_KEY",
+      c.posthog.project_key || (c.posthog.key.startsWith("phc_") ? c.posthog.key : ""),
+    ],
     ["NEXT_PUBLIC_POSTHOG_HOST", c.posthog.host],
 
     ["NEXT_PUBLIC_GA4_MEASUREMENT_ID", c.google.ga4_measurement_id],

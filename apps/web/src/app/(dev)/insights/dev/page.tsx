@@ -5,5 +5,5 @@ export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Insights (DEV)" };
 
 export default function DevInsightsPage() {
-  return <InsightsDashboard target="dev" />;
+  return <InsightsDashboard target="prod" audience="dev" />;
 }

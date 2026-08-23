@@ -123,7 +123,7 @@ web events** to both; keep tier 2 and desktop events in Supabase only. If you la
 you delete one function body and lose nothing.
 
 > `phc_A7HRSQgkac5ZUtyLThQ5sk2qLvU2rbmZmHQUnuXRTRws` is a PostHog *public project* key — designed
-> to ship in client bundles, not a secret. Set it as `key` under the existing `[posthog]` section
+> to ship in client bundles, not a secret. Set it as `project_key` under the existing `[posthog]` section
 > in `.credentials`, then `pnpm sync:env`. `NEXT_PUBLIC_POSTHOG_KEY` is already plumbed through
 > `scripts/sync-env.ts` and `apps/web/src/lib/config.ts`; `config.ts` strips any value containing
 > `...`, which is why the placeholder disables it today.
@@ -922,14 +922,16 @@ group by 1 order by 1 desc;
 
 ## 12. The dashboards
 
-### 12.1 Two stable targets
+### 12.1 Two stable audiences
 
-`/insights` always reads the dedicated production analytics credentials and `/insights/dev`
-always reads the local Supabase credentials. Neither uses `config.supabase` or
-`supabaseAdmin()`, so both routes show the same datasets under `pnpm web:dev` and
-`pnpm web:prod`. `src/server/analytics/db.ts` module-caches one service-role client per target and
-adds a four-second timeout. Request-cached panel queries return discriminated errors rather than
-throwing.
+Both pages inspect the production analytics pipeline, partitioned by the reversible ignore list.
+`/insights` is the marketing audience (`analytics_*`: ignored people excluded), while
+`/insights/dev` is the dogfooding audience (`analytics_dev_*`: ignored people only). The latter
+uses the dedicated local-only production analytics credentials and never extends the Android
+widget API; the widget's existing no-parameter response remains marketing-only. Neither page uses
+`config.supabase` or `supabaseAdmin()`. `src/server/analytics/db.ts` module-caches its service-role
+clients and adds a four-second timeout. Request-cached panel queries return discriminated errors
+rather than throwing.
 
 ### 12.2 Keeping them off production
 
@@ -937,8 +939,8 @@ Both routes live under `src/app/(dev)` and are protected by two independent guar
 `NODE_ENV === "production"` always returns 404 on a deployment, and the locally-synced
 `config.insights.enabled` flag must also be true. There are no route handlers under the group.
 The pages are force-dynamic server components, excluded from page-view tracking, robots, and the
-sitemap. `/insights/dev` has a sticky warning banner and stable `data-insights-target="dev"` hook;
-each dashboard links to the other.
+sitemap. `/insights/dev` has a sticky warning banner and stable
+`data-insights-audience="dev"` hook; each dashboard links to the other.
 
 ### 12.3 Panels
 
@@ -1088,9 +1090,9 @@ PostHog key in `.credentials`.
 route), `signup_started`, `account_created`, `signed_in`. *Do the download route first — highest
 integrity signal you have, and about ten lines.*
 
-**Phase 3 — the dashboards (complete).** Migration `0007_analytics_views.sql`, dedicated prod/dev
-target clients, `/insights`, `/insights/dev`, all eight operational panels, migration state, and
-raw streams.
+**Phase 3 — the dashboards (complete).** Migrations `0007_analytics_views.sql` and
+`0011_analytics_dev_audience.sql`, dedicated analytics clients, marketing-only `/insights`,
+ignored-person-only `/insights/dev`, all operational panels, migration state, and raw streams.
 
 **Phase 4 — billing (complete).** Webhook events, `checkout_started`, and the `invoice.payment_succeeded`
 addition. Entirely server-side, so this is the most reliable data in the system.

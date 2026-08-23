@@ -30,7 +30,10 @@ const optionalStripped = z
     return trimmed.includes("...") ? "" : trimmed;
   });
 
-const optionalPosthogKey = optionalStripped;
+const optionalPosthogKey = optionalStripped.refine(
+  (value) => value === "" || /^phc_[A-Za-z0-9_-]+$/.test(value),
+  'must be a PostHog project token beginning with "phc_" or empty',
+);
 
 /** Like `supabaseProjectUrl` but tolerates absence — an unconfigured target is not an error. */
 const optionalSupabaseProjectUrl = optionalStripped.transform((value, ctx) => {

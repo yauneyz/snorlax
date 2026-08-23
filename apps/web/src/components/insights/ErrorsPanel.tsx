@@ -1,12 +1,22 @@
+import type { AnalyticsAudience } from "@/server/analytics/audience";
 import type { AnalyticsTarget } from "@/server/analytics/db";
 import { queryRecentErrors } from "@/server/analytics/queries/errors";
 import { PanelShell } from "./PanelShell";
 import { Unavailable } from "./Unavailable";
 
-export async function ErrorsPanel({ target }: { target: AnalyticsTarget }) {
-  const result = await queryRecentErrors(target);
+export async function ErrorsPanel({
+  target,
+  audience,
+}: {
+  target: AnalyticsTarget;
+  audience: AnalyticsAudience;
+}) {
+  const result = await queryRecentErrors(target, audience);
   return (
-    <PanelShell title="Install-blocking errors" description="Full text of bootstrap/service/window failures, most recent first.">
+    <PanelShell
+      title="Install-blocking errors"
+      description="Full text of bootstrap/service/window failures, most recent first."
+    >
       {!result.ok ? (
         <Unavailable message={result.message} />
       ) : result.rows.length === 0 ? (

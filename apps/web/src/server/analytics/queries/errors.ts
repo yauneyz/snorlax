@@ -2,6 +2,7 @@ import "server-only";
 import { cache } from "react";
 import { config } from "@/lib/config";
 import { USER_FACING_ERROR_EVENTS } from "@/lib/analytics/events";
+import { audienceView, type AnalyticsAudience } from "@/server/analytics/audience";
 import type { AnalyticsTarget } from "@/server/analytics/db";
 import { queryError, withAnalyticsTarget } from "./helpers";
 import type { PanelData } from "./types";
@@ -42,27 +43,31 @@ function toReport(row: {
 }
 
 /** Always queries Supabase directly. What GET /api/analytics/errors itself calls. */
-export const queryRecentErrorsFromDb = cache(async (target: AnalyticsTarget) =>
-  withAnalyticsTarget<ErrorReport[]>(target, async (db) => {
-    const { data, error } = await db
-      .from("analytics_events")
-      .select("event, platform, app_version, device_id, occurred_at, received_at, props")
-      .in("event", [...USER_FACING_ERROR_EVENTS])
-      .order("received_at", { ascending: false })
-      .limit(MAX_ERRORS);
-    if (error) throw queryError(error.message);
-    return (data ?? []).map(toReport);
-  }),
+export const queryRecentErrorsFromDb = cache(
+  async (target: AnalyticsTarget, audience: AnalyticsAudience = "prod") =>
+    withAnalyticsTarget<ErrorReport[]>(target, async (db) => {
+      const { data, error } = await db
+        .from(audienceView(audience, "analytics_events_resolved", "analytics_dev_events_resolved"))
+        .select("event, platform, app_version, device_id, occurred_at, received_at, props")
+        .in("event", [...USER_FACING_ERROR_EVENTS])
+        .order("received_at", { ascending: false })
+        .limit(MAX_ERRORS);
+      if (error) throw queryError(error.message);
+      return (data ?? []).map(toReport);
+    }),
 );
 
 /**
  * Prod reads through the same deployed, bearer-token-gated route the Android errors screen
  * uses (mirrors summary-client.ts's fetchProdSummary) instead of holding a second Supabase
- * client for it; dev reads local Supabase directly.
+ * client for it; the internal audience reads its production DB view directly.
  */
 const fetchProdErrors = cache(async (): Promise<PanelData<ErrorReport[]>> => {
   if (!config.insights.widgetApiKey) {
-    return { ok: false, message: "INSIGHTS_WIDGET_API_KEY is not configured locally. Run pnpm sync:env." };
+    return {
+      ok: false,
+      message: "INSIGHTS_WIDGET_API_KEY is not configured locally. Run pnpm sync:env.",
+    };
   }
   try {
     const res = await fetch(`${config.insights.apiBaseUrl}/api/analytics/errors`, {
@@ -80,10 +85,13 @@ const fetchProdErrors = cache(async (): Promise<PanelData<ErrorReport[]>> => {
   }
 });
 
-/** Used by the /insights dashboard: prod reads through the deployed errors API, dev reads Supabase directly. */
+/** Marketing errors use the deployed API; internal errors use the ignored-person view directly. */
 export const queryRecentErrors = cache(
-  async (target: AnalyticsTarget): Promise<PanelData<ErrorReport[]>> => {
-    if (target === "prod") return fetchProdErrors();
-    return queryRecentErrorsFromDb(target);
+  async (
+    target: AnalyticsTarget,
+    audience: AnalyticsAudience = "prod",
+  ): Promise<PanelData<ErrorReport[]>> => {
+    if (target === "prod" && audience === "prod") return fetchProdErrors();
+    return queryRecentErrorsFromDb(target, audience);
   },
 );

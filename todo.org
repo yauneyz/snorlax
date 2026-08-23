@@ -1,11 +1,8 @@
-- smartscreen buy
-- chatgpt email upgrade
-- personalize emails
-  - include some sort of link to know where they came from.
-- send next emails
-
-- Thinky credentials
-- Thinky cancel heroku
+- verify analytics funnel
+- optimize landing page for downloads
+- drive more traffic
+- look at heatmaps and session replays
+- repeat
 
 
 - SEO pages media

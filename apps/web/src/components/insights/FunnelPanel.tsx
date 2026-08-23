@@ -1,3 +1,4 @@
+import type { AnalyticsAudience } from "@/server/analytics/audience";
 import type { AnalyticsTarget } from "@/server/analytics/db";
 import { queryFunnel } from "@/server/analytics/queries/funnel";
 import { PanelShell } from "./PanelShell";
@@ -10,10 +11,26 @@ function duration(seconds: number | null): string {
   return `${(seconds / 86_400).toFixed(1)}d`;
 }
 
-export async function FunnelPanel({ target }: { target: AnalyticsTarget }) {
-  const result = await queryFunnel(target);
-  if (!result.ok) return <PanelShell title="90-day funnel"><Unavailable message={result.message} /></PanelShell>;
-  if (!result.rows) return <PanelShell title="90-day funnel"><p className="insights-muted">No funnel data yet.</p></PanelShell>;
+export async function FunnelPanel({
+  target,
+  audience,
+}: {
+  target: AnalyticsTarget;
+  audience: AnalyticsAudience;
+}) {
+  const result = await queryFunnel(target, audience);
+  if (!result.ok)
+    return (
+      <PanelShell title="90-day funnel">
+        <Unavailable message={result.message} />
+      </PanelShell>
+    );
+  if (!result.rows)
+    return (
+      <PanelShell title="90-day funnel">
+        <p className="insights-muted">No funnel data yet.</p>
+      </PanelShell>
+    );
 
   const row = result.rows;
   const steps = [
@@ -28,23 +45,35 @@ export async function FunnelPanel({ target }: { target: AnalyticsTarget }) {
   ] as const;
 
   return (
-    <PanelShell title="90-day funnel" description="First-touch people; download → install is an aggregate estimate.">
+    <PanelShell
+      title="90-day funnel"
+      description="First-touch people; download → install is an aggregate estimate."
+    >
       <div className="insights-funnel">
         {steps.map(([event, label, count, estimated], index) => {
           const previous = index === 0 ? count : steps[index - 1][2];
           const conversion = previous > 0 ? Math.round((count / previous) * 100) : 0;
           return (
             <div className="insights-funnel__step" key={event}>
-              <span>{label}{estimated ? <sup title="Estimated"> est.</sup> : null}</span>
-              <strong data-testid={`funnel-step-${event}`} data-count={count}>{count.toLocaleString()}</strong>
+              <span>
+                {label}
+                {estimated ? <sup title="Estimated"> est.</sup> : null}
+              </span>
+              <strong data-testid={`funnel-step-${event}`} data-count={count}>
+                {count.toLocaleString()}
+              </strong>
               <small>{index === 0 ? "90 days" : `${conversion}% from prior`}</small>
             </div>
           );
         })}
       </div>
       <div className="insights-inline-stats">
-        <span>Median visit → download <strong>{duration(row.medianVisitToDownloadSeconds)}</strong></span>
-        <span>Median install → value <strong>{duration(row.medianInstallToValueSeconds)}</strong></span>
+        <span>
+          Median visit → download <strong>{duration(row.medianVisitToDownloadSeconds)}</strong>
+        </span>
+        <span>
+          Median install → value <strong>{duration(row.medianInstallToValueSeconds)}</strong>
+        </span>
       </div>
     </PanelShell>
   );

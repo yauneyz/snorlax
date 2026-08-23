@@ -134,6 +134,30 @@ describe("config schemas", () => {
     }
   });
 
+  it("rejects PostHog personal API keys in browser config", () => {
+    const r = publicSchema.safeParse({
+      NEXT_PUBLIC_APP_URL: "http://localhost:3000",
+      NEXT_PUBLIC_APP_NAME: "x",
+      NEXT_PUBLIC_SUPABASE_URL: "http://localhost:54321",
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: "sb_publishable_test",
+      NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: "pk_test_xxx",
+      NEXT_PUBLIC_POSTHOG_KEY: "phx_private_api_key",
+    });
+    expect(r.success).toBe(false);
+  });
+
+  it("accepts PostHog project tokens in browser config", () => {
+    const r = publicSchema.safeParse({
+      NEXT_PUBLIC_APP_URL: "http://localhost:3000",
+      NEXT_PUBLIC_APP_NAME: "x",
+      NEXT_PUBLIC_SUPABASE_URL: "http://localhost:54321",
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: "sb_publishable_test",
+      NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: "pk_test_xxx",
+      NEXT_PUBLIC_POSTHOG_KEY: "phc_public_project_token",
+    });
+    expect(r.success).toBe(true);
+  });
+
   it("parses the public Google Auth feature flag", () => {
     const r = publicSchema.safeParse({
       NEXT_PUBLIC_APP_URL: "http://localhost:3000",

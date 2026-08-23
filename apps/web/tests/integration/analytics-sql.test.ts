@@ -1,5 +1,5 @@
 /**
- * Contract tests for migration 0006_analytics.sql, run against the local Supabase stack.
+ * Contract tests for the analytics migrations, run against the local Supabase stack.
  *
  * These live in the integration suite (`pnpm web:test:webhook`) rather than the unit suite
  * because the behaviour under test IS the SQL — the identity merge, the idempotent usage
@@ -15,7 +15,8 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { randomUUID } from "node:crypto";
 
 const url = process.env.ANALYTICS_DEV_SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
-const secret = process.env.ANALYTICS_DEV_SUPABASE_SECRET_KEY ?? process.env.SUPABASE_SECRET_KEY ?? "";
+const secret =
+  process.env.ANALYTICS_DEV_SUPABASE_SECRET_KEY ?? process.env.SUPABASE_SECRET_KEY ?? "";
 
 function isLocal(value: string): boolean {
   try {
@@ -184,7 +185,12 @@ describe("analytics_report_usage", () => {
     if (withStack()) return;
     // Raw ON CONFLICT DO UPDATE raises 21000 "cannot affect row a second time" here.
     const device = randomUUID();
-    const base = { device_id: device, local_date: "2026-08-04", tz_offset_minutes: 0, platform: "mac" };
+    const base = {
+      device_id: device,
+      local_date: "2026-08-04",
+      tz_offset_minutes: 0,
+      platform: "mac",
+    };
     const { data: n, error } = await db.rpc("analytics_report_usage", {
       p_rows: [
         { ...base, focus_seconds: 60 },
@@ -341,5 +347,135 @@ describe("analytics ignore list", () => {
     expect(ignoredRow).toBeTruthy();
 
     await db.auth.admin.deleteUser(userId);
+  });
+
+  it("partitions an ignored person's complete funnel, usage, and billing signals into dev views", async () => {
+    if (withStack()) return;
+    const anon = randomUUID();
+    const device = randomUUID();
+    const channel = `internal-${randomUUID()}`;
+    const { data: person } = await db.rpc("analytics_link", {
+      p_identifiers: [`anon:${anon}`, `device:${device}`],
+      p_attribution: { utm_source: channel, utm_medium: "integration-test" },
+    });
+    await db.from("analytics_ignored_persons").insert({ person_id: person as string });
+
+    const [{ data: prodRevenueBefore }, { data: devRevenueBefore }] = await Promise.all([
+      db.from("analytics_revenue_summary").select("refunds").single(),
+      db.from("analytics_dev_revenue_summary").select("refunds").single(),
+    ]);
+
+    const occurredAt = new Date().toISOString();
+    const { error: eventError } = await db.from("analytics_events").insert([
+      { event: "page_viewed", occurred_at: occurredAt, anon_id: anon, source: "web", props: {} },
+      {
+        event: "download_clicked",
+        occurred_at: occurredAt,
+        anon_id: anon,
+        source: "web",
+        props: {},
+      },
+      {
+        event: "app_installed",
+        occurred_at: occurredAt,
+        device_id: device,
+        source: "desktop",
+        platform: "linux",
+        props: {},
+      },
+      {
+        event: "refund_issued",
+        occurred_at: occurredAt,
+        device_id: device,
+        source: "server",
+        props: {},
+      },
+    ]);
+    expect(eventError).toBeNull();
+
+    const { error: usageError } = await db.rpc("analytics_report_usage", {
+      p_rows: [
+        {
+          device_id: device,
+          local_date: occurredAt.slice(0, 10),
+          tz_offset_minutes: 0,
+          platform: "linux",
+          app_opens: 2,
+          focus_seconds: 1800,
+          sessions_completed: 1,
+        },
+      ],
+    });
+    expect(usageError).toBeNull();
+
+    const [
+      prodEvent,
+      devEvents,
+      prodUsage,
+      devUsage,
+      prodFunnel,
+      devFunnel,
+      prodChannel,
+      devChannel,
+    ] = await Promise.all([
+      db.from("analytics_events_resolved").select("id").eq("anon_id", anon).maybeSingle(),
+      db
+        .from("analytics_dev_events_resolved")
+        .select("event")
+        .eq("person_id", person as string),
+      db.from("analytics_usage_resolved").select("device_id").eq("device_id", device).maybeSingle(),
+      db
+        .from("analytics_dev_usage_resolved")
+        .select("device_id, focus_seconds")
+        .eq("device_id", device)
+        .single(),
+      db
+        .from("analytics_funnel")
+        .select("person_id")
+        .eq("person_id", person as string)
+        .maybeSingle(),
+      db
+        .from("analytics_dev_funnel")
+        .select("person_id, downloaded_at, installed_at")
+        .eq("person_id", person as string)
+        .single(),
+      db.from("analytics_channel_funnel").select("channel").eq("channel", channel).maybeSingle(),
+      db
+        .from("analytics_dev_channel_funnel")
+        .select("channel, visitors, downloaded, installed")
+        .eq("channel", channel)
+        .single(),
+    ]);
+
+    expect(prodEvent.data).toBeNull();
+    expect(new Set((devEvents.data ?? []).map((row: { event: string }) => row.event))).toEqual(
+      new Set(["page_viewed", "download_clicked", "app_installed", "refund_issued"]),
+    );
+    expect(prodUsage.data).toBeNull();
+    expect(devUsage.data?.focus_seconds).toBe(1800);
+    expect(prodFunnel.data).toBeNull();
+    expect(devFunnel.data?.downloaded_at).toBeTruthy();
+    expect(devFunnel.data?.installed_at).toBeTruthy();
+    expect(prodChannel.data).toBeNull();
+    expect(devChannel.data).toMatchObject({ visitors: 1, downloaded: 1, installed: 1 });
+
+    const [{ data: prodRevenueAfter }, { data: devRevenueAfter }] = await Promise.all([
+      db.from("analytics_revenue_summary").select("refunds").single(),
+      db.from("analytics_dev_revenue_summary").select("refunds").single(),
+    ]);
+    expect(prodRevenueAfter?.refunds).toBe(prodRevenueBefore?.refunds);
+    expect(devRevenueAfter?.refunds).toBe((devRevenueBefore?.refunds ?? 0) + 1);
+
+    const completeDevViews = [
+      "analytics_dev_funnel_summary",
+      "analytics_dev_dau",
+      "analytics_dev_engagement_daily",
+      "analytics_dev_retention_cohorts",
+      "analytics_dev_install_health",
+    ];
+    for (const relation of completeDevViews) {
+      const { error } = await db.from(relation).select("*").limit(1);
+      expect(error, relation).toBeNull();
+    }
   });
 });

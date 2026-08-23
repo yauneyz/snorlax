@@ -13,6 +13,8 @@ import type {
   AnalyticsFunnelRow,
   AnalyticsFunnelSummaryRow,
   AnalyticsIdentityRow,
+  AnalyticsIgnoredPersonRow,
+  AnalyticsIgnoredUserRow,
   AnalyticsInstallHealthRow,
   AnalyticsPersonRow,
   AnalyticsRetentionCohortRow,
@@ -63,7 +65,8 @@ export type Database = {
       };
       stripe_events: {
         Row: StripeEventRow;
-        Insert: Omit<StripeEventRow, "processed_at"> & Partial<Pick<StripeEventRow, "processed_at">>;
+        Insert: Omit<StripeEventRow, "processed_at"> &
+          Partial<Pick<StripeEventRow, "processed_at">>;
         Update: Partial<StripeEventRow>;
         Relationships: [];
       };
@@ -84,6 +87,18 @@ export type Database = {
         Insert: Omit<AnalyticsIdentityRow, "first_seen_at"> &
           Partial<Pick<AnalyticsIdentityRow, "first_seen_at">>;
         Update: Partial<AnalyticsIdentityRow>;
+        Relationships: [];
+      };
+      analytics_ignored_users: {
+        Row: AnalyticsIgnoredUserRow;
+        Insert: Pick<AnalyticsIgnoredUserRow, "user_id"> & Partial<AnalyticsIgnoredUserRow>;
+        Update: Partial<AnalyticsIgnoredUserRow>;
+        Relationships: [];
+      };
+      analytics_ignored_persons: {
+        Row: AnalyticsIgnoredPersonRow;
+        Insert: Pick<AnalyticsIgnoredPersonRow, "person_id"> & Partial<AnalyticsIgnoredPersonRow>;
+        Update: Partial<AnalyticsIgnoredPersonRow>;
         Relationships: [];
       };
       analytics_events: {
@@ -126,7 +141,15 @@ export type Database = {
         Row: AnalyticsEventResolvedRow;
         Relationships: [];
       };
+      analytics_dev_events_resolved: {
+        Row: AnalyticsEventResolvedRow;
+        Relationships: [];
+      };
       analytics_usage_resolved: {
+        Row: AnalyticsUsageResolvedRow;
+        Relationships: [];
+      };
+      analytics_dev_usage_resolved: {
         Row: AnalyticsUsageResolvedRow;
         Relationships: [];
       };
@@ -134,7 +157,15 @@ export type Database = {
         Row: AnalyticsFunnelRow;
         Relationships: [];
       };
+      analytics_dev_funnel: {
+        Row: AnalyticsFunnelRow;
+        Relationships: [];
+      };
       analytics_dau: {
+        Row: AnalyticsDauRow;
+        Relationships: [];
+      };
+      analytics_dev_dau: {
         Row: AnalyticsDauRow;
         Relationships: [];
       };
@@ -142,7 +173,15 @@ export type Database = {
         Row: AnalyticsChannelFunnelRow;
         Relationships: [];
       };
+      analytics_dev_channel_funnel: {
+        Row: AnalyticsChannelFunnelRow;
+        Relationships: [];
+      };
       analytics_funnel_summary: {
+        Row: AnalyticsFunnelSummaryRow;
+        Relationships: [];
+      };
+      analytics_dev_funnel_summary: {
         Row: AnalyticsFunnelSummaryRow;
         Relationships: [];
       };
@@ -150,7 +189,15 @@ export type Database = {
         Row: AnalyticsEngagementDailyRow;
         Relationships: [];
       };
+      analytics_dev_engagement_daily: {
+        Row: AnalyticsEngagementDailyRow;
+        Relationships: [];
+      };
       analytics_retention_cohorts: {
+        Row: AnalyticsRetentionCohortRow;
+        Relationships: [];
+      };
+      analytics_dev_retention_cohorts: {
         Row: AnalyticsRetentionCohortRow;
         Relationships: [];
       };
@@ -158,7 +205,15 @@ export type Database = {
         Row: AnalyticsInstallHealthRow;
         Relationships: [];
       };
+      analytics_dev_install_health: {
+        Row: AnalyticsInstallHealthRow;
+        Relationships: [];
+      };
       analytics_revenue_summary: {
+        Row: AnalyticsRevenueSummaryRow;
+        Relationships: [];
+      };
+      analytics_dev_revenue_summary: {
         Row: AnalyticsRevenueSummaryRow;
         Relationships: [];
       };

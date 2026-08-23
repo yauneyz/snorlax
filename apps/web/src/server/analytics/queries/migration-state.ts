@@ -8,6 +8,8 @@ const EXPECTED_ANALYTICS_TABLES = [
   "analytics_identities",
   "analytics_events",
   "analytics_usage_daily",
+  "analytics_ignored_users",
+  "analytics_ignored_persons",
 ] as const;
 
 const EXPECTED_ANALYTICS_VIEWS = [
@@ -21,6 +23,16 @@ const EXPECTED_ANALYTICS_VIEWS = [
   "analytics_retention_cohorts",
   "analytics_install_health",
   "analytics_revenue_summary",
+  "analytics_dev_events_resolved",
+  "analytics_dev_usage_resolved",
+  "analytics_dev_funnel",
+  "analytics_dev_dau",
+  "analytics_dev_channel_funnel",
+  "analytics_dev_funnel_summary",
+  "analytics_dev_engagement_daily",
+  "analytics_dev_retention_cohorts",
+  "analytics_dev_install_health",
+  "analytics_dev_revenue_summary",
 ] as const;
 
 export const EXPECTED_ANALYTICS_RELATIONS = [

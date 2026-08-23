@@ -1,9 +1,15 @@
+import type { AnalyticsAudience } from "@/server/analytics/audience";
 import type { AnalyticsTarget } from "@/server/analytics/db";
 import { queryMigrationState } from "@/server/analytics/queries/migration-state";
 import { PanelShell } from "./PanelShell";
 import { Unavailable } from "./Unavailable";
 
-export async function MigrationStatePanel({ target }: { target: AnalyticsTarget }) {
+export async function MigrationStatePanel({
+  target,
+}: {
+  target: AnalyticsTarget;
+  audience: AnalyticsAudience;
+}) {
   const result = await queryMigrationState(target);
   return (
     <PanelShell title="Migration state" description="Expected analytics relations on this target.">
