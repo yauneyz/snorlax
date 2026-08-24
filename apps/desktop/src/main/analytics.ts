@@ -98,6 +98,17 @@ async function pathFor(file: string): Promise<string> {
   return join(dir, file);
 }
 
+/**
+ * The ingest API's platform enum is `win | mac | linux` (apps/web/src/lib/analytics/events.ts),
+ * not Node's `process.platform`. Sending `win32`/`darwin` fails zod validation, and the server
+ * answers 400 — which `postTrackEvent` treats as permanent and drops. Map here, once.
+ */
+function analyticsPlatform(): 'win' | 'mac' | 'linux' {
+  if (process.platform === 'win32') return 'win';
+  if (process.platform === 'darwin') return 'mac';
+  return 'linux';
+}
+
 function localDateString(date: Date): string {
   const y = date.getFullYear();
   const m = String(date.getMonth() + 1).padStart(2, '0');
@@ -216,7 +227,7 @@ export function track(event: DesktopAnalyticsEvent, props?: Record<string, unkno
       device_id: identity.deviceId,
       occurred_at: new Date().toISOString(),
       app_version: app.getVersion(),
-      platform: process.platform,
+      platform: analyticsPlatform(),
       props: props ?? {},
     });
     const queue = await loadQueue();
@@ -319,7 +330,7 @@ async function flushUsageObserved(deviceId: string): Promise<void> {
   const rows = days.slice(0, 40).map((local_date) => ({
     local_date,
     tz_offset_minutes: tzOffsetMinutes,
-    platform: process.platform,
+    platform: analyticsPlatform(),
     app_opens: usage[local_date]!.app_opens,
     focus_seconds: usage[local_date]!.focus_seconds,
   }));
@@ -353,9 +364,39 @@ async function flushUsageExact(service: ServiceConnection, deviceId: string): Pr
   if (transitions.length === 0 && latestSeq === afterSeq) return;
 
   const tzOffsetMinutes = -new Date().getTimezoneOffset();
-  const rows = rollupUsage(transitions, 0, tzOffsetMinutes, new Date(), process.platform, app.getVersion());
+  const today = localDateString(new Date());
+  // The service's transition log has no notion of the UI being opened, so app_opens (and with
+  // it the dashboard's UI-DAU) can only come from the observed accumulator. Fold it into the
+  // exact rows rather than letting it rot in usage-daily.json.
+  const observed = await loadUsage();
+  const rows = rollupUsage(
+    transitions,
+    observed[today]?.app_opens ?? 0,
+    tzOffsetMinutes,
+    new Date(),
+    analyticsPlatform(),
+    app.getVersion(),
+  ).map((row) => ({
+    ...row,
+    app_opens: row.app_opens || (observed[row.local_date]?.app_opens ?? 0),
+  }));
+  // Days the UI was opened but focus never toggled produce no transition rows at all.
+  for (const [local_date, entry] of Object.entries(observed)) {
+    if (entry.app_opens === 0 || rows.some((row) => row.local_date === local_date)) continue;
+    rows.push({
+      local_date,
+      tz_offset_minutes: tzOffsetMinutes,
+      platform: analyticsPlatform(),
+      app_version: app.getVersion(),
+      focus_seconds: 0,
+      key_present_seconds: 0,
+      app_opens: entry.app_opens,
+    });
+  }
   const sent = await postUsageRows(deviceId, rows);
   if (!sent) return;
+  // Reported days are closed out; today keeps accumulating toward the next flush.
+  await saveUsage(today in observed ? { [today]: { ...observed[today]!, app_opens: 0 } } : {});
   await chain(async () => {
     const current = await loadTelemetry();
     await saveTelemetry({ ...current, lastUsageSeq: latestSeq });
@@ -451,7 +492,7 @@ export async function trackAppInstalledIfFirstRun(): Promise<void> {
   const { firstRun } = await loadDeviceIdentity();
   if (!firstRun) return;
   track('app_installed', {
-    platform: process.platform,
+    platform: analyticsPlatform(),
     app_version: app.getVersion(),
     os_version: os.release(),
   });

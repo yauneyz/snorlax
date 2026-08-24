@@ -10,6 +10,9 @@ import type { TransitionKind, UsageTransition } from '@talysman/shared';
 
 export interface DailyUsage {
   local_date: string;
+  /** Required by the ingest schema (apps/web/src/server/analytics/ingest.ts); a row without
+   * it is rejected with a 400 on every platform. */
+  tz_offset_minutes: number;
   platform: string;
   app_version: string;
   focus_seconds: number;
@@ -107,6 +110,7 @@ export function rollupUsage(
     .sort((a, b) => (a < b ? -1 : a > b ? 1 : 0))
     .map((local_date) => ({
       local_date,
+      tz_offset_minutes: tzOffsetMinutes,
       platform,
       app_version: appVersion,
       focus_seconds: Math.round(focusByDate.get(local_date) ?? 0),

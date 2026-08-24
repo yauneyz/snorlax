@@ -60,6 +60,7 @@ describe('rollupUsage', () => {
     expect(rows).toEqual([
       {
         local_date: '2024-01-07',
+        tz_offset_minutes: 0,
         platform: 'linux',
         app_version: '0.4.0',
         focus_seconds: 0,
@@ -67,6 +68,14 @@ describe('rollupUsage', () => {
         app_opens: 1,
       },
     ]);
+  });
+
+  // Regression: rows shipped without tz_offset_minutes, which the ingest schema requires —
+  // every exact-usage upload was rejected with a 400 (apps/web/src/server/analytics/ingest.ts).
+  it('stamps every row with the caller tz offset', () => {
+    const now = new Date(Date.UTC(2024, 0, 7, 12, 0, 0));
+    const rows = rollupUsage([], 2, -420, now, 'win', '0.4.0');
+    expect(rows.every((row) => row.tz_offset_minutes === -420)).toBe(true);
   });
 
   it('rolls up keyPresent/keyAbsent pairs into key_present_seconds independently of focus', () => {
