@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { sendGAEvent } from "@next/third-parties/google";
 
 type PlatformKey = "win" | "mac" | "linux";
 type Detected = { key: PlatformKey; label: string; href: string };
@@ -48,7 +49,11 @@ export function DetectedPlatform({ icons }: { icons: Record<PlatformKey, React.R
           <span className="detected-platform__eyebrow">Detected</span>
           <span className="detected-platform__name">{detected.label}</span>
         </p>
-        <a className="detected-platform__link" href={detected.href}>
+        <a
+          className="detected-platform__link"
+          href={detected.href}
+          onClick={() => sendGAEvent("event", "download", { platform: detected.key })}
+        >
           Download for {detected.label}
         </a>
       </div>

@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "858615057403",
+    "project_id": "talysman-insights",
+    "storage_bucket": "talysman-insights.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:858615057403:android:43cee9cc56a4628eaf595e",
+        "android_client_info": {
+          "package_name": "app.talysman.insights"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyA6O1T6W66QsNHS_uI8rl5GNkFtJ-k6VUo"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

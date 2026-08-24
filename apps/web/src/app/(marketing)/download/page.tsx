@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { DetectedPlatform } from "@/components/marketing/DetectedPlatform";
+import { DownloadCard } from "@/components/marketing/DownloadCard";
 import { PlatformIcon, type Platform } from "@/components/marketing/PlatformIcon";
 import { config } from "@/lib/config";
 
@@ -63,22 +64,6 @@ const extensions: DownloadTarget[] = [
     external: true,
   },
 ];
-
-function DownloadCard({ target }: { target: DownloadTarget }) {
-  return (
-    <a
-      className="download-card"
-      href={target.href}
-      {...(target.external ? { target: "_blank", rel: "noreferrer" } : {})}
-    >
-      <span className="download-card__icon">
-        <PlatformIcon platform={target.platform} size={22} />
-      </span>
-      <h3>{target.name}</h3>
-      <span className="download-card__note">{target.note}</span>
-    </a>
-  );
-}
 
 export default function DownloadPage() {
   return (
