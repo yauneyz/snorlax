@@ -7,7 +7,7 @@ import { promisify } from 'node:util';
 import { app, dialog } from 'electron';
 import { PROTOCOL_VERSION } from '@talysman/shared';
 import { logger } from '../logging.js';
-import { track } from '../analytics.js';
+import { analyticsPlatform, track } from '../analytics.js';
 import type { ServiceConnection } from './connection.js';
 
 const execFileAsync = promisify(execFile);
@@ -93,13 +93,13 @@ export async function ensureServiceInstalled(): Promise<void> {
   if (await commandSucceeds('launchctl', ['print', MAC_SERVICE_LABEL])) return;
 
   logger.info('[installer] macOS service is not installed; requesting administrator approval');
-  track('service_install_started', { platform: process.platform });
+  track('service_install_started', { platform: analyticsPlatform() });
   try {
     await runElevatedServiceCommand('install');
-    track('service_installed', { platform: process.platform });
+    track('service_installed', { platform: analyticsPlatform() });
   } catch (error) {
     track('service_install_failed', {
-      platform: process.platform,
+      platform: analyticsPlatform(),
       reason: error instanceof Error ? error.message : String(error),
     });
     throw error;
@@ -130,16 +130,16 @@ export async function ensureServiceCurrent(service: ServiceConnection): Promise<
   logger.warn(
     `[installer] service ${running.version}/protocol-${running.protocolVersion} differs from app ${expectedVersion}/protocol-${PROTOCOL_VERSION}; repairing`,
   );
-  track('service_install_started', { platform: process.platform });
+  track('service_install_started', { platform: analyticsPlatform() });
   try {
     await runElevatedServiceCommand('install');
     await waitForServiceVersion(service, expectedVersion);
     logger.info(`[installer] service upgraded successfully to ${expectedVersion}`);
-    track('service_installed', { platform: process.platform });
+    track('service_installed', { platform: analyticsPlatform() });
   } catch (error) {
     logger.error('[installer] service upgrade failed', error);
     track('service_install_failed', {
-      platform: process.platform,
+      platform: analyticsPlatform(),
       reason: error instanceof Error ? error.message : String(error),
     });
     await dialog.showMessageBox({

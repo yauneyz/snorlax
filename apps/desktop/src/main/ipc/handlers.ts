@@ -404,8 +404,18 @@ export async function registerIpcHandlers(ctx: HandlerContext): Promise<void> {
   );
   ipcHandle(
     Channels.signUpPassword,
-    (_e, creds: { email: string; password: string; fullName?: string }) =>
-      signUpWithPassword(creds.email, creds.password, creds.fullName),
+    async (_e, creds: { email: string; password: string; fullName?: string }) => {
+      const result = await signUpWithPassword(creds.email, creds.password, creds.fullName);
+      if (result.ok) {
+        track('account_created', { method: 'password', surface: 'desktop' });
+        // Flush now rather than waiting for the 15-minute tick: when sign-up returned a
+        // session, postTrackEvent's Authorization header carries it and the row lands with
+        // user_id already attached. Delaying risks it going out anonymous and resolving
+        // through device_id alone.
+        if (!result.confirmEmail) void flushEvents();
+      }
+      return result;
+    },
   );
   ipcHandle(Channels.sendPasswordReset, (_e, args: { email: string }) =>
     sendPasswordReset(args.email),

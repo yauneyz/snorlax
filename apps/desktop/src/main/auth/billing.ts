@@ -8,6 +8,7 @@
 import { shell } from 'electron';
 import { subscriptionDetailSchema, type CheckoutPrice, type SubscriptionDetail } from '@talysman/product';
 import { config } from '../config.js';
+import { bridgedUrl } from '../analyticsBridge.js';
 import { getAccessToken } from './supabase.js';
 
 interface BillingResult {
@@ -51,7 +52,9 @@ async function postForUrl(path: string, body?: unknown): Promise<BillingResult> 
   if (!res.ok) return res;
   const url = (res.data as { url?: string } | null)?.url;
   if (!url) return { ok: false, message: 'Unexpected billing response.' };
-  await shell.openExternal(url);
+  // Via the bridge so the browser's tal_aid cookie and this install's device_id are seen in
+  // one request; Stripe URLs never touch our domain otherwise.
+  await shell.openExternal(await bridgedUrl(url));
   return { ok: true };
 }
 

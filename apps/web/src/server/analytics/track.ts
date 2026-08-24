@@ -204,6 +204,40 @@ function attributionPayload(a: Attribution | undefined): Record<string, string> 
 }
 
 /**
+ * Joins identifier spaces without recording an event.
+ *
+ * The web<->desktop bridge (analytics-arch.md §4.3) is the only caller: a request that
+ * carries the `tal_aid` cookie *and* a `device_id` is proof the same human owns both, and
+ * that edge is worth storing even though nothing happened worth a milestone row.
+ *
+ * Requires at least two identifiers by design — linking one to itself creates a bare person
+ * row and joins nothing, which is a silent no-op worth refusing rather than performing.
+ */
+export async function linkIdentifiers(input: {
+  anonId?: string | null;
+  deviceId?: string | null;
+  userId?: string | null;
+  attribution?: Attribution;
+}): Promise<void> {
+  try {
+    if (!ingestAllowed()) {
+      noteSkip();
+      return;
+    }
+    const identifiers = identifiersFor(input);
+    if (identifiers.length < 2) return;
+
+    const { error } = await supabaseAdmin().rpc("analytics_link", {
+      p_identifiers: identifiers,
+      p_attribution: attributionPayload(input.attribution),
+    });
+    if (error) throw new Error(`analytics_link failed: ${error.message}`);
+  } catch (err) {
+    await captureException(err, { scope: "analytics.linkIdentifiers" });
+  }
+}
+
+/**
  * Records one milestone event. Fire-and-forget: resolves even when the database is down.
  */
 export async function track(input: TrackInput): Promise<void> {

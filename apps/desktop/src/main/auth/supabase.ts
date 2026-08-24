@@ -20,6 +20,7 @@ import {
 } from '@talysman/auth-contracts';
 import { config } from '../config.js';
 import { logger } from '../logging.js';
+import { bridgedUrl } from '../analyticsBridge.js';
 import { clearSession, supabaseAuthStorage } from './session.js';
 import { classifySignUpResult } from './signUpResult.js';
 
@@ -131,7 +132,9 @@ export async function signInWithGoogle(): Promise<{ ok: boolean; message?: strin
         message: error?.message ?? 'Could not start Google sign-in.',
       };
     }
-    await shell.openExternal(data.url);
+    // Bridged for the same reason as checkout: the OAuth URL points at supabase.co, so
+    // without this hop the browser never presents its tal_aid cookie to us.
+    await shell.openExternal(await bridgedUrl(data.url));
     return { ok: true };
   } catch (e) {
     return { ok: false, message: (e as Error).message };

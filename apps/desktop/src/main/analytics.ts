@@ -14,19 +14,17 @@
  * re-probed every cycle.
  */
 
-import { randomUUID } from 'node:crypto';
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { readFile, writeFile } from 'node:fs/promises';
 import os from 'node:os';
-import { join } from 'node:path';
 import { app } from 'electron';
 import { rollupUsage } from '@talysman/core';
 import type { UsageTransition } from '@talysman/shared';
 import { config } from './config.js';
 import { logger } from './logging.js';
+import { loadDeviceIdentity, pathFor } from './deviceIdentity.js';
 import { getAccessToken } from './auth/supabase.js';
 import { isServiceError, type ServiceConnection } from './service/connection.js';
 
-const DEVICE_ID_FILE = 'device-id.json';
 const TELEMETRY_FILE = 'telemetry.json';
 const QUEUE_FILE = 'analytics-queue.ndjson';
 const USAGE_FILE = 'usage-daily.json';
@@ -39,11 +37,6 @@ const FLUSH_BATCH_LIMIT = 100;
 const FLUSH_TIMEOUT_MS = 5000;
 const QUIT_FLUSH_TIMEOUT_MS = 2000;
 const FOCUS_SESSION_LIFETIME_CAP = 3;
-
-interface DeviceIdentity {
-  deviceId: string;
-  installedAt: string;
-}
 
 interface TelemetryState {
   lastExtensionConnectedDate?: string;
@@ -64,6 +57,7 @@ interface UsageDay {
  * apps/web/src/lib/analytics/events.ts — desktop has no visibility into the web app's source.
  */
 export type DesktopAnalyticsEvent =
+  | 'account_created'
   | 'app_installed'
   | 'service_install_started'
   | 'service_installed'
@@ -81,7 +75,6 @@ export type DesktopAnalyticsEvent =
   | 'service_disconnected'
   | 'ipc_handler_error';
 
-let deviceCache: DeviceIdentity | undefined;
 let telemetryCache: TelemetryState | undefined;
 let queueCache: string[] | undefined;
 let usageCache: Record<string, UsageDay> | undefined;
@@ -94,18 +87,12 @@ function chain<T>(fn: () => Promise<T>): Promise<T> {
   return result;
 }
 
-async function pathFor(file: string): Promise<string> {
-  const dir = app.getPath('userData');
-  await mkdir(dir, { recursive: true });
-  return join(dir, file);
-}
-
 /**
  * The ingest API's platform enum is `win | mac | linux` (apps/web/src/lib/analytics/events.ts),
  * not Node's `process.platform`. Sending `win32`/`darwin` fails zod validation, and the server
  * answers 400 — which `postTrackEvent` treats as permanent and drops. Map here, once.
  */
-function analyticsPlatform(): 'win' | 'mac' | 'linux' {
+export function analyticsPlatform(): 'win' | 'mac' | 'linux' {
   if (process.platform === 'win32') return 'win';
   if (process.platform === 'darwin') return 'mac';
   return 'linux';
@@ -116,36 +103,6 @@ function localDateString(date: Date): string {
   const m = String(date.getMonth() + 1).padStart(2, '0');
   const d = String(date.getDate()).padStart(2, '0');
   return `${y}-${m}-${d}`;
-}
-
-// ---------------------------------------------------------------------------
-// device identity — the file's absence means a fresh install (a new device_id is minted)
-// ---------------------------------------------------------------------------
-
-async function loadDeviceIdentity(): Promise<{ identity: DeviceIdentity }> {
-  if (deviceCache) return { identity: deviceCache };
-
-  try {
-    const parsed = JSON.parse(await readFile(await pathFor(DEVICE_ID_FILE), 'utf8')) as Partial<DeviceIdentity>;
-    if (typeof parsed.deviceId === 'string') {
-      deviceCache = {
-        deviceId: parsed.deviceId,
-        installedAt: typeof parsed.installedAt === 'string' ? parsed.installedAt : new Date().toISOString(),
-      };
-      return { identity: deviceCache };
-    }
-  } catch {
-    // Missing or unreadable: this is a first run.
-  }
-
-  const identity: DeviceIdentity = { deviceId: randomUUID(), installedAt: new Date().toISOString() };
-  try {
-    await writeFile(await pathFor(DEVICE_ID_FILE), JSON.stringify(identity), { mode: 0o600 });
-  } catch (error) {
-    logger.warn('[analytics] could not persist device id', error);
-  }
-  deviceCache = identity;
-  return { identity };
 }
 
 // ---------------------------------------------------------------------------
@@ -417,9 +374,17 @@ async function flushUsageExact(service: ServiceConnection, deviceId: string): Pr
 async function postUsageRows(deviceId: string, rows: readonly unknown[]): Promise<boolean> {
   if (rows.length === 0) return true;
   try {
+    // The bearer token is what links this device to an account: /api/analytics/usage
+    // derives user_id from it and never trusts one in the body. Without it every tier-2 row
+    // lands with user_id null, and the desktop<->account edge in analytics_identities is
+    // only ever created by whatever tier-1 event happens to flush while signed in.
+    const token = await getAccessToken();
     const res = await fetch(`${config.apiBaseUrl}/api/analytics/usage`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
       body: JSON.stringify({ device_id: deviceId, rows }),
       signal: AbortSignal.timeout(FLUSH_TIMEOUT_MS),
     });

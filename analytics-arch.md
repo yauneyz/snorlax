@@ -178,12 +178,30 @@ knows the new `user_id`. Link them. This is the one that matters most, and it is
 **Desktop ↔ account (exact).** Once signed in, desktop uploads carry both `device_id` and
 `user_id`. Link them.
 
-**Web ↔ desktop (exact, for most people).** The desktop already opens the *system browser* for
-Google OAuth, Stripe Checkout, and the billing portal — `signInGoogle`, `startCheckout`,
-`openBillingPortal` in `apps/desktop/src/main/ipc/channels.ts`, all landing on our own domain under
-`/api/desktop/*`. Have the desktop append `?d=<device_id>` to those URLs. That request arrives with
-the `tal_aid` cookie **and** the `device_id` in the query string — both identifiers, one request,
-one link row. Anyone who signs in or subscribes from the app is bridged exactly.
+**Web ↔ desktop (exact, for most people).** The desktop opens the *system browser* for Google
+OAuth, Stripe Checkout, and the billing portal — `signInGoogle`, `startCheckout`,
+`openBillingPortal` in `apps/desktop/src/main/ipc/channels.ts`.
+
+An earlier draft of this section assumed those hops land on our own domain under
+`/api/desktop/*`, and that appending `?d=<device_id>` to them would therefore be enough. They do
+not. `signInWithGoogle` opens Supabase's `…supabase.co/auth/v1/authorize` URL directly, and
+`startCheckout` / `openBillingPortal` POST to `/api/desktop/*` **from the app** (bearer-authenticated,
+no browser involved) and then open the `checkout.stripe.com` / `billing.stripe.com` URL that comes
+back. In every case the browser's first stop is a third party, so it never presents `tal_aid` to us
+and no cookie can ride along.
+
+The bridge is therefore a hop we add rather than one we already have:
+`GET /api/desktop/bridge?d=<device_id>&to=<url>` (`apps/web/src/app/api/desktop/bridge/route.ts`).
+The desktop wraps each outbound URL with `bridgedUrl()` (`apps/desktop/src/main/analyticsBridge.ts`);
+the request arrives carrying the `tal_aid` cookie **and** the `device_id` — both identifiers, one
+request, one `analytics_link` call — and 302s onward. Anyone who signs in or subscribes from the app
+is bridged exactly.
+
+`to` is an open-redirect surface and is checked against a host allowlist (Stripe, our Supabase
+project, our own domain; https only, matched on a dot boundary), not merely parsed. An unrecognised
+destination answers 400 — it means our own URL construction is wrong, and forwarding to an
+unvalidated host is the one outcome worth refusing outright. A bad or missing `d` costs the link but
+never the user's sign-in or checkout.
 
 **Download → install (aggregate only).** For someone who installs and never signs in, there is no
 exact link. Estimate the rate instead: `download_clicked` and `app_installed` both carry `platform`
@@ -771,7 +789,7 @@ navigate away, or double-fire, and the webhook is already idempotent via `stripe
 | `page_viewed` | `apps/web/src/app/providers.tsx` — extend the existing `PostHogPageview` to dual-emit. |
 | `download_clicked` | `apps/web/src/app/api/desktop/download/route.ts` — before the 302. |
 | `signup_started` | `apps/web/src/app/(auth)/signup` form submit. |
-| `account_created` | `apps/web/src/app/api/auth/callback/route.ts` (`flow=signup`) and the desktop `signUpPassword` handler. |
+| `account_created` | `apps/web/src/app/api/auth/callback/route.ts` (`flow=signup`, Google only), `SignupForm.tsx` (password flow, which is client-side and never reaches the callback) and the desktop `signUpPassword` handler in `apps/desktop/src/main/ipc/handlers.ts`. |
 | `signed_in` | Same callback route + `signInPassword` / `signInGoogle` handlers. |
 | `app_installed` | `apps/desktop/src/main/index.ts` startup; first run detected via the new `device_id` file. |
 | `service_install_*` | `apps/desktop/src/main/service/installer.ts`. |
