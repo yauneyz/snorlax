@@ -62,6 +62,8 @@ export function createWindow(): BrowserWindow {
     void flushEvents();
   });
   win.webContents.on('render-process-gone', (_e, details) => {
+    // 'clean-exit' is a normal renderer exit (e.g. during app quit), not a failure.
+    if (details.reason === 'clean-exit') return;
     track('window_load_failed', { message: `render-process-gone: ${details.reason}` });
     void flushEvents();
   });

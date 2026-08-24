@@ -438,6 +438,7 @@ need a real OS IPC channel between them.
 | `setSchedule` | `Schedule` | ok \| `KEY_REQUIRED` | replace schedule |
 | `enableFocus` | `{ reason }` | ok | turn blocking on |
 | `disableFocus` | `{ }` | ok \| `KEY_REQUIRED` | **service re-checks USB presence itself** |
+| `toggleFocus` | `{ }` | `{ ok, active }` \| gated error | atomic toggle; turning off uses the `disableFocus` gates |
 | `listRemovableDrives` | – | `Drive[]` | for the pairing picker |
 | `pairKey` | `{ driveId, label }` | `PairedKey` | stores identity; writes fallback marker only if needed |
 | `unpairKey` | `{ keyId }` | ok \| `KEY_REQUIRED` | removing a key is itself key-gated |

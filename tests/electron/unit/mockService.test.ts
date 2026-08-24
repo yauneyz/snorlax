@@ -44,6 +44,9 @@ describe('MockServiceConnection — focus and key gates', () => {
 
   it('toggles on without the paired key inserted, but gates toggling off', async () => {
     const svc = new MockServiceConnection();
+    await expect(svc.request('toggleFocus', {})).rejects.toMatchObject({
+      code: ErrorCode.NO_PAIRED_KEY,
+    });
     await pairMockKey(svc);
 
     await svc.request('toggleFocus', {});
