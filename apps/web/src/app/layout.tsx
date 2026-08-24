@@ -1,9 +1,12 @@
 import type { Metadata, Viewport } from "next";
 import { GoogleAnalytics } from "@next/third-parties/google";
 import { JetBrains_Mono, Space_Grotesk } from "next/font/google";
+import { BotIdClient } from "botid/client";
 import { Providers } from "./providers";
 import { config } from "@/lib/config";
 import "./globals.css";
+
+const botIdProtectedRoutes = [{ path: "/api/analytics/track", method: "POST" }];
 
 /**
  * Space Grotesk for everything, JetBrains Mono for the small caps-and-numbers labels
@@ -56,6 +59,9 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" className={`${sans.variable} ${mono.variable}`} suppressHydrationWarning>
+      <head>
+        <BotIdClient protect={botIdProtectedRoutes} />
+      </head>
       <body>
         <Providers>{children}</Providers>
         {config.google.ga4MeasurementId ? (

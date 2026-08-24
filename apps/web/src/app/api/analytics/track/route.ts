@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { checkBotId } from "botid/server";
 import { ANALYTICS_ANON_COOKIE, parseAnonId } from "@/lib/analytics/anon-id";
 import { UnauthorizedError, requireBearerUser } from "@/lib/auth/require-bearer-user";
 import {
@@ -34,9 +35,13 @@ export async function POST(request: NextRequest) {
     }
   }
 
+  const botIdResult = await checkBotId();
   const props = {
     ...parsed.data.props,
-    ua_class: classifyUserAgent(request.headers.get("user-agent")),
+    ua_class:
+      botIdResult.isBot || classifyUserAgent(request.headers.get("user-agent")) === "bot"
+        ? "bot"
+        : "human",
   };
   await track({
     event: parsed.data.event,

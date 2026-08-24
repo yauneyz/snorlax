@@ -1,6 +1,7 @@
 import type { NextConfig } from "next";
 import path from "node:path";
 import { withSentryConfig } from "@sentry/nextjs";
+import { withBotId } from "botid/next/config";
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
@@ -72,4 +73,8 @@ const sentryWebpackOptions = {
   sourcemaps: { disable: !sentryEnabled },
 };
 
-export default sentryEnabled ? withSentryConfig(nextConfig, sentryWebpackOptions) : nextConfig;
+const configWithBotId = withBotId(nextConfig);
+
+export default sentryEnabled
+  ? withSentryConfig(configWithBotId, sentryWebpackOptions)
+  : configWithBotId;
