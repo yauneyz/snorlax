@@ -25,6 +25,8 @@ function toMetrics(rows: AnalyticsChannelFunnelRow[]): ChannelMetrics[] {
     channel: row.channel,
     medium: row.medium,
     visitors: row.visitors,
+    downloaded: row.downloaded,
+    installed: row.installed,
     accounts: row.accounts,
     trials: row.trials,
     paid: row.paid,

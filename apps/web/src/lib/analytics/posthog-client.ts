@@ -39,7 +39,15 @@ export function trackEvent(
     props: properties ?? {},
   });
   const endpoint = new URL("/api/analytics/track", window.location.origin);
-  for (const key of ["utm_source", "utm_medium", "utm_campaign"] as const) {
+  for (const key of [
+    "utm_source",
+    "utm_medium",
+    "utm_campaign",
+    "gclid",
+    "msclkid",
+    "fbclid",
+    "ttclid",
+  ] as const) {
     const value = new URLSearchParams(window.location.search).get(key);
     if (value) endpoint.searchParams.set(key, value);
   }

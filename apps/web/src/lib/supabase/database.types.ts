@@ -21,6 +21,7 @@ import type {
   AnalyticsRevenueSummaryRow,
   AnalyticsUsageDailyRow,
   AnalyticsUsageResolvedRow,
+  AnalyticsVisitorBreakdownRow,
   CompCodeRow,
   EntitlementGrantRow,
   ProfileRow,
@@ -175,6 +176,14 @@ export type Database = {
       };
       analytics_dev_channel_funnel: {
         Row: AnalyticsChannelFunnelRow;
+        Relationships: [];
+      };
+      analytics_visitor_breakdown: {
+        Row: AnalyticsVisitorBreakdownRow;
+        Relationships: [];
+      };
+      analytics_dev_visitor_breakdown: {
+        Row: AnalyticsVisitorBreakdownRow;
         Relationships: [];
       };
       analytics_funnel_summary: {

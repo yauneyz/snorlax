@@ -42,6 +42,23 @@ describe('MockServiceConnection — focus and key gates', () => {
     expect(state.focusActive).toBe(false);
   });
 
+  it('toggles on without the paired key inserted, but gates toggling off', async () => {
+    const svc = new MockServiceConnection();
+    await pairMockKey(svc);
+
+    await svc.request('toggleFocus', {});
+    expect((await svc.request('getState', undefined)).focusActive).toBe(true);
+
+    await expect(svc.request('toggleFocus', {})).rejects.toMatchObject({
+      code: ErrorCode.KEY_REQUIRED,
+    });
+    expect((await svc.request('getState', undefined)).focusActive).toBe(true);
+
+    svc.devToggleKey();
+    await svc.request('toggleFocus', {});
+    expect((await svc.request('getState', undefined)).focusActive).toBe(false);
+  });
+
   it('pushes keyPresenceChanged events', async () => {
     const svc = new MockServiceConnection();
     await pairMockKey(svc);

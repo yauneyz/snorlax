@@ -965,8 +965,10 @@ sitemap. `/insights/dev` has a sticky warning banner and stable
 1. **The funnel.** Vertical bar per step with absolute count and step-over-step conversion, plus
    median time-to-step. Date range + channel filter. Label the download→install step as *estimated*
    (§4.3) so nobody quietly trusts a modelled number as a measured one.
-2. **Channel table.** First-touch source/medium × visitors → accounts → trials → paid. The panel
-   that decides where marketing money goes.
+2. **Acquisition channels.** First-touch source/medium × visitors → downloads → installs → trials
+   → paid, followed by visitor device-type and OS breakdowns. Explicit UTMs win; common ad click
+   IDs recover paid attribution; unattributed search/referrer traffic is classified as organic or
+   referral. This is the panel that decides where marketing money goes.
 3. **Active users.** DAU-protected as the headline line chart, with DAU-UI and installed-base-30d
    as secondary series, plus WAU/MAU stickiness. Grey out the last 2 days as provisional (§6.5).
 4. **Engagement depth.** Median daily focus minutes, distribution of session lengths, scheduled vs
@@ -992,8 +994,8 @@ public internet, so it cannot be dev-only. It stays inside the hardening this se
 construction, not by convention:
 
 - It reuses the same `queryFunnel` / `queryEngagement` / `queryRevenue` / `queryRetention` /
-  `queryInstallHealth` / `queryChannels` read-model functions the dashboard panels call — no new
-  query surface, no raw-table access, and it only ever reads the `prod` target.
+  `queryInstallHealth` / `queryChannels` / `queryVisitorBreakdown` read-model functions the
+  dashboard panels call — no new raw-table access, and it only ever reads the `prod` target.
 - It is gated by `INSIGHTS_WIDGET_API_KEY`, a single-purpose bearer token checked with
   `timingSafeEqual`, not by Supabase auth or any DB-level credential. The Android app holds only
   this token — never `ANALYTICS_PROD_SUPABASE_SECRET_KEY`.

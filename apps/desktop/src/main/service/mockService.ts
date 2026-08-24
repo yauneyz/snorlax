@@ -279,6 +279,23 @@ export class MockServiceConnection implements ServiceConnection {
         return OK;
       }
 
+      case 'toggleFocus': {
+        if (this.state.focusActive) {
+          const snap = this.snapshot();
+          if (snap.scheduleLocked) throw err(ErrorCode.LOCKED, 'A locked schedule window is active.');
+          if (!this.keyPresent) throw err(ErrorCode.KEY_REQUIRED, 'Insert your paired key to unlock.');
+          this.state.focusActive = false;
+        } else {
+          if (this.state.pairedKeys.length === 0) {
+            throw err(ErrorCode.NO_PAIRED_KEY, 'Pair a key before turning on focus.');
+          }
+          this.state.focusActive = true;
+        }
+        this.state.focusSource = 'user';
+        this.emit('focusChanged', { active: this.state.focusActive, source: 'user' });
+        return { ...OK, active: this.state.focusActive };
+      }
+
       case 'setBrowserHandshake': {
         const enabled = (params as Params<'setBrowserHandshake'>).enabled;
         // Turning ON is free; turning OFF is key-gated exactly like disableFocus.

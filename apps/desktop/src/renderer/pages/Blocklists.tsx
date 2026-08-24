@@ -362,7 +362,10 @@ export function Blocklists({ onUpgrade }: { onUpgrade: () => void }) {
 
   const setIntentPositive = (positive: string) => {
     if (!smartAllowed) return onUpgrade();
-    void save({ ...policy, intent: { ...policy.intent, positive } });
+    // Smart filtering always fails open: everything not on the explicit block list is allowed
+    // until the judge says otherwise, so `defaultAction` (and its UI toggle) has nothing left to
+    // decide once an intent is set.
+    void save({ ...policy, defaultAction: 'allow', intent: { ...policy.intent, positive } });
   };
   const setIntentNegative = (negative: string) => {
     void save({
@@ -662,7 +665,7 @@ export function Blocklists({ onUpgrade }: { onUpgrade: () => void }) {
           />
         )}
 
-        {SMART_FILTERING_ENABLED && (
+        {SMART_FILTERING_ENABLED && policy.intent === null && (
           <>
             <div className="mt-4 flex items-baseline gap-2.5">
               <Kicker>Default for everything else</Kicker>

@@ -35,7 +35,7 @@ const platforms: { platform: Platform; label: string }[] = [
 const steps = [
   {
     title: "Pair any USB drive",
-    body: `Install ${config.app.name} and pair a USB drive you already own. That drive becomes your physical key. Pair as many as you like — any one of them unlocks.`,
+    body: `Install ${config.app.name} and pair any USB drive you already own. That drive becomes your physical key. Pair as many as you like — any one of them unlocks.`,
     image: {
       src: "/media/app-pair-key.png",
       alt: "The Keys screen: two paired drives listed, a third selected in the removable-drive picker, and a green “Key mounted” indicator.",
@@ -43,7 +43,7 @@ const steps = [
   },
   {
     title: "Choose what gets blocked",
-    body: "Block distracting websites, close the desktop apps that pull you away, or allow only the tools you need. Start a session now, or protect the same hours every week.",
+    body: "Block distracting websites, and apps. Or go even further and allow only the tools you need. Start blocking immediately or create a schedule to protect the same hours every week.",
     image: {
       src: "/media/app-blocklist.png",
       alt: "The Blocklists screen: a “Deep work” profile blocking eight sites including youtube.com and reddit.com, plus Discord, Steam and Slack.",
@@ -51,7 +51,7 @@ const steps = [
   },
   {
     title: "Unplug the key",
-    body: "Put it in another room, a drawer, your car. The block holds until the session ends. To quit early, you have to physically go get it.",
+    body: "Put it in another room, a drawer, your car. Distractions remain blocked until you go get the key and plug it back in. No key, no unlock — even if you close the app or restart your computer.",
     image: {
       src: "/media/app-focused-key-away.png",
       alt: "The dashboard mid-session: the seal reads FOCUSED, the key readout reads “away”, and the header indicator reads NO KEY.",

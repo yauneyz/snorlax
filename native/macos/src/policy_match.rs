@@ -18,14 +18,22 @@ pub fn host_matches(host: &str, pattern: &str) -> bool {
 /// Should a DNS query for `host` be blocked under `policy`? `blockedDomains` and `allowedDomains`
 /// are hard, never-judged lists (block wins if a domain is somehow on both — see
 /// `packages/core/src/policyNormalize.ts`); anything on neither list falls back to
-/// `defaultAction`. `intent`-based Smart-filtering judgments happen at the page level in the
-/// browser extension, not here — the OS-level hosts/pf layer only ever sees the hard lists and
-/// the default.
+/// `defaultAction`, UNLESS `intent` is set, in which case unlisted hosts are let through so the
+/// page can load and the browser extension's `judgeRequest` gets a chance to run. `defaultAction`
+/// still applies in that case — just as the fail-closed/fail-open fallback if the judge never
+/// answers, not as a live gate here.
 pub fn is_host_blocked(policy: &Policy, host: &str) -> bool {
     if policy.blocked_domains.iter().any(|p| host_matches(host, p)) {
         return true;
     }
     if policy.allowed_domains.iter().any(|p| host_matches(host, p)) {
+        return false;
+    }
+    if policy.intent.is_some() {
+        // Smart filtering judges unlisted hosts at the page level (judgeRequest), which requires
+        // the page to actually load. The hosts/pf layer must not preempt that by sinkholing on
+        // `defaultAction` here — `defaultAction` still applies as the fail-closed/fail-open
+        // fallback if the judge never answers (see platform_core::sweep_expired_judges).
         return false;
     }
     policy.default_action == DefaultAction::Block

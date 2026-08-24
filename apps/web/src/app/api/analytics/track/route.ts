@@ -9,6 +9,7 @@ import {
   parseTrackBody,
   rateLimitAnalytics,
   readJsonBody,
+  visitorDimensions,
 } from "@/server/analytics/ingest";
 import { track } from "@/server/analytics/track";
 
@@ -36,12 +37,17 @@ export async function POST(request: NextRequest) {
   }
 
   const botIdResult = await checkBotId();
+  const userAgent = request.headers.get("user-agent");
   const props = {
     ...parsed.data.props,
-    ua_class:
-      botIdResult.isBot || classifyUserAgent(request.headers.get("user-agent")) === "bot"
-        ? "bot"
-        : "human",
+    ...(parsed.data.event === "page_viewed"
+      ? visitorDimensions(
+          userAgent,
+          request.headers.get("sec-ch-ua-mobile"),
+          request.headers.get("sec-ch-ua-platform"),
+        )
+      : {}),
+    ua_class: botIdResult.isBot || classifyUserAgent(userAgent) === "bot" ? "bot" : "human",
   };
   await track({
     event: parsed.data.event,

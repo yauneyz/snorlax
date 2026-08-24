@@ -261,6 +261,16 @@ describe("views", () => {
     expect(error).toBeNull();
   });
 
+  it("visitor device and OS breakdown views are queryable", async () => {
+    if (withStack()) return;
+    const [prod, dev] = await Promise.all([
+      db.from("analytics_visitor_breakdown").select("dimension, value, visitors"),
+      db.from("analytics_dev_visitor_breakdown").select("dimension, value, visitors"),
+    ]);
+    expect(prod.error).toBeNull();
+    expect(dev.error).toBeNull();
+  });
+
   it("resolves events to the merged person through analytics_events_resolved", async () => {
     if (withStack()) return;
     const anon = randomUUID();

@@ -10,6 +10,7 @@ import type {
   PanelData,
   RetentionCohortMetrics,
   RevenueMetrics,
+  VisitorBreakdownMetrics,
 } from "./queries/types";
 
 // The exact JSON shape GET /api/analytics/summary returns (apps/web/src/app/api/analytics/summary/route.ts).
@@ -27,6 +28,7 @@ interface WidgetSummary {
   retention: Section<RetentionCohortMetrics[]>;
   installHealth: Section<InstallHealthMetrics>;
   channels: Section<ChannelMetrics[]>;
+  visitorBreakdown: Section<VisitorBreakdownMetrics>;
 }
 
 type FetchResult = { ok: true; summary: WidgetSummary } | { ok: false; message: string };
@@ -63,9 +65,17 @@ export const fetchProdSummary = cache(async (): Promise<FetchResult> => {
 });
 
 /** Extracts one section of a fetched summary into the same PanelData<T> shape the dev-target Supabase queries use. */
-export function pickSection<T>(result: FetchResult, pick: (summary: WidgetSummary) => Section<T>): PanelData<T> {
+export function pickSection<T>(
+  result: FetchResult,
+  pick: (summary: WidgetSummary) => Section<T>,
+): PanelData<T> {
   if (!result.ok) return { ok: false, message: result.message };
   const section = pick(result.summary);
+  if (!section)
+    return {
+      ok: false,
+      message: "Summary section is unavailable. Deploy the latest analytics API.",
+    };
   if (!section.ok) return { ok: false, message: section.message ?? "Unavailable." };
   return { ok: true, rows: section.data as T };
 }

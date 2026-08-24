@@ -80,8 +80,21 @@ export interface ChannelMetrics {
   channel: string;
   medium: string;
   visitors: number;
+  downloaded: number;
+  installed: number;
   accounts: number;
   trials: number;
   paid: number;
   pctVisitorToPaid: number;
+}
+
+export interface VisitorBreakdownMetric {
+  label: string;
+  visitors: number;
+  pctVisitors: number;
+}
+
+export interface VisitorBreakdownMetrics {
+  deviceTypes: VisitorBreakdownMetric[];
+  operatingSystems: VisitorBreakdownMetric[];
 }

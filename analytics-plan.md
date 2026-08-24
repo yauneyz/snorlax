@@ -340,8 +340,9 @@ ingest hot path and one round trip beats two. First-touch columns use
   (`src/lib/auth/require-bearer-user.ts`); only `device_id` is client-asserted
 - per-IP and per-`device_id` rate limit, generously
 - bot user-agent classification → `props.ua_class`, **not** a pre-insert drop (§3.13)
+- coarse device type and OS labels → `props.device_type` / `props.os`; never retain the raw UA
 - attribution extracted server-side from the request: UTM query params, `Referer` host,
-  `request.geo?.country` on Vercel. Never raw IPs.
+  paid-platform click IDs, and Vercel country headers. Never raw IPs.
 
 **`POST /api/analytics/usage`** — wraps `reportUsage()`. Same shape plus §14's usage limits:
 `focus_seconds <= 86400`, counters within `smallint`, `local_date` within ±40 days of today,

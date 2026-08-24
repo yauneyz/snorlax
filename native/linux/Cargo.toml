@@ -30,6 +30,10 @@ name = "focus-disable"
 path = "src/bin/focus-disable.rs"
 
 [[bin]]
+name = "focus-toggle"
+path = "src/bin/focus-toggle.rs"
+
+[[bin]]
 name = "talysman-tray"
 path = "src/bin/tray.rs"
 

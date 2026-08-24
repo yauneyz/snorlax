@@ -142,6 +142,8 @@ export interface RequestMap {
   enableFocus: { params: { reason?: string }; result: Ok };
   /** Service re-checks USB presence itself; may fail KEY_REQUIRED / LOCKED. */
   disableFocus: { params: Record<string, never>; result: Ok };
+  /** Turning on is free; turning off uses the same key and schedule gates as `disableFocus`. */
+  toggleFocus: { params: Record<string, never>; result: Ok & { active: boolean } };
   listRemovableDrives: { params: void; result: { drives: Drive[] } };
   pairKey: { params: { driveId: string; label: string }; result: { key: PairedKey } };
   /** Removing a key is itself key-gated and may not remove the final paired key. */

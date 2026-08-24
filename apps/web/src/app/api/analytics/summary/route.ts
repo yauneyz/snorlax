@@ -8,6 +8,10 @@ import { retentionPct } from "@/server/analytics/queries/helpers";
 import { queryInstallHealthFromDb } from "@/server/analytics/queries/install-health";
 import { queryRetentionFromDb } from "@/server/analytics/queries/retention";
 import { queryRevenueFromDb } from "@/server/analytics/queries/revenue";
+import {
+  queryVisitorBreakdownFromDb,
+  toVisitorBreakdownMetrics,
+} from "@/server/analytics/queries/visitor-breakdown";
 import type { PanelData } from "@/server/analytics/queries/types";
 import { hasValidInsightsBearer } from "@/server/insights/auth";
 
@@ -18,7 +22,10 @@ import { hasValidInsightsBearer } from "@/server/insights/auth";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-function section<T, U>(result: PanelData<T>, map: (rows: T) => U): { ok: true; data: U } | { ok: false; message: string } {
+function section<T, U>(
+  result: PanelData<T>,
+  map: (rows: T) => U,
+): { ok: true; data: U } | { ok: false; message: string } {
   return result.ok ? { ok: true, data: map(result.rows) } : { ok: false, message: result.message };
 }
 
@@ -35,14 +42,16 @@ export async function GET(request: NextRequest) {
   // Always the raw *FromDb queries — never the branching queryX() used by /insights, which
   // for target="prod" would call back into this very route.
   const target = "prod" as const;
-  const [funnel, engagement, revenue, retention, installHealth, channels] = await Promise.all([
-    queryFunnelFromDb(target),
-    queryEngagementFromDb(target),
-    queryRevenueFromDb(target),
-    queryRetentionFromDb(target),
-    queryInstallHealthFromDb(target),
-    queryChannelsFromDb(target),
-  ]);
+  const [funnel, engagement, revenue, retention, installHealth, channels, visitorBreakdown] =
+    await Promise.all([
+      queryFunnelFromDb(target),
+      queryEngagementFromDb(target),
+      queryRevenueFromDb(target),
+      queryRetentionFromDb(target),
+      queryInstallHealthFromDb(target),
+      queryChannelsFromDb(target),
+      queryVisitorBreakdownFromDb(target),
+    ]);
 
   const body = {
     generatedAt: new Date().toISOString(),
@@ -61,7 +70,8 @@ export async function GET(request: NextRequest) {
             medianVisitToDownloadSeconds: row.median_visit_to_download_seconds,
             medianInstallToValueSeconds: row.median_install_to_value_seconds,
           }
-        : null),
+        : null,
+    ),
 
     activeUsers: section(engagement, (rows) => {
       const latest = rows[0];
@@ -103,7 +113,8 @@ export async function GET(request: NextRequest) {
             paymentsFailed: row.payments_failed,
             refunds: row.refunds,
           }
-        : null),
+        : null,
+    ),
 
     retention: section(retention, (rows) =>
       rows.slice(0, 12).map((row) => ({
@@ -138,12 +149,16 @@ export async function GET(request: NextRequest) {
         channel: row.channel,
         medium: row.medium,
         visitors: row.visitors,
+        downloaded: row.downloaded,
+        installed: row.installed,
         accounts: row.accounts,
         trials: row.trials,
         paid: row.paid,
         pctVisitorToPaid: row.pct_visitor_to_paid ?? 0,
       })),
     ),
+
+    visitorBreakdown: section(visitorBreakdown, toVisitorBreakdownMetrics),
   };
 
   return NextResponse.json(body, { headers: { "Cache-Control": "private, no-store" } });

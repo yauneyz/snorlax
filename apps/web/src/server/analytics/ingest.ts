@@ -115,9 +115,9 @@ function firstIssue(error: z.ZodError): string {
   return `${path}${issue.message}`;
 }
 
-export function parseTrackBody(value: unknown):
-  | { ok: true; data: ParsedTrackBody }
-  | { ok: false; message: string } {
+export function parseTrackBody(
+  value: unknown,
+): { ok: true; data: ParsedTrackBody } | { ok: false; message: string } {
   const parsed = trackBodySchema.safeParse(value);
   if (!parsed.success) return { ok: false, message: firstIssue(parsed.error) };
   const props = parseEventProps(parsed.data.event, parsed.data.props);
@@ -194,10 +194,7 @@ function withoutWww(host: string): string {
  * first-touch attribution is immutable -- so a self-referral is dropped and the person
  * stays open for a real channel (or lands in `direct`).
  */
-function referrerHostFor(
-  request: NextRequest,
-  props: Record<string, unknown>,
-): string | undefined {
+function referrerHostFor(request: NextRequest, props: Record<string, unknown>): string | undefined {
   const host =
     hostOf(typeof props.referrer_host === "string" ? `https://${props.referrer_host}` : null) ??
     hostOf(request.headers.get("referer"));
@@ -211,9 +208,22 @@ export function attributionFromRequest(
 ): Attribution {
   const referrerHost = referrerHostFor(request, props);
   const path = typeof props.path === "string" ? props.path : undefined;
+  const clickChannel = request.nextUrl.searchParams.has("gclid")
+    ? { source: "google", medium: "cpc" }
+    : request.nextUrl.searchParams.has("msclkid")
+      ? { source: "bing", medium: "cpc" }
+      : request.nextUrl.searchParams.has("fbclid")
+        ? { source: "meta", medium: "paid_social" }
+        : request.nextUrl.searchParams.has("ttclid")
+          ? { source: "tiktok", medium: "paid_social" }
+          : undefined;
   return {
-    utm_source: bounded(request.nextUrl.searchParams.get("utm_source"), 128),
-    utm_medium: bounded(request.nextUrl.searchParams.get("utm_medium"), 128),
+    // Preserve explicit UTMs, but do not file paid clicks as direct merely because an ad
+    // platform supplied its click id without a full UTM set.
+    utm_source:
+      bounded(request.nextUrl.searchParams.get("utm_source"), 128) ?? clickChannel?.source,
+    utm_medium:
+      bounded(request.nextUrl.searchParams.get("utm_medium"), 128) ?? clickChannel?.medium,
     utm_campaign: bounded(request.nextUrl.searchParams.get("utm_campaign"), 256),
     referrer_host: bounded(referrerHost ?? null, 253),
     landing_path: bounded(path ?? null, 2048),
@@ -226,6 +236,32 @@ export function classifyUserAgent(value: string | null): "bot" | "human" {
   return /bot|crawler|spider|headlesschrome|slurp|bingpreview|facebookexternalhit/i.test(value)
     ? "bot"
     : "human";
+}
+
+/** Privacy-safe visitor dimensions. We retain these labels, never the raw user-agent. */
+export function visitorDimensions(
+  userAgent: string | null,
+  clientHintMobile: string | null = null,
+  clientHintPlatform: string | null = null,
+): { device_type: string; os: string } {
+  const ua = userAgent?.toLowerCase() ?? "";
+  const hintedPlatform = clientHintPlatform?.replaceAll('"', "").toLowerCase() ?? "";
+  const tablet = /ipad|tablet|kindle|silk/.test(ua) || (/android/.test(ua) && !/mobile/.test(ua));
+  const mobile = clientHintMobile === "?1" || /iphone|ipod|mobile|windows phone/.test(ua);
+
+  let os = ua ? "Other" : "Unknown";
+  if (/windows phone/.test(ua)) os = "Windows Phone";
+  else if (/android/.test(hintedPlatform) || /android/.test(ua)) os = "Android";
+  else if (/ios|ipados/.test(hintedPlatform) || /ipad|iphone|ipod/.test(ua)) os = "iOS / iPadOS";
+  else if (/chrome os/.test(hintedPlatform) || /cros/.test(ua)) os = "Chrome OS";
+  else if (/windows/.test(hintedPlatform) || /windows/.test(ua)) os = "Windows";
+  else if (/macos/.test(hintedPlatform) || /macintosh|mac os x/.test(ua)) os = "macOS";
+  else if (/linux/.test(hintedPlatform) || /linux/.test(ua)) os = "Linux";
+
+  return {
+    device_type: tablet ? "Tablet" : mobile ? "Mobile" : ua ? "Desktop" : "Unknown",
+    os,
+  };
 }
 
 type Bucket = { startedAt: number; count: number };

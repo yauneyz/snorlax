@@ -9,11 +9,9 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
@@ -28,9 +26,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import app.talysman.insights.data.ChannelRow
-import app.talysman.insights.data.PlatformFailure
-import app.talysman.insights.data.PlatformHealth
 import app.talysman.insights.data.RetentionRow
+import app.talysman.insights.data.VisitorBreakdownRow
 
 private val Background = Color(0xFF0E0F13)
 private val Surface = Color(0xFF181A20)
@@ -91,11 +88,31 @@ fun InsightsScreen(viewModel: InsightsViewModel = viewModel()) {
                                     "Downloads" to f.downloaded.toString(),
                                     "Installs" to f.installed.toString(),
                                     "Accounts" to f.accounts.toString(),
+                                    "Paired" to f.paired.toString(),
+                                    "Activated" to f.activated.toString(),
                                     "Trials" to f.trials.toString(),
                                     "Paid" to f.paid.toString(),
                                 ),
                             )
                         } ?: EmptyState(summary.funnel.ok, summary.funnel.message)
+                    }
+                }
+
+                item {
+                    PanelCard("Acquisition channels", "First-touch funnel, device type, and OS · last 90 days") {
+                        val rows = summary.channels.data
+                        if (rows.isNullOrEmpty()) {
+                            EmptyState(summary.channels.ok, summary.channels.message)
+                        } else {
+                            ChannelsTable(rows)
+                        }
+                        val breakdown = summary.visitorBreakdown.data
+                        if (breakdown != null) {
+                            BreakdownTable("Device type", breakdown.deviceTypes)
+                            BreakdownTable("Operating system", breakdown.operatingSystems)
+                        } else if (!summary.visitorBreakdown.ok) {
+                            EmptyState(false, summary.visitorBreakdown.message)
+                        }
                     }
                 }
 
@@ -115,30 +132,13 @@ fun InsightsScreen(viewModel: InsightsViewModel = viewModel()) {
                 }
 
                 item {
-                    PanelCard("Engagement depth") {
-                        summary.engagement.data?.let { e ->
-                            KpiGrid(
-                                listOf(
-                                    "Median focus" to "${e.medianFocusMinutes}m",
-                                    "Scheduled" to "${e.scheduledFocusHours}h",
-                                    "Manual" to "${e.manualFocusHours}h",
-                                    "Completed / aborted" to "${e.sessionsCompleted} / ${e.sessionsAborted}",
-                                ),
-                            )
-                        } ?: EmptyState(summary.engagement.ok, summary.engagement.message)
-                    }
-                }
-
-                item {
                     PanelCard("Revenue") {
                         summary.revenue.data?.let { r ->
                             KpiGrid(
                                 listOf(
                                     "Active subs" to r.activeSubscriptions.toString(),
                                     "Active trials" to r.activeTrials.toString(),
-                                    "Started" to r.subscriptionsStarted.toString(),
                                     "Cancel intent / ended" to "${r.cancelIntents} / ${r.subscriptionsEnded}",
-                                    "Payment failures" to r.paymentsFailed.toString(),
                                     "Refunds" to r.refunds.toString(),
                                 ),
                             )
@@ -149,33 +149,8 @@ fun InsightsScreen(viewModel: InsightsViewModel = viewModel()) {
                 item {
                     PanelCard("Retention cohorts", "% protected-active at D1 / D7 / D30") {
                         val rows = summary.retention.data
-                        if (rows.isNullOrEmpty()) {
-                            EmptyState(summary.retention.ok, summary.retention.message)
-                        } else {
-                            RetentionTable(rows)
-                        }
-                    }
-                }
-
-                item {
-                    PanelCard("Desktop install health") {
-                        val data = summary.installHealth.data
-                        if (data == null || (data.platforms.isEmpty() && data.failures.isEmpty())) {
-                            EmptyState(summary.installHealth.ok, summary.installHealth.message)
-                        } else {
-                            InstallHealthTable(data.platforms, data.failures)
-                        }
-                    }
-                }
-
-                item {
-                    PanelCard("Channels", "First-touch source/medium, last 90 days") {
-                        val rows = summary.channels.data
-                        if (rows.isNullOrEmpty()) {
-                            EmptyState(summary.channels.ok, summary.channels.message)
-                        } else {
-                            ChannelsTable(rows)
-                        }
+                        if (rows.isNullOrEmpty()) EmptyState(summary.retention.ok, summary.retention.message)
+                        else RetentionTable(rows)
                     }
                 }
             }
@@ -246,34 +221,31 @@ private fun RetentionTable(rows: List<RetentionRow>) {
 }
 
 @Composable
-private fun InstallHealthTable(platforms: List<PlatformHealth>, failures: List<PlatformFailure>) {
-    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        if (platforms.isNotEmpty()) {
-            TableHeader(listOf("Platform", "Installed", "Service", "Extension"))
-            platforms.forEach { p ->
-                TableRow(listOf(p.platform, p.appInstalled.toString(), p.serviceInstalled.toString(), p.extensionConnected.toString()))
-            }
-        }
-        failures.forEach { f ->
-            Text("${f.platform}  ${f.reason}: ${f.count}", color = Color(0xFFE0777A), fontSize = 11.sp)
-        }
-    }
-}
-
-@Composable
 private fun ChannelsTable(rows: List<ChannelRow>) {
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        TableHeader(listOf("Channel", "Visitors", "Trials", "Paid", "→Paid"))
+        TableHeader(listOf("Channel", "Visit", "Down", "Install", "Trial", "Paid"))
         rows.take(8).forEach { row ->
             TableRow(
                 listOf(
                     "${row.channel} / ${row.medium}",
                     row.visitors.toString(),
+                    row.downloaded?.toString() ?: "—",
+                    row.installed?.toString() ?: "—",
                     row.trials.toString(),
                     row.paid.toString(),
-                    "${row.pctVisitorToPaid}%",
                 ),
             )
+        }
+    }
+}
+
+@Composable
+private fun BreakdownTable(title: String, rows: List<VisitorBreakdownRow>) {
+    if (rows.isEmpty()) return
+    Column(Modifier.padding(top = 14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Text(title, color = OnSurface, fontWeight = FontWeight.SemiBold, fontSize = 12.sp)
+        rows.forEach { row ->
+            TableRow(listOf(row.label, row.visitors.toString(), "${row.pctVisitors}%"))
         }
     }
 }

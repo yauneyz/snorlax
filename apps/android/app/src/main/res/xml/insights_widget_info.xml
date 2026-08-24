@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Sized for a Pixel 8 Pro's 5-column launcher grid: 4x2 by default (room for the header
-     plus all four metric rows without cramming), resizable up to 5x4. -->
+<!-- Sized for a Pixel 8 Pro's 5-column launcher grid: 4x2 by default, with five compact
+     funnel rows below the header; resizable up to 5x4. -->
 <appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
     android:minWidth="220dp"
     android:minHeight="140dp"

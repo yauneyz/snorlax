@@ -1,4 +1,3 @@
-- verify analytics funnel
 - optimize landing page for downloads
 - drive more traffic
 - look at heatmaps and session replays

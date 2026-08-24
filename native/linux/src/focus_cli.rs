@@ -1,7 +1,7 @@
-//! Shared client for the focus-enable / focus-disable CLIs.
+//! Shared client for the focus-enable / focus-disable / focus-toggle CLIs.
 //!
 //! Connects to the running service over its NDJSON-RPC Unix socket and calls
-//! `enableFocus` / `disableFocus`. The service is the source of truth: when
+//! `enableFocus` / `disableFocus` / `toggleFocus`. The service is the source of truth: when
 //! disabling, it re-checks USB-key presence itself and refuses with
 //! `KEY_REQUIRED` if no paired key is inserted, which we surface to the user.
 
@@ -47,6 +47,19 @@ fn request(mut stream: UnixStream, method: &str) -> std::io::Result<Value> {
 
 /// Run the enable (`true`) or disable (`false`) command and return its exit code.
 pub fn run(enable: bool) -> ExitCode {
+    run_method(if enable {
+        "enableFocus"
+    } else {
+        "disableFocus"
+    })
+}
+
+/// Toggle focus using the daemon's atomic, key-gated transition.
+pub fn run_toggle() -> ExitCode {
+    run_method("toggleFocus")
+}
+
+fn run_method(method: &str) -> ExitCode {
     let Some(stream) = connect() else {
         eprintln!(
             "Talysman service is not running (could not connect to {}).",
@@ -55,11 +68,6 @@ pub fn run(enable: bool) -> ExitCode {
         return ExitCode::FAILURE;
     };
 
-    let method = if enable {
-        "enableFocus"
-    } else {
-        "disableFocus"
-    };
     let resp = match request(stream, method) {
         Ok(v) => v,
         Err(e) => {
@@ -69,10 +77,14 @@ pub fn run(enable: bool) -> ExitCode {
     };
 
     if resp.get("ok").and_then(|v| v.as_bool()) == Some(true) {
-        println!(
-            "Focus blocking {}.",
-            if enable { "enabled" } else { "disabled" }
-        );
+        let state = match method {
+            "enableFocus" => "enabled",
+            "disableFocus" => "disabled",
+            "toggleFocus" if resp["result"]["active"].as_bool() == Some(true) => "enabled",
+            "toggleFocus" => "disabled",
+            _ => "updated",
+        };
+        println!("Focus blocking {state}.");
         ExitCode::SUCCESS
     } else {
         // Surfaces the daemon's own message, e.g. "Insert your paired key to

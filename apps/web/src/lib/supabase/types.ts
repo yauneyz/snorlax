@@ -240,6 +240,12 @@ export type AnalyticsChannelFunnelRow = {
   pct_visitor_to_paid: number | null;
 };
 
+export type AnalyticsVisitorBreakdownRow = {
+  dimension: "device_type" | "os";
+  value: string;
+  visitors: number;
+};
+
 export type AnalyticsFunnelSummaryRow = Omit<
   AnalyticsChannelFunnelRow,
   "channel" | "medium" | "pct_visitor_to_paid"

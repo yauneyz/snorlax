@@ -230,6 +230,16 @@ impl Core {
         Ok(())
     }
 
+    /// Toggle focus atomically. Turning focus on follows `enable_focus`; turning it off follows
+    /// the guarded `disable_focus` path, including a fresh USB-presence check.
+    fn toggle_focus(&mut self, source: FocusSource) -> Result<(), RpcError> {
+        if self.state.focus_active {
+            self.disable_focus(source)
+        } else {
+            self.enable_focus(source)
+        }
+    }
+
     /// Re-check USB presence and fail with KEY_REQUIRED when no paired key is plugged in.
     fn require_key(&mut self, message: &str) -> Result<(), RpcError> {
         self.recompute_presence();
@@ -790,6 +800,10 @@ impl Core {
             "disableFocus" => {
                 self.disable_focus(FocusSource::User)?;
                 Ok(ok())
+            }
+            "toggleFocus" => {
+                self.toggle_focus(FocusSource::User)?;
+                Ok(json!({ "ok": true, "active": self.state.focus_active }))
             }
             "setPolicy" => {
                 let policy: Policy = parse_field(params, "policy")?;

@@ -65,6 +65,7 @@
     },
     "enableFocus": { "params": { "reason": "string?" }, "result": { "ok": true }, "errors": ["NO_PAIRED_KEY"] },
     "disableFocus": { "params": {}, "result": { "ok": true }, "errors": ["KEY_REQUIRED", "LOCKED"] },
+    "toggleFocus": { "params": {}, "result": { "ok": true, "active": "boolean" }, "errors": ["NO_PAIRED_KEY", "KEY_REQUIRED", "LOCKED"] },
     "drainUsage": { "params": { "afterSeq": "number" }, "result": { "transitions": "UsageTransition[]", "latestSeq": "number" } },
     "listRemovableDrives": { "params": null, "result": { "drives": "Drive[]" } },
     "pairKey": { "params": { "driveId": "string", "label": "string" }, "result": { "key": "PairedKey" } },

@@ -16,6 +16,7 @@ data class InsightsSummary(
     val retention: RetentionSection,
     val installHealth: InstallHealthSection,
     val channels: ChannelsSection,
+    val visitorBreakdown: VisitorBreakdownSection = VisitorBreakdownSection(ok = true),
 )
 
 @Serializable
@@ -111,6 +112,26 @@ data class PlatformFailure(val platform: String, val reason: String, val count: 
 @Serializable
 data class ChannelsSection(val ok: Boolean, val data: List<ChannelRow>? = null, val message: String? = null)
 
+@Serializable
+data class VisitorBreakdownSection(
+    val ok: Boolean,
+    val data: VisitorBreakdownData? = null,
+    val message: String? = null,
+)
+
+@Serializable
+data class VisitorBreakdownData(
+    val deviceTypes: List<VisitorBreakdownRow> = emptyList(),
+    val operatingSystems: List<VisitorBreakdownRow> = emptyList(),
+)
+
+@Serializable
+data class VisitorBreakdownRow(
+    val label: String,
+    val visitors: Long,
+    val pctVisitors: Double = 0.0,
+)
+
 // Mirrors GET /api/analytics/errors (apps/web/src/app/api/analytics/errors/route.ts).
 @Serializable
 data class ErrorReport(
@@ -129,6 +150,8 @@ data class ChannelRow(
     val channel: String,
     val medium: String,
     val visitors: Long,
+    val downloaded: Long? = null,
+    val installed: Long? = null,
     val accounts: Long,
     val trials: Long,
     val paid: Long,
