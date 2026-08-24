@@ -19,7 +19,7 @@ import { DEEP_LINK_SCHEME, PROTOCOL_VERSION } from '@talysman/shared';
 import { productFeaturesForEnvironment } from '@talysman/product';
 import { config } from './config.js';
 import { logger } from './logging.js';
-import { flushEvents, initAnalytics, recordAppOpen, shutdownFlush, track, trackAppInstalledIfFirstRun } from './analytics.js';
+import { flushEvents, initAnalytics, recordAppOpen, shutdownFlush, track, trackAppInstalledOnce } from './analytics.js';
 import { registerIpcHandlers } from './ipc/handlers.js';
 import { PipeServiceConnection } from './service/client.js';
 import { MockServiceConnection } from './service/mockService.js';
@@ -114,7 +114,7 @@ function registerDeepLink(): void {
 }
 
 async function bootstrap(): Promise<void> {
-  await trackAppInstalledIfFirstRun();
+  await trackAppInstalledOnce();
   // Attempt delivery now, before connectService() — the service is exactly the step most
   // likely to fail on a first real install, and initAnalytics()'s flush never runs if it does.
   void flushEvents();

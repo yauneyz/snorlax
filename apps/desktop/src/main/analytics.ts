@@ -47,6 +47,8 @@ interface DeviceIdentity {
 
 interface TelemetryState {
   lastExtensionConnectedDate?: string;
+  /** Set only once the server has *accepted* app_installed — see trackAppInstalledOnce. */
+  appInstalledReported?: boolean;
   focusSessionsTracked?: number;
   drainUsageSupported?: boolean;
   lastUsageSeq?: number;
@@ -117,11 +119,11 @@ function localDateString(date: Date): string {
 }
 
 // ---------------------------------------------------------------------------
-// device identity — first-run detection lives here (absence of the file == first run)
+// device identity — the file's absence means a fresh install (a new device_id is minted)
 // ---------------------------------------------------------------------------
 
-async function loadDeviceIdentity(): Promise<{ identity: DeviceIdentity; firstRun: boolean }> {
-  if (deviceCache) return { identity: deviceCache, firstRun: false };
+async function loadDeviceIdentity(): Promise<{ identity: DeviceIdentity }> {
+  if (deviceCache) return { identity: deviceCache };
 
   try {
     const parsed = JSON.parse(await readFile(await pathFor(DEVICE_ID_FILE), 'utf8')) as Partial<DeviceIdentity>;
@@ -130,7 +132,7 @@ async function loadDeviceIdentity(): Promise<{ identity: DeviceIdentity; firstRu
         deviceId: parsed.deviceId,
         installedAt: typeof parsed.installedAt === 'string' ? parsed.installedAt : new Date().toISOString(),
       };
-      return { identity: deviceCache, firstRun: false };
+      return { identity: deviceCache };
     }
   } catch {
     // Missing or unreadable: this is a first run.
@@ -143,7 +145,7 @@ async function loadDeviceIdentity(): Promise<{ identity: DeviceIdentity; firstRu
     logger.warn('[analytics] could not persist device id', error);
   }
   deviceCache = identity;
-  return { identity, firstRun: true };
+  return { identity };
 }
 
 // ---------------------------------------------------------------------------
@@ -156,6 +158,7 @@ async function loadTelemetry(): Promise<TelemetryState> {
     const parsed = JSON.parse(await readFile(await pathFor(TELEMETRY_FILE), 'utf8')) as Partial<TelemetryState>;
     telemetryCache = {
       lastExtensionConnectedDate: parsed.lastExtensionConnectedDate,
+      appInstalledReported: parsed.appInstalledReported ?? false,
       focusSessionsTracked: parsed.focusSessionsTracked ?? 0,
       lastUsageSeq: parsed.lastUsageSeq ?? 0,
       // drainUsageSupported is intentionally not restored from disk — cached per session only.
@@ -218,14 +221,18 @@ async function saveQueue(lines: string[]): Promise<void> {
  * Queue a milestone event for delivery. Fire-and-forget from the caller's perspective — never
  * throws.
  */
-export function track(event: DesktopAnalyticsEvent, props?: Record<string, unknown>): void {
+export function track(
+  event: DesktopAnalyticsEvent,
+  props?: Record<string, unknown>,
+  occurredAt?: string,
+): void {
   void chain(async () => {
     const { identity } = await loadDeviceIdentity();
     const line = JSON.stringify({
       event,
       source: 'desktop',
       device_id: identity.deviceId,
-      occurred_at: new Date().toISOString(),
+      occurred_at: occurredAt ?? new Date().toISOString(),
       app_version: app.getVersion(),
       platform: analyticsPlatform(),
       props: props ?? {},
@@ -266,8 +273,12 @@ export async function flushEvents(): Promise<void> {
     let queue = await loadQueue();
     let processed = 0;
     while (queue.length > 0 && processed < FLUSH_BATCH_LIMIT) {
-      const outcome = await postTrackEvent(queue[0]!);
+      const line = queue[0]!;
+      const outcome = await postTrackEvent(line);
       if (outcome === 'retry') break;
+      if (outcome === 'sent' && line.includes('"app_installed"')) {
+        await saveTelemetry({ ...(await loadTelemetry()), appInstalledReported: true });
+      }
       queue = queue.slice(1);
       processed += 1;
     }
@@ -487,15 +498,29 @@ export function stopAnalytics(): void {
   flushTimer = undefined;
 }
 
-/** Called first in bootstrap(), before anything else touches device identity. */
-export async function trackAppInstalledIfFirstRun(): Promise<void> {
-  const { firstRun } = await loadDeviceIdentity();
-  if (!firstRun) return;
-  track('app_installed', {
-    platform: analyticsPlatform(),
-    app_version: app.getVersion(),
-    os_version: os.release(),
-  });
+/**
+ * Called first in bootstrap(). Emits `app_installed` until the server has actually accepted it,
+ * not just once on first run: a rejected event is dropped by `postTrackEvent`, and gating on the
+ * absence of device-id.json meant one bad request lost the install forever (which is exactly what
+ * the `win32` platform bug did to every Windows and macOS install). Re-sending is safe — the
+ * server derives `app_installed:<device_id>` as an idempotency key and dedupes
+ * (ONCE_PER_PERSON_EVENTS in apps/web/src/lib/analytics/events.ts).
+ */
+export async function trackAppInstalledOnce(): Promise<void> {
+  const { identity } = await loadDeviceIdentity();
+  const telemetry = await loadTelemetry();
+  if (telemetry.appInstalledReported) return;
+  // installedAt, not now(): on a device that predates this retry the real install date is the
+  // honest timestamp, and the desktop clock skew window is 35 days wide for exactly this reason.
+  track(
+    'app_installed',
+    {
+      platform: analyticsPlatform(),
+      app_version: app.getVersion(),
+      os_version: os.release(),
+    },
+    identity.installedAt,
+  );
 }
 
 /** Best-effort flush on quit, bounded so shutdown is never blocked on the network. */
