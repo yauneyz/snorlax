@@ -4,8 +4,10 @@ import { useRouter, useSearchParams } from "next/navigation";
 import {
   checkoutPriceSchema,
   formatPriceUsd,
+  PRO_ANNUAL_DISCOUNT_PERCENT,
   PRO_ANNUAL_MONTHLY_EQUIVALENT_CENTS,
   PRO_ANNUAL_SAVINGS_CENTS,
+  PRO_ANNUAL_WEEKLY_CENTS,
   PRO_PRICE_CENTS,
   PRO_TRIAL_DAYS,
   type CheckoutPrice,
@@ -150,7 +152,7 @@ export function PricingPlans({ freeFeatures, proFeatures, trialAvailable, alread
                 {label}
                 {price === "yearly" ? (
                   <span className="cycle__save">
-                    Save {formatPriceUsd(PRO_ANNUAL_SAVINGS_CENTS)}
+                    {PRO_ANNUAL_DISCOUNT_PERCENT}% off
                   </span>
                 ) : null}
               </button>
@@ -166,12 +168,20 @@ export function PricingPlans({ freeFeatures, proFeatures, trialAvailable, alread
             {isAnnual ? (
               <>
                 {formatPriceUsd(PRO_PRICE_CENTS.yearly)} billed annually ·{" "}
-                <strong>save {formatPriceUsd(PRO_ANNUAL_SAVINGS_CENTS)} a year</strong>
+                <strong>
+                  {PRO_ANNUAL_DISCOUNT_PERCENT}% off, save{" "}
+                  {formatPriceUsd(PRO_ANNUAL_SAVINGS_CENTS)} a year
+                </strong>
               </>
             ) : (
               <>Billed monthly · cancel anytime</>
             )}
           </p>
+          {isAnnual ? (
+            <p className="plan__price-weekly">
+              That&apos;s less than {formatPriceUsd(PRO_ANNUAL_WEEKLY_CENTS)}/week
+            </p>
+          ) : null}
         </header>
 
         <p className="plan__includes">Pro includes:</p>

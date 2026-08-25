@@ -33,6 +33,15 @@ import { createWindow, handleDeepLink, showMainWindow } from './window.js';
 const CONNECT_TIMEOUT_MS = 2000;
 const features = productFeaturesForEnvironment(config.appEnv);
 
+// `pnpm dev` shares the installed service's pipe (see file header) with whatever packaged
+// build is also running against it. Smart filtering is a daemon-global setting, not
+// per-connection, so when this dev instance is the one that turned it on, it must turn it back
+// off on the way out — otherwise the packaged app silently "inherits" smart filtering with no
+// listener attached to actually answer judgeRequested, and every unlisted page just eats the
+// full 8s judge timeout instead of getting the packaged build's instant classic-filtering answer.
+let smartFilteringOwnedByThisInstance = false;
+let connectedService: ServiceConnection | undefined;
+
 // Required for reliable native toast attribution on Windows (and harmless elsewhere).
 app.setAppUserModelId('com.talysman.app');
 
@@ -105,6 +114,20 @@ async function ensureProtocolCompatible(service: ServiceConnection, mock: MockSe
   await service.request('setSmartFilteringEnabled', { enabled: features.smartFiltering });
 }
 
+/**
+ * Hand smart-filtering control back to whichever other client is sharing this daemon (see the
+ * `smartFilteringOwnedByThisInstance` comment above) by unsetting the flag this instance turned
+ * on. Best-effort and time-boxed: shutdown must not hang on a slow/dead daemon connection.
+ */
+async function relinquishSmartFiltering(): Promise<void> {
+  if (!smartFilteringOwnedByThisInstance || !connectedService) return;
+  const request = connectedService.request('setSmartFilteringEnabled', { enabled: false });
+  const timeout = new Promise<void>((resolve) => setTimeout(resolve, CONNECT_TIMEOUT_MS));
+  await Promise.race([request, timeout]).catch((e) => {
+    logger.warn('[main] failed to relinquish smart filtering on quit', e);
+  });
+}
+
 function registerDeepLink(): void {
   if (process.defaultApp && process.argv.length >= 2) {
     app.setAsDefaultProtocolClient(DEEP_LINK_SCHEME, process.execPath, [process.argv[1]!]);
@@ -122,10 +145,14 @@ async function bootstrap(): Promise<void> {
   await ensureServiceInstalled();
 
   const { service, mock } = await connectService();
+  connectedService = service;
   await ensureProtocolCompatible(service, mock);
   await registerIpcHandlers({ service, mock });
   initAnalytics(service);
-  if (features.smartFiltering) initSmartFiltering(service);
+  if (features.smartFiltering) {
+    smartFilteringOwnedByThisInstance = true;
+    initSmartFiltering(service);
+  }
 
   createWindow();
   recordAppOpen();
@@ -189,10 +216,19 @@ if (!gotLock) {
     if (quitFlushed) return;
     e.preventDefault();
     quitFlushed = true;
-    void shutdownFlush().finally(() => app.quit());
+    void relinquishSmartFiltering()
+      .then(() => shutdownFlush())
+      .finally(() => app.quit());
   });
 
   app.on('activate', () => {
     showMainWindow();
   });
+
+  // `pnpm dev` stops this process with SIGINT/SIGTERM (see scripts/dev.mjs), not a window close.
+  // Electron does not route those to app.quit() on its own, so without this the before-quit
+  // handoff above never runs and dev.mjs's 4s grace window just elapses into a bare SIGKILL —
+  // leaving smart filtering stuck on with nothing left listening for judgeRequested.
+  process.on('SIGINT', () => app.quit());
+  process.on('SIGTERM', () => app.quit());
 }

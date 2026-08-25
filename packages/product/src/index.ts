@@ -38,14 +38,28 @@ export const PRO_TRIAL_DAYS = 14;
  */
 export const PRO_PRICE_CENTS = {
   monthly: 1000,
-  yearly: 10000,
+  yearly: 4900,
 } as const satisfies Record<CheckoutPrice, number>;
 
 /** What a year on the annual plan saves against twelve monthly charges, in cents. */
 export const PRO_ANNUAL_SAVINGS_CENTS = PRO_PRICE_CENTS.monthly * 12 - PRO_PRICE_CENTS.yearly;
 
-/** The annual plan's effective monthly rate, in cents (not a Stripe price — display only). */
-export const PRO_ANNUAL_MONTHLY_EQUIVALENT_CENTS = PRO_PRICE_CENTS.yearly / 12;
+/**
+ * The annual plan's advertised monthly rate, in cents — a marketing round number
+ * (not `yearly / 12`, which would print an odd $4.08) — not a Stripe price, display only.
+ */
+export const PRO_ANNUAL_MONTHLY_EQUIVALENT_CENTS = 499;
+
+/** List price the annual plan is discounted from, in cents — backs the "50% off" badge. */
+export const PRO_ANNUAL_LIST_CENTS = PRO_PRICE_CENTS.yearly * 2;
+
+/** The annual plan's discount off its list price, as a whole percent. */
+export const PRO_ANNUAL_DISCOUNT_PERCENT = Math.round(
+  ((PRO_ANNUAL_LIST_CENTS - PRO_PRICE_CENTS.yearly) / PRO_ANNUAL_LIST_CENTS) * 100,
+);
+
+/** The annual plan's cost per week, in cents — backs the "less than $1/week" copy. */
+export const PRO_ANNUAL_WEEKLY_CENTS = PRO_PRICE_CENTS.yearly / 52;
 
 /**
  * Cents as a display price: `$10`, `$8.33`. Fractional cents round *down* so an

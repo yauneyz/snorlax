@@ -1810,6 +1810,12 @@ input:-webkit-autofill:focus {
   font-weight: 600;
 }
 
+.plan__price-weekly {
+  margin: 0.2rem 0 0;
+  font-size: 0.86rem;
+  color: var(--fg-2);
+}
+
 /* Billing-period switch. A radiogroup, not a checkbox: two named choices, both visible. */
 .cycle {
   display: inline-flex;
