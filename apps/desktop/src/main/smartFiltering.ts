@@ -31,22 +31,39 @@ interface JudgeIntentResponse {
 }
 
 async function callJudgeEndpoint(
+  requestId: string,
   token: string,
   url: string,
   extractedText: string,
   intent: PolicyIntent,
 ): Promise<JudgeIntentResponse> {
   const endpoint = `${config.apiBaseUrl}/api/desktop/judge-intent`;
+  const startedAt = Date.now();
+  logger.info('[smart-filtering] calling judge endpoint', {
+    requestId,
+    endpoint,
+    url,
+    extractedTextLength: extractedText.length,
+  });
   const res = await fetch(endpoint, {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${token}`,
       'Content-Type': 'application/json',
+      'X-Talysman-Judge-Request-Id': requestId,
     },
     body: JSON.stringify({ url, extractedText, intent }),
     signal: AbortSignal.timeout(JUDGE_FETCH_TIMEOUT_MS),
   });
-  if (!res.ok) throw new Error(`judge-intent request failed: ${res.status}`);
+  logger.info('[smart-filtering] judge endpoint responded', {
+    requestId,
+    status: res.status,
+    elapsedMs: Date.now() - startedAt,
+  });
+  if (!res.ok) {
+    const errorBody = await res.text();
+    throw new Error(`judge-intent request failed: ${res.status} ${errorBody.slice(0, 300)}`);
+  }
   const body = (await res.json()) as Partial<JudgeIntentResponse>;
   if (typeof body.relevant !== 'boolean' || typeof body.reason !== 'string') {
     throw new Error('judge-intent response missing relevant/reason');
@@ -59,7 +76,15 @@ async function callJudgeEndpoint(
  * `createTray` / `registerIpcHandlers` (see index.ts).
  */
 export function initSmartFiltering(service: ServiceConnection): void {
+  logger.info('[smart-filtering] judge listener initialized', {
+    apiBaseUrl: config.apiBaseUrl,
+  });
   service.on('judgeRequested', ({ requestId, url, extractedText, intent }) => {
+    logger.info('[smart-filtering] judgeRequested received', {
+      requestId,
+      url,
+      extractedTextLength: extractedText.length,
+    });
     void handleJudgeRequested(service, requestId, url, extractedText, intent);
   });
 }
@@ -79,7 +104,7 @@ async function handleJudgeRequested(
 
   let verdict: JudgeIntentResponse;
   try {
-    verdict = await callJudgeEndpoint(token, url, extractedText, intent);
+    verdict = await callJudgeEndpoint(requestId, token, url, extractedText, intent);
   } catch (e) {
     // Expected occasionally (network blips, endpoint timeouts). Never retried, never surfaced to
     // the user — the daemon's timeout sweep produces the fallback verdict.
@@ -87,12 +112,19 @@ async function handleJudgeRequested(
     return;
   }
 
+  logger.info('[smart-filtering] submitting judge verdict', {
+    requestId,
+    relevant: verdict.relevant,
+    reason: verdict.reason,
+  });
+
   try {
     await service.request('submitJudgeVerdict', {
       requestId,
       relevant: verdict.relevant,
       reason: verdict.reason,
     });
+    logger.info('[smart-filtering] judge verdict accepted by daemon', { requestId });
   } catch (e) {
     logger.warn(`[smart-filtering] submitJudgeVerdict failed for ${requestId}: ${(e as Error).message}`);
   }

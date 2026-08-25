@@ -546,7 +546,17 @@ impl Core {
         }
         let policy = self.state.active_policy();
         let default_action = policy.default_action;
+        tracing::info!(
+            request_id = %request_id,
+            url = %url,
+            extracted_text_len = extracted_text.len(),
+            smart_filtering_enabled = self.state.settings.smart_filtering_enabled,
+            focus_active = self.state.focus_active,
+            intent_active = policy.intent.is_some(),
+            "smart-filtering judge request received"
+        );
         if !self.state.settings.smart_filtering_enabled {
+            tracing::info!(request_id = %request_id, "smart-filtering request using classic fallback");
             self.emit(
                 "judgeResult",
                 json!({
@@ -559,6 +569,7 @@ impl Core {
             return Ok(());
         }
         let Some(intent) = policy.intent else {
+            tracing::info!(request_id = %request_id, "smart-filtering request has no active intent");
             // A stale extension request after focus/profile changed must not wake Electron or sit
             // pending. Answer immediately using the canonical classic fallback.
             self.emit(
@@ -573,6 +584,7 @@ impl Core {
             return Ok(());
         };
         if !self.state.focus_active {
+            tracing::info!(request_id = %request_id, "smart-filtering request allowed because focus is off");
             self.emit(
                 "judgeResult",
                 json!({ "requestId": request_id, "url": url, "relevant": true, "reason": "Focus is off" }),
@@ -597,6 +609,7 @@ impl Core {
                 "intent": intent
             }),
         );
+        tracing::info!(request_id = %request_id, "smart-filtering judgeRequested emitted");
         Ok(())
     }
 
@@ -605,6 +618,7 @@ impl Core {
     /// or this is a stale/duplicate report — so the extension is never answered twice.
     fn submit_judge_verdict(&mut self, request_id: &str, relevant: bool, reason: String) {
         let Some(pending) = self.pending_judges.remove(request_id) else {
+            tracing::warn!(request_id, "smart-filtering verdict ignored: request is no longer pending");
             return;
         };
         // Discard a paid verdict if the policy changed while it was in flight. The extension also
@@ -612,8 +626,10 @@ impl Core {
         if !self.state.focus_active
             || self.state.active_policy().intent.as_ref() != Some(&pending.intent)
         {
+            tracing::warn!(request_id, "smart-filtering verdict ignored: focus or intent changed");
             return;
         }
+        tracing::info!(request_id, relevant, reason = %reason, "smart-filtering verdict accepted");
         self.emit(
             "judgeResult",
             json!({ "requestId": request_id, "url": pending.url, "relevant": relevant, "reason": reason }),

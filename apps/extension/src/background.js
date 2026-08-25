@@ -417,14 +417,38 @@ function urlsRoughlyMatch(a, b) {
 
 /** Redirect `tabId` to the local blocked page, but only if it's still on `expectedUrl`. */
 async function redirectIfStillOnUrl(tabId, expectedUrl, reason, generation = policyGeneration) {
-  if (generation !== policyGeneration || !currentPolicy.active) return;
+  if (generation !== policyGeneration || !currentPolicy.active) {
+    console.info('[talysman][smart-filtering] redirect skipped: stale policy', {
+      tabId,
+      expectedUrl,
+      generation,
+      currentGeneration: policyGeneration,
+    });
+    return;
+  }
   try {
     const tab = await browserApi.tabs.get(tabId);
     if (!tab || !tab.url) return;
-    if (!urlsRoughlyMatch(tab.url, expectedUrl)) return; // user already navigated away
+    if (!urlsRoughlyMatch(tab.url, expectedUrl)) {
+      console.info('[talysman][smart-filtering] redirect skipped: tab navigated away', {
+        tabId,
+        expectedUrl,
+        currentUrl: tab.url,
+      });
+      return;
+    }
     await browserApi.tabs.update(tabId, { url: blockedPageUrl(reason) });
+    console.info('[talysman][smart-filtering] redirected to blocked page', {
+      tabId,
+      expectedUrl,
+      reason,
+    });
   } catch (e) {
-    // Tab likely closed mid-flight; nothing to do.
+    console.warn('[talysman][smart-filtering] redirect failed', {
+      tabId,
+      expectedUrl,
+      error: e && e.message,
+    });
   }
 }
 
@@ -461,6 +485,13 @@ function handleJudgeResult(msg) {
   const relevant = !!msg.relevant;
   const reason = typeof msg.reason === 'string' ? msg.reason : '';
 
+  console.info('[talysman][smart-filtering] judge result received', {
+    requestId,
+    url,
+    relevant,
+    reason,
+  });
+
   setCachedVerdict(url, pending.intent, relevant, reason);
 
   if (!relevant) {
@@ -487,6 +518,13 @@ function sendJudgeRequest(requestId, tabId, url, extractedText, generation, inte
   const frame = { type: 'judge-request', requestId, url, extractedText };
   try {
     if (port) {
+      console.info('[talysman][smart-filtering] sending judge request', {
+        requestId,
+        tabId,
+        url,
+        extractedTextLength: extractedText.length,
+        generation,
+      });
       port.postMessage(frame);
     } else {
       console.warn('[talysman] no native port available for judge-request', { requestId });
@@ -498,7 +536,20 @@ function sendJudgeRequest(requestId, tabId, url, extractedText, generation, inte
 
 /** Consider a completed main-frame navigation for Smart filtering. */
 async function handleQualifyingNavigation(tabId, url) {
-  if (!currentPolicy.active || !currentPolicy.intent) return; // classic mode: zero overhead
+  console.info('[talysman][smart-filtering] navigation observed', {
+    tabId,
+    url,
+    focusActive: currentPolicy.active,
+    intentActive: !!currentPolicy.intent,
+    generation: policyGeneration,
+  });
+  if (!currentPolicy.active || !currentPolicy.intent) {
+    console.info('[talysman][smart-filtering] navigation skipped: smart filtering inactive', {
+      tabId,
+      url,
+    });
+    return;
+  }
   const generation = policyGeneration;
   const intent = currentPolicy.intent;
   const defaultAction = currentPolicy.defaultAction;
@@ -512,11 +563,23 @@ async function handleQualifyingNavigation(tabId, url) {
   }
 
   // Already authoritatively handled by DNR (blocked) or explicitly exempt (allowed).
-  if (hostnameMatchesAny(hostname, currentPolicy.blockedDomains)) return;
-  if (hostnameMatchesAny(hostname, currentPolicy.allowedDomains)) return;
+  if (hostnameMatchesAny(hostname, currentPolicy.blockedDomains)) {
+    console.info('[talysman][smart-filtering] navigation skipped: always blocked', { tabId, url });
+    return;
+  }
+  if (hostnameMatchesAny(hostname, currentPolicy.allowedDomains)) {
+    console.info('[talysman][smart-filtering] navigation skipped: always allowed', { tabId, url });
+    return;
+  }
 
   const cached = getCachedVerdict(url, intent);
   if (cached) {
+    console.info('[talysman][smart-filtering] using cached verdict', {
+      tabId,
+      url,
+      relevant: cached.relevant,
+      reason: cached.reason,
+    });
     if (!cached.relevant) void redirectIfStillOnUrl(tabId, url, cached.reason, generation);
     return;
   }
@@ -545,6 +608,13 @@ async function handleQualifyingNavigation(tabId, url) {
     .filter(Boolean)
     .join(' — ')
     .slice(0, MAX_JUDGE_TEXT_LENGTH);
+
+  console.info('[talysman][smart-filtering] page qualified for judging', {
+    tabId,
+    url,
+    extractedTextLength: combinedText.length,
+    generation,
+  });
 
   sendJudgeRequest(generateRequestId(), tabId, url, combinedText, generation, intent, defaultAction);
 }

@@ -19,6 +19,7 @@ interface JudgeResult {
 /** Never fail open: any parse failure, malformed model output, or ambiguous verdict
  *  lands here. Only an unambiguous "RELEVANT: yes" line overrides it. */
 const UNPARSEABLE_RESULT: JudgeResult = { relevant: false, reason: "Could not verify relevance" };
+const MAX_LLM_RETRIES = 3;
 
 const BUDGET_EXCEEDED_RESULT: JudgeResult = {
   relevant: false,
@@ -73,9 +74,9 @@ function buildMessages(input: {
 const RELEVANT_LINE = /^RELEVANT:\s*(yes|no)\s*$/i;
 const REASON_LINE = /^REASON:\s*(.+)$/i;
 
-/** Defensive line-based parse of the model's two-line response. Fails toward blocking:
- *  anything that isn't an unambiguous "RELEVANT: yes" becomes `relevant: false`. */
-function parseJudgeResponse(raw: string): JudgeResult {
+/** Defensive line-based parse of the model's two-line response. `null` means the model did not
+ * follow the contract and may be retried; an explicit `no` is a valid, final block verdict. */
+function parseJudgeResponse(raw: string): JudgeResult | null {
   const lines = raw
     .trim()
     .split(/\r?\n/)
@@ -83,31 +84,54 @@ function parseJudgeResponse(raw: string): JudgeResult {
     .filter(Boolean);
 
   const relevantMatch = lines.map((line) => RELEVANT_LINE.exec(line)).find(Boolean);
-  if (!relevantMatch || relevantMatch[1].toLowerCase() !== "yes") {
-    return UNPARSEABLE_RESULT;
-  }
-
   const reasonMatch = lines.map((line) => REASON_LINE.exec(line)).find(Boolean);
+  if (!relevantMatch || !reasonMatch) return null;
+
+  if (relevantMatch[1].toLowerCase() === "no") return UNPARSEABLE_RESULT;
+
   const reason = reasonMatch ? reasonMatch[1].trim().slice(0, 200) : "Relevant to your task";
   return { relevant: true, reason };
 }
 
+function retryMessages(messages: LlmMessage[], retryNumber: number): LlmMessage[] {
+  if (retryNumber === 0) return messages;
+  return [
+    ...messages,
+    {
+      role: "user",
+      content:
+        `Retry ${retryNumber}: your previous answer was unusable. Respond with exactly two lines: ` +
+        `RELEVANT: yes or RELEVANT: no, then REASON: followed by one short sentence.`,
+    },
+  ];
+}
+
 export async function POST(request: NextRequest) {
+  const requestId = request.headers.get("x-talysman-judge-request-id") ?? "untracked";
+  const startedAt = Date.now();
+  const log = (event: string, details: Record<string, unknown> = {}) =>
+    console.info("[smart-filtering][judge-route]", event, { requestId, ...details });
+
+  log("request received");
   if (!productFeaturesForEnvironment(config.app.environment).smartFiltering) {
+    log("rejected: feature disabled", { environment: config.app.environment });
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
   try {
     const user = await requireBearerUser(request);
+    log("authenticated", { userId: user.id });
 
     const entitlement = await getUserEntitlement({ db: supabaseAdmin(), userId: user.id });
     if (entitlement.plan !== "pro") {
+      log("rejected: Pro required", { plan: entitlement.plan });
       return NextResponse.json({ error: "Smart filtering requires Pro" }, { status: 403 });
     }
 
     const body = await request.json().catch(() => null);
     const parsed = judgeIntentSchema.safeParse(body);
     if (!parsed.success) {
+      log("rejected: invalid body", { issueCount: parsed.error.issues.length });
       return NextResponse.json(
         { error: "Invalid body", issues: parsed.error.issues },
         { status: 400 },
@@ -120,6 +144,10 @@ export async function POST(request: NextRequest) {
       0,
       JUDGE_INTENT_MAX_EXTRACTED_TEXT_LENGTH,
     );
+    log("request validated", {
+      url: parsed.data.url,
+      extractedTextLength: extractedText.length,
+    });
 
     const usageDate = new Date().toISOString().slice(0, 10);
     const { data: allowed, error: budgetError } = await supabaseAdmin().rpc(
@@ -136,6 +164,7 @@ export async function POST(request: NextRequest) {
     if (!allowed) {
       // A normal fail-closed verdict, not a system failure -- the caller should treat
       // this exactly like any other "not relevant" judgment.
+      log("budget exceeded");
       return NextResponse.json(BUDGET_EXCEEDED_RESULT);
     }
 
@@ -145,16 +174,64 @@ export async function POST(request: NextRequest) {
       intent: parsed.data.intent,
     });
 
-    const raw = await createLlmClient().completeChat(messages, {
-      temperature: 0,
-      maxTokens: 80,
+    log("calling LLM", { provider: config.llm.provider });
+    const llmStartedAt = Date.now();
+    const llm = createLlmClient();
+    let result: JudgeResult | null = null;
+    let responseLength = 0;
+    let attempts = 0;
+
+    for (let retryNumber = 0; retryNumber <= MAX_LLM_RETRIES; retryNumber += 1) {
+      attempts += 1;
+      try {
+        const raw = await llm.completeChat(retryMessages(messages, retryNumber), {
+          temperature: 0,
+          maxTokens: 128,
+          // Qwen reasoning models otherwise spend the whole short classifier budget in
+          // `reasoning_content` and return empty assistant content.
+          enableThinking: false,
+        });
+        responseLength = raw.length;
+        result = parseJudgeResponse(raw);
+      } catch (error) {
+        if (!(error instanceof Error) || error.name !== "LlmInvalidResponseError") throw error;
+        responseLength = 0;
+      }
+
+      if (result) break;
+      if (retryNumber < MAX_LLM_RETRIES) {
+        log("retrying unusable LLM response", {
+          attempt: attempts,
+          retriesRemaining: MAX_LLM_RETRIES - retryNumber,
+          responseLength,
+        });
+      }
+    }
+
+    if (!result) {
+      result = UNPARSEABLE_RESULT;
+      log("LLM retries exhausted", { attempts });
+    }
+    log("LLM verdict parsed", {
+      relevant: result.relevant,
+      reason: result.reason,
+      attempts,
+      llmElapsedMs: Date.now() - llmStartedAt,
+      totalElapsedMs: Date.now() - startedAt,
+      responseLength,
     });
 
-    return NextResponse.json(parseJudgeResponse(raw));
+    return NextResponse.json(result);
   } catch (err) {
     if (err instanceof UnauthorizedError) {
+      log("rejected: unauthorized", { message: err.message });
       return NextResponse.json({ error: err.message }, { status: 401 });
     }
+    console.error("[smart-filtering][judge-route] request failed", {
+      requestId,
+      elapsedMs: Date.now() - startedAt,
+      error: err instanceof Error ? err.message : String(err),
+    });
     // Deliberately no request body (url/extractedText) in the captured context -- page
     // content is never logged, cached, or stored beyond the lifetime of this request.
     await captureException(err, { route: "desktop/judge-intent" });

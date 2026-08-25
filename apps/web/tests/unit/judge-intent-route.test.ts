@@ -17,6 +17,7 @@ vi.mock("@/lib/config", () => ({
         return mocks.appEnvironment;
       },
     },
+    llm: { provider: "local" },
   },
 }));
 
@@ -124,6 +125,38 @@ describe("POST /api/desktop/judge-intent", () => {
 
     expect(response.status).toBe(200);
     expect(json).toEqual({ relevant: false, reason: "Could not verify relevance" });
+    expect(mocks.completeChat).toHaveBeenCalledTimes(4);
+  });
+
+  it("returns a usable verdict after retrying malformed model output", async () => {
+    mocks.completeChat
+      .mockResolvedValueOnce("I think this looks related.")
+      .mockResolvedValueOnce("RELEVANT: yes\nREASON: Matches the stated task.");
+
+    const response = await POST(request(validBody));
+
+    expect(await response.json()).toEqual({
+      relevant: true,
+      reason: "Matches the stated task.",
+    });
+    expect(mocks.completeChat).toHaveBeenCalledTimes(2);
+    expect(mocks.completeChat.mock.calls[1][0].at(-1)?.content).toMatch(/previous answer was unusable/i);
+  });
+
+  it("retries an empty assistant response reported by the LLM client", async () => {
+    const emptyResponseError = new Error("LLM response did not contain assistant content");
+    emptyResponseError.name = "LlmInvalidResponseError";
+    mocks.completeChat
+      .mockRejectedValueOnce(emptyResponseError)
+      .mockResolvedValueOnce("RELEVANT: no\nREASON: The page is unrelated to the task.");
+
+    const response = await POST(request(validBody));
+
+    expect(await response.json()).toEqual({
+      relevant: false,
+      reason: "Could not verify relevance",
+    });
+    expect(mocks.completeChat).toHaveBeenCalledTimes(2);
   });
 
   it("fails closed on an ambiguous RELEVANT value", async () => {
@@ -133,6 +166,7 @@ describe("POST /api/desktop/judge-intent", () => {
     const json = await response.json();
 
     expect(json).toEqual({ relevant: false, reason: "Could not verify relevance" });
+    expect(mocks.completeChat).toHaveBeenCalledTimes(4);
   });
 
   it("only returns relevant:true on an unambiguous RELEVANT: yes", async () => {
@@ -154,6 +188,7 @@ describe("POST /api/desktop/judge-intent", () => {
     const json = await response.json();
 
     expect(json).toEqual({ relevant: false, reason: "Could not verify relevance" });
+    expect(mocks.completeChat).toHaveBeenCalledTimes(1);
   });
 
   it("never lets page content be interpreted as instructions in the prompt sent to the LLM", async () => {

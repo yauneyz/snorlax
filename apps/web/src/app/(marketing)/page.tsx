@@ -10,7 +10,6 @@ import {
 import { AppShot } from "@/components/marketing/AppShot";
 import { HeroDemo } from "@/components/marketing/HeroDemo";
 import { MediaPlaceholder } from "@/components/marketing/MediaPlaceholder";
-import { PlatformIcon, type Platform } from "@/components/marketing/PlatformIcon";
 import { config } from "@/lib/config";
 
 export const metadata: Metadata = {
@@ -21,15 +20,6 @@ export const metadata: Metadata = {
   description: `${config.app.name} blocks distracting websites and desktop apps. Ending a focus session early requires a physical USB key you left in another room — paired from any USB drive you already own.`,
   alternates: { canonical: `${config.app.url}/` },
 };
-
-/** Above-the-fold compatibility strip. Answers "does it run on my machine" before the scroll. */
-const platforms: { platform: Platform; label: string }[] = [
-  { platform: "windows", label: "Windows" },
-  { platform: "macos", label: "macOS" },
-  { platform: "linux", label: "Linux" },
-  { platform: "chrome", label: "Chrome" },
-  { platform: "firefox", label: "Firefox" },
-];
 
 /** Shots are 4:3 captures of the real app — see scripts/capture-marketing.mjs. */
 const steps = [
@@ -80,8 +70,7 @@ const paths = [
 const uses = [
   "Finish the hard coding session",
   "Write past the part that isn't fun",
-  "Study without renegotiating",
-  "Defend the same hours every week",
+  "Study for hours uninterruped",
 ];
 
 /** Capabilities, stated as the outcome rather than the mechanism. */
@@ -96,11 +85,7 @@ const outcomes = [
   },
   {
     title: "Protect your best hours automatically",
-    body: "Set recurring windows and the block arms itself — even if the app is closed and you never remember to start it.",
-  },
-  {
-    title: "Stop one impulsive click from ending the session",
-    body: "Turning focus off asks the service to physically verify your paired key. No key in the machine, no unlock.",
+    body: "Set recurring windows and distractions are blocked automatically — even if the app is closed and you never remember to start it.",
   },
   {
     title: "Turn your computer into a workstation",
@@ -212,10 +197,8 @@ export default function LandingPage() {
   return (
     <>
       <section className="hero">
-        <h1 className="hero__headline">Make your computer a place for work again</h1>
-        <p className="hero__eyebrow">
-          A distraction blocker that works on the device where you do real work
-        </p>
+        <h1 className="hero__headline">Turn your computer into a deep work sanctuary</h1>
+        <p className="hero__eyebrow">Do more of the work that really matters to you</p>
 
         <HeroDemo />
 
@@ -230,26 +213,11 @@ export default function LandingPage() {
           <Link href="/download" className="landing__cta landing__cta--primary">
             Start focusing for free
           </Link>
-          <a href="#demo" className="landing__cta landing__cta--secondary">
-            Watch the 30-second demo
-          </a>
         </div>
-        <p className="hero__trial">
-          Free forever for {FREE_BLOCKED_SITE_LIMIT} sites · or try{" "}
-          <Link href="/pricing">Pro free for {PRO_TRIAL_DAYS} days</Link>
-        </p>
-        <ul className="compat" aria-label="Supported platforms">
-          {platforms.map(({ platform, label }) => (
-            <li key={platform} className="compat__item">
-              <PlatformIcon platform={platform} size={16} />
-              <span>{label}</span>
-            </li>
-          ))}
-        </ul>
       </section>
 
       <section className="section recognition">
-        <h2 className="section__title">You&apos;ve already tried blocking distractions</h2>
+        <h2 className="section__title">You&apos;ve already tried other app blockers</h2>
         <div className="recognition__copy">
           <p>You installed the browser extensions. You set the timers. But they never stuck.</p>
           <p>

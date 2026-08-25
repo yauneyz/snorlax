@@ -19,6 +19,8 @@ export interface LlmCompletionOptions {
   model?: string;
   temperature?: number;
   maxTokens?: number;
+  /** llama.cpp/Qwen chat-template control; only sent to the local provider. */
+  enableThinking?: boolean;
   signal?: AbortSignal;
 }
 
@@ -61,17 +63,37 @@ class OpenAICompatibleLlmClient implements LlmClient {
   }
 
   async completeChat(messages: LlmMessage[], options: LlmCompletionOptions = {}): Promise<string> {
+    const model = options.model ?? this.clientConfig.model;
+    const startedAt = Date.now();
+    console.info("[llm] request started", {
+      provider: this.clientConfig.provider,
+      endpoint: this.clientConfig.endpoint,
+      model,
+      messageCount: messages.length,
+      inputCharacters: messages.reduce((total, message) => total + message.content.length, 0),
+    });
     const response = await this.clientConfig.fetchImpl(this.clientConfig.endpoint, {
       method: "POST",
       headers: this.headers(),
       signal: options.signal,
       body: JSON.stringify({
-        model: options.model ?? this.clientConfig.model,
+        model,
         messages,
         temperature: options.temperature ?? 0.7,
         stream: false,
         ...(options.maxTokens === undefined ? {} : { max_tokens: options.maxTokens }),
+        ...(this.clientConfig.provider === "local" && options.enableThinking !== undefined
+          ? { chat_template_kwargs: { enable_thinking: options.enableThinking } }
+          : {}),
       }),
+    });
+
+    console.info("[llm] response received", {
+      provider: this.clientConfig.provider,
+      endpoint: this.clientConfig.endpoint,
+      model,
+      status: response.status,
+      elapsedMs: Date.now() - startedAt,
     });
 
     if (!response.ok) {
@@ -82,7 +104,13 @@ class OpenAICompatibleLlmClient implements LlmClient {
     const payload = (await response.json()) as Record<string, unknown>;
     const content = extractAssistantContent(payload);
     if (!content) {
-      throw new Error(`LLM response did not contain assistant content: ${JSON.stringify(payload)}`);
+      const error = new Error(
+        `LLM response did not contain assistant content: ${JSON.stringify(payload)}`,
+      );
+      // The judge route may retry unusable model output, while HTTP/provider failures remain
+      // non-retryable there. Use a stable name without coupling the route to this class/module.
+      error.name = "LlmInvalidResponseError";
+      throw error;
     }
 
     return content.trim();

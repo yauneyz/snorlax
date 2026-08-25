@@ -9,7 +9,7 @@
     "sync:env:preview": "tsx ../../scripts/sync-env.ts --vercel=preview --mode=prod",
     "predev": "pnpm sync:env",
     "prebuild": "pnpm sync:env:build",
-    "dev": "next dev",
+    "dev": "next dev --hostname 0.0.0.0 --port 3000",
     "prod": "pnpm sync:env --mode=prod && next dev -H 127.0.0.1",
     "build": "next build",
     "start": "next start",

@@ -34,6 +34,8 @@ const pnpm = process.platform === 'win32' ? 'pnpm.cmd' : 'pnpm';
 const stripe = process.platform === 'win32' ? 'stripe.exe' : 'stripe';
 const webhookUrl = 'http://localhost:3000/api/stripe/webhook';
 const webUrl = 'http://localhost:3000';
+const webHost = '0.0.0.0';
+const webPort = 3000;
 const children = new Map();
 
 // Any signature-checked webhook delivery fails against this, which is the honest outcome when
@@ -209,7 +211,7 @@ async function main() {
     announce('running with --dummy: missing credentials become placeholders, not failures');
   }
 
-  await assertPortAvailable(3000);
+  await assertPortAvailable(webPort);
 
   announce('generating local environment files');
   await run(pnpm, ['sync:env']);
@@ -261,7 +263,17 @@ async function main() {
   const webProcess = startProcess(
     'web app',
     pnpm,
-    ['--filter', '@talysman/web', 'exec', 'next', 'dev', '--port', '3000'],
+    [
+      '--filter',
+      '@talysman/web',
+      'exec',
+      'next',
+      'dev',
+      '--hostname',
+      webHost,
+      '--port',
+      String(webPort),
+    ],
     webEnv,
   );
 

@@ -17,7 +17,7 @@ describe("llm client", () => {
       },
     });
 
-    const result = await client.complete("Reply with pong.");
+    const result = await client.complete("Reply with pong.", { enableThinking: false });
 
     expect(result).toBe("pong");
     expect(requests[0]?.url).toBe("http://127.0.0.1:11434/v1/chat/completions");
@@ -25,10 +25,12 @@ describe("llm client", () => {
       model: string;
       messages: LlmMessage[];
       stream: boolean;
+      chat_template_kwargs: { enable_thinking: boolean };
     };
     expect(body.model).toBe("qwen3.5-9b");
     expect(body.messages).toEqual([{ role: "user", content: "Reply with pong." }]);
     expect(body.stream).toBe(false);
+    expect(body.chat_template_kwargs).toEqual({ enable_thinking: false });
   });
 
   it("adds OpenAI auth and organization headers for the OpenAI provider", async () => {

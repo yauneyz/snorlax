@@ -67,7 +67,9 @@ pnpm dev
 launches the web and Electron apps. The development desktop shares the installed privileged
 Talysman service with the production desktop, so it gets real USB discovery and its focus changes
 reach the existing browser extensions. The attached processes stop on Ctrl+C; Supabase remains up
-for fast restarts.
+for fast restarts. The web app listens on all network interfaces at port 3000. On the same LAN as
+the development desktop, open `http://10.1.10.188:3000` to test it on a physical phone. That address
+is static in the desktop NixOS network profile.
 
 ```bash
 pnpm dev:down        # stop the local Supabase stack

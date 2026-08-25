@@ -16,8 +16,6 @@ export async function Header() {
         <BrandLink href="/" />
         <DevBadge />
       </div>
-      {/* One CTA across the site: "Start focusing free", not "Download" or "Get started".
-          It points at /download because that is genuinely the first step. */}
       <nav className="site-nav">
         <Link href="/#how">How it works</Link>
         <Link href="/pricing">Pricing</Link>
@@ -27,14 +25,9 @@ export async function Header() {
             <AccountMenu name={(user.user_metadata?.full_name as string | undefined) ?? user.email} />
           </>
         ) : (
-          <>
-            <Link href="/login" className="site-nav__login">
-              Log in
-            </Link>
-            <Link href="/download" className="site-nav__cta">
-              Start focusing free
-            </Link>
-          </>
+          <Link href="/download" className="site-nav__cta">
+            Download
+          </Link>
         )}
       </nav>
     </header>

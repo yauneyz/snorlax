@@ -29,8 +29,7 @@ describe("landing page media", () => {
   it("ships the demo video and every app screenshot in production", async () => {
     const html = await renderLanding("production");
 
-    // The hero CTA promises a video, so the video has to be on the page it scrolls to.
-    expect(html).toContain("Watch the 30-second demo");
+    // The demo autoplays in the hero, so it must ship even without a "watch demo" CTA.
     expect(html).toContain('id="demo"');
     expect(html).toContain("/media/hero-demo.webm");
     expect(html).toContain("/media/hero-demo.mp4");

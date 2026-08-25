@@ -620,10 +620,6 @@ input:-webkit-autofill:focus {
   background: rgba(255, 255, 255, 0.06);
 }
 
-.site-nav__login {
-  color: var(--fg-3) !important;
-}
-
 .site-nav__cta {
   margin-left: 0.35rem;
   padding: 0.55rem 1.15rem !important;
@@ -775,30 +771,6 @@ input:-webkit-autofill:focus {
   border: 1px solid var(--border);
   border-radius: var(--r-xl);
   background: var(--bg-1);
-}
-
-/* Compatibility above the fold: "does this run on my machine" answered before
- * the first scroll. */
-.compat {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem 1.25rem;
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  animation: fadeUp 850ms var(--ease) 250ms both;
-}
-
-.compat__item {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.45rem;
-  font-size: 0.85rem;
-  color: var(--fg-4);
-}
-
-.compat__item svg {
-  color: var(--silver-lo);
 }
 
 /* ── App screenshots ──
@@ -3306,10 +3278,6 @@ input:-webkit-autofill:focus {
 
   .hero__ctas {
     gap: 0.6rem;
-  }
-
-  .compat {
-    gap: 0.4rem 0.9rem;
   }
 
   .site-nav,
