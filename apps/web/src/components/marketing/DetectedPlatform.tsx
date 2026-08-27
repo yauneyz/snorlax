@@ -46,8 +46,8 @@ export function DetectedPlatform({ icons }: { icons: Record<PlatformKey, React.R
           {icons[detected.key]}
         </span>
         <p className="detected-platform__text">
-          <span className="detected-platform__eyebrow">Detected</span>
-          <span className="detected-platform__name">{detected.label}</span>
+          <span className="detected-platform__eyebrow">RECOMMENDED DOWNLOAD</span>
+          <span className="detected-platform__name">{detected.label} desktop app</span>
         </p>
         <a
           className="detected-platform__link"

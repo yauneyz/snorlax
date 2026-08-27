@@ -4,7 +4,13 @@ import { config } from "@/lib/config";
 export function Footer() {
   return (
     <footer className="site-footer">
-      <div className="site-footer__brand">© {new Date().getFullYear()} {config.app.name}</div>
+      <div className="site-footer__brand">
+        <strong>{config.app.name}</strong>
+        <span>The off switch should not be one click away.</span>
+        <small>
+          © {new Date().getFullYear()} {config.app.name}
+        </small>
+      </div>
       <nav className="site-footer__nav">
         <Link href="/download">Download</Link>
         <Link href="/pricing">Pricing</Link>

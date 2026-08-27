@@ -4,12 +4,12 @@ import { useRouter, useSearchParams } from "next/navigation";
 import {
   checkoutPriceSchema,
   formatPriceUsd,
-  PRO_ANNUAL_DISCOUNT_PERCENT,
-  PRO_ANNUAL_MONTHLY_EQUIVALENT_CENTS,
   PRO_ANNUAL_SAVINGS_CENTS,
   PRO_ANNUAL_WEEKLY_CENTS,
+  PRO_LIST_PRICE_CENTS,
   PRO_PRICE_CENTS,
   PRO_TRIAL_DAYS,
+  proDiscountPercent,
   type CheckoutPrice,
 } from "@talysman/product";
 import { supabaseBrowser } from "@/lib/supabase/browser";
@@ -89,8 +89,8 @@ export function PricingPlans({ freeFeatures, proFeatures, trialAvailable, alread
     };
   }, [requestedCycle, alreadyPro, startCheckout]);
 
-  const annualEquivalent = formatPriceUsd(PRO_ANNUAL_MONTHLY_EQUIVALENT_CENTS);
   const isAnnual = cycle === "yearly";
+  const discountPercent = proDiscountPercent(cycle);
 
   const proCta = alreadyPro
     ? "You're on Pro"
@@ -103,13 +103,14 @@ export function PricingPlans({ freeFeatures, proFeatures, trialAvailable, alread
   return (
     <div className="plans">
       <article className="plan plan--free">
+        <span className="plan__kicker">TRY THE MECHANISM</span>
         <header className="plan__head">
           <h2 className="plan__name">Talysman Free</h2>
           <p className="plan__price">
             $0 <span className="plan__price-unit">forever</span>
           </p>
           <p className="plan__pitch">
-            Experience the physical-key blocking mechanism, start to finish.
+            Run a real session where quitting is no longer one click away.
           </p>
         </header>
         <ul className="plan__features">
@@ -117,29 +118,22 @@ export function PricingPlans({ freeFeatures, proFeatures, trialAvailable, alread
             <li key={f}>{f}</li>
           ))}
         </ul>
-        <button
-          type="button"
-          className="plan__cta"
-          onClick={() => router.push("/download")}
-        >
+        <button type="button" className="plan__cta" onClick={() => router.push("/download")}>
           Start focusing free
         </button>
         <p className="plan__footnote">No account required to install. No card, ever.</p>
       </article>
 
       <article className="plan plan--pro">
-        <span className="plan__badge">Everything unlocked</span>
+        <span className="plan__badge">Most complete</span>
+        <span className="plan__kicker">BUILD THE SYSTEM</span>
         <header className="plan__head">
           <h2 className="plan__name">Talysman Pro</h2>
           <p className="plan__pitch">
-            For making focused work a repeatable part of your week.
+            Make focused work automatic, repeatable, and harder to negotiate away.
           </p>
 
-          <div
-            className="cycle"
-            role="radiogroup"
-            aria-label="Billing period"
-          >
+          <div className="cycle" role="radiogroup" aria-label="Billing period">
             {BILLING_CYCLES.map(({ price, label }) => (
               <button
                 key={price}
@@ -150,36 +144,41 @@ export function PricingPlans({ freeFeatures, proFeatures, trialAvailable, alread
                 onClick={() => setCycle(price)}
               >
                 {label}
-                {price === "yearly" ? (
-                  <span className="cycle__save">
-                    {PRO_ANNUAL_DISCOUNT_PERCENT}% off
-                  </span>
-                ) : null}
+                <span className="cycle__save">{proDiscountPercent(price)}% off</span>
               </button>
             ))}
           </div>
 
-          {/* The point of stating both figures: nobody should have to divide by twelve. */}
+          <p className="plan__price-early-adopter">
+            Early adopter price · usually {formatPriceUsd(PRO_LIST_PRICE_CENTS.monthly)}/mo or{" "}
+            {formatPriceUsd(PRO_LIST_PRICE_CENTS.yearly)}/year
+          </p>
+
           <p className="plan__price">
-            {isAnnual ? annualEquivalent : formatPriceUsd(PRO_PRICE_CENTS.monthly)}
-            <span className="plan__price-unit">/month</span>
+            <span className="plan__price-list">
+              {formatPriceUsd(PRO_LIST_PRICE_CENTS[cycle])}
+            </span>{" "}
+            {formatPriceUsd(PRO_PRICE_CENTS[cycle])}
+            <span className="plan__price-unit">{isAnnual ? "/year" : "/month"}</span>
           </p>
           <p className="plan__price-detail">
             {isAnnual ? (
               <>
-                {formatPriceUsd(PRO_PRICE_CENTS.yearly)} billed annually ·{" "}
+                Billed annually ·{" "}
                 <strong>
-                  {PRO_ANNUAL_DISCOUNT_PERCENT}% off, save{" "}
-                  {formatPriceUsd(PRO_ANNUAL_SAVINGS_CENTS)} a year
+                  {discountPercent}% off, save {formatPriceUsd(PRO_ANNUAL_SAVINGS_CENTS)} a year
+                  versus monthly
                 </strong>
               </>
             ) : (
-              <>Billed monthly · cancel anytime</>
+              <>
+                Billed monthly · <strong>{discountPercent}% off list · cancel anytime</strong>
+              </>
             )}
           </p>
           {isAnnual ? (
             <p className="plan__price-weekly">
-              That&apos;s less than {formatPriceUsd(PRO_ANNUAL_WEEKLY_CENTS)}/week
+              About {formatPriceUsd(PRO_ANNUAL_WEEKLY_CENTS)}/week
             </p>
           ) : null}
         </header>
@@ -204,8 +203,8 @@ export function PricingPlans({ freeFeatures, proFeatures, trialAvailable, alread
             <>Manage billing from your account page.</>
           ) : trialAvailable ? (
             <>
-              Card required to start · nothing charged for {PRO_TRIAL_DAYS} days · cancel during
-              the trial and you pay nothing
+              Card required to start · nothing charged for {PRO_TRIAL_DAYS} days · cancel during the
+              trial and you pay nothing
             </>
           ) : (
             <>Cancel anytime · you keep Pro until the period you paid for ends</>

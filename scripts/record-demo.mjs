@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 /**
- * Records the landing page's hero demo: the 30 seconds where a session starts, a site gets
- * blocked, and quitting early turns out to need a key that isn't in the room.
+ * Records the landing page's hero demo: the blocklist, a session starting, the key leaving the
+ * room, muscle memory reaching for a blocked site anyway, and the off switch turning out to be
+ * out of reach without the key.
  *
  *   pnpm capture:build && pnpm capture:demo
  *
@@ -189,70 +190,68 @@ async function encode() {
 // ── the demo ────────────────────────────────────────────────────────────────────────────────
 
 async function perform(app, win, chrome) {
-  // 0 · The unprotected desk. Key in the machine, nothing blocked yet.
+  // 0 · What's on the list.
   await beat(win, 800);
-  await say(win, 'Block the sites and apps that pull you away');
-  await beat(win, 1400);
-
-  // 1 · What's on the list.
+  await say(win, 'Block the apps and websites that distract you');
   await point(win, win.getByRole('button', { name: 'Blocklists' }));
-  await beat(win, 2300);
+  await beat(win, 2200);
   await hush(win);
-  await beat(win, 700);
+  await beat(win, 600);
 
-  // 2 · Start the session.
+  // 1 · Start the session.
   await say(win, 'Start a focus session');
   await point(win, win.getByRole('button', { name: 'Dashboard' }));
   await beat(win, 700);
   await point(win, win.getByRole('button', { name: 'Turn on focus' }));
   await win.getByText('FOCUSED').waitFor();
-  await beat(win, 1500);
+  await beat(win, 1400);
+  await hush(win);
+  await beat(win, 500);
+
+  // 2 · The key leaves the room. The header indicator flips green → red on its own.
+  await say(win, 'Remove the key…');
+  await beat(win, 500);
+  await win.evaluate(() => window.api.devToggleKey());
+  await win.getByText('insert key to turn off focus').waitFor();
+  await beat(win, 1600);
   await hush(win);
   await win.evaluate(() => window.__demo.hideCursor());
   await beat(win, 600);
 
-  // 3 · What a blocked site turns into. The real extension block page, full frame.
+  // 3 · Muscle memory reaches for the browser before the brain catches up.
+  await say(win, 'The urge hits. You open your browser and muscle memory takes over');
+  await beat(win, 2700);
+  await hush(win);
+  await beat(win, 500);
+
+  // 4 · What that muscle memory runs into. The real extension block page, full frame.
   const blockPage = await openBlockPage(app, { height: H + chrome });
   if (blockPage) {
-    await beat(win, 700);
+    await beat(win, 300);
     await blockPage.evaluate(OVERLAY_SOURCE);
-    await blockPage.evaluate(() => window.__demo.say('Enforced below the browser, not inside it'));
-    await beat(win, 2900);
+    await blockPage.evaluate(() => window.__demo.say('But those sites are blocked'));
+    await beat(win, 2200);
     await blockPage.evaluate(() => window.__demo.hush());
     await beat(win, 500);
     await closeBlockPage(app);
     await beat(win, 700);
   }
 
-  // 4 · The key leaves the room. The header indicator flips green → red on its own.
-  await say(win, 'Then leave the key in another room');
-  await beat(win, 500);
-  await win.evaluate(() => window.api.devToggleKey());
-  await win.getByText('insert key to turn off focus').waitFor();
-  await beat(win, 1900);
-  await hush(win);
-  await beat(win, 600);
-
-  // 5 · The moment the whole product exists for: the urge hits, and the off switch is gone.
-  await say(win, 'The urge hits. You reach for the off switch…');
-  await beat(win, 1100);
+  // 5 · Reach to turn it off, just for a second.
+  await say(win, 'You go to disable the blocker, just for a second');
+  await beat(win, 900);
   await point(win, win.getByRole('button', { name: 'Turn off focus' }), { travel: 900 });
-  await beat(win, 600);
+  await beat(win, 500);
   await win.evaluate(() => window.__demo.click());
-  await beat(win, 800);
+  await beat(win, 700);
   await hush(win);
   await beat(win, 500);
 
-  await say(win, '…and it needs the key you left across the room');
-  await beat(win, 2600);
+  // 6 · Close on the seal holding — the off switch is out of reach.
+  await say(win, "…but you can't because the key is in the other room");
+  await beat(win, 2800);
   await hush(win);
   await win.evaluate(() => window.__demo.hideCursor());
-  await beat(win, 1100);
-
-  // 6 · Close on the seal holding.
-  await say(win, 'So you go back to work');
-  await beat(win, 2200);
-  await hush(win);
   await beat(win, 900);
 }
 

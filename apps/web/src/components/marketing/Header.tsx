@@ -19,14 +19,17 @@ export async function Header() {
       <nav className="site-nav">
         <Link href="/#how">How it works</Link>
         <Link href="/pricing">Pricing</Link>
+        <Link href="/#faq">FAQ</Link>
         {user ? (
           <>
             <Link href="/app">Dashboard</Link>
-            <AccountMenu name={(user.user_metadata?.full_name as string | undefined) ?? user.email} />
+            <AccountMenu
+              name={(user.user_metadata?.full_name as string | undefined) ?? user.email}
+            />
           </>
         ) : (
           <Link href="/download" className="site-nav__cta">
-            Download
+            Get Talysman free
           </Link>
         )}
       </nav>

@@ -1,7 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import {
   formatPriceUsd,
-  PRO_ANNUAL_MONTHLY_EQUIVALENT_CENTS,
   PRO_ANNUAL_SAVINGS_CENTS,
   PRO_PRICE_CENTS,
   PRO_TRIAL_DAYS,
@@ -121,19 +120,12 @@ describe("checkout session trial wiring", () => {
 });
 
 describe("displayed pricing", () => {
-  it("never advertises a monthly rate that twelve of cannot buy the annual plan", () => {
-    const advertised = Math.floor(PRO_ANNUAL_MONTHLY_EQUIVALENT_CENTS);
-    expect(advertised * 12).toBeLessThanOrEqual(PRO_PRICE_CENTS.yearly);
-  });
-
   it("states the annual saving against twelve monthly charges", () => {
     expect(PRO_ANNUAL_SAVINGS_CENTS).toBe(PRO_PRICE_CENTS.monthly * 12 - PRO_PRICE_CENTS.yearly);
   });
 
   it("formats whole dollars without cents and part-dollars with two digits", () => {
-    expect(formatPriceUsd(PRO_PRICE_CENTS.monthly)).toBe("$10");
-    expect(formatPriceUsd(PRO_PRICE_CENTS.yearly)).toBe("$100");
-    expect(formatPriceUsd(PRO_ANNUAL_MONTHLY_EQUIVALENT_CENTS)).toBe("$8.33");
-    expect(formatPriceUsd(PRO_ANNUAL_SAVINGS_CENTS)).toBe("$20");
+    expect(formatPriceUsd(PRO_PRICE_CENTS.monthly)).toBe("$4.99");
+    expect(formatPriceUsd(PRO_PRICE_CENTS.yearly)).toBe("$49.99");
   });
 });

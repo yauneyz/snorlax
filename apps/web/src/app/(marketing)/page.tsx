@@ -3,13 +3,12 @@ import Link from "next/link";
 import {
   formatPriceUsd,
   FREE_BLOCKED_SITE_LIMIT,
-  PRO_ANNUAL_MONTHLY_EQUIVALENT_CENTS,
+  PRO_LIST_PRICE_CENTS,
   PRO_PRICE_CENTS,
   PRO_TRIAL_DAYS,
 } from "@talysman/product";
 import { AppShot } from "@/components/marketing/AppShot";
 import { HeroDemo } from "@/components/marketing/HeroDemo";
-import { MediaPlaceholder } from "@/components/marketing/MediaPlaceholder";
 import { config } from "@/lib/config";
 
 export const metadata: Metadata = {
@@ -68,9 +67,9 @@ const paths = [
 
 /** Concrete situations, so the visitor can place themselves before reading capabilities. */
 const uses = [
-  "Finish the hard coding session",
-  "Write past the part that isn't fun",
-  "Study for hours uninterruped",
+  "Finish the hard coding session instead of opening YouTube",
+  "Write past the part that stopped being fun",
+  "Study long enough to get through the difficult chapter",
 ];
 
 /** Capabilities, stated as the outcome rather than the mechanism. */
@@ -168,10 +167,11 @@ const faqs = [
     a: (
       <p>
         Free covers {FREE_BLOCKED_SITE_LIMIT} blocked websites and unlimited manual focus sessions,
-        with no card and no time limit. Pro is {formatPriceUsd(PRO_ANNUAL_MONTHLY_EQUIVALENT_CENTS)}
-        /month billed annually, or {formatPriceUsd(PRO_PRICE_CENTS.monthly)} billed monthly, and
-        adds app blocking, recurring schedules, unlimited sites and unlimited profiles. New accounts
-        get {PRO_TRIAL_DAYS} days of Pro free — see <Link href="/pricing">pricing</Link>.
+        with no card and no time limit. Pro is {formatPriceUsd(PRO_PRICE_CENTS.monthly)}/month or{" "}
+        {formatPriceUsd(PRO_PRICE_CENTS.yearly)}/year at the early adopter price (usually{" "}
+        {formatPriceUsd(PRO_LIST_PRICE_CENTS.monthly)}/mo or {formatPriceUsd(PRO_LIST_PRICE_CENTS.yearly)}
+        /year), and adds app blocking, recurring schedules, unlimited sites and unlimited profiles.
+        New accounts get {PRO_TRIAL_DAYS} days of Pro free — see <Link href="/pricing">pricing</Link>.
       </p>
     ),
   },
@@ -186,49 +186,69 @@ const faqs = [
   },
 ];
 
-/**
- * TEMPORARY: the testimonials are all placeholder copy, so production hides the section rather
- * than publishing invented social proof. Development keeps it so the slot stays visible. Remove
- * this flag once real customer quotes exist.
- */
-const showTestimonials = config.app.environment !== "production";
-
 export default function LandingPage() {
   return (
     <>
       <section className="hero">
-        <h1 className="hero__headline">Turn your computer into a deep work sanctuary</h1>
-        <p className="hero__eyebrow">Do more of the work that really matters to you</p>
-
-        <HeroDemo />
-
-        <div className="hero__sub">
-          <p>
-            {config.app.name} is a unique distraction blocker that only lets you turn it off if you
-            have a paired USB drive inserted. This lets you create a physical barrier between you
-            and everything else trying to steal your focus. Use any USB drive you already own.
-          </p>
+        <div className="hero__copy">
+          <p className="hero__eyebrow">For people who keep overriding their blockers</p>
+          <h1 className="hero__headline">
+            A distraction blocker you need a <span>physical key</span> to turn off.
+          </h1>
+          <div className="hero__sub">
+            <p>
+              Pair any USB drive. Start a focus session. Put the key somewhere inconvenient. When
+              the work gets hard, the off switch is no longer sitting one click away.
+            </p>
+          </div>
+          <div className="hero__ctas">
+            <Link href="/download" className="landing__cta landing__cta--primary">
+              Start a locked session — free
+            </Link>
+            <Link href="#how" className="landing__cta landing__cta--secondary">
+              See how it works
+            </Link>
+          </div>
+          <ul className="hero__trust" aria-label="Product highlights">
+            <li>Free forever</li>
+            <li>Use any USB drive</li>
+            <li>Windows, macOS &amp; Linux</li>
+          </ul>
         </div>
-        <div className="hero__ctas">
-          <Link href="/download" className="landing__cta landing__cta--primary">
-            Start focusing for free
-          </Link>
+
+        <div className="hero__stage">
+          <div className="hero__stage-bar" aria-hidden="true">
+            <span className="hero__status">
+              <i /> Focus locked
+            </span>
+            <span className="hero__key-state">Key away</span>
+          </div>
+          <HeroDemo />
+          <div className="hero__key-callout" aria-hidden="true">
+            <span className="hero__usb">
+              <i />
+            </span>
+            <span>
+              <small>PHYSICAL OFF SWITCH</small>
+              Any USB drive you already own
+            </span>
+          </div>
         </div>
       </section>
 
-      <section className="section recognition">
-        <h2 className="section__title">You&apos;ve already tried other app blockers</h2>
-        <div className="recognition__copy">
-          <p>You installed the browser extensions. You set the timers. But they never stuck.</p>
-          <p>
-            The work got hard, you disabled the blocker, and YouTube was open again before you had
-            consciously decided to stop working.
-          </p>
-          <p className="recognition__turn">
-            The blocker did exactly what you told it to. The problem isn&apos;t that it can&apos;t
-            block websites — it&apos;s that quitting is still one click away.
-          </p>
-        </div>
+      <section
+        className="mechanism-strip"
+        aria-label="How Talysman changes the moment of distraction"
+      >
+        <p>
+          <span>01</span> Decide while you&apos;re thinking clearly
+        </p>
+        <p>
+          <span>02</span> Put the key out of reach
+        </p>
+        <p>
+          <span>03</span> Let friction beat the impulse
+        </p>
       </section>
 
       {/* The named idea the rest of the page hangs on. Everything above is the visitor's
@@ -236,20 +256,20 @@ export default function LandingPage() {
       <section className="section diagnosis">
         <div className="diagnosis__lead">
           <div className="diagnosis__copy">
-            <h2 className="section__title">The off switch is the problem</h2>
+            <p className="section__eyebrow">The real problem</p>
+            <h2 className="section__title">The off switch is the problem.</h2>
             <p>
-              Every other blocker is controlled from the computer it&apos;s supposed to be
-              protecting. The distracted version of you can undo the decision the focused version
-              made ten minutes ago, with the same mouse, in the same three clicks.
+              You installed the extensions. You set the timers. Then the work got difficult and
+              YouTube was open before you had consciously decided to stop.
             </p>
             <p>
-              {config.app.name} moves that decision into the physical world. Turning off the blocker
-              means going and getting your key — still possible when you genuinely need to stop, no
-              longer effortless enough to happen on autopilot.
+              Every normal blocker is controlled from the computer it is supposed to protect. The
+              distracted version of you can undo the focused version&apos;s decision with the same
+              mouse, in the same few clicks.
             </p>
             <p className="diagnosis__thesis">
-              It doesn&apos;t ask you to have more discipline. It gives the version of you that was
-              thinking clearly some leverage over the one who shows up when the work gets hard.
+              {config.app.name} moves that decision into the physical world. You can still stop. You
+              just have to stand up and go get the key first.
             </p>
           </div>
           <AppShot
@@ -277,7 +297,11 @@ export default function LandingPage() {
       </section>
 
       <section className="section" id="how">
-        <h2 className="section__title">Easy to use</h2>
+        <p className="section__eyebrow">One calm decision. Three steps.</p>
+        <h2 className="section__title">Make quitting harder than continuing.</h2>
+        <p className="section__lede">
+          No proprietary gadget to order. The spare drive in your drawer becomes the boundary.
+        </p>
         <ol className="steps">
           {steps.map((step, index) => (
             <li key={step.title} className="step">
@@ -299,7 +323,8 @@ export default function LandingPage() {
       </section>
 
       <section className="section">
-        <h2 className="section__title">Stay focused even when the work gets hard</h2>
+        <p className="section__eyebrow">Built for the difficult middle</p>
+        <h2 className="section__title">Starting is easy. Talysman protects what happens next.</h2>
         <p className="section__lede">
           Starting a focus session is easy. The hard part arrives twenty minutes later, when the
           work turns boring or frustrating and your hands start looking for an exit.
@@ -314,7 +339,8 @@ export default function LandingPage() {
       </section>
 
       <section className="section">
-        <h2 className="section__title">Block distractions without blocking your work</h2>
+        <p className="section__eyebrow">Strict where it matters</p>
+        <h2 className="section__title">Block distractions without blocking your work.</h2>
         <p className="section__lede">
           Pick how strict the session needs to be — a handful of sites, only the tools the job
           needs, or nothing online at all.
@@ -332,15 +358,23 @@ export default function LandingPage() {
       {/* Set expectations here rather than letting the pricing page be the first place a
           visitor learns app blocking and scheduling are paid. */}
       <section className="section split">
+        <p className="section__eyebrow">A real free product</p>
+        <h2 className="section__title">Prove the mechanism works before you pay.</h2>
+        <p className="section__lede">
+          Run unlimited manual sessions for free. Upgrade when you want Talysman to protect your
+          entire week automatically.
+        </p>
         <div className="split__grid">
           <div className="split__col">
+            <span className="split__label">TRY THE MECHANISM</span>
             <h3>Free, forever</h3>
             <p>
               {FREE_BLOCKED_SITE_LIMIT} blocked websites, allow-only and block-all modes, manual
               focus sessions, and the key requirement to end one early.
             </p>
           </div>
-          <div className="split__col">
+          <div className="split__col split__col--pro">
+            <span className="split__label">BUILD THE SYSTEM</span>
             <h3>Pro</h3>
             <p>
               Unlimited sites, desktop app blocking, recurring schedules that arm themselves, and
@@ -355,50 +389,8 @@ export default function LandingPage() {
         </p>
       </section>
 
-      {showTestimonials ? (
-        <section className="section proof">
-          <h2 className="section__title">From people who kept using it</h2>
-          <p className="section__lede">
-            The claim isn&apos;t that a physical key works for one session. It&apos;s that it keeps
-            working after the novelty wears off — so the proof here should be measured in weeks.
-          </p>
-          <div className="proof__grid">
-            <blockquote className="quote">
-              <p>
-                &ldquo;Other blockers were easy to turn off. {config.app.name} made giving up
-                inconvenient enough that I went back to work.&rdquo;
-              </p>
-              <footer>
-                <MediaPlaceholder
-                  ratio="1 / 1"
-                  kind="photo"
-                  label="Headshot"
-                  className="quote__avatar"
-                />
-                <span className="quote__attribution">
-                  Placeholder — replace with a real customer: name, role, the blockers they tried
-                  before, what they were avoiding, and how many weeks they&apos;ve used{" "}
-                  {config.app.name}.
-                </span>
-              </footer>
-            </blockquote>
-            <MediaPlaceholder
-              ratio="16 / 10"
-              kind="case study"
-              label="Customer story: the developer"
-              note="Stopped opening YouTube between hard coding tasks. Needs: previous blockers tried, sessions completed, weeks of use, work shipped."
-            />
-            <MediaPlaceholder
-              ratio="16 / 10"
-              kind="case study"
-              label="Customer story: the writer"
-              note="Protected a two-hour morning block. Same shape of proof: before, during, how long it lasted."
-            />
-          </div>
-        </section>
-      ) : null}
-
       <section className="section faq" id="faq">
+        <p className="section__eyebrow">No hidden catches</p>
         <h2 className="section__title">Frequently asked questions</h2>
         <div className="faq__list">
           {faqs.map((faq) => (
@@ -411,9 +403,11 @@ export default function LandingPage() {
       </section>
 
       <section className="cta-band">
-        <h2>Take back your attention and go fulfill your destiny.</h2>
+        <p className="section__eyebrow">The next hard task is coming</p>
+        <h2>Put the off switch in another room.</h2>
+        <p>Use a USB drive you already own. Your first locked focus session is free.</p>
         <Link href="/download" className="landing__cta landing__cta--primary">
-          Start focusing free
+          Download Talysman free
         </Link>
         <p className="cta-band__note">
           Free forever, no card. Want schedules and app blocking?{" "}

@@ -35,28 +35,32 @@ export const PRO_TRIAL_DAYS = 14;
  * STRIPE_PRICE_YEARLY. Kept here so the pricing page can do the annual math instead of
  * hardcoding "$8.33" in copy that silently rots when a price changes. Stripe remains the
  * source of truth for what is actually charged — these only drive display.
+ *
+ * This is early-adopter pricing: 50% off the eventual list price in {@link PRO_LIST_PRICE_CENTS}.
  */
 export const PRO_PRICE_CENTS = {
+  monthly: 499,
+  yearly: 4999,
+} as const satisfies Record<CheckoutPrice, number>;
+
+/**
+ * The list price early-adopter pricing is discounted from — not a Stripe price, display only,
+ * backs the "usually $10/mo, $100/year" copy.
+ */
+export const PRO_LIST_PRICE_CENTS = {
   monthly: 1000,
-  yearly: 4900,
+  yearly: 10000,
 } as const satisfies Record<CheckoutPrice, number>;
 
 /** What a year on the annual plan saves against twelve monthly charges, in cents. */
 export const PRO_ANNUAL_SAVINGS_CENTS = PRO_PRICE_CENTS.monthly * 12 - PRO_PRICE_CENTS.yearly;
 
-/**
- * The annual plan's advertised monthly rate, in cents — a marketing round number
- * (not `yearly / 12`, which would print an odd $4.08) — not a Stripe price, display only.
- */
-export const PRO_ANNUAL_MONTHLY_EQUIVALENT_CENTS = 499;
-
-/** List price the annual plan is discounted from, in cents — backs the "50% off" badge. */
-export const PRO_ANNUAL_LIST_CENTS = PRO_PRICE_CENTS.yearly * 2;
-
-/** The annual plan's discount off its list price, as a whole percent. */
-export const PRO_ANNUAL_DISCOUNT_PERCENT = Math.round(
-  ((PRO_ANNUAL_LIST_CENTS - PRO_PRICE_CENTS.yearly) / PRO_ANNUAL_LIST_CENTS) * 100,
-);
+/** The early-adopter discount off list price, as a whole percent — same function for both cycles. */
+export function proDiscountPercent(cycle: CheckoutPrice): number {
+  return Math.round(
+    ((PRO_LIST_PRICE_CENTS[cycle] - PRO_PRICE_CENTS[cycle]) / PRO_LIST_PRICE_CENTS[cycle]) * 100,
+  );
+}
 
 /** The annual plan's cost per week, in cents — backs the "less than $1/week" copy. */
 export const PRO_ANNUAL_WEEKLY_CENTS = PRO_PRICE_CENTS.yearly / 52;

@@ -17,7 +17,7 @@ test.describe("marketing surface", () => {
     // Annual leads, and its price must be stated per-month so nobody has to divide by 12.
     const annual = page.getByRole("radio", { name: /annual/i });
     await expect(annual).toHaveAttribute("aria-checked", "true");
-    await expect(page.getByText(/\$100 billed annually/i)).toBeVisible();
+    await expect(page.getByText(/\$49 billed annually/i)).toBeVisible();
 
     await page.getByRole("radio", { name: /monthly/i }).click();
     await expect(page.getByText(/billed monthly/i)).toBeVisible();

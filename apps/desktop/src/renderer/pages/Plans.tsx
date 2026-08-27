@@ -2,8 +2,8 @@ import React, { useState } from 'react';
 import {
   formatPriceUsd,
   FREE_BLOCKED_SITE_LIMIT,
-  PRO_ANNUAL_MONTHLY_EQUIVALENT_CENTS,
   PRO_ANNUAL_SAVINGS_CENTS,
+  PRO_LIST_PRICE_CENTS,
   PRO_PRICE_CENTS,
   PRO_TRIAL_DAYS,
 } from '@talysman/product';
@@ -95,7 +95,7 @@ export function Plans() {
             onClick={() => checkout('yearly')}
             disabled={busy || !entitlementLoaded || subscriptionPlan === 'pro' || !signedIn}
           >
-            Annual — {formatPriceUsd(PRO_ANNUAL_MONTHLY_EQUIVALENT_CENTS)}/mo
+            Annual — {formatPriceUsd(PRO_PRICE_CENTS.yearly)}/yr
           </Button>
           <Button
             variant="ghost"
@@ -107,9 +107,11 @@ export function Plans() {
         </div>
         {subscriptionPlan !== 'pro' && (
           <p className="mt-3 text-xs text-slate-500">
-            Annual bills {formatPriceUsd(PRO_PRICE_CENTS.yearly)} once a year and saves{' '}
-            {formatPriceUsd(PRO_ANNUAL_SAVINGS_CENTS)}. First-time subscribers start with a{' '}
-            {PRO_TRIAL_DAYS}-day free trial — nothing is charged until it ends.
+            Early adopter price — usually {formatPriceUsd(PRO_LIST_PRICE_CENTS.monthly)}/mo or{' '}
+            {formatPriceUsd(PRO_LIST_PRICE_CENTS.yearly)}/yr. Annual bills{' '}
+            {formatPriceUsd(PRO_PRICE_CENTS.yearly)} once a year and saves{' '}
+            {formatPriceUsd(PRO_ANNUAL_SAVINGS_CENTS)} versus monthly. First-time subscribers
+            start with a {PRO_TRIAL_DAYS}-day free trial — nothing is charged until it ends.
           </p>
         )}
         {!signedIn && (

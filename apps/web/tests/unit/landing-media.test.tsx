@@ -1,9 +1,7 @@
 // @vitest-environment node
 // Server component: render in node so `config.app.environment` reflects APP_ENVIRONMENT.
 //
-// The product media (hero demo + app screenshots) is real and ships in every environment. What
-// is still TEMPORARY is the testimonial section: those quotes are invented, so production must
-// not publish them. Delete the second half of this file when real customer quotes exist.
+// The product media (hero demo + app screenshots) is real and ships in every environment.
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 
@@ -53,26 +51,19 @@ describe("landing page media", () => {
   it("describes each screenshot for readers who can't see it", async () => {
     const html = await renderLanding("production");
 
-    expect(html).toContain("alt=\"The Keys screen");
-    expect(html).toContain("alt=\"The Blocklists screen");
-    expect(html).toContain("alt=\"The dashboard mid-session");
+    expect(html).toContain('alt="The Keys screen');
+    expect(html).toContain('alt="The Blocklists screen');
+    expect(html).toContain('alt="The dashboard mid-session');
     expect(html).not.toContain('alt=""');
   });
-});
 
-describe("landing page testimonials", () => {
-  it("keeps the placeholder proof section in development", async () => {
-    const html = await renderLanding("development");
-
-    expect(html).toContain("From people who kept using it");
-    expect(html).toContain("media-slot");
-  });
-
-  it("drops the invented social proof in production", async () => {
+  it("leads with the physical-key mechanism without invented social proof", async () => {
     const html = await renderLanding("production");
 
+    expect(html).toContain("A distraction blocker you need a");
+    expect(html).toContain("physical key");
+    expect(html).toContain("Start a locked session — free");
     expect(html).not.toContain("From people who kept using it");
     expect(html).not.toContain("Placeholder — replace with a real customer");
-    expect(html).not.toContain("media-slot");
   });
 });

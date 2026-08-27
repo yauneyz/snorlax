@@ -18,10 +18,10 @@ export const metadata: Metadata = {
  * profiles, and app blocking.
  */
 const freeFeatures = [
-  "Pair any USB drive you already own",
+  "Turn any USB drive into your physical key",
   `Block up to ${FREE_BLOCKED_SITE_LIMIT} distracting websites`,
   "Allow-only and block-all-internet modes",
-  "Run manual focus sessions, any length",
+  "Run unlimited manual focus sessions",
   "Your paired key is required to end a session early",
 ];
 
@@ -39,9 +39,9 @@ const faqs = [
     q: `Can I keep using ${config.app.name} Free after the trial?`,
     a: (
       <p>
-        Yes. Cancel before the trial ends and you are never charged — the app drops to Free,
-        which keeps key-gated focus sessions and {FREE_BLOCKED_SITE_LIMIT} blocked websites. You
-        do not lose the mechanism, only the parts that make it repeatable.
+        Yes. Cancel before the trial ends and you are never charged — the app drops to Free, which
+        keeps key-gated focus sessions and {FREE_BLOCKED_SITE_LIMIT} blocked websites. You do not
+        lose the mechanism, only the parts that make it repeatable.
       </p>
     ),
   },
@@ -49,9 +49,9 @@ const faqs = [
     q: "Can I cancel at any time?",
     a: (
       <p>
-        Yes, from your account page — no email, no retention call. Cancellation takes effect at
-        the end of the period you have already paid for, and you keep Pro until then. During the
-        trial, cancelling means no charge at all.
+        Yes, from your account page — no email, no retention call. Cancellation takes effect at the
+        end of the period you have already paid for, and you keep Pro until then. During the trial,
+        cancelling means no charge at all.
       </p>
     ),
   },
@@ -70,16 +70,15 @@ const faqs = [
     a: (
       <>
         <p>
-          They are removed, not paused. When your plan drops to Free the app brings your setup
-          back inside the Free limits: scheduled windows are cleared, extra blocking profiles are
-          deleted, app blocks are dropped, and a blocklist longer than{" "}
-          {FREE_BLOCKED_SITE_LIMIT} sites is trimmed. The profile you are actively using is
-          always the one kept.
+          They are removed, not paused. When your plan drops to Free the app brings your setup back
+          inside the Free limits: scheduled windows are cleared, extra blocking profiles are
+          deleted, app blocks are dropped, and a blocklist longer than {FREE_BLOCKED_SITE_LIMIT}{" "}
+          sites is trimmed. The profile you are actively using is always the one kept.
         </p>
         <p>
-          One wrinkle worth knowing: loosening enforcement is key-gated like everything else, so
-          if your key isn&apos;t plugged in when the downgrade lands, the stricter setup simply
-          stays in force until it is. Nothing is silently unblocked behind your back.
+          One wrinkle worth knowing: loosening enforcement is key-gated like everything else, so if
+          your key isn&apos;t plugged in when the downgrade lands, the stricter setup simply stays
+          in force until it is. Nothing is silently unblocked behind your back.
         </p>
       </>
     ),
@@ -90,9 +89,8 @@ const faqs = [
       <p>
         Not today. {config.app.name} is a subscription because the desktop service, the browser
         extensions, and the signing and notarization behind them are ongoing work, and a lifetime
-        price that ignores that is a promise we would rather not make badly. If a founder
-        lifetime offer happens, it will be announced on the{" "}
-        <Link href="/blog">blog</Link> first.
+        price that ignores that is a promise we would rather not make badly. If a founder lifetime
+        offer happens, it will be announced on the <Link href="/blog">blog</Link> first.
       </p>
     ),
   },
@@ -100,9 +98,9 @@ const faqs = [
     q: "What do I actually need to buy?",
     a: (
       <p>
-        Nothing but the subscription. The physical key is a USB drive you already own — any one
-        will do, and you can pair several so a lost drive isn&apos;t a lockout. There is no
-        hardware to ship and nothing to wait for.
+        Nothing but the subscription. The physical key is a USB drive you already own — any one will
+        do, and you can pair several so a lost drive isn&apos;t a lockout. There is no hardware to
+        ship and nothing to wait for.
       </p>
     ),
   },
@@ -121,11 +119,21 @@ export default async function PricingPage() {
   return (
     <div className="pricing">
       <section className="pricing__intro">
-        <h1>Protect your focus before the next tab wins</h1>
+        <p className="section__eyebrow">Simple, honest pricing</p>
+        <h1>
+          Try the mechanism free.
+          <br />
+          Pay for the system.
+        </h1>
         <p className="pricing__lede">
-          Start free and experience a focus session you can&apos;t end with one impulsive click.
-          Then try everything free for {PRO_TRIAL_DAYS} days.
+          Free proves that a physical off switch changes your behavior. Pro turns that one good
+          session into a repeatable week with schedules, app blocking, and unlimited profiles.
         </p>
+        <ul className="pricing__promises" aria-label="Pricing assurances">
+          <li>No hardware to buy</li>
+          <li>No device limits</li>
+          <li>Cancel online</li>
+        </ul>
       </section>
 
       {/* No Suspense boundary needed around `useSearchParams`: reading auth cookies above
@@ -138,19 +146,27 @@ export default async function PricingPage() {
       />
 
       <section className="assurance">
-        <h2>Not sure it will work for you?</h2>
-        <p>
-          Try {config.app.name} during a real workweek. Pair a key, schedule your hardest work
-          hours, and see what happens the first time you try to abandon a session. That moment —
-          not the install — is the thing you are actually evaluating.
-        </p>
+        <p className="section__eyebrow">The 14-day test</p>
+        <h2>Don&apos;t evaluate Talysman at install. Evaluate it when you want to quit.</h2>
+        <ol className="assurance__steps">
+          <li>
+            <span>01</span> Schedule the work you usually avoid.
+          </li>
+          <li>
+            <span>02</span> Put your key somewhere you have to stand up to reach.
+          </li>
+          <li>
+            <span>03</span> Notice what happens when the first urge to escape arrives.
+          </li>
+        </ol>
         <p className="assurance__terms">
-          The trial runs {PRO_TRIAL_DAYS} days and we email you before it ends. Cancel any time
-          before then and you are not charged.
+          Pro is free for {PRO_TRIAL_DAYS} days. We email you before the trial ends. Cancel before
+          then and you are not charged.
         </p>
       </section>
 
       <section className="faq faq--pricing" id="faq">
+        <p className="section__eyebrow">Before you decide</p>
         <h2 className="section__title">Frequently asked questions</h2>
         <div className="faq__list">
           {faqs.map((faq) => (

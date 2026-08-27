@@ -28,6 +28,9 @@ export function DownloadCard({ target }: { target: DownloadTarget }) {
       </span>
       <h3>{target.name}</h3>
       <span className="download-card__note">{target.note}</span>
+      <span className="download-card__action" aria-hidden="true">
+        Download <span>→</span>
+      </span>
     </a>
   );
 }
