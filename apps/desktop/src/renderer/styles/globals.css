@@ -78,11 +78,11 @@ body {
    Keep the controls on one continuous surface, but center their vertical working area when the
    compositor gives Talysman substantially more height than its intended portrait window. */
 .desktop-sidebar {
-  padding-block: max(0px, calc((100vh - 720px) / 2));
+  padding-block: max(0px, calc((100vh - 820px) / 2));
 }
 
 .desktop-pane {
-  height: min(100%, 720px);
+  height: min(100%, 820px);
   margin-block: auto;
 }
 

@@ -38,7 +38,7 @@ export function getMainWindow(): BrowserWindow | null {
 export function createWindow(): BrowserWindow {
   const win = new BrowserWindow({
     width: 1160,
-    height: 720,
+    height: 820,
     minWidth: 900,
     minHeight: 640,
     show: false,

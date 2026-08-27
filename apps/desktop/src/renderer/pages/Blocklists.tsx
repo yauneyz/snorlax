@@ -73,6 +73,198 @@ function appIdentifiers(app: AppRef): string {
     .join(' · ');
 }
 
+/** One row in a domain list — the sibling-hint UI is shared between the inline grid and the edit modal. */
+function DomainRow({
+  d,
+  accent,
+  onRemove,
+}: {
+  d: string;
+  accent: string;
+  onRemove: (d: string) => void;
+}) {
+  const siblings = siblingsFor(d);
+  return (
+    <div className="flex items-center gap-2.5 bg-panel px-3.5 py-2">
+      <span
+        className="block h-[5px] w-[5px] shrink-0 rounded-full"
+        style={{ backgroundColor: accent }}
+      />
+      <span className="min-w-0 flex-1 truncate font-mono text-[12.5px] text-slate-200">{d}</span>
+      {siblings.length > 0 && (
+        <span
+          className="hidden max-w-[40%] truncate text-[11px] text-slate-450 xl:block"
+          title={siblings.join(', ')}
+        >
+          also {siblings.join(', ')}
+        </span>
+      )}
+      <button
+        onClick={() => onRemove(d)}
+        className="shrink-0 text-[11px] font-medium text-slate-500 transition hover:text-dangerInk"
+      >
+        remove
+      </button>
+    </div>
+  );
+}
+
+/**
+ * The full-list editor opened from "Edit" — single column, a search box, and a paste-many box so
+ * power users can manage a list of hundreds without hunting through a two-column grid or adding
+ * one line at a time.
+ */
+function DomainListModal({
+  kicker,
+  accent,
+  domains,
+  onAdd,
+  onAddMany,
+  onRemove,
+  max,
+  limitReached,
+  onClose,
+}: {
+  kicker: string;
+  accent: string;
+  domains: string[];
+  onAdd: (d: string) => void;
+  onAddMany: (domains: string[]) => void;
+  onRemove: (d: string) => void;
+  max: number | null;
+  limitReached: boolean;
+  onClose: () => void;
+}) {
+  const [query, setQuery] = useState('');
+  const [pasteOpen, setPasteOpen] = useState(false);
+  const [pasteText, setPasteText] = useState('');
+  const [quickAdd, setQuickAdd] = useState('');
+
+  function submitQuickAdd() {
+    const trimmed = quickAdd.trim();
+    if (!trimmed) return;
+    onAdd(trimmed);
+    setQuickAdd('');
+  }
+
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return domains;
+    return domains.filter((d) => d.toLowerCase().includes(q));
+  }, [domains, query]);
+
+  function submitPaste() {
+    const parsed = pasteText
+      .split(/[\n,]+/)
+      .map((s) => s.trim())
+      .filter(Boolean);
+    if (parsed.length === 0) return;
+    onAddMany(parsed);
+    setPasteText('');
+    setPasteOpen(false);
+  }
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(8,9,10,0.72)] px-4 backdrop-blur-md"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="domain-list-modal-title"
+      onKeyDown={(e) => e.key === 'Escape' && onClose()}
+    >
+      <div className="flex max-h-[82vh] w-full max-w-2xl flex-col rounded-xl border border-white/[0.09] bg-[rgba(14,15,17,0.96)] shadow-[0_24px_60px_-20px_rgba(0,0,0,0.9)]">
+        <div className="border-b border-white/[0.07] p-5">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <h2
+                id="domain-list-modal-title"
+                className="font-mono text-[10px] font-medium uppercase tracking-[0.2em] text-slate-500"
+              >
+                Edit {kicker.toLowerCase()}
+              </h2>
+              <p className="mt-2 text-[12.5px] text-slate-400">
+                {max === null ? domains.length : `${domains.length}/${max}`} sites
+              </p>
+            </div>
+            <button
+              onClick={onClose}
+              className="rounded-lg px-2 py-1 text-[12px] text-slate-400 hover:bg-white/[0.06] hover:text-white"
+              aria-label="Close editor"
+            >
+              Close
+            </button>
+          </div>
+          <div className="mt-4 flex gap-2">
+            <Input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search this list"
+              autoFocus
+              className="font-mono"
+            />
+            <Button
+              variant="ghost"
+              onClick={() => setPasteOpen((v) => !v)}
+              className="shrink-0 px-4"
+            >
+              {pasteOpen ? 'Cancel paste' : 'Paste many'}
+            </Button>
+          </div>
+
+          <div className="mt-2.5 flex gap-2">
+            <Input
+              value={quickAdd}
+              onChange={(e) => setQuickAdd(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && submitQuickAdd()}
+              placeholder="Add a single site"
+              disabled={limitReached}
+              className="font-mono"
+            />
+            <Button onClick={submitQuickAdd} disabled={limitReached} className="shrink-0 px-5">
+              Add
+            </Button>
+          </div>
+
+          {pasteOpen && (
+            <div className="mt-2.5">
+              <Textarea
+                rows={4}
+                value={pasteText}
+                onChange={(e) => setPasteText(e.target.value)}
+                placeholder={'One per line, or comma-separated\nreddit.com\nyoutube.com'}
+                disabled={limitReached}
+                className="font-mono"
+              />
+              <div className="mt-2 flex justify-end">
+                <Button onClick={submitPaste} disabled={limitReached || !pasteText.trim()}>
+                  Add all
+                </Button>
+              </div>
+            </div>
+          )}
+        </div>
+
+        <div className="min-h-0 flex-1 overflow-y-auto p-3">
+          <div className="flex flex-col gap-px overflow-hidden rounded-[10px] border border-white/[0.06] bg-white/[0.05]">
+            {filtered.map((d) => (
+              <DomainRow key={d} d={d} accent={accent} onRemove={onRemove} />
+            ))}
+            {filtered.length === 0 && (
+              <p className="bg-panel px-3.5 py-3 text-[12px] text-slate-500">
+                {domains.length === 0 ? 'No sites yet.' : 'No matches.'}
+              </p>
+            )}
+          </div>
+        </div>
+
+        <div className="flex justify-end gap-2 border-t border-white/[0.07] p-4">
+          <Button onClick={onClose}>Done</Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /** One "Always block" / "Always allow" list — same add/remove/sibling-hint UI, different binding. */
 function DomainListEditor({
   kicker,
@@ -83,6 +275,7 @@ function DomainListEditor({
   input,
   onInputChange,
   onAdd,
+  onAddMany,
   onRemove,
   max,
   limitReached,
@@ -95,10 +288,13 @@ function DomainListEditor({
   input: string;
   onInputChange: (v: string) => void;
   onAdd: () => void;
+  onAddMany: (domains: string[]) => void;
   onRemove: (d: string) => void;
   max: number | null;
   limitReached: boolean;
 }) {
+  const [editOpen, setEditOpen] = useState(false);
+
   return (
     <>
       <div className="mt-4 flex items-baseline gap-2.5">
@@ -106,6 +302,12 @@ function DomainListEditor({
         <span className="text-[11px] text-slate-600">
           {max === null ? domains.length : `${domains.length}/${max}`}
         </span>
+        <button
+          onClick={() => setEditOpen(true)}
+          className="text-[11px] font-medium text-slate-450 transition hover:text-slate-200"
+        >
+          Edit
+        </button>
         <span className="ml-auto text-[11px] text-slate-450">{hint}</span>
       </div>
 
@@ -123,39 +325,35 @@ function DomainListEditor({
         </Button>
       </div>
 
-      <div className="mt-2.5 grid grid-cols-2 content-start gap-px overflow-hidden rounded-[10px] border border-white/[0.06] bg-white/[0.05]">
-        {domains.map((d) => {
-          const siblings = siblingsFor(d);
-          return (
-            <div key={d} className="flex items-center gap-2.5 bg-panel px-3.5 py-2">
-              <span
-                className="block h-[5px] w-[5px] shrink-0 rounded-full"
-                style={{ backgroundColor: accent }}
-              />
-              <span className="min-w-0 flex-1 truncate font-mono text-[12.5px] text-slate-200">
-                {d}
-              </span>
-              {siblings.length > 0 && (
-                <span
-                  className="hidden max-w-[40%] truncate text-[11px] text-slate-450 xl:block"
-                  title={siblings.join(', ')}
-                >
-                  also {siblings.join(', ')}
-                </span>
-              )}
-              <button
-                onClick={() => onRemove(d)}
-                className="shrink-0 text-[11px] font-medium text-slate-500 transition hover:text-dangerInk"
-              >
-                remove
-              </button>
-            </div>
-          );
-        })}
-        {domains.length === 0 && (
-          <p className="col-span-2 bg-panel px-3.5 py-3 text-[12px] text-slate-500">No sites yet.</p>
-        )}
+      <div className="mt-2.5 max-h-[228px] overflow-y-auto rounded-[10px] border border-white/[0.06] bg-white/[0.05]">
+        <div className="grid grid-cols-2 content-start gap-px">
+          {domains.map((d) => (
+            <DomainRow key={d} d={d} accent={accent} onRemove={onRemove} />
+          ))}
+          {domains.length === 0 && (
+            <p className="col-span-2 bg-panel px-3.5 py-3 text-[12px] text-slate-500">
+              No sites yet.
+            </p>
+          )}
+        </div>
       </div>
+
+      {editOpen && (
+        <DomainListModal
+          kicker={kicker}
+          accent={accent}
+          domains={domains}
+          onAdd={(d) => {
+            onInputChange(d);
+            onAdd();
+          }}
+          onAddMany={onAddMany}
+          onRemove={onRemove}
+          max={max}
+          limitReached={limitReached}
+          onClose={() => setEditOpen(false)}
+        />
+      )}
     </>
   );
 }
@@ -172,7 +370,6 @@ export function Blocklists({ onUpgrade }: { onUpgrade: () => void }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [blockedInput, setBlockedInput] = useState('');
   const [allowedInput, setAllowedInput] = useState('');
-  const [smartOpen, setSmartOpen] = useState(false);
   const [negativeOpen, setNegativeOpen] = useState(false);
   const [appName, setAppName] = useState('');
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -200,7 +397,6 @@ export function Blocklists({ onUpgrade }: { onUpgrade: () => void }) {
   const blockedLimitReached = maxBlocked !== null && policy.blockedDomains.length >= maxBlocked;
   const allowedLimitReached = maxAllowed !== null && policy.allowedDomains.length >= maxAllowed;
   const appBlockingLocked = maxApps === 0;
-  const smartSectionOpen = smartOpen || (SMART_FILTERING_ENABLED && policy.intent !== null);
   const negativeSectionOpen = negativeOpen || Boolean(policy.intent?.negative);
   const existingAppKeys = useMemo(
     () => new Set(policy.apps.map((app) => appKey(app))),
@@ -295,7 +491,6 @@ export function Blocklists({ onUpgrade }: { onUpgrade: () => void }) {
   function applyPreset(preset: 'blacklist' | 'whitelist' | 'block-all' | 'smart') {
     if (preset === 'smart') {
       if (!smartAllowed) return onUpgrade();
-      setSmartOpen(true);
       return;
     }
     if (preset === 'blacklist') {
@@ -319,9 +514,6 @@ export function Blocklists({ onUpgrade }: { onUpgrade: () => void }) {
     return save({ ...policy, blockedDomains: [], allowedDomains: [], defaultAction: 'block', intent: null });
   }
 
-  const setDefaultAction = (defaultAction: Policy['defaultAction']) =>
-    save({ ...policy, defaultAction });
-
   const addBlockedDomain = () => {
     if (!blockedInput.trim()) return;
     if (blockedLimitReached) {
@@ -340,6 +532,18 @@ export function Blocklists({ onUpgrade }: { onUpgrade: () => void }) {
       blockedDomains: policy.blockedDomains.filter((x) => x !== d),
       allowedDomains: SMART_FILTERING_ENABLED ? policy.allowedDomains : [],
     });
+  /** Pasting a big list into the edit modal — dedupes against what's already there and stops at the plan limit. */
+  const addManyBlockedDomains = (raw: string[]) => {
+    const room = maxBlocked === null ? Infinity : maxBlocked - policy.blockedDomains.length;
+    const existing = new Set(policy.blockedDomains);
+    const additions = [...new Set(raw)].filter((d) => d && !existing.has(d)).slice(0, room);
+    if (additions.length === 0) return;
+    void save({
+      ...policy,
+      blockedDomains: [...policy.blockedDomains, ...additions],
+      allowedDomains: SMART_FILTERING_ENABLED ? policy.allowedDomains : [],
+    });
+  };
 
   const addAllowedDomain = () => {
     if (!allowedInput.trim()) return;
@@ -359,12 +563,22 @@ export function Blocklists({ onUpgrade }: { onUpgrade: () => void }) {
       blockedDomains: SMART_FILTERING_ENABLED ? policy.blockedDomains : [],
       allowedDomains: policy.allowedDomains.filter((x) => x !== d),
     });
+  const addManyAllowedDomains = (raw: string[]) => {
+    const room = maxAllowed === null ? Infinity : maxAllowed - policy.allowedDomains.length;
+    const existing = new Set(policy.allowedDomains);
+    const additions = [...new Set(raw)].filter((d) => d && !existing.has(d)).slice(0, room);
+    if (additions.length === 0) return;
+    void save({
+      ...policy,
+      blockedDomains: SMART_FILTERING_ENABLED ? policy.blockedDomains : [],
+      allowedDomains: [...policy.allowedDomains, ...additions],
+    });
+  };
 
   const setIntentPositive = (positive: string) => {
     if (!smartAllowed) return onUpgrade();
     // Smart filtering always fails open: everything not on the explicit block list is allowed
-    // until the judge says otherwise, so `defaultAction` (and its UI toggle) has nothing left to
-    // decide once an intent is set.
+    // until the judge says otherwise.
     void save({ ...policy, defaultAction: 'allow', intent: { ...policy.intent, positive } });
   };
   const setIntentNegative = (negative: string) => {
@@ -374,7 +588,6 @@ export function Blocklists({ onUpgrade }: { onUpgrade: () => void }) {
     });
   };
   const clearIntent = () => {
-    setSmartOpen(false);
     setNegativeOpen(false);
     void save({ ...policy, intent: null });
   };
@@ -599,7 +812,72 @@ export function Blocklists({ onUpgrade }: { onUpgrade: () => void }) {
         )}
       </div>
 
-      <section className="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto">
+      <section className="flex min-h-0 min-w-0 flex-1 flex-col">
+        {SMART_FILTERING_ENABLED && (
+          <div className="mt-3 rounded-[10px] border border-white/[0.07] bg-white/[0.02] p-3.5">
+            <div className="flex items-baseline gap-2.5">
+              <Kicker>Smart filtering</Kicker>
+              {policy.intent && (
+                <button
+                  onClick={clearIntent}
+                  className="ml-auto text-[11px] font-medium text-slate-500 transition hover:text-dangerInk"
+                >
+                  turn off
+                </button>
+              )}
+            </div>
+
+            <div className="mt-2.5 flex flex-col gap-2.5">
+              <div>
+                <label className="mb-1 block text-[11px] text-slate-450">What are you working on?</label>
+                <Textarea
+                  rows={2}
+                  value={policy.intent?.positive ?? ''}
+                  onChange={(e) => setIntentPositive(e.target.value)}
+                  placeholder="Researching flight prices for a trip to Japan"
+                  disabled={!smartAllowed}
+                />
+              </div>
+
+              {!negativeSectionOpen ? (
+                <button
+                  onClick={() => setNegativeOpen(true)}
+                  className="self-start text-[11px] font-medium text-slate-450 transition hover:text-slate-200"
+                >
+                  + Add exclusions
+                </button>
+              ) : (
+                <div>
+                  <label className="mb-1 block text-[11px] text-slate-450">
+                    Anything to avoid, even if related?
+                  </label>
+                  <Textarea
+                    rows={2}
+                    value={policy.intent?.negative ?? ''}
+                    onChange={(e) => setIntentNegative(e.target.value)}
+                    placeholder="General travel influencer content, unrelated shopping"
+                    disabled={!smartAllowed}
+                  />
+                </div>
+              )}
+
+              {!smartAllowed ? (
+                <button
+                  onClick={onUpgrade}
+                  className="self-start text-[11px] font-medium text-slate-400 transition hover:text-slate-200"
+                >
+                  Upgrade to enable smart filtering →
+                </button>
+              ) : (
+                <p className="text-[11px] leading-relaxed text-slate-450">
+                  Pages that aren’t explicitly blocked or allowed below will load, then get checked
+                  against your task — usually within a few seconds.
+                </p>
+              )}
+            </div>
+          </div>
+        )}
+
         {/* One-click starting points — each just prefills the fields below. */}
         <div className="mt-3 flex gap-2">
           {PRESETS.map((p) => {
@@ -641,6 +919,7 @@ export function Blocklists({ onUpgrade }: { onUpgrade: () => void }) {
             input={blockedInput}
             onInputChange={setBlockedInput}
             onAdd={addBlockedDomain}
+            onAddMany={addManyBlockedDomains}
             onRemove={removeBlockedDomain}
             max={maxBlocked}
             limitReached={blockedLimitReached}
@@ -659,103 +938,11 @@ export function Blocklists({ onUpgrade }: { onUpgrade: () => void }) {
             input={allowedInput}
             onInputChange={setAllowedInput}
             onAdd={addAllowedDomain}
+            onAddMany={addManyAllowedDomains}
             onRemove={removeAllowedDomain}
             max={maxAllowed}
             limitReached={allowedLimitReached}
           />
-        )}
-
-        {SMART_FILTERING_ENABLED && policy.intent === null && (
-          <>
-            <div className="mt-4 flex items-baseline gap-2.5">
-              <Kicker>Default for everything else</Kicker>
-            </div>
-            <div className="mt-2 flex gap-2">
-              {(['allow', 'block'] as const).map((a) => {
-                const on = policy.defaultAction === a;
-                return (
-                  <button
-                    key={a}
-                    onClick={() => setDefaultAction(a)}
-                    className={cx(
-                      'flex-1 rounded-[10px] border px-3 py-2 text-left text-[12.5px] font-semibold transition',
-                      on
-                        ? 'border-seal/30 bg-seal/[0.09] text-slate-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_0_18px_rgba(199,204,212,0.10)]'
-                        : 'border-white/[0.07] bg-white/[0.025] text-slate-250 hover:border-white/[0.14] hover:bg-white/[0.05]',
-                    )}
-                  >
-                    {a === 'allow' ? 'Allow' : 'Block'}
-                  </button>
-                );
-              })}
-            </div>
-          </>
-        )}
-
-        {SMART_FILTERING_ENABLED && (
-          <div className="mt-4 rounded-[10px] border border-white/[0.07] bg-white/[0.02] p-3.5">
-            <div className="flex items-baseline gap-2.5">
-              <Kicker>Smart filtering</Kicker>
-              <Badge tone="neutral">Pro</Badge>
-              {policy.intent && (
-                <button
-                  onClick={clearIntent}
-                  className="ml-auto text-[11px] font-medium text-slate-500 transition hover:text-dangerInk"
-                >
-                  turn off
-                </button>
-              )}
-            </div>
-
-            {!smartSectionOpen ? (
-              <button
-                onClick={() => (smartAllowed ? setSmartOpen(true) : onUpgrade())}
-                className="mt-2 text-[12px] font-medium text-slate-400 transition hover:text-slate-200"
-              >
-                Judge anything that isn’t on either list above, against what you’re working on →
-              </button>
-            ) : (
-              <div className="mt-2.5 flex flex-col gap-2.5">
-                <div>
-                  <label className="mb-1 block text-[11px] text-slate-450">What are you working on?</label>
-                  <Textarea
-                    rows={2}
-                    value={policy.intent?.positive ?? ''}
-                    onChange={(e) => setIntentPositive(e.target.value)}
-                    placeholder="Researching flight prices for a trip to Japan"
-                    disabled={!smartAllowed}
-                  />
-                </div>
-
-                {!negativeSectionOpen ? (
-                  <button
-                    onClick={() => setNegativeOpen(true)}
-                    className="self-start text-[11px] font-medium text-slate-450 transition hover:text-slate-200"
-                  >
-                    + Add exclusions
-                  </button>
-                ) : (
-                  <div>
-                    <label className="mb-1 block text-[11px] text-slate-450">
-                      Anything to avoid, even if related?
-                    </label>
-                    <Textarea
-                      rows={2}
-                      value={policy.intent?.negative ?? ''}
-                      onChange={(e) => setIntentNegative(e.target.value)}
-                      placeholder="General travel influencer content, unrelated shopping"
-                      disabled={!smartAllowed}
-                    />
-                  </div>
-                )}
-
-                <p className="text-[11px] leading-relaxed text-slate-450">
-                  Pages that aren’t explicitly blocked or allowed above will load, then get checked
-                  against your task — usually within a few seconds.
-                </p>
-              </div>
-            )}
-          </div>
         )}
 
         <div className="mt-4 flex items-baseline gap-2.5">
@@ -797,7 +984,7 @@ export function Blocklists({ onUpgrade }: { onUpgrade: () => void }) {
           </div>
         )}
 
-        <div className="mt-2.5 flex flex-wrap gap-1.5">
+        <div className="mt-2.5 flex max-h-[150px] flex-wrap gap-1.5 overflow-y-auto">
           {policy.apps.map((a) => (
             <span
               key={appKey(a)}
