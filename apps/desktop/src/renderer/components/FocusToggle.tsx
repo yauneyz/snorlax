@@ -72,7 +72,7 @@ export function FocusToggle() {
           className="absolute inset-[50px] rounded-full"
           style={{
             background: `radial-gradient(circle, ${
-              focusActive ? 'rgb(var(--color-success)/0.12)' : 'rgb(var(--color-brand)/0.05)'
+              focusActive ? 'rgb(var(--color-success)/0.12)' : 'rgb(var(--color-white)/0.05)'
             }, transparent 72%)`,
           }}
         />

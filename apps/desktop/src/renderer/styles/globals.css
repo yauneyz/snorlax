@@ -32,9 +32,7 @@ body,
 }
 
 body {
-  background:
-    radial-gradient(circle at 60% 28%, rgb(var(--color-signal)/0.035), transparent 34rem),
-    rgb(var(--color-background));
+  background: rgb(var(--color-background));
   color: rgb(var(--color-foreground));
   font-family: 'Space Grotesk Variable', ui-sans-serif, system-ui, 'Segoe UI', Roboto, sans-serif;
   -webkit-font-smoothing: antialiased;
@@ -46,24 +44,7 @@ body {
 .desktop-workspace {
   max-width: 1180px;
   isolation: isolate;
-  background:
-    radial-gradient(circle at 54% -20%, rgb(var(--color-brand)/0.08), transparent 34rem),
-    rgb(var(--color-background));
-}
-
-/* The landing hero uses a faint drafting grid to make the lock feel physical and engineered. */
-.desktop-workspace::before {
-  content: '';
-  position: absolute;
-  z-index: 0;
-  inset: 0 0 0 11rem;
-  pointer-events: none;
-  opacity: 0.42;
-  background-image:
-    linear-gradient(rgb(var(--color-white)/0.018) 1px, transparent 1px),
-    linear-gradient(90deg, rgb(var(--color-white)/0.018) 1px, transparent 1px);
-  background-size: 40px 40px;
-  mask-image: radial-gradient(circle at 48% 42%, black, transparent 76%);
+  background: rgb(var(--color-background));
 }
 
 .desktop-sidebar {
@@ -101,24 +82,6 @@ body {
 .dashboard-stage {
   position: relative;
   isolation: isolate;
-}
-
-.dashboard-stage::before {
-  content: '';
-  position: absolute;
-  z-index: -1;
-  top: 50%;
-  left: 50%;
-  width: 520px;
-  height: 520px;
-  transform: translate(-50%, -55%);
-  border: 1px solid rgb(var(--color-signal)/0.09);
-  border-radius: 32px;
-  background:
-    linear-gradient(rgb(var(--color-white)/0.018), rgb(var(--color-white)/0.004)),
-    repeating-linear-gradient(90deg, transparent 0 39px, rgb(var(--color-white)/0.018) 40px),
-    repeating-linear-gradient(0deg, transparent 0 39px, rgb(var(--color-white)/0.018) 40px);
-  mask-image: radial-gradient(circle, black 30%, transparent 72%);
 }
 
 .instrument-card {
@@ -295,13 +258,3 @@ input[type='time']::-webkit-calendar-picker-indicator {
   }
 }
 
-@media (max-width: 760px) {
-  .desktop-workspace::before {
-    left: 0;
-  }
-
-  .dashboard-stage::before {
-    width: 440px;
-    height: 440px;
-  }
-}

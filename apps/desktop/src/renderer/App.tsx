@@ -75,8 +75,6 @@ export default function App() {
     return () => clearTimeout(t);
   }, [watchdogWarning, clearWatchdogWarning]);
 
-  // The landing hero's cyan bloom makes the protected state legible without tinting the canvas.
-  const ambient = focusActive ? 'rgb(var(--color-signal)/0.055)' : 'rgb(var(--color-brand)/0.035)';
   const activeRoute = NAV.find((item) => item.route === route);
 
   // The walkthrough covers the whole window until it's finished. It needs live service state
@@ -92,18 +90,7 @@ export default function App() {
     >
       {showFirstRun && <FirstRun onDone={() => setRoute('dashboard')} />}
 
-      {/* The dashboard alone gets the ambient bloom across the continuous window surface. */}
-      {route === 'dashboard' && (
-        <div
-          aria-hidden
-          className="pointer-events-none absolute inset-0"
-          style={{
-            background: `radial-gradient(720px 720px at 50% 38%, ${ambient}, transparent 68%)`,
-          }}
-        />
-      )}
-
-      {/* Nav rail. Glass over the bloom so the canvas reads as one surface behind it. */}
+      {/* Nav rail. */}
       <aside className="desktop-sidebar relative flex w-44 shrink-0 flex-col border-r border-white/[0.07] backdrop-blur-xl">
         <div className="flex items-center gap-2.5 px-[18px] pb-[17px] pt-[18px]">
           <TalysmanMark size={20} className="opacity-90" />

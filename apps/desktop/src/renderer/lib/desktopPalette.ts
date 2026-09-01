@@ -10,6 +10,7 @@ const DESKTOP_SIGNAL_OVERRIDES = {
   signal: '#2dd9ee',
   signalHigh: '#8ff0fa',
   signalInk: '#031316',
+  background: '#050506',
 } satisfies Partial<Record<PaletteColorName, string>>;
 
 export function desktopPaletteColor(name: keyof typeof DESKTOP_SIGNAL_OVERRIDES): string {
