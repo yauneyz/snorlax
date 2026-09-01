@@ -62,6 +62,7 @@ const publicSchema = z.object({
   NEXT_PUBLIC_SENTRY_DSN: optionalSentryDsn,
   NEXT_PUBLIC_POSTHOG_KEY: optionalPosthogKey,
   NEXT_PUBLIC_POSTHOG_HOST: z.string().optional().default("https://us.i.posthog.com"),
+  NEXT_PUBLIC_POSTHOG_UI_HOST: z.string().optional().default("https://us.posthog.com"),
   NEXT_PUBLIC_GA4_MEASUREMENT_ID: z.string().optional().default(""),
 });
 
@@ -176,6 +177,7 @@ const publicEnv = {
   NEXT_PUBLIC_SENTRY_DSN: process.env.NEXT_PUBLIC_SENTRY_DSN,
   NEXT_PUBLIC_POSTHOG_KEY: process.env.NEXT_PUBLIC_POSTHOG_KEY,
   NEXT_PUBLIC_POSTHOG_HOST: process.env.NEXT_PUBLIC_POSTHOG_HOST,
+  NEXT_PUBLIC_POSTHOG_UI_HOST: process.env.NEXT_PUBLIC_POSTHOG_UI_HOST,
   NEXT_PUBLIC_GA4_MEASUREMENT_ID: process.env.NEXT_PUBLIC_GA4_MEASUREMENT_ID,
 };
 
@@ -273,6 +275,7 @@ export const config = {
   posthog: {
     key: parsed.NEXT_PUBLIC_POSTHOG_KEY,
     host: parsed.NEXT_PUBLIC_POSTHOG_HOST,
+    uiHost: parsed.NEXT_PUBLIC_POSTHOG_UI_HOST,
   },
   google: {
     authEnabled: parsed.NEXT_PUBLIC_GOOGLE_AUTH_ENABLED,

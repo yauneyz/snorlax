@@ -88,6 +88,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
     if (!config.posthog.key) return;
     posthog.init(config.posthog.key, {
       api_host: config.posthog.host,
+      ui_host: config.posthog.uiHost, // host above is the reverse proxy; links must point at real PostHog
       capture_pageview: false, // App Router: manual tracking via PostHogPageview
       person_profiles: "identified_only",
       enable_heatmaps: true,

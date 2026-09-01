@@ -164,6 +164,9 @@ const credentialsSchema = z.object({
     // value here is treated as an API/MCP credential and is never exported.
     key: optionalPosthogValue.optional().default(""),
     host: z.string().optional().default("https://us.i.posthog.com"),
+    // Where the toolbar/link-outs point, since `host` may be a reverse proxy domain rather
+    // than a real PostHog host.
+    ui_host: z.string().optional().default("https://us.posthog.com"),
   }),
   google: z.object({
     ga4_measurement_id: z.string().optional().default(""),
@@ -592,6 +595,7 @@ function toWebEnvPairs(c: Credentials, mode: Mode): Array<[string, string]> {
       c.posthog.project_key || (c.posthog.key.startsWith("phc_") ? c.posthog.key : ""),
     ],
     ["NEXT_PUBLIC_POSTHOG_HOST", c.posthog.host],
+    ["NEXT_PUBLIC_POSTHOG_UI_HOST", c.posthog.ui_host],
 
     ["NEXT_PUBLIC_GA4_MEASUREMENT_ID", c.google.ga4_measurement_id],
     ["GOOGLE_SITE_VERIFICATION", c.google.search_console_verification],
