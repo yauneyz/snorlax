@@ -219,22 +219,8 @@ export default function LandingPage() {
         </div>
 
         <div className="hero__stage">
-          <div className="hero__stage-bar" aria-hidden="true">
-            <span className="hero__status">
-              <i /> Focus locked
-            </span>
-            <span className="hero__key-state">Key away</span>
-          </div>
+          <div className="hero__stage-glow" aria-hidden="true" />
           <HeroDemo />
-          <div className="hero__key-callout" aria-hidden="true">
-            <span className="hero__usb">
-              <i />
-            </span>
-            <span>
-              <small>PHYSICAL OFF SWITCH</small>
-              Any USB drive you already own
-            </span>
-          </div>
         </div>
       </section>
 

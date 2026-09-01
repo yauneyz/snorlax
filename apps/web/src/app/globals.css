@@ -853,44 +853,13 @@ input:-webkit-autofill:focus {
     repeating-linear-gradient(0deg, transparent 0 39px, rgb(var(--color-white)/0.025) 40px);
 }
 
-.hero__stage-bar {
+.hero__stage-glow {
   position: absolute;
-  z-index: 2;
-  top: 0.7rem;
-  right: 1rem;
-  left: 1rem;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-  padding: 0.65rem 0.85rem;
-  font: 700 0.65rem/1 var(--font-mono);
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: var(--fg-3);
-  background: rgb(var(--color-background)/0.9);
-  border: 1px solid var(--border-strong);
-  border-radius: var(--r-md);
-  backdrop-filter: blur(12px);
-}
-
-.hero__status {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.55rem;
-  color: var(--signal);
-}
-
-.hero__status i {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: currentColor;
-  box-shadow: 0 0 12px currentColor;
-}
-
-.hero__key-state {
-  color: var(--fg-4);
+  z-index: 0;
+  inset: -6% -8%;
+  background: radial-gradient(60% 60% at 50% 40%, rgb(var(--color-signal)/0.16), transparent 70%);
+  filter: blur(28px);
+  pointer-events: none;
 }
 
 .hero__media {
@@ -900,6 +869,8 @@ input:-webkit-autofill:focus {
 }
 
 .hero__video {
+  position: relative;
+  z-index: 1;
   display: block;
   width: 100%;
   height: auto;
@@ -907,67 +878,6 @@ input:-webkit-autofill:focus {
   border-radius: var(--r-xl);
   background: var(--bg-1);
   box-shadow: 0 28px 90px rgb(var(--color-black)/0.55);
-}
-
-.hero__key-callout {
-  position: absolute;
-  z-index: 2;
-  right: -0.25rem;
-  bottom: 0.45rem;
-  display: flex;
-  align-items: center;
-  gap: 0.9rem;
-  max-width: 18rem;
-  padding: 0.8rem 1rem 0.8rem 0.8rem;
-  color: var(--fg-1);
-  font-size: 0.78rem;
-  line-height: 1.35;
-  background: rgb(var(--color-panel)/0.94);
-  border: 1px solid var(--signal-line);
-  border-radius: var(--r-lg);
-  box-shadow: var(--shadow-lg);
-}
-
-.hero__key-callout small {
-  display: block;
-  margin-bottom: 0.18rem;
-  color: var(--signal);
-  font: 700 0.56rem/1 var(--font-mono);
-  letter-spacing: 0.12em;
-}
-
-.hero__usb {
-  position: relative;
-  display: block;
-  width: 42px;
-  height: 24px;
-  flex: none;
-  border: 1px solid rgb(var(--color-white)/0.22);
-  border-radius: 5px 2px 2px 5px;
-  background: linear-gradient(145deg, rgb(var(--color-neutral700)), rgb(var(--color-neutral900)));
-}
-
-.hero__usb::after {
-  content: "";
-  position: absolute;
-  top: 4px;
-  right: -14px;
-  width: 14px;
-  height: 14px;
-  border: 1px solid rgb(var(--color-foreground-soft));
-  border-left: 0;
-  border-radius: 0 2px 2px 0;
-  background: linear-gradient(rgb(var(--color-foreground)), rgb(var(--color-foreground-muted)));
-}
-
-.hero__usb i {
-  position: absolute;
-  inset: 8px auto auto 8px;
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: var(--signal);
-  box-shadow: 0 0 8px rgb(var(--color-signal)/0.7);
 }
 
 /* ── App screenshots ──
@@ -3702,17 +3612,6 @@ input:-webkit-autofill:focus {
 
   .hero__stage::before {
     inset: 1rem -0.5rem 2.2rem 0.5rem;
-  }
-
-  .hero__stage-bar {
-    right: 0.4rem;
-    left: 0.4rem;
-  }
-
-  .hero__key-callout {
-    right: 0.25rem;
-    left: 1rem;
-    max-width: none;
   }
 
   .mechanism-strip {
