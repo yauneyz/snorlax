@@ -169,9 +169,11 @@ const faqs = [
         Free covers {FREE_BLOCKED_SITE_LIMIT} blocked websites and unlimited manual focus sessions,
         with no card and no time limit. Pro is {formatPriceUsd(PRO_PRICE_CENTS.monthly)}/month or{" "}
         {formatPriceUsd(PRO_PRICE_CENTS.yearly)}/year at the early adopter price (usually{" "}
-        {formatPriceUsd(PRO_LIST_PRICE_CENTS.monthly)}/mo or {formatPriceUsd(PRO_LIST_PRICE_CENTS.yearly)}
+        {formatPriceUsd(PRO_LIST_PRICE_CENTS.monthly)}/mo or{" "}
+        {formatPriceUsd(PRO_LIST_PRICE_CENTS.yearly)}
         /year), and adds app blocking, recurring schedules, unlimited sites and unlimited profiles.
-        New accounts get {PRO_TRIAL_DAYS} days of Pro free — see <Link href="/pricing">pricing</Link>.
+        New accounts get {PRO_TRIAL_DAYS} days of Pro free — see{" "}
+        <Link href="/pricing">pricing</Link>.
       </p>
     ),
   },
@@ -203,7 +205,7 @@ export default function LandingPage() {
           </div>
           <div className="hero__ctas">
             <Link href="/download" className="landing__cta landing__cta--primary">
-              Start a locked session — free
+              Start focusing now - free
             </Link>
             <Link href="#how" className="landing__cta landing__cta--secondary">
               See how it works
@@ -236,19 +238,30 @@ export default function LandingPage() {
         </div>
       </section>
 
-      <section
-        className="mechanism-strip"
-        aria-label="How Talysman changes the moment of distraction"
-      >
-        <p>
-          <span>01</span> Decide while you&apos;re thinking clearly
+      <section className="section" id="how">
+        <p className="section__eyebrow">One calm decision. Three steps.</p>
+        <h2 className="section__title">Make quitting harder than continuing.</h2>
+        <p className="section__lede">
+          No proprietary gadget to order. The spare drive in your drawer becomes the boundary.
         </p>
-        <p>
-          <span>02</span> Put the key out of reach
-        </p>
-        <p>
-          <span>03</span> Let friction beat the impulse
-        </p>
+        <ol className="steps">
+          {steps.map((step, index) => (
+            <li key={step.title} className="step">
+              <AppShot
+                src={step.image.src}
+                alt={step.image.alt}
+                width={2160}
+                height={1620}
+                className="step__media"
+              />
+              <span className="step__number" aria-hidden="true">
+                {index + 1}
+              </span>
+              <h3>{step.title}</h3>
+              <p>{step.body}</p>
+            </li>
+          ))}
+        </ol>
       </section>
 
       {/* The named idea the rest of the page hangs on. Everything above is the visitor's
@@ -294,32 +307,6 @@ export default function LandingPage() {
             </li>
           ))}
         </ul>
-      </section>
-
-      <section className="section" id="how">
-        <p className="section__eyebrow">One calm decision. Three steps.</p>
-        <h2 className="section__title">Make quitting harder than continuing.</h2>
-        <p className="section__lede">
-          No proprietary gadget to order. The spare drive in your drawer becomes the boundary.
-        </p>
-        <ol className="steps">
-          {steps.map((step, index) => (
-            <li key={step.title} className="step">
-              <AppShot
-                src={step.image.src}
-                alt={step.image.alt}
-                width={2160}
-                height={1620}
-                className="step__media"
-              />
-              <span className="step__number" aria-hidden="true">
-                {index + 1}
-              </span>
-              <h3>{step.title}</h3>
-              <p>{step.body}</p>
-            </li>
-          ))}
-        </ol>
       </section>
 
       <section className="section">

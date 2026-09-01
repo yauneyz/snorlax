@@ -20,8 +20,10 @@ import { mkdtemp, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { readPalette } from './palette.mjs';
 
 export const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
+const palette = readPalette();
 const MAIN = resolve(ROOT, 'apps/desktop/out/main/index.cjs');
 
 /** Keep in sync with ONBOARDING_VERSION in apps/desktop/src/main/onboarding.ts. */
@@ -44,7 +46,7 @@ const HIDE_DEV_CHROME = `
 export const DEEP_WORK = {
   id: 'profile-default',
   name: 'Deep work',
-  color: '#4fd6c0',
+  color: palette.colors.profileAqua,
   policy: {
     mode: 'blacklist',
     domains: [
@@ -68,7 +70,7 @@ export const DEEP_WORK = {
 export const EVENING_STUDY = {
   id: 'profile-study',
   name: 'Evening study',
-  color: '#a58bff',
+  color: palette.colors.profileViolet,
   policy: {
     mode: 'whitelist',
     domains: ['docs.google.com', 'scholar.google.com', 'wikipedia.org'],

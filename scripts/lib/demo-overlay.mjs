@@ -31,7 +31,7 @@ export const OVERLAY_SOURCE = `
         height: 26px;
         transform: translate(-100px, -100px);
         transition: transform 700ms cubic-bezier(0.33, 0, 0.15, 1);
-        filter: drop-shadow(0 2px 5px rgba(0, 0, 0, 0.65));
+        filter: drop-shadow(0 2px 5px rgb(var(--color-black)/0.65));
         opacity: 0;
       }
       #demo-cursor.on { opacity: 1; }
@@ -43,7 +43,7 @@ export const OVERLAY_SOURCE = `
         height: 46px;
         margin: -23px 0 0 -23px;
         border-radius: 999px;
-        border: 2px solid rgba(255, 255, 255, 0.85);
+        border: 2px solid rgb(var(--color-white)/0.85);
         opacity: 0;
       }
       #demo-ring.pulse { animation: demo-pulse 520ms ease-out; }
@@ -58,10 +58,10 @@ export const OVERLAY_SOURCE = `
         transform: translate(-50%, 14px);
         padding: 13px 26px;
         border-radius: 999px;
-        border: 1px solid rgba(255, 255, 255, 0.11);
-        background: rgba(10, 11, 13, 0.82);
+        border: 1px solid rgb(var(--color-white)/0.11);
+        background: rgb(var(--color-brand-ink)/0.82);
         backdrop-filter: blur(14px);
-        color: #eef0f3;
+        color: rgb(var(--color-foreground-strong));
         font-size: 21px;
         font-weight: 500;
         letter-spacing: 0.005em;
@@ -73,7 +73,7 @@ export const OVERLAY_SOURCE = `
     </style>
     <svg id="demo-cursor" viewBox="0 0 26 26" fill="none" xmlns="http://www.w3.org/2000/svg">
       <path d="M4 2.2 L4 20.4 L8.7 16.1 L11.9 23.2 L15.1 21.7 L12 14.8 L18.4 14.6 Z"
-            fill="#ffffff" stroke="#0b0c0e" stroke-width="1.3" stroke-linejoin="round" />
+            fill="rgb(var(--color-white))" stroke="rgb(var(--color-brand-ink))" stroke-width="1.3" stroke-linejoin="round" />
     </svg>
     <div id="demo-ring"></div>
     <div id="demo-caption"></div>

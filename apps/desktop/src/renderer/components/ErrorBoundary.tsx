@@ -1,4 +1,5 @@
 import React from 'react';
+import { palette } from '@talysman/shared';
 
 interface Props {
   children: React.ReactNode;
@@ -28,9 +29,18 @@ export class ErrorBoundary extends React.Component<Props, State> {
   render(): React.ReactNode {
     if (this.state.error) {
       return (
-        <div style={{ padding: 32, color: '#f4f5f7', background: '#0e0f13', height: '100vh' }}>
+        <div
+          style={{
+            padding: 32,
+            color: palette.colors.foregroundStrong,
+            background: palette.colors.panel,
+            height: '100vh',
+          }}
+        >
           <h2>Something went wrong.</h2>
-          <p style={{ color: '#8b8fa3' }}>Please restart Talysman. This has been reported.</p>
+          <p style={{ color: palette.colors.foregroundMuted }}>
+            Please restart Talysman. This has been reported.
+          </p>
         </div>
       );
     }

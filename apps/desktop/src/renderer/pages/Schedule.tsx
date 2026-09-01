@@ -5,7 +5,7 @@
  */
 import React, { useEffect, useMemo, useState } from 'react';
 import type { Profile, ScheduleWindow, Weekday } from '@talysman/shared';
-import { resolveActiveProfile } from '@talysman/shared';
+import { palette, resolveActiveProfile } from '@talysman/shared';
 import { evaluateSchedule, parseHm, windowCovers } from '@talysman/core/schedule';
 import { request } from '../lib/bridge.js';
 import { useFocusStore } from '../store/useFocusStore.js';
@@ -112,7 +112,7 @@ export function SchedulePage({ onUpgrade }: { onUpgrade: () => void }) {
     id ? profiles.find((p) => p.id === id) : undefined;
   /** The colour a window paints with — its own profile, or whatever is active if it keeps it. */
   const colorFor = (w: ScheduleWindow) =>
-    profileFor(w.profileId)?.color ?? activeProfile?.color ?? '#5a5f67';
+    profileFor(w.profileId)?.color ?? activeProfile?.color ?? palette.colors.foregroundFaint;
   const nameFor = (w: ScheduleWindow) => profileFor(w.profileId)?.name ?? 'Active profile';
 
   const windows = useMemo(
@@ -185,7 +185,7 @@ export function SchedulePage({ onUpgrade }: { onUpgrade: () => void }) {
         {!scheduleEnabled && <Badge tone="neutral">Pro</Badge>}
         <button
           onClick={addWindow}
-          className="ml-auto rounded-lg border border-seal/30 bg-seal/[0.12] px-3.5 py-1.5 text-[11.5px] font-semibold text-sealInk transition hover:border-seal/45 hover:bg-seal/[0.18]"
+          className="ml-auto rounded-full border border-seal/30 bg-seal/[0.12] px-3.5 py-1.5 text-[11.5px] font-semibold text-sealInk transition hover:border-seal/45 hover:bg-seal/[0.18]"
         >
           {scheduleEnabled ? '+ New block' : 'Upgrade for scheduling'}
         </button>
@@ -201,7 +201,7 @@ export function SchedulePage({ onUpgrade }: { onUpgrade: () => void }) {
           className={cx(
             'block h-2 w-2 shrink-0 rounded-full',
             runningWindow
-              ? 'bg-ok shadow-[0_0_9px_2px_rgba(34,197,94,0.45)]'
+              ? 'bg-ok shadow-[0_0_9px_2px_rgb(var(--color-success)/0.45)]'
               : 'bg-slate-450',
           )}
         />
@@ -230,7 +230,7 @@ export function SchedulePage({ onUpgrade }: { onUpgrade: () => void }) {
               className={cx(
                 'shrink-0 overflow-hidden rounded-xl border transition',
                 open
-                  ? 'border-white/[0.16] bg-white/[0.05] shadow-[0_10px_26px_rgba(0,0,0,0.35)]'
+                  ? 'border-white/[0.16] bg-white/[0.05] shadow-[0_10px_26px_rgb(var(--color-black)/0.35)]'
                   : 'border-white/[0.06] bg-white/[0.025] hover:border-white/[0.10]',
               )}
             >
@@ -260,7 +260,7 @@ export function SchedulePage({ onUpgrade }: { onUpgrade: () => void }) {
                       </span>
                     )}
                     {w.locked && (
-                      <span className="shrink-0 rounded-full border border-[#ff8f6b]/30 bg-[#ff8f6b]/10 px-1.5 py-px font-mono text-[9px] font-semibold tracking-[0.14em] text-[#ffb59d]">
+                      <span className="shrink-0 rounded-full border border-locked/30 bg-locked/10 px-1.5 py-px font-mono text-[9px] font-semibold tracking-[0.14em] text-lockedInk">
                         KEY LOCKED
                       </span>
                     )}
@@ -297,7 +297,7 @@ export function SchedulePage({ onUpgrade }: { onUpgrade: () => void }) {
                   <div>
                     <Kicker className="text-[9.5px] tracking-[0.16em]">Profile</Kicker>
                     <div className="mt-1.5 grid grid-cols-2 gap-1.5">
-                      {[{ id: KEEP_ACTIVE, name: 'Keep active', color: '#5a5f67' }, ...profiles].map(
+                      {[{ id: KEEP_ACTIVE, name: 'Keep active', color: palette.colors.foregroundFaint }, ...profiles].map(
                         (p) => {
                           const on = (w.profileId ?? KEEP_ACTIVE) === p.id;
                           return (
@@ -402,7 +402,7 @@ export function SchedulePage({ onUpgrade }: { onUpgrade: () => void }) {
                       className={cx(
                         'flex-1 rounded-lg border py-2.5 text-[11.5px] font-medium transition',
                         w.locked
-                          ? 'border-[#ff8f6b]/35 bg-[#ff8f6b]/[0.14] text-[#ffb59d]'
+                          ? 'border-locked/35 bg-locked/[0.14] text-lockedInk'
                           : 'border-white/[0.08] bg-white/[0.03] text-slate-400 hover:bg-white/[0.06]',
                       )}
                     >
@@ -430,7 +430,7 @@ export function SchedulePage({ onUpgrade }: { onUpgrade: () => void }) {
             </span>
             <button
               onClick={addWindow}
-              className="mt-1.5 rounded-[9px] border border-seal/30 bg-seal/[0.12] px-[18px] py-2 text-[12.5px] font-semibold text-sealInk transition hover:border-seal/45 hover:bg-seal/[0.18]"
+              className="mt-1.5 rounded-full border border-seal/30 bg-seal/[0.12] px-[18px] py-2 text-[12.5px] font-semibold text-sealInk transition hover:border-seal/45 hover:bg-seal/[0.18]"
             >
               {scheduleEnabled ? 'Add your first block' : 'Upgrade for scheduling'}
             </button>

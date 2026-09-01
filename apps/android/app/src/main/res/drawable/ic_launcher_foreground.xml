@@ -6,6 +6,6 @@
     android:viewportHeight="108">
     <!-- Simple "T" glyph, centered, safe inside the adaptive-icon mask. -->
     <path
-        android:fillColor="#F4F5F7"
+        android:fillColor="@color/talysman_foreground_strong"
         android:pathData="M34,38 h40 v10 h-15 v32 h-10 v-32 h-15 z" />
 </vector>

@@ -50,4 +50,24 @@ fn main() {
     let output = PathBuf::from(env::var_os("OUT_DIR").expect("OUT_DIR"))
         .join("extension_identity.rs");
     fs::write(output, generated).expect("write generated extension identities");
+
+    let palette_path = PathBuf::from("../../packages/shared/src/palette.json");
+    println!("cargo:rerun-if-changed={}", palette_path.display());
+    let palette: serde_json::Value = serde_json::from_str(
+        &fs::read_to_string(&palette_path).expect("read shared palette.json"),
+    )
+    .expect("parse shared palette.json");
+    let default_profile_token = palette["profileColors"][0]
+        .as_str()
+        .expect("palette profileColors must not be empty");
+    let default_profile_color = palette["colors"][default_profile_token]
+        .as_str()
+        .expect("default profile token must name a palette color");
+    let generated_palette = format!(
+        "pub const DEFAULT_PROFILE_COLOR: &str = {:?};\n",
+        default_profile_color,
+    );
+    let palette_output = PathBuf::from(env::var_os("OUT_DIR").expect("OUT_DIR"))
+        .join("palette.rs");
+    fs::write(palette_output, generated_palette).expect("write generated palette constants");
 }

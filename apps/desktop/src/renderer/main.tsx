@@ -1,8 +1,14 @@
 import React from 'react';
 import { createRoot } from 'react-dom/client';
+import { applyPaletteVariables } from '@talysman/shared';
 import App from './App.js';
 import { ErrorBoundary } from './components/ErrorBoundary.js';
+import { applyDesktopPaletteOverrides } from './lib/desktopPalette.js';
 import './styles/globals.css';
+
+// Apply the canonical palette before React mounts so the first painted frame has every token.
+applyPaletteVariables(document.documentElement);
+applyDesktopPaletteOverrides(document.documentElement);
 
 // Catches what the ErrorBoundary can't: exceptions outside React's render tree (event handlers,
 // timers, async callbacks) and unhandled promise rejections.

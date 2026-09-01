@@ -27,18 +27,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import app.talysman.insights.data.ErrorReport
-
-private val Background = Color(0xFF0E0F13)
-private val Surface = Color(0xFF181A20)
-private val Muted = Color(0xFF8B8FA3)
-private val OnSurface = Color(0xFFF4F5F7)
-private val ErrorColor = Color(0xFFE0777A)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -46,11 +39,11 @@ fun ErrorsScreen(viewModel: ErrorsViewModel = viewModel()) {
     val state by viewModel.state.collectAsState()
 
     Scaffold(
-        containerColor = Background,
+        containerColor = TalysmanPalette.Background,
         topBar = {
             TopAppBar(
-                title = { Text("Errors", color = OnSurface, fontWeight = FontWeight.Bold) },
-                colors = androidx.compose.material3.TopAppBarDefaults.topAppBarColors(containerColor = Background),
+                title = { Text("Errors", color = TalysmanPalette.ForegroundStrong, fontWeight = FontWeight.Bold) },
+                colors = androidx.compose.material3.TopAppBarDefaults.topAppBarColors(containerColor = TalysmanPalette.Background),
             )
         },
     ) { padding ->
@@ -64,15 +57,15 @@ fun ErrorsScreen(viewModel: ErrorsViewModel = viewModel()) {
                 state.error != null && errors.isNullOrEmpty() -> Column(
                     Modifier.fillMaxWidth().padding(32.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
-                ) { Text(state.error ?: "Failed to load", color = ErrorColor, fontSize = 13.sp) }
+                ) { Text(state.error ?: "Failed to load", color = TalysmanPalette.DangerInk, fontSize = 13.sp) }
 
                 errors == null -> Column(
                     Modifier.fillMaxSize().padding(32.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
-                ) { CircularProgressIndicator(color = OnSurface) }
+                ) { CircularProgressIndicator(color = TalysmanPalette.ForegroundStrong) }
 
                 errors.isEmpty() -> Column(Modifier.fillMaxWidth().padding(32.dp)) {
-                    Text("No install-blocking errors reported. Good sign.", color = Muted, fontSize = 13.sp)
+                    Text("No install-blocking errors reported. Good sign.", color = TalysmanPalette.ForegroundMuted, fontSize = 13.sp)
                 }
 
                 else -> LazyColumn(
@@ -95,23 +88,23 @@ private fun ErrorCard(report: ErrorReport) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .background(Surface, RoundedCornerShape(14.dp))
+            .background(TalysmanPalette.PanelRaised, RoundedCornerShape(14.dp))
             .clickable { expanded = !expanded }
             .padding(16.dp),
     ) {
         Text(
             "${report.platform ?: "?"} · ${report.event}",
-            color = ErrorColor,
+            color = TalysmanPalette.DangerInk,
             fontWeight = FontWeight.Bold,
             fontSize = 14.sp,
         )
-        Text(report.occurredAt, color = Muted, fontSize = 11.sp)
-        report.appVersion?.let { Text("v$it", color = Muted, fontSize = 11.sp) }
+        Text(report.occurredAt, color = TalysmanPalette.ForegroundMuted, fontSize = 11.sp)
+        report.appVersion?.let { Text("v$it", color = TalysmanPalette.ForegroundMuted, fontSize = 11.sp) }
         androidx.compose.foundation.layout.Spacer(Modifier.padding(top = 6.dp))
         SelectionContainer {
             Text(
                 report.message,
-                color = OnSurface,
+                color = TalysmanPalette.ForegroundStrong,
                 fontSize = 13.sp,
                 maxLines = if (expanded) Int.MAX_VALUE else 3,
             )
@@ -119,7 +112,7 @@ private fun ErrorCard(report: ErrorReport) {
         if (expanded && report.stack != null) {
             androidx.compose.foundation.layout.Spacer(Modifier.padding(top = 8.dp))
             SelectionContainer {
-                Text(report.stack, color = Muted, fontSize = 11.sp)
+                Text(report.stack, color = TalysmanPalette.ForegroundMuted, fontSize = 11.sp)
             }
         }
     }

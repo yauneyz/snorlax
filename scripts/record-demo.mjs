@@ -33,8 +33,10 @@ import {
   CAPTURE_WORKSPACE,
 } from './lib/marketing-capture.mjs';
 import { OVERLAY_SOURCE } from './lib/demo-overlay.mjs';
+import { readPalette } from './lib/palette.mjs';
 
 const run = promisify(execFile);
+const palette = readPalette();
 
 const OUT = process.env.CAPTURE_OUT ?? resolve(ROOT, 'apps/web/public/media');
 const WORK = resolve(ROOT, '.demo-capture');
@@ -94,13 +96,19 @@ async function openBlockPage(app, { height }) {
 
   const appearing = app.waitForEvent('window');
   await app.evaluate(
-    ({ BrowserWindow }, { file, width, height, title }) => {
-      const blocked = new BrowserWindow({ width, height, title, backgroundColor: '#08090a' });
+    ({ BrowserWindow }, { file, width, height, title, backgroundColor }) => {
+      const blocked = new BrowserWindow({ width, height, title, backgroundColor });
       blocked.setMenuBarVisibility(false);
       void blocked.loadFile(file);
       globalThis.__blockPage = blocked;
     },
-    { file: BLOCK_PAGE, width: W, height, title: BLOCK_PAGE_TITLE },
+    {
+      file: BLOCK_PAGE,
+      width: W,
+      height,
+      title: BLOCK_PAGE_TITLE,
+      backgroundColor: palette.colors.background,
+    },
   );
 
   const page = await appearing;

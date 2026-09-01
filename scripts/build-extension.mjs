@@ -31,6 +31,7 @@ import {
 } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, relative, resolve } from "node:path";
+import { PALETTE_PATH, paletteCssBlock } from "./lib/palette.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const extDir = resolve(root, "apps/extension");
@@ -64,6 +65,7 @@ const extensionFiles = [
   "popup.js",
   "popup-view.js",
 ];
+const paletteCss = paletteCssBlock();
 
 const identities = JSON.parse(readFileSync(identitiesPath, "utf8"));
 const FIREFOX_ID = identities.firefoxId;
@@ -160,7 +162,13 @@ function stageStore(name, manifest, background) {
   }
   copyFileSync(blockedLogoPath, resolve(outputDir, "blocked-logo.svg"));
   for (const file of extensionFiles) {
-    copyFileSync(resolve(srcDir, file), resolve(outputDir, file));
+    const source = resolve(srcDir, file);
+    const destination = resolve(outputDir, file);
+    if (file.endsWith(".css")) {
+      writeFileSync(destination, paletteCss + "\n" + readFileSync(source, "utf8"));
+    } else {
+      copyFileSync(source, destination);
+    }
   }
   return outputDir;
 }
@@ -285,6 +293,8 @@ const sourceInputPaths = [
   ...Object.values(iconFiles),
   blockedLogoPath,
   identitiesPath,
+  PALETTE_PATH,
+  resolve(root, "scripts/lib/palette.mjs"),
   resolve(root, "scripts/build-extension.mjs"),
   resolve(root, "scripts/audit-extension.mjs"),
 ];

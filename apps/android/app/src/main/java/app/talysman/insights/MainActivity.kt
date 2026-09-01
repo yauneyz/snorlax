@@ -23,6 +23,7 @@ import androidx.core.content.ContextCompat
 import app.talysman.insights.notifications.PushNotifications
 import app.talysman.insights.ui.ErrorsScreen
 import app.talysman.insights.ui.InsightsScreen
+import app.talysman.insights.ui.TalysmanColorScheme
 
 class MainActivity : ComponentActivity() {
     private val notificationPermission = registerForActivityResult(
@@ -43,7 +44,7 @@ class MainActivity : ComponentActivity() {
         val initialTab = mutableStateOf(if (intent.getBooleanExtra(EXTRA_OPEN_ERRORS, false)) Tab.ERRORS else Tab.DASHBOARD)
         tabState = initialTab
         setContent {
-            MaterialTheme {
+            MaterialTheme(colorScheme = TalysmanColorScheme) {
                 var tab by initialTab
                 Column(Modifier.fillMaxSize()) {
                     TabRow(selectedTabIndex = tab.ordinal) {

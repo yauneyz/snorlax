@@ -2,7 +2,6 @@ package app.talysman.insights.widget
 
 import android.content.Context
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.glance.GlanceId
@@ -25,6 +24,7 @@ import androidx.glance.unit.ColorProvider
 import app.talysman.insights.MainActivity
 import app.talysman.insights.data.InsightsRepository
 import app.talysman.insights.data.InsightsSummary
+import app.talysman.insights.ui.TalysmanPalette
 
 object InsightsWidget : GlanceAppWidget() {
     override suspend fun provideGlance(context: Context, id: GlanceId) {
@@ -33,15 +33,15 @@ object InsightsWidget : GlanceAppWidget() {
     }
 }
 
-private val TextPrimary = ColorProvider(Color.White)
-private val TextMuted = ColorProvider(Color(0xFF8B8FA3))
+private val TextPrimary = ColorProvider(TalysmanPalette.ForegroundStrong)
+private val TextMuted = ColorProvider(TalysmanPalette.ForegroundMuted)
 
 @Composable
 private fun WidgetContent(summary: InsightsSummary?) {
     Column(
         modifier = GlanceModifier
             .fillMaxSize()
-            .background(Color(0xFF14161A))
+            .background(TalysmanPalette.PanelRaised)
             .cornerRadius(16.dp)
             .padding(12.dp)
             .clickable(actionStartActivity<MainActivity>()),

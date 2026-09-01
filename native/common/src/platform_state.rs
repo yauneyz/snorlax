@@ -248,7 +248,7 @@ mod migration_tests {
         state.profiles.push(Profile {
             id: "evening".into(),
             name: "Evening".into(),
-            color: "#ff8f6b".into(),
+            color: crate::model::DEFAULT_PROFILE_COLOR.into(),
             policy: Policy::default(),
         });
         state.active_profile_id = "deleted".into();
@@ -288,13 +288,11 @@ mod migration_tests {
                 {
                     "id": "profile-default",
                     "name": "Default",
-                    "color": "#4fd6c0",
                     "policy": { "mode": "blacklist", "domains": ["youtube.com"], "apps": [] }
                 },
                 {
                     "id": "evening",
                     "name": "Evening",
-                    "color": "#ff8f6b",
                     "policy": { "mode": "block-all", "domains": [], "apps": [] }
                 }
             ],
@@ -326,7 +324,6 @@ mod migration_tests {
                 {
                     "id": "profile-default",
                     "name": "Default",
-                    "color": "#4fd6c0",
                     "policy": {
                         "blockedDomains": ["youtube.com"],
                         "allowedDomains": [],

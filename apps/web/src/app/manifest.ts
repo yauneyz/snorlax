@@ -1,4 +1,5 @@
 import type { MetadataRoute } from "next";
+import { palette } from "@talysman/shared";
 import { config } from "@/lib/config";
 
 /**
@@ -13,8 +14,8 @@ export default function manifest(): MetadataRoute.Manifest {
     description: `${config.app.name} account, billing, and subscription management.`,
     start_url: "/",
     display: "standalone",
-    background_color: "#08090a",
-    theme_color: "#08090a",
+    background_color: palette.colors.background,
+    theme_color: palette.colors.background,
     icons: [
       { src: "/icons/icon-192.png", sizes: "192x192", type: "image/png", purpose: "any" },
       { src: "/icons/icon-512.png", sizes: "512x512", type: "image/png", purpose: "any" },

@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import type { Policy } from '@talysman/shared';
-import { resolveActiveProfile } from '@talysman/shared';
+import { palette } from '@talysman/shared';
+import { desktopPaletteColor } from './lib/desktopPalette.js';
 import { productFeaturesForEnvironment } from '@talysman/product';
 import { useFocusStore } from './store/useFocusStore.js';
 import { Dashboard } from './pages/Dashboard.js';
@@ -11,6 +12,7 @@ import { Account } from './pages/Account.js';
 import { Settings } from './pages/Settings.js';
 import { Plans } from './pages/Plans.js';
 import { FirstRun } from './components/FirstRun.js';
+import { TalysmanMark } from './components/TalysmanMark.js';
 import { ProfileDot } from './components/ui/index.js';
 import { cx } from './lib/utils.js';
 
@@ -51,14 +53,11 @@ export default function App() {
   const keyPresent = useFocusStore((s) => s.keyPresent);
   const focusActive = useFocusStore((s) => s.focusActive);
   const policy = useFocusStore((s) => s.policy);
-  const profiles = useFocusStore((s) => s.profiles);
-  const activeProfileId = useFocusStore((s) => s.activeProfileId);
   const watchdogWarning = useFocusStore((s) => s.watchdogWarning);
   const clearWatchdogWarning = useFocusStore((s) => s.clearWatchdogWarning);
   const passwordRecovery = useFocusStore((s) => s.passwordRecovery);
   const onboardingComplete = useFocusStore((s) => s.onboardingComplete);
   const [route, setRoute] = useState<Route>('dashboard');
-  const activeProfile = resolveActiveProfile(profiles, activeProfileId);
 
   useEffect(() => {
     void init();
@@ -76,8 +75,9 @@ export default function App() {
     return () => clearTimeout(t);
   }, [watchdogWarning, clearWatchdogWarning]);
 
-  // Keep the dashboard depth neutral; focus state belongs to the seal, not the whole canvas.
-  const ambient = 'rgba(199,204,212,0.04)';
+  // The landing hero's cyan bloom makes the protected state legible without tinting the canvas.
+  const ambient = focusActive ? 'rgb(var(--color-signal)/0.055)' : 'rgb(var(--color-brand)/0.035)';
+  const activeRoute = NAV.find((item) => item.route === route);
 
   // The walkthrough covers the whole window until it's finished. It needs live service state
   // (drives, paired keys, the active profile), so it waits for the same `ready` gate as the pages.
@@ -104,9 +104,10 @@ export default function App() {
       )}
 
       {/* Nav rail. Glass over the bloom so the canvas reads as one surface behind it. */}
-      <aside className="desktop-sidebar relative flex w-44 shrink-0 flex-col border-r border-white/[0.06] bg-[rgba(14,15,17,0.88)] backdrop-blur-xl">
-        <div className="flex items-center gap-2 px-[18px] pb-[15px] pt-[17px]">
-          <span className="text-[13px] font-semibold tracking-[0.1em] text-slate-250">Talysman</span>
+      <aside className="desktop-sidebar relative flex w-44 shrink-0 flex-col border-r border-white/[0.07] backdrop-blur-xl">
+        <div className="flex items-center gap-2.5 px-[18px] pb-[17px] pt-[18px]">
+          <TalysmanMark size={20} className="opacity-90" />
+          <span className="desktop-brand-name">Talysman</span>
           {IS_DEV && (
             <span className="dev-mode-label" aria-label="Development mode">
               Dev
@@ -122,17 +123,12 @@ export default function App() {
                 key={n.route}
                 onClick={() => setRoute(n.route)}
                 className={cx(
-                  'flex items-center gap-2.5 rounded-[9px] px-[11px] py-[9px] text-left text-[13px] font-medium transition',
-                  on ? 'bg-white/[0.07] text-white' : 'text-slate-400 hover:bg-white/[0.04] hover:text-slate-200',
+                  'desktop-nav-item flex items-center gap-2.5 rounded-[10px] px-[11px] py-[9px] text-left text-[13px] font-medium transition',
+                  on
+                    ? 'bg-white/[0.065] text-white shadow-[inset_0_1px_rgb(var(--color-white)/0.035)]'
+                    : 'text-slate-400 hover:bg-white/[0.04] hover:text-slate-200',
                 )}
               >
-                {/* 3px rail is the only active marker — it survives the low-contrast fill. */}
-                <span
-                  className={cx(
-                    'block h-3.5 w-[3px] rounded-sm',
-                    on ? 'bg-seal' : 'bg-transparent',
-                  )}
-                />
                 {n.label}
               </button>
             );
@@ -140,7 +136,10 @@ export default function App() {
         </nav>
 
         <div className="mt-auto flex items-center gap-2.5 border-t border-white/[0.06] px-4 pb-[15px] pt-[13px]">
-          <ProfileDot color={focusActive ? (activeProfile?.color ?? '#c7ccd4') : '#5a5f67'} />
+          <ProfileDot
+            color={focusActive ? desktopPaletteColor('signal') : palette.colors.foregroundFaint}
+            glow={focusActive}
+          />
           <div>
             <div className="font-mono text-[9.5px] tracking-[0.14em] text-slate-450">MODE</div>
             <div className="mt-0.5 text-[12.5px] font-medium text-slate-200">
@@ -151,8 +150,18 @@ export default function App() {
       </aside>
 
       <div className="desktop-pane relative flex min-w-0 flex-1 flex-col">
-        <header className="flex h-12 shrink-0 items-center px-5">
+        <header className="flex h-14 shrink-0 items-center border-b border-white/[0.035] px-5">
           <div className="mx-auto flex w-full max-w-[960px] items-center gap-2.5">
+            <div className="flex items-center gap-2.5">
+              <span
+                aria-hidden="true"
+                className="block h-1.5 w-1.5 rounded-full bg-signal shadow-[0_0_10px_rgb(var(--color-signal)/0.6)]"
+              />
+              <span className="desktop-route-title">{activeRoute?.label}</span>
+              <span className="font-mono text-[9px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+                Control surface
+              </span>
+            </div>
             {usingMock && (
               <span className="font-mono text-[10px] tracking-[0.14em] text-warn">MOCK SERVICE</span>
             )}
@@ -170,8 +179,8 @@ export default function App() {
                 className={cx(
                   'block h-[7px] w-[7px] rounded-full',
                   keyPresent
-                    ? 'bg-ok shadow-[0_0_8px_2px_rgba(34,197,94,0.6)]'
-                    : 'bg-danger shadow-[0_0_8px_2px_rgba(239,68,68,0.55)]',
+                    ? 'bg-ok shadow-[0_0_8px_2px_rgb(var(--color-success)/0.6)]'
+                    : 'bg-danger shadow-[0_0_8px_2px_rgb(var(--color-danger)/0.55)]',
                 )}
               />
               <span
@@ -187,7 +196,7 @@ export default function App() {
         </header>
 
         {watchdogWarning && (
-          <div className="pointer-events-none absolute inset-x-0 top-12 z-50 flex justify-center p-4">
+          <div className="pointer-events-none absolute inset-x-0 top-14 z-50 flex justify-center p-4">
             <div className="pointer-events-auto flex items-center gap-3 rounded-[10px] border border-warn/40 bg-warn/[0.10] px-4 py-2 text-[12.5px] text-warn backdrop-blur-md">
               <span>
                 {watchdogWarning.browser} isn’t proving the Talysman extension is active — it will

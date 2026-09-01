@@ -18,8 +18,10 @@ export type ProductEnvironment = 'development' | 'production';
  * a production UI from hiding a feature while its server-side implementation remains callable.
  */
 export function productFeaturesForEnvironment(environment: ProductEnvironment) {
+  void environment;
   return {
-    smartFiltering: environment === 'development',
+    // Temporarily disabled in all environments, including development.
+    smartFiltering: false,
   } as const;
 }
 

@@ -23,12 +23,12 @@ export function TalysmanMark({
     >
       <defs>
         <linearGradient id="tal-mark-silver" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0" stopColor="#f2f3f5" />
-          <stop offset="0.48" stopColor="#c7ccd4" />
-          <stop offset="1" stopColor="#8b9098" />
+          <stop offset="0" stopColor="rgb(var(--color-foreground-strong))" />
+          <stop offset="0.48" stopColor="rgb(var(--color-brand))" />
+          <stop offset="1" stopColor="rgb(var(--color-foreground-muted))" />
         </linearGradient>
         <mask id="tal-mark-mask" maskUnits="userSpaceOnUse" x="0" y="0" width="512" height="512">
-          <g fill="#fff">
+          <g fill="rgb(var(--color-white))">
             <path d="M160 90 L256 34 L352 90 L326 105 L256 64 L186 105 Z" />
             <path d="M76 108 L226 149 L226 181 L111 150 L111 193 L151 213 L133 242 L76 213 Z" />
             <path d="M126 164 L197 183 L197 222 L171 211 L171 201 L126 188 Z" />
@@ -44,7 +44,7 @@ export function TalysmanMark({
             </g>
             <path d="M201 140 H311 V174 H276 V329 H302 V428 L256 463 L210 428 V329 H236 V174 H201 Z" />
           </g>
-          <g fill="#000">
+          <g fill="rgb(var(--color-black))">
             <path d="M256 232 L273 249 L256 266 L239 249 Z" />
             <rect x="249" y="263" width="14" height="53" rx="4" />
             <rect x="229" y="367" width="18" height="22" rx="2" />

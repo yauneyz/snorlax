@@ -12,6 +12,7 @@ import {
   DESKTOP_AUTH_RESET_CALLBACK_PATH,
   DESKTOP_BILLING_SUCCESS_PATH,
 } from '@talysman/auth-contracts';
+import { palette } from '@talysman/shared';
 import { config } from './config.js';
 import { logger } from './logging.js';
 import { flushEvents, recordAppOpen, track } from './analytics.js';
@@ -42,7 +43,7 @@ export function createWindow(): BrowserWindow {
     minWidth: 900,
     minHeight: 640,
     show: false,
-    backgroundColor: '#08090a',
+    backgroundColor: palette.colors.background,
     title: 'Talysman',
     icon: windowIcon(),
     webPreferences: {

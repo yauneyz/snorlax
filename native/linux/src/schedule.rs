@@ -248,13 +248,13 @@ mod restrictiveness_tests {
 #[cfg(test)]
 mod profile_tests {
     use super::*;
-    use crate::model::{DefaultAction, Policy, ScheduleWindow};
+    use crate::model::{DefaultAction, Policy, ScheduleWindow, DEFAULT_PROFILE_COLOR};
 
     fn profile(id: &str, policy: Policy) -> Profile {
         Profile {
             id: id.into(),
             name: id.into(),
-            color: "#4fd6c0".into(),
+            color: DEFAULT_PROFILE_COLOR.into(),
             policy,
         }
     }

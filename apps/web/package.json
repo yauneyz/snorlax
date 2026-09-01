@@ -36,6 +36,7 @@
     "@talysman/auth-contracts": "workspace:*",
     "@talysman/billing-server": "workspace:*",
     "@talysman/product": "workspace:*",
+    "@talysman/shared": "workspace:*",
     "@tanstack/react-query": "^5.62.8",
     "@tanstack/react-query-devtools": "^5.62.8",
     "botid": "^1.5.11",

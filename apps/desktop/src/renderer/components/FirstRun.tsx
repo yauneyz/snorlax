@@ -9,7 +9,7 @@
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import type { Drive, Policy } from '@talysman/shared';
-import { resolveActiveProfile } from '@talysman/shared';
+import { palette, resolveActiveProfile } from '@talysman/shared';
 import { productFeaturesForEnvironment } from '@talysman/product';
 import { devSimulateExtension, openExternal, request } from '../lib/bridge.js';
 import { useFocusStore } from '../store/useFocusStore.js';
@@ -223,7 +223,7 @@ export function FirstRun({ onDone }: { onDone: () => void }) {
         aria-hidden
         className="pointer-events-none absolute inset-0"
         style={{
-          background: 'radial-gradient(620px 520px at 50% 34%, rgba(199,204,212,0.09), transparent 70%)',
+          background: 'radial-gradient(620px 520px at 50% 34%, rgb(var(--color-signal)/0.07), transparent 70%)',
         }}
       />
 
@@ -255,7 +255,7 @@ export function FirstRun({ onDone }: { onDone: () => void }) {
           <div className="flex flex-col items-center animate-rise">
             <TalysmanMark
               size={64}
-              className="[filter:drop-shadow(0_0_20px_rgba(199,204,212,0.3))]"
+              className="[filter:drop-shadow(0_0_20px_rgb(var(--color-brand)/0.3))]"
             />
             <h1 className="mt-[22px] text-[34px] font-bold leading-[1.15] tracking-[-0.02em] text-slate-100">
               The shield stays up.
@@ -288,7 +288,7 @@ export function FirstRun({ onDone }: { onDone: () => void }) {
                       // so cards with different blurb lengths still line their titles up.
                       'flex w-[212px] flex-col rounded-xl border p-4 text-left transition',
                       on
-                        ? 'border-seal/30 bg-seal/[0.09] shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_0_18px_rgba(199,204,212,0.10)]'
+                        ? 'border-seal/30 bg-seal/[0.09] shadow-[inset_0_1px_0_rgb(var(--color-white)/0.06),0_0_18px_rgb(var(--color-signal)/0.10)]'
                         : 'border-white/[0.07] bg-white/[0.025] hover:border-white/[0.14]',
                     )}
                   >
@@ -297,7 +297,7 @@ export function FirstRun({ onDone }: { onDone: () => void }) {
                         className={cx(
                           'block h-[9px] w-[9px] rounded-full border',
                           on
-                            ? 'border-seal bg-seal shadow-[0_0_7px_1px_rgba(199,204,212,0.6)]'
+                            ? 'border-seal bg-seal shadow-[0_0_7px_1px_rgb(var(--color-signal)/0.6)]'
                             : 'border-white/25 bg-transparent',
                         )}
                       />
@@ -369,7 +369,7 @@ export function FirstRun({ onDone }: { onDone: () => void }) {
                           className={cx(
                             'block h-[9px] w-[9px] shrink-0 rounded-full border',
                             on
-                              ? 'border-seal bg-seal shadow-[0_0_7px_1px_rgba(199,204,212,0.6)]'
+                              ? 'border-seal bg-seal shadow-[0_0_7px_1px_rgb(var(--color-signal)/0.6)]'
                               : 'border-white/25 bg-transparent',
                           )}
                         />
@@ -421,13 +421,13 @@ export function FirstRun({ onDone }: { onDone: () => void }) {
         {current === 'ready' && (
           <div className="flex flex-col items-center animate-rise">
             <div className="relative flex h-[186px] w-[186px] items-center justify-center">
-              <div className="absolute inset-0 rounded-full border border-seal/30 shadow-[0_0_34px_rgba(199,204,212,0.18),inset_0_0_34px_rgba(199,204,212,0.07)]" />
+              <div className="absolute inset-0 rounded-full border border-seal/30 shadow-[0_0_34px_rgb(var(--color-signal)/0.16),inset_0_0_34px_rgb(var(--color-signal)/0.06)]" />
               <div className="absolute inset-[18px] rounded-full border border-dashed border-white/[0.07]" />
               <div
                 aria-hidden
                 className="absolute inset-[34px] rounded-full"
                 style={{
-                  background: 'radial-gradient(circle, rgba(199,204,212,0.16), transparent 72%)',
+                  background: 'radial-gradient(circle, rgb(var(--color-signal)/0.14), transparent 72%)',
                 }}
               />
               <div className="relative text-[15px] font-bold tracking-[0.14em] text-sealInk">
@@ -467,8 +467,8 @@ export function FirstRun({ onDone }: { onDone: () => void }) {
             className={cx(
               'rounded-full px-7 py-2.5 text-[13px] font-semibold transition disabled:opacity-50',
               canRaise
-                ? 'border border-seal/[0.38] bg-seal/[0.16] text-sealInk shadow-[0_0_22px_rgba(199,204,212,0.22)] hover:bg-seal/[0.22]'
-                : 'border border-transparent bg-gradient-to-b from-white to-accent text-accentInk shadow-[inset_0_1px_0_rgba(255,255,255,0.4)]',
+                ? 'border border-seal/[0.38] bg-seal/[0.16] text-sealInk shadow-[0_0_22px_rgb(var(--color-signal)/0.18)] hover:bg-seal/[0.22]'
+                : 'border border-signal bg-signal text-signalInk shadow-[0_8px_28px_rgb(var(--color-signal)/0.13)] hover:bg-signalHi',
             )}
           >
             {canRaise ? 'Raise shield' : 'Finish setup'}
@@ -477,7 +477,7 @@ export function FirstRun({ onDone }: { onDone: () => void }) {
           <button
             onClick={() => void next()}
             disabled={busy}
-            className="rounded-full border border-transparent bg-gradient-to-b from-white to-accent px-7 py-2.5 text-[13px] font-semibold text-accentInk shadow-[inset_0_1px_0_rgba(255,255,255,0.4)] transition hover:to-slate-100 disabled:opacity-50"
+            className="rounded-full border border-signal bg-signal px-7 py-2.5 text-[13px] font-semibold text-signalInk shadow-[0_8px_28px_rgb(var(--color-signal)/0.13)] transition hover:bg-signalHi disabled:opacity-50"
           >
             {busy ? 'Working…' : nextLabel}
           </button>
@@ -613,14 +613,19 @@ function ExtensionStep({
 /** The animated link between the app and the browser. Dashed while searching, solid on contact. */
 function HandshakeChannel({ state, live }: { state: 'waiting' | 'ok' | 'degraded'; live: boolean }) {
   const connected = state !== 'waiting';
-  const color = state === 'ok' ? '#22c55e' : state === 'degraded' ? '#f59e0b' : undefined;
+  const color =
+    state === 'ok'
+      ? palette.colors.success
+      : state === 'degraded'
+        ? palette.colors.warning
+        : undefined;
 
   return (
     <span className="relative flex h-9 flex-1 items-center">
       <span
         className={cx(
           'block h-px w-full',
-          connected ? '' : 'bg-[repeating-linear-gradient(90deg,rgba(255,255,255,0.18)_0_5px,transparent_5px_11px)]',
+          connected ? '' : 'bg-[repeating-linear-gradient(90deg,rgb(var(--color-white)/0.18)_0_5px,transparent_5px_11px)]',
         )}
         style={connected ? { backgroundColor: color, boxShadow: `0 0 10px 1px ${color}66` } : undefined}
       />

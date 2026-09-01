@@ -1,3 +1,15 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+
+const palette = JSON.parse(
+  readFileSync(resolve(import.meta.dirname, '../../packages/shared/src/palette.json'), 'utf8'),
+);
+
+const cssColor = (name) => {
+  if (!(name in palette.colors)) throw new Error(`Unknown palette token: ${name}`);
+  return `rgb(var(--color-${name.replace(/[A-Z]/g, (letter) => `-${letter.toLowerCase()}`)}) / <alpha-value>)`;
+};
+
 /** @type {import('tailwindcss').Config} */
 export default {
   content: ['./src/renderer/index.html', './src/renderer/**/*.{ts,tsx}'],
@@ -8,39 +20,41 @@ export default {
         mono: ['"JetBrains Mono Variable"', 'ui-monospace', 'SFMono-Regular', 'Menlo', 'monospace'],
       },
       colors: {
-        // Historical near-black surfaces from the pre-redesign palette.
-        bg: '#08090a',
-        panel: '#0e0f11',
-        panel2: '#16181b',
-        border: '#26292e',
-        // Keep the current semantic API while restoring silver as the product accent.
-        seal: '#c7ccd4',
-        sealInk: '#f2f3f5',
-        ok: '#22c55e',
-        okInk: '#4ade80',
-        warn: '#f59e0b',
-        danger: '#ef4444',
-        dangerInk: '#f87171',
-        // Silver, not indigo. `accentInk` is the dark text that sits on top of it.
-        accent: '#c7ccd4',
-        accentInk: '#0a0b0d',
+        bg: cssColor('background'),
+        panel: cssColor('panel'),
+        panel2: cssColor('panelRaised'),
+        border: cssColor('border'),
+        signal: cssColor('signal'),
+        signalHi: cssColor('signalHigh'),
+        signalInk: cssColor('signalInk'),
+        seal: cssColor('signal'),
+        sealInk: cssColor('signal'),
+        ok: cssColor('success'),
+        okInk: cssColor('successInk'),
+        warn: cssColor('warning'),
+        danger: cssColor('danger'),
+        dangerInk: cssColor('dangerInk'),
+        locked: cssColor('profileCoral'),
+        lockedInk: cssColor('lockedInk'),
+        accent: cssColor('signal'),
+        accentInk: cssColor('signalInk'),
         // Neutral ramp shadowing Tailwind's `slate` so the existing text-slate-*
         // usage reads silver-grey instead of blue-grey, with no call-site churn.
         slate: {
-          50: '#fafafa',
-          100: '#f2f3f5',
-          150: '#e8eaee',
-          200: '#dcdee2',
-          250: '#c7ccd4',
-          300: '#b8bcc4',
-          400: '#8b9098',
-          450: '#5a5f67',
-          500: '#676c74',
-          600: '#4d5158',
-          700: '#3a3d43',
-          800: '#26292e',
-          900: '#17191c',
-          950: '#0e0f11',
+          50: cssColor('neutral50'),
+          100: cssColor('foregroundStrong'),
+          150: cssColor('neutral150'),
+          200: cssColor('foreground'),
+          250: cssColor('brand'),
+          300: cssColor('foregroundSoft'),
+          400: cssColor('foregroundMuted'),
+          450: cssColor('foregroundFaint'),
+          500: cssColor('foregroundDim'),
+          600: cssColor('neutral600'),
+          700: cssColor('neutral700'),
+          800: cssColor('border'),
+          900: cssColor('neutral900'),
+          950: cssColor('panel'),
         },
       },
       keyframes: {

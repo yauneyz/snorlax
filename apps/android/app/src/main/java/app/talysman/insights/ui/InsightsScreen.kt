@@ -20,7 +20,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -29,22 +28,17 @@ import app.talysman.insights.data.ChannelRow
 import app.talysman.insights.data.RetentionRow
 import app.talysman.insights.data.VisitorBreakdownRow
 
-private val Background = Color(0xFF0E0F13)
-private val Surface = Color(0xFF181A20)
-private val Muted = Color(0xFF8B8FA3)
-private val OnSurface = Color(0xFFF4F5F7)
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun InsightsScreen(viewModel: InsightsViewModel = viewModel()) {
     val state by viewModel.state.collectAsState()
 
     Scaffold(
-        containerColor = Background,
+        containerColor = TalysmanPalette.Background,
         topBar = {
             TopAppBar(
-                title = { Text("Insights", color = OnSurface, fontWeight = FontWeight.Bold) },
-                colors = androidx.compose.material3.TopAppBarDefaults.topAppBarColors(containerColor = Background),
+                title = { Text("Insights", color = TalysmanPalette.ForegroundStrong, fontWeight = FontWeight.Bold) },
+                colors = androidx.compose.material3.TopAppBarDefaults.topAppBarColors(containerColor = TalysmanPalette.Background),
             )
         },
     ) { padding ->
@@ -61,19 +55,19 @@ fun InsightsScreen(viewModel: InsightsViewModel = viewModel()) {
                 item {
                     Text(
                         text = "Generated ${state.summary?.generatedAt ?: "—"}",
-                        color = Muted,
+                        color = TalysmanPalette.ForegroundMuted,
                         fontSize = 11.sp,
                     )
                 }
                 state.error?.let { error ->
-                    item { PanelCard("Last refresh failed") { Text(error, color = Color(0xFFE0777A), fontSize = 13.sp) } }
+                    item { PanelCard("Last refresh failed") { Text(error, color = TalysmanPalette.DangerInk, fontSize = 13.sp) } }
                 }
 
                 val summary = state.summary
                 if (summary == null) {
                     item {
                         Column(Modifier.fillMaxWidth().padding(32.dp), horizontalAlignment = androidx.compose.ui.Alignment.CenterHorizontally) {
-                            CircularProgressIndicator(color = OnSurface)
+                            CircularProgressIndicator(color = TalysmanPalette.ForegroundStrong)
                         }
                     }
                     return@LazyColumn
@@ -163,11 +157,11 @@ private fun PanelCard(title: String, description: String? = null, content: @Comp
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .background(Surface, RoundedCornerShape(14.dp))
+            .background(TalysmanPalette.PanelRaised, RoundedCornerShape(14.dp))
             .padding(16.dp),
     ) {
-        Text(title, color = OnSurface, fontWeight = FontWeight.Bold, fontSize = 15.sp)
-        description?.let { Text(it, color = Muted, fontSize = 11.sp) }
+        Text(title, color = TalysmanPalette.ForegroundStrong, fontWeight = FontWeight.Bold, fontSize = 15.sp)
+        description?.let { Text(it, color = TalysmanPalette.ForegroundMuted, fontSize = 11.sp) }
         androidx.compose.foundation.layout.Spacer(Modifier.padding(top = 8.dp))
         content()
     }
@@ -177,7 +171,7 @@ private fun PanelCard(title: String, description: String? = null, content: @Comp
 private fun EmptyState(ok: Boolean, message: String?) {
     Text(
         text = if (ok) "No data yet." else (message ?: "Unavailable."),
-        color = Muted,
+        color = TalysmanPalette.ForegroundMuted,
         fontSize = 12.sp,
     )
 }
@@ -197,8 +191,8 @@ private fun KpiGrid(items: List<Pair<String, String>>) {
 @Composable
 private fun Kpi(label: String, value: String, modifier: Modifier = Modifier) {
     Column(modifier) {
-        Text(label, color = Muted, fontSize = 11.sp)
-        Text(value, color = OnSurface, fontWeight = FontWeight.Bold, fontSize = 18.sp)
+        Text(label, color = TalysmanPalette.ForegroundMuted, fontSize = 11.sp)
+        Text(value, color = TalysmanPalette.ForegroundStrong, fontWeight = FontWeight.Bold, fontSize = 18.sp)
     }
 }
 
@@ -243,7 +237,7 @@ private fun ChannelsTable(rows: List<ChannelRow>) {
 private fun BreakdownTable(title: String, rows: List<VisitorBreakdownRow>) {
     if (rows.isEmpty()) return
     Column(Modifier.padding(top = 14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        Text(title, color = OnSurface, fontWeight = FontWeight.SemiBold, fontSize = 12.sp)
+        Text(title, color = TalysmanPalette.ForegroundStrong, fontWeight = FontWeight.SemiBold, fontSize = 12.sp)
         rows.forEach { row ->
             TableRow(listOf(row.label, row.visitors.toString(), "${row.pctVisitors}%"))
         }
@@ -253,13 +247,13 @@ private fun BreakdownTable(title: String, rows: List<VisitorBreakdownRow>) {
 @Composable
 private fun TableHeader(labels: List<String>) {
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-        labels.forEach { Text(it, color = Muted, fontSize = 10.sp, modifier = Modifier.weight(1f)) }
+        labels.forEach { Text(it, color = TalysmanPalette.ForegroundMuted, fontSize = 10.sp, modifier = Modifier.weight(1f)) }
     }
 }
 
 @Composable
 private fun TableRow(values: List<String>) {
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-        values.forEach { Text(it, color = OnSurface, fontSize = 11.sp, modifier = Modifier.weight(1f)) }
+        values.forEach { Text(it, color = TalysmanPalette.ForegroundStrong, fontSize = 11.sp, modifier = Modifier.weight(1f)) }
     }
 }

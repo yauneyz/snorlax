@@ -10,6 +10,7 @@
 
 import type { Policy } from './policy.js';
 import { EMPTY_POLICY } from './policy.js';
+import { PROFILE_COLORS } from './palette.js';
 
 export interface Profile {
   id: string;
@@ -20,15 +21,7 @@ export interface Profile {
   policy: Policy;
 }
 
-/** Palette offered when creating a profile; index 0 is the default profile's colour. */
-export const PROFILE_COLORS = [
-  '#4fd6c0',
-  '#a58bff',
-  '#ff8f6b',
-  '#ffb454',
-  '#7cb4ff',
-  '#f47ab0',
-] as const;
+export { PROFILE_COLORS } from './palette.js';
 
 export const DEFAULT_PROFILE_ID = 'profile-default';
 export const DEFAULT_PROFILE_NAME = 'Default';

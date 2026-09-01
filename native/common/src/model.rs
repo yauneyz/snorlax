@@ -23,7 +23,7 @@ pub struct Profile {
 
 pub const DEFAULT_PROFILE_ID: &str = "profile-default";
 pub const DEFAULT_PROFILE_NAME: &str = "Default";
-pub const DEFAULT_PROFILE_COLOR: &str = "#4fd6c0";
+include!(concat!(env!("OUT_DIR"), "/palette.rs"));
 /// Mirrors MAX_PROFILE_NAME_LENGTH in packages/shared/src/profile.ts.
 pub const MAX_PROFILE_NAME_LENGTH: usize = 40;
 

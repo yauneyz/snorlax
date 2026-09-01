@@ -1,7 +1,7 @@
 /**
  * A handful of hand-rolled UI primitives (kept light instead of a full shadcn install),
- * speaking the "seal" design language: near-black glass panels, hairline borders, green/red
- * status signals, and monospaced small caps for anything instrument-like.
+ * speaking the landing page's design language: near-black glass panels, hairline borders, a
+ * cyan action signal, and monospaced small caps for anything instrument-like.
  */
 import React from 'react';
 import { cx } from '../../lib/utils.js';
@@ -10,7 +10,7 @@ export function Card({ className, children }: { className?: string; children: Re
   return (
     <div
       className={cx(
-        'rounded-xl border border-white/[0.07] bg-white/[0.02] p-5 backdrop-blur-[2px] shadow-[0_1px_0_rgba(255,255,255,0.04)_inset,0_10px_30px_-18px_rgba(0,0,0,0.9)]',
+        'rounded-[14px] border border-white/[0.08] bg-gradient-to-br from-white/[0.045] to-white/[0.012] p-5 backdrop-blur-[2px] shadow-[0_1px_0_rgb(var(--color-white)/0.05)_inset,0_12px_34px_-22px_rgb(var(--color-black)/0.95)]',
         className,
       )}
     >
@@ -24,7 +24,7 @@ export function Kicker({ children, className }: { children: React.ReactNode; cla
   return (
     <span
       className={cx(
-        'font-mono text-[10px] font-medium uppercase tracking-[0.2em] text-slate-500',
+        'font-mono text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-400',
         className,
       )}
     >
@@ -36,7 +36,7 @@ export function Kicker({ children, className }: { children: React.ReactNode; cla
 export function CardTitle({ children, hint }: { children: React.ReactNode; hint?: string }) {
   return (
     <div className="mb-3">
-      <h2 className="font-mono text-[10px] font-medium uppercase tracking-[0.2em] text-slate-500">
+      <h2 className="font-mono text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-400">
         {children}
       </h2>
       {hint && <p className="mt-2 text-[12.5px] leading-relaxed text-slate-400">{hint}</p>}
@@ -51,11 +51,12 @@ type ButtonProps = React.ButtonHTMLAttributes<HTMLButtonElement> & {
 
 export function Button({ variant = 'primary', className, ...props }: ButtonProps) {
   const base =
-    'inline-flex items-center justify-center rounded-[9px] px-4 py-2 text-[12.5px] font-semibold transition disabled:opacity-45 disabled:cursor-not-allowed';
+    'inline-flex items-center justify-center rounded-full px-4 py-2 text-[12.5px] font-semibold transition disabled:cursor-not-allowed disabled:opacity-45';
   const variants = {
     primary:
-      'border border-seal/30 bg-seal/[0.12] text-sealInk hover:border-seal/45 hover:bg-seal/[0.18]',
-    hero: 'bg-gradient-to-b from-white to-accent text-accentInk shadow-[0_1px_0_rgba(255,255,255,0.4)_inset] hover:from-white hover:to-slate-100',
+      'border border-signal bg-signal text-signalInk shadow-[0_8px_24px_rgb(var(--color-signal)/0.10)] hover:border-signalHi hover:bg-signalHi',
+    hero:
+      'border border-signal bg-signal text-signalInk shadow-[0_8px_28px_rgb(var(--color-signal)/0.13)] hover:border-signalHi hover:bg-signalHi',
     ghost:
       'border border-white/[0.10] bg-white/[0.04] text-slate-200 backdrop-blur-sm hover:bg-white/[0.08] hover:text-white',
     danger:

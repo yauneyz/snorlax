@@ -15,20 +15,25 @@ from PIL import Image, ImageDraw, ImageFont
 ROOT = Path(__file__).resolve().parents[1]
 SOURCE = ROOT / "source"
 GENERATED = ROOT / "generated"
+PALETTE_PATH = ROOT.parents[1] / "packages" / "shared" / "src" / "palette.json"
+PALETTE = json.loads(PALETTE_PATH.read_text(encoding="utf-8"))
+PALETTE_COLORS = PALETTE["colors"]
 
 COLORS = {
-    "background": "#08090a",
-    "panel": "#0e0f11",
-    "panel2": "#16181b",
-    "border": "#26292e",
-    "accent": "#c7ccd4",
-    "accent_ink": "#0a0b0d",
-    "body": "#dcdee2",
-    "highlight": "#f2f3f5",
-    "midtone": "#8b9098",
-    "success": "#22c55e",
-    "danger": "#ef4444",
-    "warning": "#f59e0b",
+    "black": PALETTE_COLORS["black"],
+    "white": PALETTE_COLORS["white"],
+    "background": PALETTE_COLORS["background"],
+    "panel": PALETTE_COLORS["panel"],
+    "panel2": PALETTE_COLORS["panelRaised"],
+    "border": PALETTE_COLORS["border"],
+    "accent": PALETTE_COLORS["brand"],
+    "accent_ink": PALETTE_COLORS["brandInk"],
+    "body": PALETTE_COLORS["foreground"],
+    "highlight": PALETTE_COLORS["foregroundStrong"],
+    "midtone": PALETTE_COLORS["foregroundMuted"],
+    "success": PALETTE_COLORS["success"],
+    "danger": PALETTE_COLORS["danger"],
+    "warning": PALETTE_COLORS["warning"],
 }
 
 FULL_MASK_SHAPES = """
@@ -106,11 +111,11 @@ def svg_defs(mask_id: str, shapes: str, cutouts: str) -> str:
         <stop offset="1" stop-color="{COLORS['background']}"/>
       </radialGradient>
       <filter id="softShadow" x="-20%" y="-20%" width="140%" height="150%">
-        <feDropShadow dx="0" dy="15" stdDeviation="18" flood-color="#000000" flood-opacity="0.55"/>
+        <feDropShadow dx="0" dy="15" stdDeviation="18" flood-color="{COLORS['black']}" flood-opacity="0.55"/>
       </filter>
       <mask id="{mask_id}" maskUnits="userSpaceOnUse" x="0" y="0" width="512" height="512">
-        <g fill="#fff">{shapes}</g>
-        <g fill="#000">{cutouts}</g>
+        <g fill="{COLORS['white']}">{shapes}</g>
+        <g fill="{COLORS['black']}">{cutouts}</g>
       </mask>
     </defs>
     """
@@ -138,8 +143,8 @@ def tray_svg() -> str:
       <title>Talysman tray icon</title>
       <defs>
         <mask id="trayMask" maskUnits="userSpaceOnUse" x="0" y="0" width="512" height="512">
-          <g fill="#fff">{MICRO_MASK_SHAPES}</g>
-          <g fill="#000">{MICRO_MASK_CUTOUTS}</g>
+          <g fill="{COLORS['white']}">{MICRO_MASK_SHAPES}</g>
+          <g fill="{COLORS['black']}">{MICRO_MASK_CUTOUTS}</g>
         </mask>
       </defs>
       <rect width="512" height="512" fill="currentColor" mask="url(#trayMask)"/>
@@ -301,7 +306,12 @@ def create_preview() -> None:
         font_sub = ImageFont.load_default()
 
     draw.text((90, 64), "Talysman logo asset kit", fill=COLORS["body"], font=font_title)
-    draw.text((92, 136), "Silver #c7ccd4 on near-black #08090a", fill=COLORS["midtone"], font=font_sub)
+    draw.text(
+        (92, 136),
+        f"Silver {COLORS['accent']} on near-black {COLORS['background']}",
+        fill=COLORS["midtone"],
+        font=font_sub,
+    )
 
     icon = render_svg(app_icon_svg("full"), 620)
     canvas.paste(icon.convert("RGB"), (90, 230))
@@ -348,12 +358,6 @@ def main() -> None:
     }
     for name, content in source_files.items():
         (SOURCE / name).write_text(content, encoding="utf-8")
-
-    (SOURCE / "brand-tokens.json").write_text(json.dumps({
-        "name": "Talysman",
-        "palette": COLORS,
-        "neutralRamp": ["#fafafa", "#f2f3f5", "#dcdee2", "#b8bcc4", "#8b9098", "#676c74", "#4d5158", "#3a3d43", "#26292e", "#17191c", "#0e0f11"]
-    }, indent=2) + "\n", encoding="utf-8")
 
     create_outlined_svg(SOURCE / "talysman-wordmark.svg", SOURCE / "talysman-wordmark-outlined.svg")
     create_outlined_svg(SOURCE / "talysman-lockup.svg", SOURCE / "talysman-lockup-outlined.svg")
@@ -451,12 +455,12 @@ def main() -> None:
         "display": "standalone",
     }
     (web / "manifest.webmanifest").write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
-    (web / "head-snippet.html").write_text(dedent("""\
+    (web / "head-snippet.html").write_text(dedent(f"""\
         <link rel="icon" href="/favicon.ico" sizes="any">
         <link rel="icon" href="/favicon.svg" type="image/svg+xml">
         <link rel="apple-touch-icon" href="/apple-touch-icon.png">
         <link rel="manifest" href="/manifest.webmanifest">
-        <meta name="theme-color" content="#08090a">
+        <meta name="theme-color" content="{COLORS['background']}">
     """), encoding="utf-8")
 
     # Electron configuration snippets.
@@ -476,12 +480,9 @@ def main() -> None:
     readme = dedent(f"""\
     # Talysman logo asset kit
 
-    This package reconstructs the approved concept as a clean, scalable vector system using the Talysman palette:
-
-    - Silver: `{COLORS['accent']}`
-    - Near-black: `{COLORS['background']}`
-    - Mid-tone: `{COLORS['midtone']}`
-    - Highlight: `{COLORS['highlight']}`
+    This package reconstructs the approved concept as a clean, scalable vector system using the
+    repository palette. Color values are read from `../../packages/shared/src/palette.json`;
+    generated SVGs and rasters are outputs, not additional color sources.
 
     ## Important note
 
@@ -489,7 +490,8 @@ def main() -> None:
 
     ## Source of truth
 
-    Keep `source/` under version control. Everything in `generated/` can be regenerated by running:
+    Keep `source/` under version control. Its SVG files and everything in `generated/` can be
+    regenerated from the canonical palette by running:
 
     ```bash
     python scripts/generate_assets.py

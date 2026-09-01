@@ -17,14 +17,15 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { readPalette } from "./lib/palette.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const brand = resolve(root, "assets/brand");
+const palette = readPalette();
 
-// Matches assets/brand/source/brand-tokens.json.
-const INK = "#08090a";
-const SUCCESS = "#22c55e";
-const MIDTONE = "#8b9098";
+const INK = palette.colors.background;
+const SUCCESS = palette.colors.success;
+const MIDTONE = palette.colors.foregroundMuted;
 
 const TRAY_SIZE = 32;
 

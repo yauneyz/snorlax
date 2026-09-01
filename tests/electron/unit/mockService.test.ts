@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Profile } from '@talysman/shared';
-import { DEFAULT_PROFILE_ID, EMPTY_POLICY, ErrorCode } from '@talysman/shared';
+import { DEFAULT_PROFILE_ID, EMPTY_POLICY, ErrorCode, palette } from '@talysman/shared';
 import { MockServiceConnection } from '../../helpers/mockService.js';
 
 async function pairMockKey(svc: MockServiceConnection, driveId = 'mock-drive-1') {
@@ -97,7 +97,7 @@ describe('MockServiceConnection — focus and key gates', () => {
 const evening: Profile = {
   id: 'evening',
   name: 'Evening',
-  color: '#ff8f6b',
+  color: palette.colors.profileCoral,
   policy: { ...EMPTY_POLICY, defaultAction: 'block' },
 };
 

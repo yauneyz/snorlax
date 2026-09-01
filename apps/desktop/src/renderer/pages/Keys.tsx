@@ -79,8 +79,8 @@ export function Keys() {
           className={cx(
             'block h-2.5 w-2.5 rounded-full',
             keyPresent
-              ? 'bg-ok shadow-[0_0_10px_2px_rgba(34,197,94,0.6)]'
-              : 'bg-danger shadow-[0_0_10px_2px_rgba(239,68,68,0.55)]',
+              ? 'bg-ok shadow-[0_0_10px_2px_rgb(var(--color-success)/0.6)]'
+              : 'bg-danger shadow-[0_0_10px_2px_rgb(var(--color-danger)/0.55)]',
           )}
         />
         <div>
@@ -169,7 +169,7 @@ export function Keys() {
                     className={cx(
                       'block h-2 w-2 shrink-0 rounded-full border',
                       on
-                        ? 'border-seal bg-seal shadow-[0_0_7px_1px_rgba(199,204,212,0.6)]'
+                        ? 'border-seal bg-seal shadow-[0_0_7px_1px_rgb(var(--color-signal)/0.6)]'
                         : 'border-white/25 bg-transparent',
                     )}
                   />

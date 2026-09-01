@@ -14,7 +14,7 @@ function Readout({ label, value, tone }: { label: string; value: string; tone?: 
   const color =
     tone === 'ok' ? 'text-okInk' : tone === 'danger' ? 'text-dangerInk' : 'text-slate-200';
   return (
-    <div className="rounded-[11px] border border-white/[0.07] bg-gradient-to-br from-white/[0.045] to-white/[0.012] px-4 py-3">
+    <div className="instrument-card rounded-[14px] border border-white/[0.08] px-4 py-3.5">
       <Kicker className="text-[9.5px] tracking-[0.18em]">{label}</Kicker>
       <div className={`mt-1.5 font-mono text-[15px] font-medium ${color}`}>{value}</div>
     </div>
@@ -40,7 +40,7 @@ export function Dashboard() {
     policy.defaultAction === 'block' ? policy.allowedDomains.length : policy.blockedDomains.length;
 
   return (
-    <div className="flex min-h-full flex-col items-center justify-center gap-9 py-6">
+    <div className="dashboard-stage flex min-h-full flex-col items-center justify-center gap-8 py-6">
       <FocusToggle />
 
       <div className="grid w-full max-w-2xl grid-cols-2 gap-3 sm:grid-cols-4">

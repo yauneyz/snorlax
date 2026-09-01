@@ -9,14 +9,19 @@
 :root {
   color-scheme: dark;
 
-  /* Silver is the product accent; green, amber, and red are reserved for status. */
-  --seal: #c7ccd4;
-  --seal-ink: #f2f3f5;
-  --ok: #22c55e;
-  --ok-ink: #4ade80;
-  --warn: #f59e0b;
-  --danger: #ef4444;
-  --danger-ink: #f87171;
+  /* Match the landing page: silver carries the brand, cyan signals deliberate action. */
+  --signal: rgb(var(--color-signal));
+  --signal-hi: rgb(var(--color-signal-high));
+  --signal-ink: rgb(var(--color-signal-ink));
+  --signal-soft: rgb(var(--color-signal)/0.1);
+  --signal-line: rgb(var(--color-signal)/0.3);
+  --seal: var(--signal);
+  --seal-ink: var(--signal);
+  --ok: rgb(var(--color-success));
+  --ok-ink: rgb(var(--color-success-ink));
+  --warn: rgb(var(--color-warning));
+  --danger: rgb(var(--color-danger));
+  --danger-ink: rgb(var(--color-danger-ink));
 }
 
 html,
@@ -27,8 +32,10 @@ body,
 }
 
 body {
-  background: #08090a;
-  color: #dcdee2;
+  background:
+    radial-gradient(circle at 60% 28%, rgb(var(--color-signal)/0.035), transparent 34rem),
+    rgb(var(--color-background));
+  color: rgb(var(--color-foreground));
   font-family: 'Space Grotesk Variable', ui-sans-serif, system-ui, 'Segoe UI', Roboto, sans-serif;
   -webkit-font-smoothing: antialiased;
   overflow: hidden;
@@ -39,6 +46,101 @@ body {
 .desktop-workspace {
   max-width: 1180px;
   isolation: isolate;
+  background:
+    radial-gradient(circle at 54% -20%, rgb(var(--color-brand)/0.08), transparent 34rem),
+    rgb(var(--color-background));
+}
+
+/* The landing hero uses a faint drafting grid to make the lock feel physical and engineered. */
+.desktop-workspace::before {
+  content: '';
+  position: absolute;
+  z-index: 0;
+  inset: 0 0 0 11rem;
+  pointer-events: none;
+  opacity: 0.42;
+  background-image:
+    linear-gradient(rgb(var(--color-white)/0.018) 1px, transparent 1px),
+    linear-gradient(90deg, rgb(var(--color-white)/0.018) 1px, transparent 1px);
+  background-size: 40px 40px;
+  mask-image: radial-gradient(circle at 48% 42%, black, transparent 76%);
+}
+
+.desktop-sidebar {
+  background: linear-gradient(180deg, rgb(var(--color-panel)/0.96), rgb(var(--color-background)/0.94));
+  box-shadow: inset -1px 0 rgb(var(--color-white)/0.015);
+}
+
+.desktop-brand-name {
+  color: rgb(var(--color-neutral150));
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.desktop-nav-item {
+  position: relative;
+}
+
+.desktop-nav-item::after {
+  content: '';
+  position: absolute;
+  inset: auto 12px 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgb(var(--color-white)/0.045), transparent);
+}
+
+.desktop-route-title {
+  color: rgb(var(--color-foreground-strong));
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.dashboard-stage {
+  position: relative;
+  isolation: isolate;
+}
+
+.dashboard-stage::before {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  top: 50%;
+  left: 50%;
+  width: 520px;
+  height: 520px;
+  transform: translate(-50%, -55%);
+  border: 1px solid rgb(var(--color-signal)/0.09);
+  border-radius: 32px;
+  background:
+    linear-gradient(rgb(var(--color-white)/0.018), rgb(var(--color-white)/0.004)),
+    repeating-linear-gradient(90deg, transparent 0 39px, rgb(var(--color-white)/0.018) 40px),
+    repeating-linear-gradient(0deg, transparent 0 39px, rgb(var(--color-white)/0.018) 40px);
+  mask-image: radial-gradient(circle, black 30%, transparent 72%);
+}
+
+.instrument-card {
+  position: relative;
+  overflow: hidden;
+  background: linear-gradient(150deg, rgb(var(--color-white)/0.055), rgb(var(--color-white)/0.014));
+  box-shadow:
+    inset 0 1px rgb(var(--color-white)/0.045),
+    0 12px 30px -22px rgb(var(--color-black)/0.95);
+}
+
+.instrument-card::after {
+  content: '';
+  position: absolute;
+  right: 12px;
+  bottom: 11px;
+  width: 4px;
+  height: 4px;
+  border-radius: 999px;
+  background: var(--signal);
+  box-shadow: 0 0 9px rgb(var(--color-signal)/0.55);
+  opacity: 0.6;
 }
 
 /* Development builds get a viewport-level energy blade. Fixed positioning is intentional:
@@ -50,28 +152,28 @@ body {
   z-index: 9999;
   box-sizing: border-box;
   pointer-events: none;
-  border: 2px solid #ff3434;
+  border: 2px solid rgb(var(--color-development));
   box-shadow:
-    inset 0 0 5px rgba(255, 52, 52, 0.95),
-    inset 0 0 13px rgba(255, 28, 28, 0.58),
-    inset 0 0 24px rgba(255, 20, 20, 0.2);
+    inset 0 0 5px rgb(var(--color-development)/0.95),
+    inset 0 0 13px rgb(var(--color-development)/0.58),
+    inset 0 0 24px rgb(var(--color-development)/0.2);
 }
 
 .dev-mode-label {
-  border: 1px solid rgba(255, 52, 52, 0.72);
+  border: 1px solid rgb(var(--color-development)/0.72);
   border-radius: 4px;
   padding: 1px 5px;
-  color: #ff5252;
-  background: rgba(255, 35, 35, 0.1);
+  color: rgb(var(--color-development-high));
+  background: rgb(var(--color-development)/0.1);
   box-shadow:
-    inset 0 0 5px rgba(255, 35, 35, 0.18),
-    0 0 7px rgba(255, 35, 35, 0.24);
+    inset 0 0 5px rgb(var(--color-development)/0.18),
+    0 0 7px rgb(var(--color-development)/0.24);
   font-family: 'JetBrains Mono Variable', ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 9px;
   font-weight: 700;
   line-height: 14px;
   letter-spacing: 0.08em;
-  text-shadow: 0 0 5px rgba(255, 52, 52, 0.75);
+  text-shadow: 0 0 5px rgb(var(--color-development)/0.75);
 }
 
 /* Tiling Wayland compositors are allowed to disregard the BrowserWindow's requested bounds.
@@ -94,7 +196,7 @@ body {
   font-weight: 500;
   letter-spacing: 0.2em;
   text-transform: uppercase;
-  color: #676c74;
+  color: rgb(var(--color-foreground-dim));
 }
 
 @keyframes tal-pulse {
@@ -116,18 +218,18 @@ body {
 @keyframes dev-lightsaber-pulse {
   0%,
   100% {
-    border-color: #ff3434;
+    border-color: rgb(var(--color-development));
     box-shadow:
-      inset 0 0 5px rgba(255, 52, 52, 0.9),
-      inset 0 0 13px rgba(255, 28, 28, 0.5),
-      inset 0 0 24px rgba(255, 20, 20, 0.16);
+      inset 0 0 5px rgb(var(--color-development)/0.9),
+      inset 0 0 13px rgb(var(--color-development)/0.5),
+      inset 0 0 24px rgb(var(--color-development)/0.16);
   }
   50% {
-    border-color: #ff5555;
+    border-color: rgb(var(--color-development-high));
     box-shadow:
-      inset 0 0 7px rgba(255, 70, 70, 1),
-      inset 0 0 17px rgba(255, 35, 35, 0.66),
-      inset 0 0 30px rgba(255, 20, 20, 0.24);
+      inset 0 0 7px rgb(var(--color-development-high)),
+      inset 0 0 17px rgb(var(--color-development)/0.66),
+      inset 0 0 30px rgb(var(--color-development)/0.24);
   }
 }
 
@@ -165,19 +267,19 @@ body {
   height: 10px;
 }
 ::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.08);
+  background: rgb(var(--color-white)/0.08);
   border-radius: 6px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.14);
+  background: rgb(var(--color-white)/0.14);
 }
 ::-webkit-scrollbar-track {
   background: transparent;
 }
 
-/* Focus ring: silver, never the browser default blue. */
+/* Focus ring follows the landing page's action signal, never browser-default blue. */
 :focus-visible {
-  outline: 2px solid rgba(199, 204, 212, 0.5);
+  outline: 2px solid rgb(var(--color-signal)/0.52);
   outline-offset: 2px;
 }
 
@@ -190,5 +292,16 @@ input[type='time']::-webkit-calendar-picker-indicator {
 @media (prefers-reduced-motion: reduce) {
   .desktop-workspace--dev::after {
     animation: none;
+  }
+}
+
+@media (max-width: 760px) {
+  .desktop-workspace::before {
+    left: 0;
+  }
+
+  .dashboard-stage::before {
+    width: 440px;
+    height: 440px;
   }
 }

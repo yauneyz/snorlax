@@ -4,7 +4,7 @@
  * service, which re-checks every gate itself.
  */
 import React, { useState } from 'react';
-import { ErrorCode, resolveActiveProfile } from '@talysman/shared';
+import { ErrorCode, palette, resolveActiveProfile } from '@talysman/shared';
 import { request } from '../lib/bridge.js';
 import { useFocusStore } from '../store/useFocusStore.js';
 import { cx, profileSummary } from '../lib/utils.js';
@@ -62,8 +62,8 @@ export function FocusToggle() {
           className={cx(
             'absolute inset-0 rounded-full border',
             focusActive
-              ? 'border-ok/40 shadow-[0_0_30px_rgba(34,197,94,0.20),inset_0_0_40px_rgba(34,197,94,0.08)]'
-              : 'border-white/[0.10] shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]',
+              ? 'border-ok/40 shadow-[0_0_42px_rgb(var(--color-success)/0.14),inset_0_0_44px_rgb(var(--color-success)/0.06)]'
+              : 'border-white/[0.10] shadow-[inset_0_1px_0_rgb(var(--color-white)/0.08)]',
           )}
         />
         <div className="absolute inset-4 rounded-full border border-dashed border-white/[0.06]" />
@@ -72,7 +72,7 @@ export function FocusToggle() {
           className="absolute inset-[50px] rounded-full"
           style={{
             background: `radial-gradient(circle, ${
-              focusActive ? 'rgba(34,197,94,0.14)' : 'rgba(199,204,212,0.05)'
+              focusActive ? 'rgb(var(--color-success)/0.12)' : 'rgb(var(--color-brand)/0.05)'
             }, transparent 72%)`,
           }}
         />
@@ -81,11 +81,13 @@ export function FocusToggle() {
             size={46}
             className={cx(
               focusActive
-                ? 'drop-shadow-[0_0_14px_rgba(34,197,94,0.4)]'
+                ? 'drop-shadow-[0_0_16px_rgb(var(--color-success)/0.32)]'
                 : 'opacity-75 grayscale-[0.5]',
             )}
           />
-          <div className="mt-2 text-2xl font-bold tracking-[0.06em] text-slate-100">
+          <div
+            className="mt-2 text-[25px] font-bold tracking-[-0.025em] text-slate-100"
+          >
             {focusActive ? 'FOCUSED' : 'UNPROTECTED'}
           </div>
 
@@ -101,7 +103,7 @@ export function FocusToggle() {
           >
             <span
               className="block h-[7px] w-[7px] rounded-[2px]"
-              style={{ backgroundColor: activeProfile?.color ?? '#c7ccd4' }}
+              style={{ backgroundColor: activeProfile?.color ?? palette.colors.brand }}
             />
             <span className="whitespace-nowrap text-[12.5px] font-semibold text-slate-200">
               {activeProfile?.name ?? 'None'}

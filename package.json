@@ -34,6 +34,7 @@
     "build:dev": "cross-env APP_ENV=development node scripts/build.mjs --target linux",
     "build:extension": "node scripts/build-extension.mjs && node scripts/audit-extension.mjs",
     "audit:extension": "node scripts/audit-extension.mjs",
+    "palette:check": "node scripts/check-palette.mjs",
     "release:local": "node scripts/release-local.mjs",
     "release:both": "node scripts/release-both-from-linux.mjs",
     "release:upload": "node scripts/upload-release.mjs",
@@ -57,7 +58,7 @@
     "capture:marketing": "node scripts/capture-marketing.mjs",
     "capture:demo": "node scripts/record-demo.mjs",
     "test:watch": "vitest",
-    "lint": "eslint . && pnpm --filter @talysman/web lint",
+    "lint": "node scripts/check-palette.mjs && eslint . && pnpm --filter @talysman/web lint",
     "lint:fix": "eslint . --fix && pnpm --filter @talysman/web lint --fix"
   },
   "devDependencies": {

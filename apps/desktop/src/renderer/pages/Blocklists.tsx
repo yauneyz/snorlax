@@ -9,6 +9,7 @@ import {
 } from '@talysman/shared';
 import { siblingsFor } from '@talysman/core/browser';
 import { listInstalledApps, request } from '../lib/bridge.js';
+import { desktopPaletteColor } from '../lib/desktopPalette.js';
 import { useFocusStore } from '../store/useFocusStore.js';
 import { Badge, Button, Input, Kicker, ProfileDot, Textarea } from '../components/ui/index.js';
 import { cx, profileSummary } from '../lib/utils.js';
@@ -36,6 +37,9 @@ type Preset = {
 const SMART_FILTERING_ENABLED = productFeaturesForEnvironment(
   __APP_CONFIG__.APP_ENV,
 ).smartFiltering;
+
+/** Page-level indicators follow the desktop app's signal color; profile colours stay in the switcher. */
+const BLOCKLIST_SIGNAL = desktopPaletteColor('signal');
 
 const CLASSIC_PRESETS: Preset[] = [
   { value: 'blacklist', label: 'Blacklist', hint: 'Block only the sites you list.' },
@@ -166,13 +170,13 @@ function DomainListModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(8,9,10,0.72)] px-4 backdrop-blur-md"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-[rgb(var(--color-background)/0.72)] px-4 backdrop-blur-md"
       role="dialog"
       aria-modal="true"
       aria-labelledby="domain-list-modal-title"
       onKeyDown={(e) => e.key === 'Escape' && onClose()}
     >
-      <div className="flex max-h-[82vh] w-full max-w-2xl flex-col rounded-xl border border-white/[0.09] bg-[rgba(14,15,17,0.96)] shadow-[0_24px_60px_-20px_rgba(0,0,0,0.9)]">
+      <div className="flex max-h-[82vh] w-full max-w-2xl flex-col rounded-xl border border-white/[0.09] bg-[rgb(var(--color-panel)/0.96)] shadow-[0_24px_60px_-20px_rgb(var(--color-black)/0.9)]">
         <div className="border-b border-white/[0.07] p-5">
           <div className="flex items-start justify-between gap-4">
             <div>
@@ -383,7 +387,7 @@ export function Blocklists({ onUpgrade }: { onUpgrade: () => void }) {
   const selected = resolveActiveProfile(profiles, selectedId ?? activeProfileId);
   const policy = selected?.policy ?? EMPTY_POLICY;
   const isActive = selected?.id === activeProfileId;
-  const accent = selected?.color ?? '#c7ccd4';
+  const accent = BLOCKLIST_SIGNAL;
   const profileLimit = maxProfiles(productLimits);
   const profileLimitReached = profileLimit !== null && profiles.length >= profileLimit;
 
@@ -692,7 +696,7 @@ export function Blocklists({ onUpgrade }: { onUpgrade: () => void }) {
           {menuOpen && (
             <>
               <div className="fixed inset-0 z-40" onClick={() => setMenuOpen(false)} />
-              <div className="absolute left-0 top-[calc(100%+7px)] z-50 w-[322px] animate-rise rounded-xl border border-white/[0.12] bg-[rgba(14,15,17,0.97)] p-[7px] shadow-[0_18px_46px_rgba(0,0,0,0.6)] backdrop-blur-xl">
+              <div className="absolute left-0 top-[calc(100%+7px)] z-50 w-[322px] animate-rise rounded-xl border border-white/[0.12] bg-[rgb(var(--color-panel)/0.97)] p-[7px] shadow-[0_18px_46px_rgb(var(--color-black)/0.6)] backdrop-blur-xl">
                 <div className="px-2 pb-[7px] pt-1.5 font-mono text-[9.5px] font-medium tracking-[0.18em] text-slate-450">
                   SWITCH PROFILE ·{' '}
                   {profileLimit === null ? profiles.length : `${profiles.length}/${profileLimit}`}
@@ -894,7 +898,7 @@ export function Blocklists({ onUpgrade }: { onUpgrade: () => void }) {
                 className={cx(
                   'flex-1 rounded-[10px] border px-3 py-2.5 text-left transition',
                   active
-                    ? 'border-seal/30 bg-seal/[0.09] shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_0_18px_rgba(199,204,212,0.10)]'
+                    ? 'border-seal/30 bg-seal/[0.09] shadow-[inset_0_1px_0_rgb(var(--color-white)/0.06),0_0_18px_rgb(var(--color-signal)/0.10)]'
                     : 'border-white/[0.07] bg-white/[0.025] hover:border-white/[0.14] hover:bg-white/[0.05]',
                   locked && 'opacity-65',
                 )}
@@ -1013,12 +1017,12 @@ export function Blocklists({ onUpgrade }: { onUpgrade: () => void }) {
 
       {pickerOpen && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(8,9,10,0.72)] px-4 backdrop-blur-md"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-[rgb(var(--color-background)/0.72)] px-4 backdrop-blur-md"
           role="dialog"
           aria-modal="true"
           aria-labelledby="app-picker-title"
         >
-          <div className="flex max-h-[82vh] w-full max-w-2xl flex-col rounded-xl border border-white/[0.09] bg-[rgba(14,15,17,0.96)] shadow-[0_24px_60px_-20px_rgba(0,0,0,0.9)]">
+          <div className="flex max-h-[82vh] w-full max-w-2xl flex-col rounded-xl border border-white/[0.09] bg-[rgb(var(--color-panel)/0.96)] shadow-[0_24px_60px_-20px_rgb(var(--color-black)/0.9)]">
             <div className="border-b border-white/[0.07] p-5">
               <div className="flex items-start justify-between gap-4">
                 <div>

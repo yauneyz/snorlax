@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Policy, Profile, Schedule } from '@talysman/shared';
-import { EMPTY_POLICY } from '@talysman/shared';
+import { EMPTY_POLICY, palette } from '@talysman/shared';
 import {
   constrainPolicyToLimits,
   constrainProfilesToLimits,
@@ -28,11 +28,11 @@ const schedule: Schedule = {
 };
 
 const profiles: Profile[] = [
-  { id: 'deep', name: 'Deep Work', color: '#4fd6c0', policy: EMPTY_POLICY },
+  { id: 'deep', name: 'Deep Work', color: palette.colors.profileAqua, policy: EMPTY_POLICY },
   {
     id: 'evening',
     name: 'Evening',
-    color: '#ff8f6b',
+    color: palette.colors.profileCoral,
     policy: { ...EMPTY_POLICY, defaultAction: 'block' },
   },
 ];
