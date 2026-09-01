@@ -280,8 +280,13 @@ drop the column. Do the former.
   live once it was real. That contradicts §14's "keep PII out of analytics", so the email is
   gone — identification is by opaque user id only. `analytics_events.user_id` joins to
   `profiles` when an address is genuinely needed, so copying one into a third-party store bought
-  nothing and put PII somewhere we do not control. Session replay on the marketing site is
-  still worth auditing separately before launch.
+  nothing and put PII somewhere we do not control.
+- **Desktop session replay — DECIDED AND IMPLEMENTED.** `posthog-js` now also runs in the
+  Electron renderer (`apps/desktop/src/renderer/lib/posthog.ts`), identified by `device_id` only
+  (no email), inputs masked. It never records for dev builds or the developer's own
+  `release:local` install (`config.isDev`/`config.isLocalRelease`). See `analytics-arch.md` §3
+  for the exception this carves out of the `track()`-seam architecture, and the privacy policy's
+  "Desktop app session replay" paragraph for the user-facing disclosure.
 
 ---
 

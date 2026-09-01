@@ -9,4 +9,6 @@ declare const __APP_CONFIG__: {
   VITE_SUPABASE_ANON_KEY: string;
   LOCAL_ENTITLEMENT_PUBLIC_KEY: string;
   LOCAL_RELEASE_BUILD: boolean;
+  POSTHOG_KEY: string;
+  POSTHOG_HOST: string;
 };

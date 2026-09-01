@@ -119,8 +119,16 @@ zero engineering, and the provider is already wired.
 
 **So: one `track()` seam that fans out.** Every call site writes once. The seam does the Supabase
 insert (authoritative) and fires PostHog (best-effort, never blocks, never throws). Send **tier 1
-web events** to both; keep tier 2 and desktop events in Supabase only. If you later drop PostHog,
-you delete one function body and lose nothing.
+web events** to both; keep tier 2 and desktop milestone/usage events in Supabase only. If you later
+drop PostHog, you delete one function body and lose nothing.
+
+**Exception: desktop session replay.** The Electron renderer (`apps/desktop/src/renderer/lib/
+posthog.ts`) initializes `posthog-js` directly and sends replay straight to PostHog — this bypasses
+the `track()` seam entirely, since it's UI interaction capture, not a milestone/usage event, and has
+no Supabase analogue. Identified by the desktop's opaque `device_id` only, no email/PII, inputs
+masked (`maskAllInputs: true`). It never initializes for `pnpm dev`/`dev:desktop`
+(`config.isDev`) or `pnpm release:local` (`config.isLocalRelease`, the developer's own daily-driver
+install) — both stay silent regardless of a configured key.
 
 > `phc_A7HRSQgkac5ZUtyLThQ5sk2qLvU2rbmZmHQUnuXRTRws` is a PostHog *public project* key — designed
 > to ship in client bundles, not a secret. Set it as `project_key` under the existing `[posthog]` section

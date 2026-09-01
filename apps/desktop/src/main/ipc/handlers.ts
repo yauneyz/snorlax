@@ -15,6 +15,7 @@ import { isServiceError, type ServiceConnection } from '../service/connection.js
 import type { MockServiceConnection } from '../service/mockService.js';
 import { uninstallService } from '../service/uninstaller.js';
 import { flushEvents, track } from '../analytics.js';
+import { loadDeviceIdentity } from '../deviceIdentity.js';
 import {
   getEntitlement,
   invalidateEntitlementCache,
@@ -326,15 +327,23 @@ export async function registerIpcHandlers(ctx: HandlerContext): Promise<void> {
     }
   });
 
-  ipcHandle(Channels.appInfo, () => ({
-    appVersion: app.getVersion(),
-    appEnv: config.appEnv,
-    isLocalRelease: config.isLocalRelease,
-    localEntitlementEnabled: config.isLocalRelease && isLocalEntitlementEnabled(),
-    usingMock: Boolean(mock),
-    serviceConnected: service.connected,
-    platform: process.platform,
-  }));
+  ipcHandle(Channels.appInfo, async () => {
+    const { identity } = await loadDeviceIdentity();
+    return {
+      appVersion: app.getVersion(),
+      appEnv: config.appEnv,
+      isDev: config.isDev,
+      isLocalRelease: config.isLocalRelease,
+      localEntitlementEnabled: config.isLocalRelease && isLocalEntitlementEnabled(),
+      usingMock: Boolean(mock),
+      serviceConnected: service.connected,
+      platform: process.platform,
+      // Session replay identity only — no email/PII (architecture §3.15).
+      deviceId: identity.deviceId,
+      posthogKey: config.posthogKey,
+      posthogHost: config.posthogHost,
+    };
+  });
 
   ipcHandle(Channels.checkForUpdates, () => checkForAppUpdates());
 

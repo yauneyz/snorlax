@@ -115,11 +115,15 @@ const api = {
   appInfo: (): Promise<{
     appVersion: string;
     appEnv: string;
+    isDev: boolean;
     isLocalRelease: boolean;
     localEntitlementEnabled: boolean;
     usingMock: boolean;
     serviceConnected: boolean;
     platform: NodeJS.Platform;
+    deviceId: string;
+    posthogKey: string;
+    posthogHost: string;
   }> => ipcRenderer.invoke(Channels.appInfo),
 
   checkForUpdates: (): Promise<AppUpdateCheckResult> =>

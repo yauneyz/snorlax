@@ -81,6 +81,13 @@ your blocklists, or any browsing content. It is on by default and can be turned
 off at any time from the app's Settings page, which stops all further reporting
 immediately.
 
+**Desktop app session replay.** The desktop application also uses PostHog to
+record how the app's own interface is used — for example, which screens are
+opened and which buttons are clicked — so we can see and fix usability problems.
+This replay is limited to the Talysman application window; it does not capture
+your screen, other applications, or any website or content you are browsing. Text
+entered into input fields is masked and never recorded.
+
 ## Data retention
 
 We retain your personal information for as long as your account is active or as

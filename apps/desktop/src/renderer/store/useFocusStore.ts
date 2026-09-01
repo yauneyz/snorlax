@@ -31,6 +31,7 @@ import {
   type SubscriptionPlan,
 } from '../lib/bridge.js';
 import { limitsForPlan, type ProductLimits } from '../../shared/productLimits.js';
+import { initSessionReplay } from '../lib/posthog.js';
 
 interface FocusStore {
   ready: boolean;
@@ -264,6 +265,13 @@ export const useFocusStore = create<FocusStore>((set, get) => ({
         onboardingComplete: onboarding.complete,
       });
       void get().refreshSubscriptionDetail();
+      initSessionReplay({
+        posthogKey: info.posthogKey,
+        posthogHost: info.posthogHost,
+        isDev: info.isDev,
+        isLocalRelease: info.isLocalRelease,
+        deviceId: info.deviceId,
+      });
 
       // Subscribe before taking the initial snapshot. If another desktop client changes the daemon
       // during startup, the following getState either includes it or a later event applies it.

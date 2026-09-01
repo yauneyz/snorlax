@@ -23,6 +23,9 @@ export function desktopEnvPairs(credentials, mode, { stripeTarget = "development
     stripeMode === "live" ? stripe.publishable_key_live : stripe.publishable_key_test;
   const supabase = credentials.supabase[mode];
   const appUrl = mode === "prod" ? credentials.app.url_prod : credentials.app.url_dev;
+  const posthog = credentials.posthog ?? {};
+  const posthogKey =
+    posthog.project_key || (posthog.key?.startsWith("phc_") ? posthog.key : "");
 
   return [
     ["APP_ENV", mode === "prod" ? "production" : "development"],
@@ -47,6 +50,10 @@ export function desktopEnvPairs(credentials, mode, { stripeTarget = "development
       "UPDATE_FEED_URL",
       `${credentials.extension_hosting.public_s3_base_url.replace(/\/+$/, "")}/desktop`,
     ],
+    // Session replay in the renderer (main/config.ts's isDev/isLocalRelease gate skips init
+    // for dev and release:local builds regardless of these being present).
+    ["POSTHOG_KEY", posthogKey],
+    ["POSTHOG_HOST", posthog.host ?? ""],
   ];
 }
 
