@@ -199,8 +199,8 @@ export default function LandingPage() {
           </h1>
           <div className="hero__sub">
             <p>
-              Pair any USB drive. Start a focus session. Put the key somewhere inconvenient. When
-              the work gets hard, the off switch is no longer sitting one click away.
+              You pair a USB drive with the app and then you can only turn off focus mode when that
+              key is inserted. Your computer becomes a deep work sanctuary.
             </p>
           </div>
           <div className="hero__ctas">
@@ -226,10 +226,8 @@ export default function LandingPage() {
 
       <section className="section" id="how">
         <p className="section__eyebrow">One calm decision. Three steps.</p>
-        <h2 className="section__title">Make quitting harder than continuing.</h2>
-        <p className="section__lede">
-          No proprietary gadget to order. The spare drive in your drawer becomes the boundary.
-        </p>
+        <h2 className="section__title">How It Works</h2>
+        <p className="section__lede">Getting started with Talysman takes just a few clicks.</p>
         <ol className="steps">
           {steps.map((step, index) => (
             <li key={step.title} className="step">
