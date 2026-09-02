@@ -79,8 +79,14 @@ describe("isPosthogFanoutEvent", () => {
   it("sends web events to PostHog but keeps desktop and server events in Supabase only", () => {
     // §3: rollups are not events and per-event pricing punishes usage data, so tier 2 and
     // desktop signals stay in the system of record.
-    expect(isPosthogFanoutEvent("web")).toBe(true);
-    expect(isPosthogFanoutEvent("desktop")).toBe(false);
-    expect(isPosthogFanoutEvent("server")).toBe(false);
+    expect(isPosthogFanoutEvent("web", "page_viewed")).toBe(true);
+    expect(isPosthogFanoutEvent("desktop", "app_installed")).toBe(false);
+    expect(isPosthogFanoutEvent("server", "trial_started")).toBe(false);
+  });
+
+  it("fans out download_clicked even though it's recorded with source \"server\"", () => {
+    // The download redirect route (api/desktop/download/route.ts) has no client component to
+    // fire it from, so it's recorded server-side — but it's still a marketing/web milestone.
+    expect(isPosthogFanoutEvent("server", "download_clicked")).toBe(true);
   });
 });

@@ -8,6 +8,7 @@ import {
   PRO_TRIAL_DAYS,
 } from "@talysman/product";
 import { AppShot } from "@/components/marketing/AppShot";
+import { HeroCopy } from "@/components/marketing/HeroCopy";
 import { HeroDemo } from "@/components/marketing/HeroDemo";
 import { config } from "@/lib/config";
 
@@ -193,24 +194,7 @@ export default function LandingPage() {
     <>
       <section className="hero">
         <div className="hero__copy">
-          <p className="hero__eyebrow">For people who keep overriding their blockers</p>
-          <h1 className="hero__headline">
-            A distraction blocker you need a <span>physical key</span> to turn off.
-          </h1>
-          <div className="hero__sub">
-            <p>
-              You pair a USB drive with the app and then you can only turn off focus mode when that
-              key is inserted. Your computer becomes a deep work sanctuary.
-            </p>
-          </div>
-          <div className="hero__ctas">
-            <Link href="/download" className="landing__cta landing__cta--primary">
-              Start focusing now - free
-            </Link>
-            <Link href="#how" className="landing__cta landing__cta--secondary">
-              See how it works
-            </Link>
-          </div>
+          <HeroCopy />
           <ul className="hero__trust" aria-label="Product highlights">
             <li>Free forever</li>
             <li>Use any USB drive</li>

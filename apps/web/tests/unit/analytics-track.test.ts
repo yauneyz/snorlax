@@ -6,6 +6,7 @@ const mocks = vi.hoisted(() => ({
   insert: vi.fn(),
   captureException: vi.fn(),
   posthogCapture: vi.fn(),
+  posthogFlush: vi.fn(),
   getPosthogServer: vi.fn(),
 }));
 
@@ -33,6 +34,7 @@ beforeEach(() => {
   mocks.rpc.mockResolvedValue({ data: "person-1", error: null });
   mocks.insert.mockResolvedValue({ error: null });
   mocks.getPosthogServer.mockReturnValue(null);
+  mocks.posthogFlush.mockResolvedValue(undefined);
 });
 
 describe("ingestAllowed", () => {
@@ -192,8 +194,19 @@ describe("track", () => {
     expect(mocks.captureException).not.toHaveBeenCalled();
   });
 
+  it("does not fan a duplicate idempotency_key out to PostHog", async () => {
+    // Supabase dedupes via the unique index, but PostHog has no equivalent — capturing on a
+    // 23505 no-op would inflate PostHog's count past Supabase's for once-per-person events.
+    mocks.getPosthogServer.mockReturnValue({ capture: mocks.posthogCapture, flush: mocks.posthogFlush });
+    mocks.insert.mockResolvedValue({
+      error: { code: "23505", message: "duplicate key value violates unique constraint" },
+    });
+    await track({ event: "account_created", source: "web", userId: "u1" });
+    expect(mocks.posthogCapture).not.toHaveBeenCalled();
+  });
+
   it("fans out web events to PostHog but not desktop ones", async () => {
-    mocks.getPosthogServer.mockReturnValue({ capture: mocks.posthogCapture });
+    mocks.getPosthogServer.mockReturnValue({ capture: mocks.posthogCapture, flush: mocks.posthogFlush });
 
     await track({ event: "page_viewed", source: "web", anonId: "a1", props: { path: "/" } });
     expect(mocks.posthogCapture).toHaveBeenCalledOnce();
@@ -201,6 +214,15 @@ describe("track", () => {
     mocks.posthogCapture.mockClear();
     await track({ event: "app_installed", source: "desktop", deviceId: "d1" });
     expect(mocks.posthogCapture).not.toHaveBeenCalled();
+  });
+
+  it("flushes the PostHog client so a serverless freeze can't drop the buffered event", async () => {
+    // posthog-node batches capture() calls and only sends them at a size/time threshold. A
+    // Vercel function is frozen right after it returns, so without an awaited flush() here a
+    // captured event can sit in the client's in-memory queue and never actually be sent.
+    mocks.getPosthogServer.mockReturnValue({ capture: mocks.posthogCapture, flush: mocks.posthogFlush });
+    await track({ event: "page_viewed", source: "web", anonId: "a1" });
+    expect(mocks.posthogFlush).toHaveBeenCalledOnce();
   });
 
   it("survives a throwing PostHog client without losing the Supabase write", async () => {

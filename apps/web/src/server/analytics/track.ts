@@ -283,12 +283,16 @@ export async function track(input: TrackInput): Promise<void> {
     });
 
     // 23505 is the unique violation on idempotency_key: a replayed desktop flush, or a
-    // once-per-person event firing from its second call site. Both are successes.
-    if (error && error.code !== "23505") {
-      throw new Error(`analytics_events insert failed: ${error.message}`);
+    // once-per-person event firing from its second call site. Both are successes for Supabase,
+    // which is what the idempotency key is for — but PostHog has no equivalent dedup, so this
+    // duplicate must not fan out there too, or PostHog counts would inflate past Supabase's.
+    if (error) {
+      if (error.code !== "23505") {
+        throw new Error(`analytics_events insert failed: ${error.message}`);
+      }
+    } else {
+      await fanoutToPosthog(input);
     }
-
-    fanoutToPosthog(input);
 
     if (USER_FACING_ERROR_EVENTS.has(input.event)) {
       await alertOnUserFacingError(db, input);
@@ -333,10 +337,19 @@ async function alertOnUserFacingError(
   }
 }
 
-/** Best-effort only. A PostHog outage must be invisible to the caller and to Supabase. */
-function fanoutToPosthog(input: TrackInput): void {
+/**
+ * Best-effort only. A PostHog outage must be invisible to the caller and to Supabase.
+ *
+ * `posthog-node` batches `capture()` calls in memory and only sends them at a queue-size or
+ * time threshold, not on every call. A Vercel serverless function is frozen right after it
+ * returns its response, so without an explicit `flush()` here a captured event can sit in the
+ * client's buffer and never actually reach PostHog — the call succeeds, nothing throws, and
+ * the event is just gone. `flush()` is awaited (not `shutdown()`) so the client stays alive
+ * for the next invocation on a reused (Fluid Compute) instance instead of tearing down.
+ */
+async function fanoutToPosthog(input: TrackInput): Promise<void> {
   try {
-    if (!isPosthogFanoutEvent(input.source)) return;
+    if (!isPosthogFanoutEvent(input.source, input.event)) return;
     const posthog = getPosthogServer();
     if (!posthog) return;
     const distinctId = input.userId ?? input.anonId ?? input.deviceId;
@@ -346,6 +359,7 @@ function fanoutToPosthog(input: TrackInput): void {
       event: input.event,
       properties: { ...input.props, ...attributionPayload(input.attribution) },
     });
+    await posthog.flush();
   } catch {
     // Deliberately silent: this is the non-authoritative store.
   }

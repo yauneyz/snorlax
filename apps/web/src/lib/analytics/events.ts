@@ -192,7 +192,12 @@ export const USER_FACING_ERROR_EVENTS = new Set<AnalyticsEventName>([
  * Tier-1 web events also go to PostHog; desktop and billing stay in Supabase only.
  * Per §3: PostHog earns its keep on session replay and ad-hoc funnels for the marketing
  * site. Rollups are not events, and per-event pricing punishes usage data.
+ *
+ * `download_clicked` is checked by event name rather than source: it's a marketing/web
+ * milestone, but it's recorded from a server-side redirect route (no client component fires
+ * it), so `source` is "server" even though it belongs in the same funnels as the other
+ * marketing events.
  */
-export function isPosthogFanoutEvent(source: AnalyticsSource): boolean {
-  return source === "web";
+export function isPosthogFanoutEvent(source: AnalyticsSource, event: AnalyticsEventName): boolean {
+  return source === "web" || event === "download_clicked";
 }
