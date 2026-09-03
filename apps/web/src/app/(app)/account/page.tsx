@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { cookies } from "next/headers";
 import { ManageBillingButton } from "@/components/app/ManageBillingButton";
+import { PmfSurvey } from "@/components/app/PmfSurvey";
 import {
   ENTITLEMENT_GRACE_COOKIE,
   entitlementGraceCookieIsValid,
@@ -10,6 +11,7 @@ import { requireUser } from "@/lib/auth/require-user";
 import { getSubscriptionDetailForUser } from "@/lib/stripe/subscription";
 import { supabaseServer } from "@/lib/supabase/server";
 import type { ProfileRow } from "@/lib/supabase/types";
+import { shouldShowPmfSurvey } from "@/server/analytics/pmf-survey";
 
 export const metadata: Metadata = {
   title: "Account",
@@ -19,7 +21,7 @@ export const metadata: Metadata = {
 export default async function AccountPage() {
   const user = await requireUser();
   const supabase = await supabaseServer();
-  const [{ data: profile }, detailResult] = await Promise.all([
+  const [{ data: profile }, detailResult, showPmfSurvey] = await Promise.all([
     supabase
       .from("profiles")
       .select("full_name,email,avatar_url")
@@ -28,6 +30,7 @@ export default async function AccountPage() {
     getSubscriptionDetailForUser(user.id)
       .then((detail) => ({ detail, unavailable: false as const }))
       .catch(() => ({ detail: undefined, unavailable: true as const })),
+    shouldShowPmfSurvey(user.id, user.created_at),
   ]);
   const detail = detailResult.detail;
   const graceCookie = detailResult.unavailable
@@ -98,6 +101,7 @@ export default async function AccountPage() {
           )}
         </aside>
       </div>
+      {showPmfSurvey ? <PmfSurvey /> : null}
     </section>
   );
 }

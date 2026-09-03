@@ -141,6 +141,21 @@ fun InsightsScreen(viewModel: InsightsViewModel = viewModel()) {
                 }
 
                 item {
+                    PanelCard("Product-market fit", "Sean Ellis survey · % \"very disappointed\" without Talysman, 40% is the classic threshold") {
+                        summary.pmf.data?.takeIf { it.responses > 0 }?.let { p ->
+                            KpiGrid(
+                                listOf(
+                                    "Very disappointed" to (p.pctVeryDisappointed?.let { "$it%" } ?: "—"),
+                                    "Somewhat disappointed" to (p.pctSomewhatDisappointed?.let { "$it%" } ?: "—"),
+                                    "Not disappointed" to (p.pctNotDisappointed?.let { "$it%" } ?: "—"),
+                                    "Responses" to p.responses.toString(),
+                                ),
+                            )
+                        } ?: EmptyState(summary.pmf.ok, summary.pmf.message)
+                    }
+                }
+
+                item {
                     PanelCard("Retention cohorts", "% protected-active at D1 / D7 / D30") {
                         val rows = summary.retention.data
                         if (rows.isNullOrEmpty()) EmptyState(summary.retention.ok, summary.retention.message)

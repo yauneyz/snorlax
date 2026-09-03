@@ -96,6 +96,23 @@ describe("POST /api/analytics/track", () => {
     expect(bodyAnon.status).toBe(400);
   });
 
+  it("never runs BotID's browser challenge against desktop-sourced events", async () => {
+    // The desktop app has no way to produce BotID's client-side proof (that only runs in a
+    // real browser via BotIdClient), so checkBotId() must never be consulted for it -- or
+    // every desktop event would be permanently mislabeled ua_class: "bot" in production.
+    const response = await trackPost(
+      request("/api/analytics/track", {
+        event: "extension_connected",
+        source: "desktop",
+        device_id: deviceId,
+      }),
+    );
+    expect(response.status).toBe(202);
+    expect(mocks.track).toHaveBeenCalledWith(
+      expect.objectContaining({ props: expect.objectContaining({ ua_class: "human" }) }),
+    );
+  });
+
   it("adds privacy-safe device and OS dimensions to page views", async () => {
     const response = await trackPost(
       request(

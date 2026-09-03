@@ -6,6 +6,7 @@ import { captureException } from "@/lib/sentry";
 import { getStripe } from "@/lib/stripe/client";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { config } from "@/lib/config";
+import { track } from "@/server/analytics/track";
 
 export async function POST(request: NextRequest) {
   try {
@@ -18,6 +19,13 @@ export async function POST(request: NextRequest) {
         { status: 400 },
       );
     }
+
+    void track({
+      event: "checkout_started",
+      source: "server",
+      userId: user.id,
+      props: { price: parsed.data.price, surface: "desktop" },
+    });
 
     const { url } = await createBillingCheckoutSession({
       stripe: getStripe(),

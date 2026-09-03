@@ -10,6 +10,7 @@ import { FunnelPanel } from "./FunnelPanel";
 import { InstallHealthPanel } from "./InstallHealthPanel";
 import { MigrationStatePanel } from "./MigrationStatePanel";
 import { PanelLoading } from "./PanelShell";
+import { PmfPanel } from "./PmfPanel";
 import { RawStreamPanel } from "./RawStreamPanel";
 import { RetentionPanel } from "./RetentionPanel";
 import { RevenuePanel } from "./RevenuePanel";
@@ -30,6 +31,7 @@ const panels = [
   ["Retention", RetentionPanel],
   ["Install health", InstallHealthPanel],
   ["Revenue", RevenuePanel],
+  ["Product-market fit", PmfPanel],
   ["Errors", ErrorsPanel],
   ["Raw stream", RawStreamPanel],
   ["Migration state", MigrationStatePanel],

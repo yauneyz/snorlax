@@ -66,6 +66,8 @@ export type DesktopAnalyticsEvent =
   | 'usb_key_paired'
   | 'usb_pair_failed'
   | 'schedule_created'
+  | 'schedule_edited'
+  | 'plan_selected'
   | 'extension_connected'
   | 'focus_session_completed'
   | 'bootstrap_failed'

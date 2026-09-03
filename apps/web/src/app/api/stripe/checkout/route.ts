@@ -3,6 +3,7 @@ import { requireUser } from "@/lib/auth/require-user";
 import { captureException } from "@/lib/sentry";
 import { createCheckoutSession } from "@/lib/stripe/checkout";
 import { checkoutSchema } from "@/lib/zod/checkout";
+import { track } from "@/server/analytics/track";
 
 export async function POST(request: NextRequest) {
   const user = await requireUser();
@@ -12,6 +13,12 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Invalid body", issues: parsed.error.issues }, { status: 400 });
   }
   try {
+    void track({
+      event: "checkout_started",
+      source: "server",
+      userId: user.id,
+      props: { price: parsed.data.price, surface: "web" },
+    });
     const { url } = await createCheckoutSession({
       userId: user.id,
       userEmail: user.email ?? "",

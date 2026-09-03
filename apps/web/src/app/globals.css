@@ -3049,6 +3049,105 @@ input:-webkit-autofill:focus {
   color: rgb(var(--color-danger-ink));
 }
 
+.account__pmf-survey {
+  margin-top: 1.15rem;
+  padding: 1.6rem 1.5rem;
+  background: var(--bg-1);
+  border: 1px solid var(--border);
+  border-radius: var(--r-xl);
+}
+
+.account__pmf-survey-title {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: 0.66rem;
+  font-weight: 500;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--fg-4);
+}
+
+.account__pmf-survey-prompt {
+  margin: 0.6rem 0 0;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--fg-0);
+}
+
+.account__pmf-survey-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  margin-top: 1rem;
+}
+
+.account__pmf-survey-option {
+  padding: 0.6rem 1rem;
+  font-size: 0.85rem;
+  color: var(--fg-2);
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: var(--r-pill);
+  transition: background var(--t-base) var(--ease);
+}
+
+.account__pmf-survey-option--on {
+  color: var(--accent-ink);
+  background: var(--grad-brand);
+  border-color: var(--signal-line);
+}
+
+.account__pmf-survey-followups {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-top: 1.15rem;
+}
+
+.account__pmf-survey-followups label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  font-size: 0.82rem;
+  color: var(--fg-3);
+}
+
+.account__pmf-survey-followups input {
+  padding: 0.6rem 0.75rem;
+  font-size: 0.85rem;
+  color: var(--fg-0);
+  background: var(--bg-0);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+}
+
+.account__pmf-survey-submit {
+  align-self: flex-start;
+  padding: 0.65rem 1.1rem;
+  font-weight: 600;
+  font-size: 0.85rem;
+  color: var(--accent-ink);
+  background: var(--grad-brand);
+  border: 1px solid var(--signal-line);
+  border-radius: var(--r-pill);
+  transition: background var(--t-base) var(--ease);
+}
+
+.account__pmf-survey-submit:hover:not(:disabled) {
+  background: var(--grad-brand-hover);
+}
+
+.account__pmf-survey-submit:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.account__pmf-survey-error {
+  margin: 0.6rem 0 0;
+  font-size: 0.82rem;
+  color: rgb(var(--color-danger-ink));
+}
+
 @media (max-width: 48rem) {
   .account__grid {
     grid-template-columns: 1fr;

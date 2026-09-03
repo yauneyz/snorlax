@@ -13,6 +13,7 @@ import {
   type CheckoutPrice,
 } from "@talysman/product";
 import { supabaseBrowser } from "@/lib/supabase/browser";
+import { trackEvent } from "@/lib/analytics/posthog-client";
 
 type Props = {
   freeFeatures: string[];
@@ -44,8 +45,17 @@ export function PricingPlans({ freeFeatures, proFeatures, trialAvailable, alread
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // First step of the pricing → plan_selected → checkout_started → trial_started/
+  // subscription_started funnel. `beacon: true` matches the other fire-and-forget marketing
+  // events (OAuthButtons, SignupForm) so this never blocks paint or a fast navigation away.
+  useEffect(() => {
+    void trackEvent("pricing_page_viewed", { surface: "web" }, { beacon: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- fire once per mount only
+  }, []);
+
   const startCheckout = useCallback(
     async (price: CheckoutPrice) => {
+      void trackEvent("plan_selected", { price, surface: "web" }, { beacon: true });
       setError(null);
       setPending(true);
       const client = supabaseBrowser();

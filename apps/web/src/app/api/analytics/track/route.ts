@@ -36,7 +36,12 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  const botIdResult = await checkBotId();
+  // BotID's client-side challenge (see BotIdClient in layout.tsx) only ever runs in a real
+  // browser. The desktop app posts here too, over a plain HTTP client that can never produce
+  // that proof, so checkBotId() would call every desktop-sourced event a bot unconditionally.
+  // Only ask it about web traffic; desktop events fall back to the user-agent heuristic alone.
+  const isWebSource = parsed.data.source === "web";
+  const botIdResult = isWebSource ? await checkBotId() : null;
   const userAgent = request.headers.get("user-agent");
   const props = {
     ...parsed.data.props,
@@ -47,7 +52,8 @@ export async function POST(request: NextRequest) {
           request.headers.get("sec-ch-ua-platform"),
         )
       : {}),
-    ua_class: botIdResult.isBot || classifyUserAgent(userAgent) === "bot" ? "bot" : "human",
+    ua_class:
+      botIdResult?.isBot || classifyUserAgent(userAgent) === "bot" ? "bot" : "human",
   };
   await track({
     event: parsed.data.event,

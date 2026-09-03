@@ -10,6 +10,7 @@ import { subscriptionDetailSchema, type CheckoutPrice, type SubscriptionDetail }
 import { config } from '../config.js';
 import { bridgedUrl } from '../analyticsBridge.js';
 import { getAccessToken } from './supabase.js';
+import { track } from '../analytics.js';
 
 interface BillingResult {
   ok: boolean;
@@ -60,6 +61,11 @@ async function postForUrl(path: string, body?: unknown): Promise<BillingResult> 
 
 /** Open Stripe Checkout for the chosen plan in the system browser. */
 export function startCheckout(price: CheckoutPrice): Promise<BillingResult> {
+  // Fired here rather than in the renderer: there is no generic renderer→main analytics
+  // bridge (only the single-purpose reportRendererError channel), so every desktop milestone
+  // is tracked from main, as a side effect of the action it accompanies — same pattern as
+  // onboarding_completed in ipc/handlers.ts.
+  track('plan_selected', { price, surface: 'desktop' });
   return postForUrl('/api/desktop/checkout', { price });
 }
 

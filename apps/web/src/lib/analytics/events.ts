@@ -13,6 +13,8 @@ import { z } from "zod";
 export const ANALYTICS_EVENT_NAMES = [
   // --- Marketing / web -----------------------------------------------------
   "page_viewed",
+  "pricing_page_viewed",
+  "plan_selected",
   "signup_started",
   "account_created",
   "signed_in",
@@ -30,6 +32,7 @@ export const ANALYTICS_EVENT_NAMES = [
   "usb_key_paired",
   "usb_pair_failed",
   "schedule_created",
+  "schedule_edited",
   "focus_session_completed",
   "app_uninstalled",
   "bootstrap_failed",
@@ -39,8 +42,10 @@ export const ANALYTICS_EVENT_NAMES = [
   "service_disconnected",
   "ipc_handler_error",
 
-  // --- Billing (all server-side, from the Stripe webhook) ------------------
+  // --- Billing (all server-side; checkout_started fires from the checkout
+  // routes, everything else from the Stripe webhook) ------------------------
   "checkout_started",
+  "trial_ending_soon",
   "trial_started",
   "subscription_started",
   "subscription_renewed",
@@ -49,6 +54,9 @@ export const ANALYTICS_EVENT_NAMES = [
   "subscription_ended",
   "refund_issued",
   "comp_code_redeemed",
+
+  // --- PMF survey (web account page, Sean-Ellis style) ----------------------
+  "pmf_survey_responded",
 ] as const;
 
 export type AnalyticsEventName = (typeof ANALYTICS_EVENT_NAMES)[number];
@@ -74,6 +82,19 @@ export const ANALYTICS_EVENT_PROPS = {
     path: z.string().max(2048),
     title: z.string().max(512).optional(),
     referrer_host: z.string().max(253).optional(),
+  }),
+  // Fired once per pricing-page mount (not on every scroll/re-render) — the highest-intent
+  // pre-checkout signal, and the first step of the pricing → plan_selected → checkout_started
+  // → trial_started/subscription_started funnel.
+  pricing_page_viewed: z.object({
+    surface: z.enum(["web"]),
+  }),
+  // Fired when the visitor changes the billing-cycle toggle (monthly/yearly) and again,
+  // idempotently duplicative but harmless, right before checkout is kicked off — so the
+  // funnel step exists even for a visitor who never touches the toggle and accepts the default.
+  plan_selected: z.object({
+    price: z.enum(["monthly", "yearly"]),
+    surface: z.enum(["web", "desktop"]),
   }),
   signup_started: z.object({
     method: z.enum(["password", "google"]),
@@ -119,6 +140,18 @@ export const ANALYTICS_EVENT_PROPS = {
     session_index: z.number().int().min(1).max(3),
   }),
   app_uninstalled: z.object({ days_installed: z.number().int().min(0).optional() }),
+  // The three canonical Sean Ellis PMF-survey questions. `disappointment` alone is the PMF
+  // number (% "very" is the metric — the classic 40% threshold); the other two are free-text
+  // context for reading *why*, so they're capped but optional.
+  pmf_survey_responded: z.object({
+    disappointment: z.enum(["very", "somewhat", "not"]),
+    primary_benefit: z.string().max(500).optional(),
+    main_alternative: z.string().max(200).optional(),
+  }),
+  // Distinguishes "came back and changed an existing schedule" (a stickiness signal) from
+  // one-time schedule_created — both fire from the same `setSchedule` IPC method, split by
+  // whether the schedule id already existed.
+  schedule_edited: z.object({}),
   payment_failed: z.object({ attempt: z.number().int().min(0).optional() }),
 } as const satisfies Partial<Record<AnalyticsEventName, z.ZodTypeAny>>;
 

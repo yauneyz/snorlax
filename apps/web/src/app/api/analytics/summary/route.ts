@@ -6,6 +6,7 @@ import { queryEngagementFromDb } from "@/server/analytics/queries/engagement";
 import { queryFunnelFromDb } from "@/server/analytics/queries/funnel";
 import { retentionPct } from "@/server/analytics/queries/helpers";
 import { queryInstallHealthFromDb } from "@/server/analytics/queries/install-health";
+import { queryPmf } from "@/server/analytics/queries/pmf";
 import { queryRetentionFromDb } from "@/server/analytics/queries/retention";
 import { queryRevenueFromDb } from "@/server/analytics/queries/revenue";
 import {
@@ -42,7 +43,7 @@ export async function GET(request: NextRequest) {
   // Always the raw *FromDb queries — never the branching queryX() used by /insights, which
   // for target="prod" would call back into this very route.
   const target = "prod" as const;
-  const [funnel, engagement, revenue, retention, installHealth, channels, visitorBreakdown] =
+  const [funnel, engagement, revenue, retention, installHealth, channels, visitorBreakdown, pmf] =
     await Promise.all([
       queryFunnelFromDb(target),
       queryEngagementFromDb(target),
@@ -51,6 +52,7 @@ export async function GET(request: NextRequest) {
       queryInstallHealthFromDb(target),
       queryChannelsFromDb(target),
       queryVisitorBreakdownFromDb(target),
+      queryPmf(target),
     ]);
 
   const body = {
@@ -159,6 +161,11 @@ export async function GET(request: NextRequest) {
     ),
 
     visitorBreakdown: section(visitorBreakdown, toVisitorBreakdownMetrics),
+
+    // New top-level section (added alongside the PMF survey). The widget's Kotlin JSON parser
+    // uses `ignoreUnknownKeys = true`, so this is safe to add without touching widget code —
+    // only the full Insights app screen reads it.
+    pmf: section(pmf, (row) => row),
   };
 
   return NextResponse.json(body, { headers: { "Cache-Control": "private, no-store" } });

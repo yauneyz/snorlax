@@ -1,10 +1,9 @@
-- optimize landing page for downloads
+- set up a/b test
   - the 100m offer
     - "so that" language
-  - images
-    - emotion
   - strip and simplify
   - visual hierarchy
+- update telemetry
 - optimize actual app
 - Email 15 people
 - drive more traffic - post on X, linkedIn, Reddit

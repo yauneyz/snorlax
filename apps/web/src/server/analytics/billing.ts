@@ -104,6 +104,22 @@ export function billingSignalsFor(event: Stripe.Event): BillingSignal[] {
       return [{ event: "subscription_ended", props: subscriptionProps(sub) }];
     }
 
+    // Stripe fires this three days before a trial ends — the same moment `notifyTrialEnding`
+    // sends its email (webhook/route.ts). Tracking it lets trial-conversion analysis see who
+    // got the warning before converting or lapsing, instead of only seeing the two endpoints.
+    case "customer.subscription.trial_will_end": {
+      const sub = event.data.object as Stripe.Subscription;
+      return [
+        {
+          event: "trial_ending_soon",
+          props: {
+            ...subscriptionProps(sub),
+            ...(sub.trial_end ? { trial_end: new Date(sub.trial_end * 1000).toISOString() } : {}),
+          },
+        },
+      ];
+    }
+
     case "invoice.payment_succeeded": {
       const invoice = event.data.object as Stripe.Invoice;
       // Only cycle invoices are renewals. `subscription_create` is the first invoice of a

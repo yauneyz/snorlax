@@ -307,15 +307,24 @@ export async function registerIpcHandlers(ctx: HandlerContext): Promise<void> {
         }
       }
 
+      // 'setSchedule' is a single upsert of the device's one schedule (there is no per-id
+      // schedule list — `ServiceState.schedule` is singular), so whether this is a create or
+      // an edit has to be read from state *before* the call — same pattern as the setProfile
+      // allowance check above. A device with existing windows configured is being edited, not
+      // set up for the first time. `schedule_edited` (a return visit changing an existing
+      // setup) is a stickiness signal distinct from the one-time schedule_created milestone.
+      let isScheduleEdit = false;
       if (arg.method === 'setSchedule') {
         const params = arg.params as Params<'setSchedule'>;
         const violations = validateScheduleForLimits(params.schedule, limits);
         if (violations[0]) return limitError(violations[0].message);
+        const state = await service.request('getState', undefined);
+        isScheduleEdit = state.schedule.windows.length > 0;
       }
 
       const result = await service.request(arg.method, arg.params as Params<Method>);
       if (arg.method === 'pairKey') track('usb_key_paired');
-      if (arg.method === 'setSchedule') track('schedule_created');
+      if (arg.method === 'setSchedule') track(isScheduleEdit ? 'schedule_edited' : 'schedule_created');
       return { ok: true, result };
     } catch (e) {
       if (arg.method === 'pairKey') {

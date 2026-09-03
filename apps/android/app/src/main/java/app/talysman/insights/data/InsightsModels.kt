@@ -17,6 +17,9 @@ data class InsightsSummary(
     val installHealth: InstallHealthSection,
     val channels: ChannelsSection,
     val visitorBreakdown: VisitorBreakdownSection = VisitorBreakdownSection(ok = true),
+    // Defaulted like visitorBreakdown above: cached JSON written before this field existed
+    // (SharedPreferences in InsightsRepository) must still deserialize without it.
+    val pmf: PmfSection = PmfSection(ok = true),
 )
 
 @Serializable
@@ -130,6 +133,19 @@ data class VisitorBreakdownRow(
     val label: String,
     val visitors: Long,
     val pctVisitors: Double = 0.0,
+)
+
+@Serializable
+data class PmfSection(val ok: Boolean, val data: PmfData? = null, val message: String? = null)
+
+// Sean Ellis PMF survey ("how would you feel if you could no longer use Talysman?").
+// pctVeryDisappointed is the actual PMF number — 40% is the classic threshold.
+@Serializable
+data class PmfData(
+    val responses: Long,
+    val pctVeryDisappointed: Int? = null,
+    val pctSomewhatDisappointed: Int? = null,
+    val pctNotDisappointed: Int? = null,
 )
 
 // Mirrors GET /api/analytics/errors (apps/web/src/app/api/analytics/errors/route.ts).

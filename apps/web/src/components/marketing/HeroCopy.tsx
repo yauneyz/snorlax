@@ -11,6 +11,14 @@ import { config } from "@/lib/config";
  * must match what unauthenticated/flag-less visitors saw before this experiment existed, so a
  * failed flag fetch (ad blocker, PostHog outage) degrades to the original page rather than an
  * unproven one.
+ *
+ * Each test variant gets its own key, never reused for different copy. PostHog buckets and
+ * reports by variant key, so editing an existing variant's copy in place would silently blend
+ * pre- and post-edit traffic into one number — neither trustworthy. To try new copy, add a new
+ * key below (`test-b`, `test-c`, ...) and create a matching variant in the PostHog experiment
+ * (or a fresh experiment/flag if the old one already concluded). Retire a variant by deleting
+ * its entry here once its flag/experiment is gone — VariantKey then stops accepting it, so any
+ * leftover reference is a compile error, not a silent fallback to "control".
  */
 const VARIANTS = {
   control: {
@@ -23,6 +31,7 @@ const VARIANTS = {
     sub: "You pair a USB drive with the app and then you can only turn off focus mode when that key is inserted. Your computer becomes a deep work sanctuary.",
     cta: "Start focusing now - free",
   },
+  // Added 2026-09-02.
   test: {
     eyebrow: "For people who keep overriding their blockers",
     headline: (
@@ -34,6 +43,12 @@ const VARIANTS = {
     cta: "Get your free key setup",
   },
 } as const;
+
+type VariantKey = keyof typeof VARIANTS;
+
+function isVariantKey(value: string | undefined): value is VariantKey {
+  return value !== undefined && value in VARIANTS;
+}
 
 export function HeroCopy() {
   // Reads the raw posthog-js singleton rather than posthog-js/react's context hook: `Providers`
@@ -49,7 +64,10 @@ export function HeroCopy() {
     });
   }, []);
 
-  const variant = VARIANTS[variantKey === "test" ? "test" : "control"];
+  // Falls back to "control" for undefined (flag not loaded/configured) *and* for a flag value
+  // that names a variant no longer in VARIANTS (e.g. a retired one still assigned in PostHog) —
+  // never lets an unrecognized key reach the lookup below.
+  const variant = VARIANTS[isVariantKey(variantKey) ? variantKey : "control"];
 
   return (
     <>
