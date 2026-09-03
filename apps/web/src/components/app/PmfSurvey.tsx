@@ -67,7 +67,7 @@ export function PmfSurvey() {
       {disappointment ? (
         <div className="account__pmf-survey-followups">
           <label>
-            What's the main benefit you get from Talysman? (optional)
+            What&apos;s the main benefit you get from Talysman? (optional)
             <input
               type="text"
               maxLength={500}
@@ -93,7 +93,7 @@ export function PmfSurvey() {
             {status === "sending" ? "Sending…" : "Submit"}
           </button>
           {status === "error" ? (
-            <p className="account__pmf-survey-error">Couldn't send — please try again.</p>
+            <p className="account__pmf-survey-error">Couldn&apos;t send — please try again.</p>
           ) : null}
         </div>
       ) : null}
