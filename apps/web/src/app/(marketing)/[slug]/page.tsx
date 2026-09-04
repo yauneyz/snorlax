@@ -13,22 +13,34 @@ import {
   type IntentSection,
 } from "@/lib/content/intent";
 import { config } from "@/lib/config";
+import { LandingPage } from "@/components/marketing/LandingPage";
+import { isVariantKey, VARIANT_KEYS } from "@/components/marketing/heroVariants";
 
 /**
  * One template for the high-intent search pages. They live at the site root — the query is the
  * URL — and static segments still win over this one, so `/pricing` and `/download` are unaffected.
  * Anything not in the registry 404s.
+ *
+ * Outside production, this slug is also how you preview an A/B hero variant locally: `/control`
+ * or `/test` renders the real landing page with that variant forced, bypassing the live PostHog
+ * flag. It rides this route (rather than a route of its own) because a dynamic segment can only
+ * have one name per URL position — this one already owns the site root.
  */
+const isDev = process.env.NODE_ENV !== "production";
+
 export const dynamicParams = false;
 
 export function generateStaticParams() {
-  return intentPages.map((page) => ({ slug: page.slug }));
+  const params = intentPages.map((page) => ({ slug: page.slug }));
+  return isDev ? [...params, ...VARIANT_KEYS.map((key) => ({ slug: key }))] : params;
 }
 
 type PageProps = { params: Promise<{ slug: string }> };
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { slug } = await params;
+  if (isDev && isVariantKey(slug)) return { title: `[dev] ${slug} variant preview` };
+
   const page = getIntentPage(slug);
   if (!page) return { title: "Not found" };
 
@@ -226,6 +238,8 @@ function Section({ section }: { section: IntentSection }) {
 
 export default async function IntentLandingPage({ params }: PageProps) {
   const { slug } = await params;
+  if (isDev && isVariantKey(slug)) return <LandingPage variantOverride={slug} />;
+
   const page = getIntentPage(slug);
   if (!page) notFound();
 

@@ -1,10 +1,8 @@
-- set up a/b test
-  - the 100m offer
-    - "so that" language
-  - strip and simplify
-  - visual hierarchy
-- update telemetry
+- Answer the user's question - get inside their OODA loop
+- strip and simplify
 - optimize actual app
+- put out new build
+  - gather new media for landing page
 - Email 15 people
 - drive more traffic - post on X, linkedIn, Reddit
 - look at heatmaps and session replays
@@ -20,6 +18,11 @@ Notes:
 - Let's try to build the "$100M Offer"
 - We have way too much text
 
+======================================================
+Daily Routing:
+f5bot
+post on x/linkedin
+view session replays
 ======================================================
 The Marketing Plan:
 - X, LinkedIn, Reddit reply guy
