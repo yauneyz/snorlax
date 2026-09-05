@@ -57,33 +57,6 @@ const paths = [
   },
 ];
 
-/** Concrete situations, so the visitor can place themselves before reading capabilities. */
-const uses = [
-  "Finish the hard coding session instead of opening YouTube",
-  "Write past the part that stopped being fun",
-  "Study long enough to get through the difficult chapter",
-];
-
-/** Capabilities, stated as the outcome rather than the mechanism. */
-const outcomes = [
-  {
-    title: "Keep YouTube and Reddit out of reach",
-    body: "Website blocking runs below the browser, in a privileged background service. Closing the app window doesn't lift it.",
-  },
-  {
-    title: "Close the apps that pull you away",
-    body: "Desktop apps are blocked too, not just tabs. Discord and Steam don't get to be the loophole.",
-  },
-  {
-    title: "Protect your best hours automatically",
-    body: "Set recurring windows and distractions are blocked automatically — even if the app is closed and you never remember to start it.",
-  },
-  {
-    title: "Turn your computer into a workstation",
-    body: "Allow-only mode blocks everything except the tools the job actually needs. A work computer without buying a second computer.",
-  },
-];
-
 const faqs = [
   {
     q: "Can I use any USB drive?",
