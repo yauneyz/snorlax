@@ -59,6 +59,7 @@ export function FocusToggle() {
         style={{ width: RING, height: RING }}
       >
         <div
+          data-focus-glow
           className={cx(
             'absolute inset-0 rounded-full border',
             focusActive
@@ -67,17 +68,9 @@ export function FocusToggle() {
           )}
         />
         <div className="absolute inset-4 rounded-full border border-dashed border-white/[0.06]" />
-        <div
-          aria-hidden
-          className="absolute inset-[50px] rounded-full"
-          style={{
-            background: `radial-gradient(circle, ${
-              focusActive ? 'rgb(var(--color-success)/0.12)' : 'rgb(var(--color-white)/0.05)'
-            }, transparent 72%)`,
-          }}
-        />
         <div className="relative flex flex-col items-center gap-1.5">
           <TalysmanMark
+            data-focus-glow
             size={46}
             className={cx(
               focusActive

@@ -40,6 +40,7 @@ const HIDE_DEV_CHROME = `
   .desktop-workspace--dev::after { display: none !important; }
   .dev-mode-label { display: none !important; }
   [data-capture-hide] { display: none !important; }
+  [data-focus-glow] { box-shadow: none !important; filter: none !important; }
 `;
 
 /** The fixture the media is shot against: a Pro-shaped setup with two profiles and a schedule. */

@@ -5,13 +5,16 @@
  * because a page may render the mark more than once and SVG ids are document-global.
  * apps/web/src/components/brand/TalysmanMark.tsx is the same drawing for the web app.
  */
+import type { SVGAttributes } from 'react';
+
 export function TalysmanMark({
   size = 28,
   className,
+  ...rest
 }: {
   size?: number;
   className?: string;
-}) {
+} & SVGAttributes<SVGSVGElement>) {
   return (
     <svg
       viewBox="0 0 512 512"
@@ -20,6 +23,7 @@ export function TalysmanMark({
       role="img"
       aria-label="Talysman"
       className={className}
+      {...rest}
     >
       <defs>
         <linearGradient id="tal-mark-silver" x1="0" y1="0" x2="1" y2="1">

@@ -187,7 +187,7 @@ export function LandingPage({ variantOverride }: { variantOverride?: VariantKey 
       </section>
 
       <section className="section" id="how">
-        <p className="section__eyebrow">One calm decision. Three steps.</p>
+        <p className="section__eyebrow">Wonderfully simple, surprisingly robust</p>
         <h2 className="section__title">How It Works</h2>
         <p className="section__lede">Getting started with Talysman takes just a few clicks.</p>
         <ol className="steps">
@@ -215,8 +215,8 @@ export function LandingPage({ variantOverride }: { variantOverride?: VariantKey 
       <section className="section diagnosis">
         <div className="diagnosis__lead">
           <div className="diagnosis__copy">
-            <p className="section__eyebrow">The real problem</p>
-            <h2 className="section__title">The off switch is the problem.</h2>
+            <p className="section__eyebrow">It will be different this time</p>
+            <h2 className="section__title">Why It Works</h2>
             <p>
               You installed the extensions. You set the timers. Then the work got difficult and
               YouTube was open before you had consciously decided to stop.
@@ -255,47 +255,18 @@ export function LandingPage({ variantOverride }: { variantOverride?: VariantKey 
         </ul>
       </section>
 
-      <section className="section">
-        <p className="section__eyebrow">Built for the difficult middle</p>
-        <h2 className="section__title">Starting is easy. Talysman protects what happens next.</h2>
-        <p className="section__lede">
-          Starting a focus session is easy. The hard part arrives twenty minutes later, when the
-          work turns boring or frustrating and your hands start looking for an exit.
-        </p>
-        <ul className="uses">
-          {uses.map((use) => (
-            <li key={use} className="use">
-              {use}
-            </li>
-          ))}
-        </ul>
-      </section>
-
-      <section className="section">
-        <p className="section__eyebrow">Strict where it matters</p>
-        <h2 className="section__title">Block distractions without blocking your work.</h2>
-        <p className="section__lede">
-          Pick how strict the session needs to be — a handful of sites, only the tools the job
-          needs, or nothing online at all.
-        </p>
-        <ul className="outcomes">
-          {outcomes.map((outcome) => (
-            <li key={outcome.title} className="outcome">
-              <h3>{outcome.title}</h3>
-              <p>{outcome.body}</p>
-            </li>
-          ))}
-        </ul>
-      </section>
-
       {/* Set expectations here rather than letting the pricing page be the first place a
           visitor learns app blocking and scheduling are paid. */}
       <section className="section split">
-        <p className="section__eyebrow">A real free product</p>
-        <h2 className="section__title">Prove the mechanism works before you pay.</h2>
+        <h2 className="section__title">Blocking your most distracting sites will always be free</h2>
         <p className="section__lede">
-          Run unlimited manual sessions for free. Upgrade when you want Talysman to protect your
-          entire week automatically.
+          You will always be able to block up to {FREE_BLOCKED_SITE_LIMIT} websites, create a
+          whitelist, or block the entire internet, for free. Forever. Block Reddit, YouTube, or
+          whatever else is stealing your attention.
+        </p>
+        <p className="section__lede">
+          When you want to expand your blocklist, block distracting applications, or set up
+          recurring schedules, upgrade to Pro.
         </p>
         <div className="split__grid">
           <div className="split__col">
