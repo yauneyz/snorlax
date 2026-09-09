@@ -1,0 +1,14 @@
+Subject: {{organization_short_name}}: a focus tool
+
+Hi {{first_name_or_organization_team}},
+
+{{one_verified_specific_detail_about_their_program}}. {{one_sentence_connecting_that_detail_to_members_focused_work}}.
+
+I'm building Talysman, a desktop blocker for distracting websites and apps. Pair your own USB drive, start a focus session, and put the drive away. Ending early means retrieving and reconnecting it.
+
+I'd love to give you a free lifetime Pro code to try yourself, with no obligation to share it with {{participants_or_members}}.
+
+Want me to send it over?
+
+Zac
+Founder, Talysman

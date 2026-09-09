@@ -16,7 +16,7 @@ import { HeroDemo } from "@/components/marketing/HeroDemo";
 const steps = [
   {
     title: "Pair any USB drive",
-    body: `Install ${config.app.name} and pair any USB drive you already own. That drive becomes your physical key. Pair as many as you like — any one of them unlocks.`,
+    body: `Install ${config.app.name} and pair any USB drive you already own`,
     image: {
       src: "/media/app-pair-key.png",
       alt: "The Keys screen: two paired drives listed, a third selected in the removable-drive picker, and a green “Key mounted” indicator.",
@@ -24,7 +24,7 @@ const steps = [
   },
   {
     title: "Choose what gets blocked",
-    body: "Block distracting websites, and apps. Or go even further and allow only the tools you need. Start blocking immediately or create a schedule to protect the same hours every week.",
+    body: "Block distracting websites, and apps.",
     image: {
       src: "/media/app-blocklist.png",
       alt: "The Blocklists screen: a “Deep work” profile blocking eight sites including youtube.com and reddit.com, plus Discord, Steam and Slack.",
@@ -32,7 +32,7 @@ const steps = [
   },
   {
     title: "Unplug the key",
-    body: "Put it in another room, a drawer, your car. Distractions remain blocked until you go get the key and plug it back in. No key, no unlock — even if you close the app or restart your computer.",
+    body: "Put it in another room, a drawer, your car. No key, no unlock — even if you close the app or restart your computer.",
     image: {
       src: "/media/app-focused-key-away.png",
       alt: "The dashboard mid-session: the seal reads FOCUSED, the key readout reads “away”, and the header indicator reads NO KEY.",
@@ -227,6 +227,28 @@ export function LandingPage({ variantOverride }: { variantOverride?: VariantKey 
           ))}
         </ul>
       </section>
+
+      {/*<section className="section promise">
+        <div className="promise__lead">
+          <div className="promise__copy">
+            <p className="section__eyebrow">It will be different this time</p>
+            <h2 className="section__title">What Will You Do With Your Attention Back?</h2>
+            <p>
+              You installed the extensions. You set the timers. Then the work got difficult and
+              YouTube was open before you had consciously decided to stop.
+            </p>
+            <p>
+              Every normal blocker is controlled from the computer it is supposed to protect. The
+              distracted version of you can undo the focused version&apos;s decision with the same
+              mouse, in the same few clicks.
+            </p>
+            <p className="diagnosis__thesis">
+              {config.app.name} moves that decision into the physical world. You can still stop. You
+              just have to stand up and go get the key first.
+            </p>
+          </div>
+        </div>
+      </section>*/}
 
       {/* Set expectations here rather than letting the pricing page be the first place a
           visitor learns app blocking and scheduling are paid. */}

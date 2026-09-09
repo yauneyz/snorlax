@@ -747,7 +747,7 @@ input:-webkit-autofill:focus {
 }
 
 .hero__headline {
-  max-width: 11.5ch;
+  max-width: 22ch;
   font-size: clamp(3rem, 5.2vw, 5.35rem);
   font-weight: 700;
   letter-spacing: -0.055em;
@@ -759,6 +759,25 @@ input:-webkit-autofill:focus {
 
 .hero__headline span {
   color: var(--signal);
+}
+
+/* Belt-and-suspenders: the lead phrase must never split across a line, at any width. */
+.hero__headline .nowrap {
+  white-space: nowrap;
+}
+
+/* Explicit, hand-authored line break for the mobile tier — not left to the browser's
+   `text-wrap: balance` heuristic, which produces awkward breaks at some widths. Matches the
+   hero layout's own mobile breakpoint (globals.css:3677, where the headline also gets a
+   dedicated font-size override). */
+.hero__headline .brk {
+  display: none;
+}
+
+@media (max-width: 640px) {
+  .hero__headline .brk--mobile {
+    display: block;
+  }
 }
 
 .hero__sub {
@@ -1141,7 +1160,7 @@ input:-webkit-autofill:focus {
   gap: 0.9rem;
 }
 
-.diagnosis__copy p {
+.diagnosis__copy p:not(.section__eyebrow) {
   margin: 0;
   max-width: 46ch;
   color: var(--fg-2);

@@ -12,11 +12,8 @@ export function HeroCopy({ forceVariant }: { forceVariant?: VariantKey } = {}) {
   const [variantKey, setVariantKey] = useState<string | undefined>(undefined);
 
   useEffect(() => {
-    if (forceVariant || !config.posthog.key) return;
-    // `hero-headline-test` is created and toggled from the PostHog Experiments UI, not in code.
-    return posthog.onFeatureFlags(() => {
-      setVariantKey(posthog.getFeatureFlag("hero-headline-test") as string | undefined);
-    });
+    // Experiment temporarily disabled: always show the "control" variant.
+    return;
   }, [forceVariant]);
 
   // Falls back to "control" for undefined (flag not loaded/configured) *and* for a flag value

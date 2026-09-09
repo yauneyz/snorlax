@@ -21,21 +21,26 @@
  */
 export const VARIANTS = {
   control: {
-    eyebrow: "For people who keep overriding their blockers",
+    eyebrow: "",
     headline: (
       <>
-        A distraction blocker you need a <span>physical key</span> to turn off.
+        <span className="nowrap">A distraction</span> blocker
+        <br />
+        you need a <span>physical key</span>
+        <br className="brk brk--mobile" /> to turn off.
       </>
     ),
-    sub: "You pair a USB drive with the app and then you can only turn off focus mode when that key is inserted. Your computer becomes a deep work sanctuary.",
-    cta: "Start focusing now - free",
+    sub: "Talysman is a distraction blocker you can only turn off when a physical usb key is inserted. Pair any USB drive you own and then you can only turn off focus mode when that key is inserted.",
+    cta: "Start focusing in under 5 minutes - free",
   },
   // Added 2026-09-02.
   test: {
     eyebrow: "",
     headline: (
       <>
-        Protect your attention to you can <span>focus</span> on your work.
+        Protect your attention
+        <br />
+        to you can <span>focus</span> on your work.
       </>
     ),
     sub: "Talysman is a distraction blocker you can only turn off when a physical usb key is inserted. Pair any USB drive you own and then you can only turn off focus mode when that key is inserted.",

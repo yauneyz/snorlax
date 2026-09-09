@@ -1,0 +1,14 @@
+Subject: MPC Hacks: a focus tool
+
+Hi MPC Hacks organizing team,
+
+MPC Hacks is Montreal's inter-university hackathon co-organized by Girls Who Code McGill, PolyAI at Polytechnique Montréal, and SCS Concordia, run as an open-ended weekend with no fixed tracks. A whole weekend of open-ended building goes better when a laptop stays free of distracting tabs and apps.
+
+I'm building Talysman, a desktop blocker for distracting websites and apps. Pair your own USB drive, start a focus session, and put the drive away. Ending early means retrieving and reconnecting it.
+
+I'd love to give you a free lifetime Pro code to try yourself, with no obligation to share it with participants.
+
+Want me to send it over?
+
+Zac
+Founder, Talysman
