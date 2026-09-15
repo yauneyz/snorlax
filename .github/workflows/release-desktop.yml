@@ -21,7 +21,32 @@ env:
   AWS_REGION: ${{ vars.AWS_REGION }}
 
 jobs:
+  blocklists:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          run_install: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Refresh premade blocklists from upstream sources
+        run: pnpm run update:blocklists
+      - uses: actions/upload-artifact@v4
+        with:
+          name: premade-blocklists
+          path: |
+            native/common/resources/premade-lists/**
+            apps/extension/resources/premade-lists/**
+            packages/shared/src/premadeLists.ts
+          retention-days: 7
+
   windows:
+    needs: blocklists
     runs-on: windows-latest
     environment: production
     steps:
@@ -39,6 +64,9 @@ jobs:
           role-to-assume: ${{ vars.AWS_RELEASE_ROLE_ARN }}
           aws-region: ${{ vars.AWS_REGION }}
       - run: pnpm install --frozen-lockfile
+      - uses: actions/download-artifact@v4
+        with:
+          name: premade-blocklists
       - name: Build signed Windows installer
         run: pnpm build:win
         env:
@@ -53,6 +81,7 @@ jobs:
         run: pnpm release:upload -- --no-build --require win
 
   macos:
+    needs: blocklists
     runs-on: macos-latest
     environment: production
     steps:
@@ -70,6 +99,9 @@ jobs:
           role-to-assume: ${{ vars.AWS_RELEASE_ROLE_ARN }}
           aws-region: ${{ vars.AWS_REGION }}
       - run: pnpm install --frozen-lockfile
+      - uses: actions/download-artifact@v4
+        with:
+          name: premade-blocklists
       - name: Write App Store Connect API key
         run: printf '%s' "$APPLE_API_KEY_P8" > "$RUNNER_TEMP/notarization-key.p8"
         env:
@@ -84,6 +116,7 @@ jobs:
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
 
   linux:
+    needs: blocklists
     runs-on: ubuntu-latest
     environment: production
     steps:
@@ -102,6 +135,9 @@ jobs:
           aws-region: ${{ vars.AWS_REGION }}
       - run: sudo apt-get update && sudo apt-get install --yes dpkg-dev
       - run: pnpm install --frozen-lockfile
+      - uses: actions/download-artifact@v4
+        with:
+          name: premade-blocklists
       - name: Build Linux packages
         run: pnpm build:linux
       - name: Smoke-test Linux install/uninstall

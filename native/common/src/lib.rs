@@ -14,6 +14,7 @@ pub mod pairing;
 pub mod panic_log;
 pub mod policy;
 pub mod policy_match;
+pub mod premade_lists;
 pub mod watchdog;
 
 /// Browser-store and sideload identities generated from `extension-identities.json`.

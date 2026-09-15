@@ -76,11 +76,12 @@ pub fn remove_include() {
     let _ = std::fs::remove_file(DNSMASQ_INCLUDE_PATH);
 }
 
-/// dnsmasq only ever sinkholes `blockedDomains` — the hard block list. `allowedDomains` exemptions
+/// dnsmasq sinkholes `blockedDomains` plus every domain in an enabled premade list (see
+/// `talysman_common::policy_match::effective_dns_sinkhole_domains`). `allowedDomains` exemptions
 /// and the `defaultAction` fallback for everything else are enforced at the IP/port level by
-/// nftables (see `nft.rs`).
+/// nftables (see `nft.rs`) — nftables only ever backstops `blockedDomains`, not premade lists.
 pub fn apply_policy(policy: &Policy) -> std::io::Result<()> {
-    if policy.blocked_domains.is_empty() {
+    if crate::policy_match::effective_dns_sinkhole_domains(policy).is_empty() {
         return remove_config();
     }
 
@@ -125,10 +126,11 @@ fn dnsmasq_config(policy: &Policy) -> String {
         "# Talysman DNS sinkhole configuration.\n# Auto-generated; do not edit manually.\n\n",
     );
 
-    if policy.blocked_domains.is_empty() {
+    let domains = dnsmasq_domains(policy);
+    if domains.is_empty() {
         out.push_str("# No explicit blocked domains; enforced by nftables IP rules.\n");
     } else {
-        for domain in dnsmasq_domains(&policy.blocked_domains) {
+        for domain in domains {
             let _ = writeln!(out, "address=/{domain}/0.0.0.0");
             let _ = writeln!(out, "address=/{domain}/::");
         }
@@ -137,9 +139,9 @@ fn dnsmasq_config(policy: &Policy) -> String {
     out
 }
 
-fn dnsmasq_domains(domains: &[String]) -> Vec<String> {
+fn dnsmasq_domains(policy: &Policy) -> Vec<String> {
     let mut unique = BTreeSet::new();
-    for domain in domains {
+    for domain in crate::policy_match::effective_dns_sinkhole_domains(policy) {
         let domain = domain
             .trim()
             .trim_start_matches("*.")
@@ -170,6 +172,16 @@ mod tests {
         assert!(config.contains("address=/youtube.com/::"));
         assert!(config.contains("address=/reddit.com/0.0.0.0"));
         assert_eq!(config.matches("address=/youtube.com/0.0.0.0").count(), 1);
+    }
+
+    #[test]
+    fn dnsmasq_config_sinkholes_enabled_premade_list_domains_but_honors_exemptions() {
+        let mut p = Policy::default();
+        p.enabled_premade_lists = vec![talysman_common::policy::PremadeListId::Shopping];
+        p.allowed_domains = vec!["amazon.com".into()];
+        let config = dnsmasq_config(&p);
+        assert!(config.contains("address=/ebay.com/0.0.0.0"));
+        assert!(!config.contains("address=/amazon.com/0.0.0.0"));
     }
 
     #[test]

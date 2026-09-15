@@ -83,4 +83,18 @@ describe('normalizePolicy', () => {
     const n = normalizePolicy(policy);
     expect(n.intent).toEqual({ positive: 'Researching flights to Japan' });
   });
+
+  it('dedupes enabledPremadeLists and rejects unknown ids', () => {
+    const policy: Policy = {
+      blockedDomains: [],
+      allowedDomains: [],
+      defaultAction: 'allow',
+      intent: null,
+      apps: [],
+      enabledPremadeLists: ['shopping', 'shopping', 'nsfw', 'not-a-real-list' as never],
+    };
+    const n = normalizePolicy(policy);
+    expect(n.enabledPremadeLists).toEqual(['shopping', 'nsfw']);
+    expect(n.rejected.map((r) => r.value)).toContain('not-a-real-list');
+  });
 });

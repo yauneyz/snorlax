@@ -3,6 +3,22 @@
 
 use crate::model::{AppRef, DefaultAction, Policy};
 
+/// Domains a DNS-layer sinkhole should refuse: `blockedDomains` plus every enabled premade
+/// list's domains, minus anything exempted by `allowedDomains`. See
+/// `talysman_common::premade_lists` for why premade-list matching is exact-domain-or-`www.`
+/// only, and why this is never fed into the nftables IP backstop.
+pub fn effective_dns_sinkhole_domains(policy: &Policy) -> std::collections::BTreeSet<String> {
+    let mut out: std::collections::BTreeSet<String> =
+        policy.blocked_domains.iter().cloned().collect();
+    for domain in talysman_common::premade_lists::expand_enabled(&policy.enabled_premade_lists) {
+        if policy.allowed_domains.iter().any(|p| host_matches(&domain, p)) {
+            continue;
+        }
+        out.insert(domain);
+    }
+    out
+}
+
 /// Does `host` match `pattern`? `pattern` may be exact ("youtube.com") or a leading wildcard
 /// ("*.reddit.com" matches reddit.com and any subdomain).
 pub fn host_matches(host: &str, pattern: &str) -> bool {
@@ -28,6 +44,9 @@ pub fn is_host_blocked(policy: &Policy, host: &str) -> bool {
     }
     if policy.allowed_domains.iter().any(|p| host_matches(host, p)) {
         return false;
+    }
+    if talysman_common::premade_lists::is_blocked_by_premade(&policy.enabled_premade_lists, host) {
+        return true;
     }
     if policy.intent.is_some() {
         // Smart filtering judges unlisted hosts at the page level (judgeRequest), which requires
@@ -89,9 +108,17 @@ pub fn is_at_least_as_restrictive(prev: &Policy, next: &Policy) -> bool {
         }
     }
 
-    prev.apps
+    if !prev
+        .apps
         .iter()
         .all(|app| next.apps.iter().any(|candidate| same_app(candidate, app)))
+    {
+        return false;
+    }
+
+    prev.enabled_premade_lists
+        .iter()
+        .all(|id| next.enabled_premade_lists.contains(id))
 }
 
 /// Hostnames a future DNS sinkhole should refuse while focus is active, independent of the user's
@@ -182,6 +209,7 @@ mod restrictiveness_tests {
             default_action: DefaultAction::Allow,
             intent: None,
             apps: vec![],
+            enabled_premade_lists: vec![],
         }
     }
 
@@ -193,6 +221,7 @@ mod restrictiveness_tests {
             default_action: DefaultAction::Block,
             intent: None,
             apps: vec![],
+            enabled_premade_lists: vec![],
         }
     }
 
@@ -204,6 +233,7 @@ mod restrictiveness_tests {
             default_action: DefaultAction::Block,
             intent: None,
             apps: vec![],
+            enabled_premade_lists: vec![],
         }
     }
 

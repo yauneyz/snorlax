@@ -65,6 +65,8 @@ const extensionFiles = [
   "popup.js",
   "popup-view.js",
 ];
+const premadeListsDir = resolve(extDir, "resources/premade-lists");
+const premadeListFiles = readdirSync(premadeListsDir).filter((f) => f.endsWith(".json"));
 const paletteCss = paletteCssBlock();
 
 const identities = JSON.parse(readFileSync(identitiesPath, "utf8"));
@@ -161,6 +163,11 @@ function stageStore(name, manifest, background) {
     copyFileSync(source, resolve(outputDir, name));
   }
   copyFileSync(blockedLogoPath, resolve(outputDir, "blocked-logo.svg"));
+  const premadeListsOut = resolve(outputDir, "premade-lists");
+  mkdirSync(premadeListsOut, { recursive: true });
+  for (const file of premadeListFiles) {
+    copyFileSync(resolve(premadeListsDir, file), resolve(premadeListsOut, file));
+  }
   for (const file of extensionFiles) {
     const source = resolve(srcDir, file);
     const destination = resolve(outputDir, file);
@@ -290,6 +297,7 @@ const sourceInputPaths = [
   resolve(extDir, "STORE_SUBMISSION.md"),
   resolve(extDir, "manifest.json"),
   ...listFiles(srcDir).map((file) => file.path),
+  ...premadeListFiles.map((file) => resolve(premadeListsDir, file)),
   ...Object.values(iconFiles),
   blockedLogoPath,
   identitiesPath,

@@ -114,8 +114,25 @@ fn sinkhole_block(policy: &Policy) -> String {
     // blacklist-only sinkhole this applies even when the default is `block` — pf enforces the
     // default itself at the packet layer.
     let mut names = sinkhole_names(&policy.blocked_domains);
+    // Enabled premade lists sinkhole here too (never in the pf IP backstop — resolving tens of
+    // thousands of domains to IPs on a timer would be prohibitively expensive; see
+    // `talysman_common::premade_lists`). `expand_enabled` already yields bare+`www.` pairs, so no
+    // further normalization is needed; `allowedDomains` still carves out exceptions.
+    for domain in talysman_common::premade_lists::expand_enabled(&policy.enabled_premade_lists) {
+        if policy
+            .allowed_domains
+            .iter()
+            .any(|p| crate::policy_match::host_matches(&domain, p))
+        {
+            continue;
+        }
+        if !names.contains(&domain) {
+            names.push(domain);
+        }
+    }
     if names.is_empty() {
-        // No user domains → no sinkhole; DoH endpoints only matter as a bypass of one.
+        // No user domains and no enabled premade list → no sinkhole; DoH endpoints only matter
+        // as a bypass of one.
         return String::new();
     }
     for h in DOH_BYPASS_HOSTS {

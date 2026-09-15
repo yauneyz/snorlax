@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
-import type { AppRef, Policy, Profile } from '@talysman/shared';
+import type { AppRef, Policy, PremadeListId, Profile } from '@talysman/shared';
+import { PREMADE_LISTS } from '@talysman/shared';
 import { productFeaturesForEnvironment } from '@talysman/product';
 import {
   EMPTY_POLICY,
@@ -579,6 +580,16 @@ export function Blocklists({ onUpgrade }: { onUpgrade: () => void }) {
     });
   };
 
+  const togglePremadeList = (id: PremadeListId) => {
+    const enabled = policy.enabledPremadeLists.includes(id);
+    void save({
+      ...policy,
+      enabledPremadeLists: enabled
+        ? policy.enabledPremadeLists.filter((x) => x !== id)
+        : [...policy.enabledPremadeLists, id],
+    });
+  };
+
   const setIntentPositive = (positive: string) => {
     if (!smartAllowed) return onUpgrade();
     // Smart filtering always fails open: everything not on the explicit block list is allowed
@@ -948,6 +959,59 @@ export function Blocklists({ onUpgrade }: { onUpgrade: () => void }) {
             limitReached={allowedLimitReached}
           />
         )}
+
+        <div className="mt-4">
+          <Kicker>Premade blocklists</Kicker>
+          <p className="mt-1 text-[11px] leading-snug text-slate-500">
+            Built-in categories with too many sites to list by hand. Toggle any on alongside your
+            own block list — turning one on is free, turning one off needs your key while focus is
+            enforcing.
+          </p>
+          <div className="mt-2.5 flex flex-col gap-1.5">
+            {PREMADE_LISTS.map((list) => {
+              const enabled = policy.enabledPremadeLists.includes(list.id);
+              return (
+                <button
+                  key={list.id}
+                  onClick={() => togglePremadeList(list.id)}
+                  className={cx(
+                    'flex items-center gap-3 rounded-[10px] border px-3 py-2.5 text-left transition',
+                    enabled
+                      ? 'border-seal/30 bg-seal/[0.09] shadow-[inset_0_1px_0_rgb(var(--color-white)/0.06),0_0_18px_rgb(var(--color-signal)/0.10)]'
+                      : 'border-white/[0.07] bg-white/[0.025] hover:border-white/[0.14] hover:bg-white/[0.05]',
+                  )}
+                >
+                  <span className="flex-1">
+                    <span className="text-[12.5px] font-semibold text-slate-250">
+                      {list.label}
+                    </span>
+                    <span className="ml-2 text-[11px] text-slate-500">
+                      {list.domainCount.toLocaleString()} sites
+                    </span>
+                    <span className="mt-0.5 block text-[11px] leading-snug text-slate-500">
+                      {list.description}
+                    </span>
+                  </span>
+                  <span
+                    role="switch"
+                    aria-checked={enabled}
+                    className={cx(
+                      'relative h-5 w-9 shrink-0 rounded-full transition',
+                      enabled ? 'bg-seal/70' : 'bg-white/10',
+                    )}
+                  >
+                    <span
+                      className={cx(
+                        'absolute top-0.5 h-4 w-4 rounded-full bg-white transition',
+                        enabled ? 'left-[18px]' : 'left-0.5',
+                      )}
+                    />
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
 
         <div className="mt-4 flex items-baseline gap-2.5">
           <Kicker>Apps blocked</Kicker>

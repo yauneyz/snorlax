@@ -56,6 +56,7 @@ struct Blocking {
     /// Raw JSON so a `null` intent round-trips as JSON `null` rather than `{}`. `Value::Null` by
     /// default, matching "no Smart filtering" for a freshly-constructed `Blocking`.
     intent: Value,
+    enabled_premade_lists: Vec<String>,
     handshake_enabled: bool,
     smart_filtering_enabled: bool,
 }
@@ -74,6 +75,7 @@ impl Blocking {
             "allowedDomains": self.allowed_domains,
             "defaultAction": default_action,
             "intent": if self.smart_filtering_enabled { self.intent.clone() } else { Value::Null },
+            "enabledPremadeLists": self.enabled_premade_lists,
             "handshakeEnabled": self.handshake_enabled,
         })
     }
@@ -109,6 +111,15 @@ fn parse_policy(policy: &Value, b: &mut Blocking) {
         "allow".to_string()
     };
     b.intent = policy.get("intent").cloned().unwrap_or(Value::Null);
+    b.enabled_premade_lists = policy
+        .get("enabledPremadeLists")
+        .and_then(|v| v.as_array())
+        .map(|a| {
+            a.iter()
+                .filter_map(|d| d.as_str().map(str::to_string))
+                .collect()
+        })
+        .unwrap_or_default();
 }
 
 #[derive(Debug)]
@@ -321,6 +332,7 @@ mod tests {
             allowed_domains: allowed.iter().map(|d| d.to_string()).collect(),
             default_action: default_action.to_string(),
             intent: Value::Null,
+            enabled_premade_lists: Vec::new(),
             handshake_enabled: true,
             smart_filtering_enabled: false,
         }

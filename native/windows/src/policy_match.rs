@@ -99,6 +99,18 @@ mod tests {
     }
 
     #[test]
+    fn premade_list_blocks_without_wildcarding_shared_infra() {
+        let p = Policy {
+            enabled_premade_lists: vec![talysman_common::policy::PremadeListId::Shopping],
+            ..Policy::default()
+        };
+        assert!(is_host_blocked(&p, "amazon.com"));
+        assert!(!is_host_blocked(&p, "console.aws.amazon.com"));
+        assert!(is_at_least_as_restrictive(&Policy::default(), &p));
+        assert!(!is_at_least_as_restrictive(&p, &Policy::default()));
+    }
+
+    #[test]
     fn doh_bypass_hosts() {
         assert!(is_doh_bypass_host("use-application-dns.net"));
         assert!(is_doh_bypass_host("dns.google"));

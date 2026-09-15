@@ -10,6 +10,11 @@
  * `apps/desktop/src/renderer/pages/Blocklists.tsx`.
  */
 
+import type { PremadeListId } from './premadeLists';
+
+export type { PremadeListId, PremadeListMeta } from './premadeLists';
+export { PREMADE_LISTS } from './premadeLists';
+
 /** UI-preset label only — never part of the enforced/wire `Policy` shape. */
 export type PolicyPreset = 'blacklist' | 'whitelist' | 'block-all' | 'smart';
 
@@ -45,6 +50,8 @@ export interface Policy {
   /** Non-null activates Smart filtering for domains on neither hard list. */
   intent: PolicyIntent | null;
   apps: AppRef[];
+  /** Built-in bulk blocklist categories the user has toggled on (e.g. "nsfw", "shopping"). */
+  enabledPremadeLists: PremadeListId[];
 }
 
 export const EMPTY_POLICY: Policy = {
@@ -53,4 +60,5 @@ export const EMPTY_POLICY: Policy = {
   defaultAction: 'allow',
   intent: null,
   apps: [],
+  enabledPremadeLists: [],
 };

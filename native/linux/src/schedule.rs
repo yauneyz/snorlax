@@ -266,6 +266,7 @@ mod profile_tests {
             default_action: DefaultAction::Allow,
             intent: None,
             apps: Vec::new(),
+            enabled_premade_lists: Vec::new(),
         }
     }
 

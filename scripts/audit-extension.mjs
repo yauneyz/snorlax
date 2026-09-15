@@ -33,6 +33,7 @@ const expectedFiles = [
   "popup.css",
   "popup.html",
   "popup.js",
+  "premade-lists",
 ];
 
 function fail(message) {

@@ -10,7 +10,8 @@
  *  - de-duplicated, order-stable
  */
 
-import type { AppRef, Policy, PolicyIntent } from '@talysman/shared';
+import type { AppRef, Policy, PolicyIntent, PremadeListId } from '@talysman/shared';
+import { PREMADE_LISTS } from '@talysman/shared';
 
 export interface NormalizedPolicy extends Policy {
   /** Inputs that were dropped during normalization, with a reason. */
@@ -155,5 +156,27 @@ export function normalizePolicy(policy: Policy): NormalizedPolicy {
     }
   }
 
-  return { blockedDomains, allowedDomains, defaultAction, intent, apps, rejected };
+  const knownListIds = new Set<PremadeListId>(PREMADE_LISTS.map((l) => l.id));
+  const enabledPremadeLists: PremadeListId[] = [];
+  const premadeSeen = new Set<PremadeListId>();
+  for (const id of policy.enabledPremadeLists ?? []) {
+    if (!knownListIds.has(id)) {
+      rejected.push({ value: id, reason: 'unknown premade list id' });
+      continue;
+    }
+    if (!premadeSeen.has(id)) {
+      premadeSeen.add(id);
+      enabledPremadeLists.push(id);
+    }
+  }
+
+  return {
+    blockedDomains,
+    allowedDomains,
+    defaultAction,
+    intent,
+    apps,
+    enabledPremadeLists,
+    rejected,
+  };
 }

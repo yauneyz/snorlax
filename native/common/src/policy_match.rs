@@ -7,6 +7,7 @@
 //! executable naming convention (`chrome.exe` vs `google-chrome`).
 
 use crate::policy::{AppRef, DefaultAction, Policy};
+use crate::premade_lists;
 
 /// Does `host` match `pattern`? `pattern` may be exact ("youtube.com") or a leading wildcard
 /// ("*.reddit.com" matches reddit.com and any subdomain).
@@ -22,17 +23,23 @@ pub fn host_matches(host: &str, pattern: &str) -> bool {
 
 /// Should a DNS query for `host` be blocked under `policy`? `blockedDomains` and `allowedDomains`
 /// are hard, never-judged lists (block wins if a domain is somehow on both — see
-/// `packages/core/src/policyNormalize.ts`); anything on neither list falls back to
-/// `defaultAction`, UNLESS `intent` is set, in which case unlisted hosts are let through so the
-/// page can load and the browser extension's `judgeRequest` gets a chance to run. `defaultAction`
-/// still applies in that case — just as the fail-closed/fail-open fallback if the judge never
-/// answers (see `platform_core::sweep_expired_judges`), not as a live gate here.
+/// `packages/core/src/policyNormalize.ts`); `allowedDomains` also exempts a host from the
+/// built-in premade lists (`enabledPremadeLists`), which are checked next — this is the escape
+/// hatch for a user who wants a category blocked except for one site. Anything on neither hard
+/// list and not in an enabled premade list falls back to `defaultAction`, UNLESS `intent` is set,
+/// in which case unlisted hosts are let through so the page can load and the browser extension's
+/// `judgeRequest` gets a chance to run. `defaultAction` still applies in that case — just as the
+/// fail-closed/fail-open fallback if the judge never answers (see
+/// `platform_core::sweep_expired_judges`), not as a live gate here.
 pub fn is_host_blocked(policy: &Policy, host: &str) -> bool {
     if policy.blocked_domains.iter().any(|p| host_matches(host, p)) {
         return true;
     }
     if policy.allowed_domains.iter().any(|p| host_matches(host, p)) {
         return false;
+    }
+    if premade_lists::is_blocked_by_premade(&policy.enabled_premade_lists, host) {
+        return true;
     }
     if policy.intent.is_some() {
         // Smart filtering judges unlisted hosts at the page level (judgeRequest), which requires
@@ -97,9 +104,43 @@ pub fn is_at_least_as_restrictive(prev: &Policy, next: &Policy) -> bool {
         }
     }
 
-    prev.apps
+    if !prev
+        .apps
         .iter()
         .all(|app| next.apps.iter().any(|candidate| same_app(candidate, app)))
+    {
+        return false;
+    }
+
+    // Direct set comparison rather than sampling hosts from each list: the lists are fixed and
+    // shipped with the app (not user-editable subsets), so "every list prev had enabled is still
+    // enabled in next" is exactly the restrictiveness condition — turning one off always frees
+    // traffic, turning one on never does.
+    prev.enabled_premade_lists
+        .iter()
+        .all(|id| next.enabled_premade_lists.contains(id))
+}
+
+/// Domains a DNS-layer sinkhole (dnsmasq on Linux, the `/etc/hosts` splice on macOS) should
+/// refuse: the user's own `blockedDomains` plus every domain in an enabled premade list, minus
+/// anything exempted by `allowedDomains`. Deliberately NOT fed into the IP-resolution backstops
+/// (pf/nftables/WinDivert IP tables) — those resolve every entry to an IP on a timer, and doing
+/// that for tens of thousands of premade-list domains would be prohibitively expensive; premade
+/// lists rely on the DNS layer alone.
+pub fn effective_dns_sinkhole_domains(policy: &Policy) -> std::collections::BTreeSet<String> {
+    let mut out: std::collections::BTreeSet<String> =
+        policy.blocked_domains.iter().cloned().collect();
+    for domain in premade_lists::expand_enabled(&policy.enabled_premade_lists) {
+        if policy
+            .allowed_domains
+            .iter()
+            .any(|p| host_matches(&domain, p))
+        {
+            continue;
+        }
+        out.insert(domain);
+    }
+    out
 }
 
 /// Hostnames a DNS sinkhole must refuse while focus is active, independent of the user's policy,
@@ -144,7 +185,57 @@ mod tests {
             default_action,
             intent: None,
             apps: Vec::new(),
+            enabled_premade_lists: Vec::new(),
         }
+    }
+
+    use crate::policy::PremadeListId;
+
+    #[test]
+    fn enabling_a_premade_list_blocks_its_domains() {
+        let p = policy(&[], &[], DefaultAction::Allow);
+        assert!(!is_host_blocked(&p, "amazon.com"));
+
+        let mut with_shopping = p.clone();
+        with_shopping.enabled_premade_lists = vec![PremadeListId::Shopping];
+        assert!(is_host_blocked(&with_shopping, "amazon.com"));
+        assert!(is_host_blocked(&with_shopping, "www.amazon.com"));
+        // Not a subdomain wildcard: AWS console/login live under the same apex but must not be
+        // collaterally blocked by the "shopping" list.
+        assert!(!is_host_blocked(&with_shopping, "console.aws.amazon.com"));
+        assert!(!is_host_blocked(&with_shopping, "signin.aws.amazon.com"));
+    }
+
+    #[test]
+    fn allowed_domains_exempt_a_host_from_an_enabled_premade_list() {
+        let mut p = policy(&[], &["amazon.com"], DefaultAction::Allow);
+        p.enabled_premade_lists = vec![PremadeListId::Shopping];
+        assert!(!is_host_blocked(&p, "amazon.com"));
+        // Other shopping domains stay blocked.
+        assert!(is_host_blocked(&p, "ebay.com"));
+    }
+
+    #[test]
+    fn enabling_a_premade_list_is_more_restrictive_and_disabling_one_is_a_relaxation() {
+        let mut off = policy(&[], &[], DefaultAction::Allow);
+        let mut on = off.clone();
+        on.enabled_premade_lists = vec![PremadeListId::Shopping];
+        assert!(is_at_least_as_restrictive(&off, &on));
+        assert!(!is_at_least_as_restrictive(&on, &off));
+
+        off.enabled_premade_lists = vec![PremadeListId::Shopping, PremadeListId::Social];
+        on.enabled_premade_lists = vec![PremadeListId::Shopping];
+        assert!(!is_at_least_as_restrictive(&off, &on));
+    }
+
+    #[test]
+    fn widening_the_allow_list_under_a_premade_list_is_a_relaxation() {
+        let mut prev = policy(&[], &[], DefaultAction::Allow);
+        prev.enabled_premade_lists = vec![PremadeListId::Shopping];
+        let mut next = prev.clone();
+        next.allowed_domains = vec!["amazon.com".into()];
+        assert!(!is_at_least_as_restrictive(&prev, &next));
+        assert!(is_at_least_as_restrictive(&next, &prev));
     }
 
     #[test]

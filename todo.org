@@ -1,3 +1,7 @@
+- premade blocklists
+- discord
+- contact me 
+
 - Answer the user's question - get inside their OODA loop
 - strip and simplify
 - optimize actual app

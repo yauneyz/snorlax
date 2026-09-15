@@ -12,6 +12,65 @@
       "matches": ["<all_urls>"]
     }
   ],
+  "declarative_net_request": {
+    "rule_resources": [
+      {
+        "id": "premade-nsfw",
+        "enabled": false,
+        "path": "premade-lists/nsfw.json"
+      },
+      {
+        "id": "premade-shopping",
+        "enabled": false,
+        "path": "premade-lists/shopping.json"
+      },
+      {
+        "id": "premade-social",
+        "enabled": false,
+        "path": "premade-lists/social.json"
+      },
+      {
+        "id": "premade-gambling",
+        "enabled": false,
+        "path": "premade-lists/gambling.json"
+      },
+      {
+        "id": "premade-press",
+        "enabled": false,
+        "path": "premade-lists/press.json"
+      },
+      {
+        "id": "premade-games",
+        "enabled": false,
+        "path": "premade-lists/games.json"
+      },
+      {
+        "id": "premade-sports",
+        "enabled": false,
+        "path": "premade-lists/sports.json"
+      },
+      {
+        "id": "premade-forums",
+        "enabled": false,
+        "path": "premade-lists/forums.json"
+      },
+      {
+        "id": "premade-webemail",
+        "enabled": false,
+        "path": "premade-lists/webemail.json"
+      },
+      {
+        "id": "premade-blog",
+        "enabled": false,
+        "path": "premade-lists/blog.json"
+      },
+      {
+        "id": "premade-streaming",
+        "enabled": false,
+        "path": "premade-lists/streaming.json"
+      }
+    ]
+  },
   "action": {
     "default_title": "Talysman status",
     "default_popup": "popup.html"

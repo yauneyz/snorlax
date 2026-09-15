@@ -110,6 +110,43 @@ function deriveModeLabel(policy) {
   return 'blacklist';
 }
 
+/** Built-in bulk blocklists, shipped as static DNR rulesets (see manifest.json). Toggling one is
+ * `updateEnabledRulesets`, not `updateDynamicRules` — Chrome's dynamic-rule quota (~5k) can't
+ * hold the tens of thousands of domains these lists carry. */
+const PREMADE_RULESET_IDS = {
+  nsfw: 'premade-nsfw',
+  shopping: 'premade-shopping',
+  social: 'premade-social',
+  gambling: 'premade-gambling',
+  press: 'premade-press',
+  games: 'premade-games',
+  sports: 'premade-sports',
+  forums: 'premade-forums',
+  webemail: 'premade-webemail',
+  blog: 'premade-blog',
+  streaming: 'premade-streaming',
+};
+
+/** Enable exactly the rulesets for `enabledPremadeLists` while focus is active; disable all of
+ * them otherwise — mirrors `buildRules` returning `[]` when focus is inactive. */
+async function applyPremadeRulesets(active, enabledPremadeLists) {
+  if (typeof browserApi.declarativeNetRequest?.updateEnabledRulesets !== 'function') return;
+  const wanted = new Set(active ? enabledPremadeLists : []);
+  const enableRulesetIds = [];
+  const disableRulesetIds = [];
+  for (const [listId, rulesetId] of Object.entries(PREMADE_RULESET_IDS)) {
+    (wanted.has(listId) ? enableRulesetIds : disableRulesetIds).push(rulesetId);
+  }
+  try {
+    await browserApi.declarativeNetRequest.updateEnabledRulesets({
+      enableRulesetIds,
+      disableRulesetIds,
+    });
+  } catch (e) {
+    console.error('[talysman] premade ruleset update failed', e);
+  }
+}
+
 /** Accept the latest desired state synchronously, then serialize/coalesce DNR mutations. */
 function applyState(state) {
   const previousHeartbeatDelay = heartbeatDelay();
@@ -124,7 +161,9 @@ function applyState(state) {
       state.intent && typeof state.intent.positive === 'string' && state.intent.positive
         ? state.intent
         : null,
+    enabledPremadeLists: Array.isArray(state.enabledPremadeLists) ? state.enabledPremadeLists : [],
   };
+  void applyPremadeRulesets(blockingActive, currentPolicy.enabledPremadeLists);
   policyGeneration += 1;
   invalidatePendingJudges();
   blockingMode = deriveModeLabel(currentPolicy);

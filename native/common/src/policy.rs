@@ -49,6 +49,25 @@ impl Default for DefaultAction {
     }
 }
 
+/// Mirrors `PremadeListId` in packages/shared/src/policy.ts: a built-in, bulk-domain blocklist
+/// category the user can toggle on/off alongside their custom `blockedDomains`. See
+/// `crate::premade_lists`.
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
+#[serde(rename_all = "lowercase")]
+pub enum PremadeListId {
+    Nsfw,
+    Shopping,
+    Social,
+    Gambling,
+    Press,
+    Games,
+    Sports,
+    Forums,
+    Webemail,
+    Blog,
+    Streaming,
+}
+
 /// Mirrors `PolicyIntent` in packages/shared/src/policy.ts. Non-null on a `Policy` activates
 /// Smart filtering for domains that fall through both hard lists.
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
@@ -70,6 +89,8 @@ pub struct Policy {
     pub default_action: DefaultAction,
     pub intent: Option<Intent>,
     pub apps: Vec<AppRef>,
+    /// Built-in bulk blocklist categories the user has toggled on. See `crate::premade_lists`.
+    pub enabled_premade_lists: Vec<PremadeListId>,
 }
 
 /// Only for backward-compatible deserialization: pre-Smart-filtering policies (persisted state
@@ -103,6 +124,8 @@ struct PolicyWire {
     intent: Option<Intent>,
     #[serde(default)]
     apps: Vec<AppRef>,
+    #[serde(default)]
+    enabled_premade_lists: Vec<PremadeListId>,
 }
 
 impl<'de> Deserialize<'de> for Policy {
@@ -124,6 +147,7 @@ impl<'de> Deserialize<'de> for Policy {
                     default_action: DefaultAction::Allow,
                     intent: None,
                     apps: wire.apps,
+                    enabled_premade_lists: Vec::new(),
                 },
                 LegacyMode::Whitelist => Policy {
                     blocked_domains: Vec::new(),
@@ -131,6 +155,7 @@ impl<'de> Deserialize<'de> for Policy {
                     default_action: DefaultAction::Block,
                     intent: None,
                     apps: wire.apps,
+                    enabled_premade_lists: Vec::new(),
                 },
                 LegacyMode::BlockAll => Policy {
                     blocked_domains: Vec::new(),
@@ -138,6 +163,7 @@ impl<'de> Deserialize<'de> for Policy {
                     default_action: DefaultAction::Block,
                     intent: None,
                     apps: wire.apps,
+                    enabled_premade_lists: Vec::new(),
                 },
             };
             Ok(policy)
@@ -148,6 +174,7 @@ impl<'de> Deserialize<'de> for Policy {
                 default_action: wire.default_action.unwrap_or_default(),
                 intent: wire.intent,
                 apps: wire.apps,
+                enabled_premade_lists: wire.enabled_premade_lists,
             })
         }
     }
@@ -217,6 +244,7 @@ mod tests {
             "defaultAction",
             "intent",
             "apps",
+            "enabledPremadeLists",
         ] {
             assert!(json.get(key).is_some(), "missing `{key}` in {json}");
         }

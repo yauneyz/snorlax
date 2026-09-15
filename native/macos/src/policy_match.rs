@@ -29,6 +29,9 @@ pub fn is_host_blocked(policy: &Policy, host: &str) -> bool {
     if policy.allowed_domains.iter().any(|p| host_matches(host, p)) {
         return false;
     }
+    if talysman_common::premade_lists::is_blocked_by_premade(&policy.enabled_premade_lists, host) {
+        return true;
+    }
     if policy.intent.is_some() {
         // Smart filtering judges unlisted hosts at the page level (judgeRequest), which requires
         // the page to actually load. The hosts/pf layer must not preempt that by sinkholing on
@@ -89,9 +92,17 @@ pub fn is_at_least_as_restrictive(prev: &Policy, next: &Policy) -> bool {
         }
     }
 
-    prev.apps
+    if !prev
+        .apps
         .iter()
         .all(|app| next.apps.iter().any(|candidate| same_app(candidate, app)))
+    {
+        return false;
+    }
+
+    prev.enabled_premade_lists
+        .iter()
+        .all(|id| next.enabled_premade_lists.contains(id))
 }
 
 /// Hostnames a future DNS sinkhole should refuse while focus is active, independent of the user's
@@ -331,5 +342,17 @@ mod tests {
         }];
         assert!(is_app_blocked(&p, "Spotify", Some("com.spotify.client")));
         assert!(!is_app_blocked(&p, "spotify", None));
+    }
+
+    #[test]
+    fn premade_list_blocks_without_wildcarding_shared_infra() {
+        let mut p = Policy::default();
+        p.enabled_premade_lists = vec![talysman_common::policy::PremadeListId::Shopping];
+        assert!(is_host_blocked(&p, "amazon.com"));
+        assert!(!is_host_blocked(&p, "console.aws.amazon.com"));
+
+        let off = Policy::default();
+        assert!(is_at_least_as_restrictive(&off, &p));
+        assert!(!is_at_least_as_restrictive(&p, &off));
     }
 }

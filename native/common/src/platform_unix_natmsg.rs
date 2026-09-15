@@ -26,6 +26,7 @@ struct Blocking {
     blocked_domains: Vec<String>,
     allowed_domains: Vec<String>,
     default_action: String,
+    enabled_premade_lists: Vec<String>,
     /// Raw JSON so a `null` intent round-trips as JSON `null` rather than `{}`. `Value::Null` by
     /// default, matching "no Smart filtering" for a freshly-constructed `Blocking`.
     intent: Value,
@@ -47,6 +48,7 @@ impl Blocking {
             "allowedDomains": self.allowed_domains,
             "defaultAction": default_action,
             "intent": if self.smart_filtering_enabled { self.intent.clone() } else { Value::Null },
+            "enabledPremadeLists": self.enabled_premade_lists,
             "handshakeEnabled": self.handshake_enabled,
         })
     }
@@ -82,6 +84,15 @@ fn parse_policy(policy: &Value, b: &mut Blocking) {
         "allow".to_string()
     };
     b.intent = policy.get("intent").cloned().unwrap_or(Value::Null);
+    b.enabled_premade_lists = policy
+        .get("enabledPremadeLists")
+        .and_then(|v| v.as_array())
+        .map(|a| {
+            a.iter()
+                .filter_map(|d| d.as_str().map(str::to_string))
+                .collect()
+        })
+        .unwrap_or_default();
 }
 
 /// The PID of the process that launched us — the browser.
