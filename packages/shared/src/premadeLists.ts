@@ -14,43 +14,43 @@ export const PREMADE_LISTS: PremadeListMeta[] = [
     "id": "nsfw",
     "label": "NSFW",
     "description": "Pornography and adult content sites.",
-    "domainCount": 395151
+    "domainCount": 428013
   },
   {
     "id": "shopping",
     "label": "Shopping",
     "description": "Online retail and shopping sites.",
-    "domainCount": 36756
+    "domainCount": 36778
   },
   {
     "id": "social",
     "label": "Social media",
     "description": "Social networking and social media sites.",
-    "domainCount": 888
+    "domainCount": 887
   },
   {
     "id": "gambling",
     "label": "Gambling",
     "description": "Online casinos and betting sites.",
-    "domainCount": 67161
+    "domainCount": 67317
   },
   {
     "id": "press",
     "label": "Press",
     "description": "News and press sites.",
-    "domainCount": 4629
+    "domainCount": 4633
   },
   {
     "id": "games",
     "label": "Games",
     "description": "Online games and game distribution sites.",
-    "domainCount": 32807
+    "domainCount": 32914
   },
   {
     "id": "sports",
     "label": "Sports",
     "description": "Sports news and content sites.",
-    "domainCount": 2302
+    "domainCount": 2309
   },
   {
     "id": "forums",
@@ -68,12 +68,12 @@ export const PREMADE_LISTS: PremadeListMeta[] = [
     "id": "blog",
     "label": "Blog",
     "description": "Blog hosting and publishing sites.",
-    "domainCount": 1425
+    "domainCount": 1421
   },
   {
     "id": "streaming",
     "label": "Streaming",
     "description": "Audio and video streaming sites.",
-    "domainCount": 3346
+    "domainCount": 3352
   }
 ];

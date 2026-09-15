@@ -14,6 +14,7 @@
 import {
   faApple,
   faChrome,
+  faDiscord,
   faEdge,
   faFirefoxBrowser,
   faLinux,
@@ -32,8 +33,8 @@ const icons: Record<Platform, IconDefinition> = {
   firefox: faFirefoxBrowser,
 };
 
-export function PlatformIcon({ platform, size = 40 }: { platform: Platform; size?: number }) {
-  const [width, height, , , path] = icons[platform].icon;
+function Glyph({ icon, size }: { icon: IconDefinition; size: number }) {
+  const [width, height, , , path] = icon.icon;
 
   return (
     <svg
@@ -47,4 +48,13 @@ export function PlatformIcon({ platform, size = 40 }: { platform: Platform; size
       <path d={Array.isArray(path) ? path.join(" ") : path} fill="currentColor" />
     </svg>
   );
+}
+
+export function PlatformIcon({ platform, size = 40 }: { platform: Platform; size?: number }) {
+  return <Glyph icon={icons[platform]} size={size} />;
+}
+
+/** Not a platform, but the same glyph set and the same currentColor rules — see the note above. */
+export function DiscordIcon({ size = 20 }: { size?: number }) {
+  return <Glyph icon={faDiscord} size={size} />;
 }

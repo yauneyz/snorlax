@@ -1507,6 +1507,34 @@ input:-webkit-autofill:focus {
   color: var(--fg-0);
 }
 
+/* Community button. Discord blurple is the brand's own colour rather than one of ours, so it
+ * is set literally here instead of going through a token — nothing else on the site uses it. */
+.cta-band .cta-band__community {
+  margin: 1.25rem auto 0;
+}
+
+.discord-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.7rem 1.4rem;
+  font-weight: 600;
+  font-size: 0.95rem;
+  border-radius: var(--r-pill);
+  background: #5865f2;
+  color: #fff;
+  border: 1px solid #5865f2;
+  transition:
+    background var(--t-base) var(--ease),
+    border-color var(--t-base) var(--ease);
+}
+
+.discord-cta:hover {
+  background: #4752c4;
+  border-color: #4752c4;
+  color: #fff;
+}
+
 /* Free-vs-Pro split on the landing page. Two plain columns: this is a disclosure,
  * not a second pricing table. */
 .split__grid {

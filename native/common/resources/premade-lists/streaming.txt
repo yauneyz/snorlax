@@ -16,10 +16,15 @@
 107mix.com
 123cam.com
 123convert.to
+128vod-adaptive.akamaized.net
+139vod-adaptive.akamaized.net
 140provision.be
 1500videos.com
 150camaras.com.ar
+158vod-adaptive.akamaized.net
+174vod-adaptive.akamaized.net
 181.fm
+191vod-adaptive.akamaized.net
 1cheval.com
 1club.fm
 2008online1.net
@@ -112,6 +117,7 @@ actionband.de
 ada-music.com
 add-mp3.com
 addislive.com
+addressinfo.sytes.net
 ados.fr
 adrenalin-band.de
 aflamizik.com
@@ -124,8 +130,6 @@ aircraftmusiclibrary.com
 airmp3.com
 airplayradio.nl
 aiv-delivery.net
-akamaihd.net
-akamaized.net
 akimp3.com
 akoff.com
 alavery.net
@@ -215,7 +219,6 @@ arabmusic.nl
 arcadya.net
 arnet.com.ar
 arnoldclassicamateurbodybuilding.com
-art.pl
 arte.tv
 artistdirect.com
 asdiscount.com
@@ -237,6 +240,7 @@ atresplayer.com
 atube.me
 auboutdufil.com
 audio-mp3-recorder.com
+audio.msk.ru
 audioblog.com
 audiocover.de
 audiofanzine.com
@@ -829,6 +833,7 @@ enterthepit.com
 envierecados.com.br
 epidemicsound.com
 epitonic.com
+eplayer2sp-vh.akamaihd.net
 erika.net
 ersn.net
 ert.pl
@@ -1262,6 +1267,7 @@ interscope.com
 inthemoodforlove-wkw.com
 intomusic.co.uk
 inxs.com
+ip1.mypsx.net
 ipodder.org
 iprogramdev.com
 iquebec.com
@@ -1298,6 +1304,7 @@ javamusic.com
 jaydroz.com
 jayfan.com
 jazzcorner.com
+jcs.art.pl
 je2.ru
 jeinzmacias.net
 jessica-alba-pics.com
@@ -1337,6 +1344,7 @@ jyothikaindialove.com
 k-films.com
 k-streaming.com
 kamini.fr
+kanal.no-ip.info
 kannadaaudio.com
 karafun.com
 karaoke-z.net
@@ -1795,7 +1803,6 @@ mpstream.com
 mptrwa.com
 mpx.cz
 mradio.fr
-msk.ru
 msn.com
 mtayfa.com
 mthai.com
@@ -1867,7 +1874,6 @@ mylifetv.it
 mymovies.it
 mymovies.net
 myplay.com
-mypsx.net
 mysongbook.com
 myspace.com
 myspacecdn.com
@@ -1933,7 +1939,6 @@ njom.net
 nlziet.nl
 nme.ro
 nnm.ru
-no-ip.info
 nonsolomp3.com
 noolmusic.com
 norecordlabel.com
@@ -1998,7 +2003,6 @@ orange.es
 orange.fr
 orange.pl
 orb.com
-org.ru
 orlamusic.com
 oss117.fr
 ostr.net
@@ -2367,6 +2371,7 @@ rock.com.ar
 rockbase.co.uk
 rockdetente.com
 rockfun24.de
+rockmetal.art.pl
 rockmusicmp3s.com
 rocknrollzone.com
 rocksonico.com
@@ -2680,7 +2685,6 @@ swteam.info
 syndon.com
 synth.net
 synthcom.com
-sytes.net
 syxy.com
 szm.sk
 t-sonic.net
@@ -3020,6 +3024,7 @@ videos-du-net.com
 videos-gag.fr
 videos-manga.net
 videos-people.com
+videos-sport-es.akamaized.net
 videos.es
 videos07.com
 videosbr.info
@@ -3294,6 +3299,7 @@ yourv.id
 yourviewtube.com
 youtube-converter.top
 youtube-mp3.net
+youtube-mp3.org.ru
 youtube.com
 youtube.fr
 youtube2mp3.pro

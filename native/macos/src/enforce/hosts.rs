@@ -6,6 +6,7 @@
 //! pf IP rules fed from the warm resolver. Whitelist/block-all modes carry no hosts block —
 //! pf enforces those wholesale.
 
+use std::collections::HashSet;
 use std::fmt::Write as _;
 use std::path::PathBuf;
 use std::process::Command;
@@ -114,10 +115,11 @@ fn sinkhole_block(policy: &Policy) -> String {
     // blacklist-only sinkhole this applies even when the default is `block` — pf enforces the
     // default itself at the packet layer.
     let mut names = sinkhole_names(&policy.blocked_domains);
+    let mut seen: HashSet<String> = names.iter().cloned().collect();
     // Enabled premade lists sinkhole here too (never in the pf IP backstop — resolving tens of
     // thousands of domains to IPs on a timer would be prohibitively expensive; see
-    // `talysman_common::premade_lists`). `expand_enabled` already yields bare+`www.` pairs, so no
-    // further normalization is needed; `allowedDomains` still carves out exceptions.
+    // `talysman_common::premade_lists`). Add the common `www.` form because hosts entries match
+    // exact names; `allowedDomains` still carves out exceptions.
     for domain in talysman_common::premade_lists::expand_enabled(&policy.enabled_premade_lists) {
         if policy
             .allowed_domains
@@ -126,8 +128,12 @@ fn sinkhole_block(policy: &Policy) -> String {
         {
             continue;
         }
-        if !names.contains(&domain) {
-            names.push(domain);
+        if seen.insert(domain.clone()) {
+            names.push(domain.clone());
+        }
+        let www = format!("www.{domain}");
+        if seen.insert(www.clone()) {
+            names.push(www);
         }
     }
     if names.is_empty() {
@@ -137,7 +143,7 @@ fn sinkhole_block(policy: &Policy) -> String {
     }
     for h in DOH_BYPASS_HOSTS {
         let h = h.to_string();
-        if !names.contains(&h) {
+        if seen.insert(h.clone()) {
             names.push(h);
         }
     }
@@ -156,8 +162,9 @@ fn sinkhole_block(policy: &Policy) -> String {
 /// domains since hosts entries are exact-match only.
 fn sinkhole_names(domains: &[String]) -> Vec<String> {
     let mut out: Vec<String> = Vec::new();
+    let mut seen = HashSet::new();
     let mut push = |name: String| {
-        if !name.is_empty() && !out.contains(&name) {
+        if !name.is_empty() && seen.insert(name.clone()) {
             out.push(name);
         }
     };

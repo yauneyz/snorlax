@@ -54,7 +54,6 @@ alloforum.com
 alnyethelawyerguy.com
 aloevera-blog.com
 alt1040.com
-altervista.org
 alucinavecina.com
 alvaro.net
 amandaenredada.com
@@ -109,6 +108,7 @@ barnikel.net
 barraquito.net
 barrettchase.com
 battellemedia.com
+baxi.pp.ru
 beaufourfamily.com
 becker-posner-blog.com
 bekkelund.net
@@ -181,9 +181,6 @@ blogdaddy.com
 blogdigger.com
 blogdirect.net
 blogdirs.com
-blogdns.com
-blogdns.net
-blogdns.org
 blogdrive.com
 blogdumoderateur.com
 blogeasy.com
@@ -266,7 +263,6 @@ blogsforauthors.com
 blogsforbush.com
 blogshares.com
 blogsharing.com
-blogsite.org
 blogsitenavi.com
 blogskins.com
 blogsky.com
@@ -278,7 +274,6 @@ blogspace.com
 blogspace.fr
 blogspam.org
 blogspirit.com
-blogspot.com
 blogspot.de
 blogspot.es
 blogspot.nl
@@ -557,7 +552,6 @@ free-blog.in
 free.fr
 freeblog.hu
 freeblognetwork.com
-frenchkiss.jp
 frenzieddaddy.com
 frequentlywrongbutneverindoubt.com
 freshblogs.com
@@ -643,7 +637,6 @@ hiredmonkey.com
 hkmdb.com
 hoerenblog.nl
 hollyscoop.com
-homelinux.net
 hotfact.com
 howtobepoor.com
 hqblog.net
@@ -749,6 +742,7 @@ keener.org
 kellyjeanne.org
 kensavage.com
 kenwong.cn
+kev.homelinux.net
 keykan.com
 kgadams.net
 kibeland.com
@@ -951,6 +945,7 @@ nadaimportante.org
 nadig.com
 nadinerine.com
 nafzinger.com
+nakedblue.frenchkiss.jp
 negativesmart.com
 neongreen.com
 netalive.org
@@ -1061,7 +1056,6 @@ postkiwi.com
 povertybarn.com
 powerblogs.com
 powerblogs.net
-pp.ru
 pri.me.uk
 produzentin.com
 professorsalt.com
@@ -1364,6 +1358,7 @@ webdekultursanat.com
 weblog.com.pt
 weblog.ro
 weblogger.dk
+weblogs.altervista.org
 weblogs.com
 weblogs.com.ar
 weblogs.com.uy
@@ -1417,6 +1412,7 @@ zbroj.info
 zdnet.fr
 zeblog.com
 zeecu.com
+zenigata.altervista.org
 zerotom.net
 zmaze.org
 znsunimage.com

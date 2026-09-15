@@ -41,6 +41,7 @@ jobs:
           name: premade-blocklists
           path: |
             native/common/resources/premade-lists/**
+            native/common/src/premade_list_ids.rs
             apps/extension/resources/premade-lists/**
             packages/shared/src/premadeLists.ts
           retention-days: 7

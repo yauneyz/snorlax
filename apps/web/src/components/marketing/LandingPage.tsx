@@ -11,6 +11,7 @@ import { AppShot } from "@/components/marketing/AppShot";
 import { HeroCopy } from "@/components/marketing/HeroCopy";
 import type { VariantKey } from "@/components/marketing/heroVariants";
 import { HeroDemo } from "@/components/marketing/HeroDemo";
+import { DiscordIcon } from "@/components/marketing/PlatformIcon";
 
 /** Shots are 4:3 captures of the real app — see scripts/capture-marketing.mjs. */
 const steps = [
@@ -311,6 +312,17 @@ export function LandingPage({ variantOverride }: { variantOverride?: VariantKey 
         <p className="cta-band__note">
           Free forever, no card. Want schedules and app blocking?{" "}
           <Link href="/pricing">Try Pro free for {PRO_TRIAL_DAYS} days</Link>.
+        </p>
+        <p className="cta-band__community">
+          <a
+            href="https://discord.gg/QZzrM3gpt"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="discord-cta"
+          >
+            <DiscordIcon size={20} />
+            Join our Discord server
+          </a>
         </p>
       </section>
     </>

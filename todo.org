@@ -1,6 +1,7 @@
-- premade blocklists
-  - get it actually working
-  - smaller UI
+- test
+- upload new extension
+- ship new version
+
 - discord community
 - landing page
   - copy

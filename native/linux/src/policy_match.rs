@@ -5,13 +5,17 @@ use crate::model::{AppRef, DefaultAction, Policy};
 
 /// Domains a DNS-layer sinkhole should refuse: `blockedDomains` plus every enabled premade
 /// list's domains, minus anything exempted by `allowedDomains`. See
-/// `talysman_common::premade_lists` for why premade-list matching is exact-domain-or-`www.`
-/// only, and why this is never fed into the nftables IP backstop.
+/// `talysman_common::premade_lists` for the matching semantics and why this is never fed into the
+/// nftables IP backstop.
 pub fn effective_dns_sinkhole_domains(policy: &Policy) -> std::collections::BTreeSet<String> {
     let mut out: std::collections::BTreeSet<String> =
         policy.blocked_domains.iter().cloned().collect();
     for domain in talysman_common::premade_lists::expand_enabled(&policy.enabled_premade_lists) {
-        if policy.allowed_domains.iter().any(|p| host_matches(&domain, p)) {
+        if policy
+            .allowed_domains
+            .iter()
+            .any(|p| host_matches(&domain, p))
+        {
             continue;
         }
         out.insert(domain);

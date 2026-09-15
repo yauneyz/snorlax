@@ -49,6 +49,8 @@
 1001hry.cz
 1001jeux.fr
 1001jogos.com.br
+1001juegos-swf.blogspot.com
+1001juegos.blogspot.com
 1001juegos.com
 1001onlinegames.com
 1001paixnidia.gr
@@ -264,6 +266,7 @@
 2dogsgames.com
 2dplay.com
 2dplay.net
+2dynamic.azurewebsites.net
 2fight.net
 2flashgames.com
 2freeonlinegames.com
@@ -467,6 +470,8 @@
 5ehpcalculator.com
 5emagic.shop
 5eplay.com
+5etools-mirror-1.github.io
+5etools-mirror-2.github.io
 5footstep.de
 5forum.info
 5gamericas.org
@@ -806,6 +811,7 @@ actionquiz.com
 actionsportgames.com
 actiontrip.com
 actiontrivia.com
+activ23.blogspot.com
 activebb.net
 activecheats.com
 activegamer.com
@@ -942,6 +948,7 @@ aestivus.org
 aesvi.it
 aeternathegame.com
 aether-online.com
+aether.in.net
 aetherco.com
 aethergames.io
 aetherhub.com
@@ -1087,7 +1094,6 @@ ajedrezonline.com
 ajeeb.com
 ajoutez.fr
 akalinteraktif.com
-akamaized.net
 akanbar.com
 akaonistudio.com
 akedostudio.com
@@ -1300,7 +1306,6 @@ alternative-armies.com
 alternativeshift.fr
 alternativesoft.co.uk
 alternativesoftware.com
-altervista.org
 altitude-games.com
 altmarket.net
 altoids.com
@@ -1329,7 +1334,6 @@ amazingcasinocardgamez.com
 amazingcasinolivecardgamez.com
 amazingcheaproulettegamez.com
 amazingroulettecheapgamez.com
-amazonaws.com
 amazongames.com
 ambbet.game
 ambercon.org.uk
@@ -1410,6 +1414,7 @@ analyzedota.com
 analyzingamerica.org
 anarchy-online.com
 anarchyent.com
+anathema.github.io
 anatheria.com
 anawiki.com
 ancestorsgame.com
@@ -1639,7 +1644,6 @@ appsministry.com
 appsolutegames.com
 appsomniacs.com
 appsplayground.com
-appspot.com
 appsto.re
 apptopi.jp
 apptuts.net
@@ -1902,6 +1906,7 @@ arludo.com
 armadafleetcommand.com
 armageddon.org
 armaholic.com
+armataducale.altervista.org
 armature.com
 armchairanalysis.com
 armchairarcade.com
@@ -1944,6 +1949,7 @@ artefacts-studio.fr
 artematica.com
 artepiazza.com
 artexponent.com
+artflow-ai.firebaseapp.com
 artforgames.com
 artgigapps.com
 artie.com
@@ -1974,6 +1980,7 @@ artwho9figurepainting.co.uk
 aruba-studios.de
 arumastudios.com
 arvore.io
+arya.altervista.org
 arzest.jp
 as32590.net
 asbointeractive.com
@@ -2000,6 +2007,8 @@ ashirion.co.uk
 asi.org
 asiagames.com
 asianbookie.com
+asianf4rmer.repl.co
+asianf4rmer.vercel.app
 asianfreeforum.com
 asiangames2018.id
 asiasoft.co.th
@@ -2087,7 +2096,6 @@ atfclan.com
 atgame.cloud
 atgames.net
 atgames.us
-ath.cx
 athala.org
 athas.org
 athenaeumchessclub.com
@@ -2145,6 +2153,7 @@ atthetrack.net
 atticescape.com
 atticgames.net
 atticspacegames.com
+atticussprague.repl.co
 atwiki.jp
 atypicalgames.com
 au.tt
@@ -2280,6 +2289,7 @@ axisandallies.org
 axolotgames.com
 axoninteractive.ca
 ayelet.studio
+ayinger.no-ip.info
 ayopagames.com
 ayumilove.net
 azagame.fr
@@ -2289,6 +2299,7 @@ azdimension.az
 azerion.com
 azeroth.fr
 azet.sk
+azgaar.github.io
 azgame.io
 azhry.sk
 azminecraft.ru
@@ -2297,7 +2308,6 @@ azteccoin.co.uk
 aztez.com
 azuregaming.net
 azurel2.com
-azurewebsites.net
 azurgames.com
 azzer.com
 b-alive.de
@@ -2515,6 +2525,7 @@ battlecorp.com
 battlecrythegame.com
 battlefact.com
 battlefield.com
+battlefield2142tips.yolasite.com
 battlefieldbadcompany2.com
 battlefieldbargo.com
 battlefieldheroes.com
@@ -2610,6 +2621,7 @@ beamdog.com
 beamng.gmbh
 beamteamgames.com
 beano.com
+bear.squares.net
 bearbitstudios.com
 bearboystudios.com
 beardedbrothers.games
@@ -2671,6 +2683,7 @@ behemutt.com
 beholdstudios.com.br
 beijingworldgames.info
 beingai.com
+beinternetawesome.withgoogle.com
 beirut-guide.com
 beladcom.com
 belatragames.com
@@ -2762,6 +2775,7 @@ bestiaire.org
 bestjeux.com
 bestmgames.com
 bestminecraftskins.com
+bestminenn.ddns.net
 bestmp3converter.org
 bestofbreedsim.com
 bestofjeuxvideos.com
@@ -2838,6 +2852,7 @@ betx12.net
 bevgames.com
 beyblade-games.net
 beyblade.com
+beyond20.here-for-more.info
 beyondframes.com
 beyondfunstudio.com
 beyondgames.biz
@@ -2881,6 +2896,7 @@ bifrostpro.com
 big-monster.net
 big-robot.com
 big8games.com
+bigame.altervista.org
 bigant.com
 bigantgames.com
 bigarcade.net
@@ -2891,6 +2907,7 @@ bigbangstudio.nl
 bigbassbonanza-game.com
 bigbeans.solutions
 bigben-interactive.de
+bigbigboytw.blogspot.com
 bigbluebubble.com
 bigblueskygames.com
 bigbootyarcade.com
@@ -2968,6 +2985,7 @@ billrini.com
 billsgames.com
 billybobteeth-direct.co.uk
 billygoat.tv
+bimboo.sakura.ne.jp
 bimboosoft.com
 biminiringgame.com
 bin.sh
@@ -3194,6 +3212,7 @@ blklein.id.au
 blobby-dungeon.com
 blobby-volley.com
 blobby-volley.de
+blobcraft.duckdns.org
 blobcraft.tk
 blobie.io
 blobzone.com
@@ -3221,7 +3240,6 @@ blognomic.com
 blogplay.com
 blogplay.ga
 blogplay.pl
-blogspot.com
 blogspot.ru
 blogtruyenmoi.com
 blokus.com
@@ -3297,6 +3315,7 @@ blueprintreality.com
 blueshinra.com
 blueskied.com
 bluesnews.com
+bluestacks-eb-prod.us-west-1.elasticbeanstalk.com
 bluestacks.com
 bluesunsetgames.com
 bluetablepainting.com
@@ -3864,6 +3883,7 @@ burlingame.org
 burlingamehistorical.org
 burlingamepezmuseum.com
 burningskygames.com
+burritoedition.repl.co
 bus-manager.com
 busbridgebridge.org.uk
 buscar-juegos.com
@@ -3899,6 +3919,7 @@ buzzville.com
 buzzwordbingogame.com
 buzzwordfrenzy.com
 buzzy.bees
+bve.altervista.org
 bvecornwall.co.uk
 bveklub.hu
 bvestation.com
@@ -4177,8 +4198,8 @@ carp-mi.net
 carparkinggames.us
 carpefulgur.com
 carplaylife.com
+carplele.altervista.org
 carracinggames.biz
-carrd.co
 carresmagiques.com
 carriercommand.com
 carrionfields.com
@@ -4405,6 +4426,7 @@ cdmediaworld.com
 cdprojekt.com
 cdromance.com
 cdromance.org
+cdsystems.uk.com
 cdyn.com
 ceasarsarena.com
 ceasia.cn
@@ -4933,7 +4955,6 @@ clothcat.com
 cloudcade.com
 cloudchamberstudios.com
 cloudfirestudios.com
-cloudfront.net
 cloudgamepay.com
 cloudgames.com
 cloudgate.studio
@@ -5132,8 +5153,7 @@ columbiagames.com
 columbinegame.com
 colvillecasinos.com
 colyseo.fr
-com.de
-com.ru
+com.s3.amazonaws.com
 com02.com
 com2us.com
 comacotoys.com
@@ -5247,6 +5267,7 @@ conquerorgame.com
 conquest-lys.net
 conquest-world.com
 conquest.asn.au
+conradicalgames.netlify.app
 consala.com
 conseilvirtuel.com
 conservativeplaybook.com
@@ -5350,6 +5371,7 @@ copymanga.site
 copymanga.tv
 corashack.com
 corbomitegames.com
+cordygame.appspot.com
 coreballgame.com
 corecell.co.th
 coreconcepts.com
@@ -5593,6 +5615,7 @@ crimecitythegame.com
 crimecraft.com
 crimescene.com
 crimethegame.com
+criminalcrackdown.blogspot.com
 criminapolis.co.uk
 crimsongames200.com
 crimsonherring.com
@@ -5615,6 +5638,7 @@ critrole.co.uk
 critrole.com
 critrolestats.com
 critter.net
+crobi.github.io
 crocevia.it
 crocgames.it
 crocodilegames.com
@@ -5650,6 +5674,7 @@ crossword.org.uk
 crosswordanswers911.net
 crosswordclub.org
 crosswordclues.com
+crosswordcorner.blogspot.com
 crosswordfiend.com
 crosswordfix.com
 crosswordgenius.com
@@ -5715,6 +5740,7 @@ crytivo.com
 crywolf-lejeu.com
 cryzen.io
 cs-conditionzero.com
+cs-games.net.ru
 cs.money
 csegames.com
 csgame.cz
@@ -5784,12 +5810,14 @@ cubovelocidade.com.br
 cuebid.com
 cuendillar.org
 cug.net
+cugosoc.soc.srcf.net
 cuicuiland.com
 cuirass.net
 cuisineaz.com
 cuisinejeux.com
 culga.com
 cultgames.com
+culturavg.altervista.org
 culturequizz.com
 culturogame.com
 culverve.fun
@@ -5896,6 +5924,7 @@ d10bridge.org
 d12dev.com
 d16acbl.org
 d17acbl.org
+d1vzi28wh99zvq.cloudfront.net
 d20pfsrd.com
 d20srd.org
 d21acbl.com
@@ -6022,12 +6051,14 @@ darkagerp.com
 darkages.com
 darkagesworld.com
 darkbb.com
+darkblade.ath.cx
 darkboy.ru
 darkcloud.games
 darkcrystalgames.com
 darkcurry.com
 darkdevotion.fr
 darkdiscord.com
+darkelf.altervista.org
 darkelfdice.com
 darkeningsun.org
 darkeragaming.co.uk
@@ -6091,6 +6122,7 @@ dasproduction.it
 dasut.com
 data-display.com
 datadriveninvestor.com
+dataform.uk.com
 datalink.sk
 datamosh.com
 datarealms.com
@@ -6164,7 +6196,6 @@ ddcaz.com
 dddistortion-games.com
 ddlc.moe
 ddlc.plus
-ddns.net
 ddo.com
 ddo.jp
 ddocast.com
@@ -6320,7 +6351,6 @@ demiononline.nl
 demiplane.com
 demiurgestudios.com
 demon.co.uk
-demon.nl
 demonically.com
 demonicious.com
 demonistes.com
@@ -6357,6 +6387,7 @@ desafiando.com.br
 desafiosdiarios.com
 desbonsplans.com
 descargajuegosgratis.info
+descargajuegoz.blogspot.com
 descargarse.es
 descargasdec.com
 descent2.com
@@ -6733,6 +6764,7 @@ dm-stuff.ru
 dmaland.ru
 dmarket.com
 dmg.to
+dmg8bit.appspot.com
 dmgenie.com
 dmgice.com
 dmm.co.jp
@@ -6977,6 +7009,7 @@ download-online-games.com
 download-subway-surfers.ru
 download11-treecardgames.com
 download3000.com
+downloadgame4pc.blogspot.com
 downloadgames.dk
 downloadgames2008.com
 downloadgames3000.com
@@ -7002,6 +7035,7 @@ dpsimulation.org.uk
 dpxq.com
 dqrpg.com
 dqshrine.com
+dr-eigenvalue.github.io
 dr-mikes-math-games-for-kids.com
 dr.dk
 drachenkampf3.de
@@ -7030,6 +7064,7 @@ dragonfable.com
 dragonfiar.com
 dragonflycave.com
 dragonflygame.com
+dragongame-prod.appspot.com
 dragongame22.com
 dragongamestudio.com
 dragongamez.com
@@ -7075,6 +7110,7 @@ drakeslair.net
 drakharstudio.com
 drakier.com
 drakkardev.com
+drakonia.altervista.org
 drakulastream.eu
 dramaticlabs.com
 dramatv.online
@@ -7243,7 +7279,6 @@ dubitlimited.com
 dubois-manchot.org
 dubzplay.com
 duckbridge.nl
-duckdns.org
 duckpark.io
 ducksters.com
 dudegames.fr
@@ -7256,6 +7291,7 @@ duelyst.com
 dueprocess.info
 duerojuegos.com
 duetdisplay.com
+dugout-online-espanol.blogspot.com
 dugout-online.com
 duizgame.cn
 dukertcm.com
@@ -7275,6 +7311,7 @@ dune.net
 dune2k.com
 dunedincasino.co.nz
 dunegames.com
+dungeon.no-ip.info
 dungeonblitz.com
 dungeoncrawl.org
 dungeoncrawlers.com
@@ -7319,6 +7356,7 @@ dwellergame.com
 dwmud.com
 dworks-ent.co.jp
 dwpc.jp
+dxblade.altervista.org
 dxx-rebirth.com
 dyingearth.com
 dyinglightgame.com
@@ -7333,7 +7371,6 @@ dynamo-led-displays.co.uk
 dynasty-warriors.net
 dynasty11.com
 dynastywarriorsstrikeforce.co.uk
-dyndns.org
 dynotech.com
 dyscordionentertainment.com
 dysonlogos.blog
@@ -7357,6 +7394,7 @@ e-scapegames.co.uk
 e-scrabble.com
 e-soccermania.com
 e-sports.sk
+e-story.dyndns.org
 e-sudoku.fr
 e-univers.org
 e-zug.com
@@ -7374,12 +7412,14 @@ eagames.com
 eagb.net
 eaglegames.net
 eaglemtncasino.com
+eaglercraft-server--ayunami2000.repl.co
 eaglercraft.com
 eaglercraft.me
 eaglercraft.net
 eaglercraft.org
 eaglercraft.ru
 eaglercraft.xyz
+eaglercraftx.pages.dev
 eaglesoftdg.com
 eagregames.com
 ealiensoft.com
@@ -7473,6 +7513,7 @@ ed-td.space
 edagames.com
 edaplayground.com
 edebe.com.br
+edelweiss.skr.jp
 eden-studios.fr
 edeneclipse.com
 edengame.net
@@ -7480,6 +7521,7 @@ edengames.com
 edengames.net
 edenor.ru
 edgeent.com
+edgeflow-01.webflow.io
 edgelib.com
 edgeofcreation.net
 edgesuite88.net
@@ -7573,7 +7615,6 @@ el71.com
 elainecunningham.com
 elamigos-games.net
 elastic-games.com
-elasticbeanstalk.com
 elastomania.com
 elbingo.com
 elbowrivercasino.com
@@ -7773,6 +7814,7 @@ engagevr.io
 engine-house.co.uk
 engine-software.com
 engine001.com
+engineous.repl.co
 engineroomgames.com
 enginuity.com
 englishchess.org.uk
@@ -7843,6 +7885,7 @@ epicbasing.com
 epicbundle.com
 epicgame.com.br
 epicgameads.com
+epicgames-download1.akamaized.net
 epicgames.com
 epicgames.dev
 epicgames.net
@@ -7894,6 +7937,7 @@ eradain.com
 erasmatazz.com
 erasmusplay.com
 erasmusplus-jeunesse.fr
+erciccio.altervista.org
 erdener.org
 eredan.com
 eremitegames.com
@@ -7993,8 +8037,6 @@ ets2mods.pl
 etterstudio.com
 etwa.org
 etyries.com
-eu.com
-eu.org
 eu.pn
 euchrelinks.com
 eugensystems.com
@@ -8362,6 +8404,7 @@ fanni.biz
 fanotop.com
 fanplayr.com
 fanstudio.co.uk
+fantager.no-ip.org
 fantasiapelit.com
 fantasiastore.it
 fantasiegames.de
@@ -8380,6 +8423,7 @@ fantasylibrary.com
 fantasyligue.com
 fantasynamegenerators.com
 fantasyreborn.com
+fantasyreign.altervista.org
 fantasyroleplay.co
 fantasyspringsresort.com
 fantasytalesonline.com
@@ -8660,7 +8704,6 @@ fireandfury.com
 fireandiceconvention.com
 firearmsmod.com
 fireart.games
-firebaseapp.com
 firebelly-studios.com
 fireblazehost.com
 firebolt.com
@@ -8903,6 +8946,7 @@ flibus.com
 fliggerty.com
 flight1.com
 flightgear.org
+flightgear.tuxfamily.org
 flightless.co.nz
 flightrising.com
 flightschoolstudio.com
@@ -9102,6 +9146,8 @@ forsaken-realms.com
 fortafygames.com
 forthstar.com
 fortitudegames.co.uk
+fortnite-storage-live.s3.amazonaws.com
+fortnite-vod.akamaized.net
 fortnite.com
 fortnite.gg
 fortnite.io
@@ -9246,6 +9292,7 @@ free-games-scout.com
 free-games-zone.com
 free-games.as
 free-games.com.au
+free-games.eu.com
 free-games.to
 free-hearts.com
 free-iqtest.net
@@ -9317,6 +9364,7 @@ freedomfans.com
 freedomresist.com
 freedomresist.es
 freedomresist.hk
+freedoom.github.io
 freedownloadgame.com
 freedownloadscenter.com
 freedressupgamez.com
@@ -9350,6 +9398,7 @@ freegames.de
 freegames.dk
 freegames.fm
 freegames.org
+freegames.uk.eu.org
 freegames.ws
 freegames14.com
 freegames24.de
@@ -9497,6 +9546,7 @@ fridaytrivia.com
 friedmandesign.com
 friendandfoegames.com
 friendlygames.ru
+friends-prod.us-east-1.elasticbeanstalk.com
 friendshipgardengames.com
 friendshipquiz2022.com
 friendswithholograms.com
@@ -9600,6 +9650,7 @@ fsolver.es
 fspazone.org
 fsplanet.com
 fsx-download.com
+fsxirishscenery.yolasite.com
 fsxmultiplayer.com
 ftbwiki.org
 ftgames.com
@@ -9708,6 +9759,7 @@ funny-games.name
 funny-games.ws
 funnycargames.com
 funnycrazygames.com
+funnyfunnyq.blogspot.com
 funnygame.de
 funnygames.asia
 funnygames.biz
@@ -9966,12 +10018,12 @@ game-fresh.com
 game-fun-real.eu
 game-gaga.com
 game-game.com
+game-game.com.de
 game-game.com.ua
 game-game.sk
 game-guide.fr
 game-guide.info
 game-guru.com
-game-host.org
 game-icons.net
 game-info.wiki
 game-insight.com
@@ -10012,7 +10064,6 @@ game-remakes.com
 game-revolution.com
 game-roblox.ru
 game-seer.com
-game-server.cc
 game-servers.com
 game-shed.com
 game-show-utopia.net
@@ -10379,6 +10430,7 @@ gameeyeofhorus.com
 gamef888.com
 gamefa.com
 gamefabrique.com
+gamefacill.blogspot.com
 gamefactory.jp
 gamefactx.com
 gamefair.fr
@@ -11261,6 +11313,7 @@ gamesgames.ca
 gamesgames.com
 gamesgds.com
 gamesghetto.com
+gamesgizmo.blogspot.com
 gamesgmaes.com
 gamesgnome.com
 gamesgo.net
@@ -11534,6 +11587,7 @@ gameswelt.at
 gameswelt.de
 gameswelt.tv
 gameswf.com
+gameswhitelisted.googleapis.com
 gameswift.io
 gameswirtschaft.de
 gameswithwords.org
@@ -11553,6 +11607,7 @@ gamesysgroup.com
 gamesystemrequirements.com
 gamesystems.com
 gameszone.ro
+gameszoo.altervista.org
 gameszoone.com
 gamet.eu
 gametab.com
@@ -11727,6 +11782,7 @@ gamezastar.com
 gamezboost.com
 gamezebo.com
 gamezebra.com
+gamezeedownload.blogspot.com
 gamezees.com
 gamezer.com
 gamezero.com
@@ -12086,6 +12142,7 @@ ghostcreativestudio.net
 ghostfiregaming.com
 ghostgames.com
 ghostlevel.games
+ghostlight.uk.com
 ghostlybeargames.com
 ghostpattern.net
 ghostpunch.com
@@ -12160,6 +12217,7 @@ giochigratisonline.com
 giochigratisonline.it
 giochionline.it
 giochionline.org
+giochionlineita.altervista.org
 giochisuinternet.net
 giochiweb.net
 giochixl.it
@@ -12195,7 +12253,6 @@ girlybox.com
 girnaas.com
 gismart.com
 gitclan.com
-github.io
 giveawayoftheday.com
 giveuprobot.info
 gixer.com.br
@@ -12305,6 +12362,7 @@ gobase.org
 goblinclangames.com
 goblinkeeper.com
 goblinoidgames.com
+goblinpunch.blogspot.com
 goblins.net
 goblinzstudio.com
 gobooks.info
@@ -12359,6 +12417,7 @@ gokgs.com
 gokifu.com
 gokkastenplein.nl
 gol.ge
+golarion.altervista.org
 gold-miner-game.cn
 gold-online-games.com
 gold-price-check.com
@@ -12452,7 +12511,6 @@ goodwargames.com
 goodworld.ca
 goofcentral.tk
 google.com
-googleapis.com
 googlegames.cz
 googlemaps.com
 googleminigames.com
@@ -12484,6 +12542,7 @@ gorillaz.com
 goriya.com
 gorogoa.com
 gory-detail.com
+gosclient.altervista.org
 gosensations.com
 goshrine.com
 gosphero.com
@@ -12559,6 +12618,7 @@ grandrivercasino.com
 grandsierraresort.com
 grandslammn.org
 grandt.com.ar
+grandtargentino.blogspot.com
 grandtargentino.com.ar
 grandtblog.com
 grandtheftauto3.com
@@ -13039,6 +13099,7 @@ happywheels-demo.net
 happywheels-game.net
 happywheels.eu
 happywheels.fr
+happywheels.us.com
 happywheels2online.com
 happywheelsdemo2.com
 happywheelsgame.io
@@ -13051,6 +13112,7 @@ hardcoreshooter.com
 hardgame2.com
 hardgame2.net
 hardgamers.com
+hardle.herokuapp.com
 hardlightstudio.com
 hardmine.ru
 hardpornsex.net
@@ -13178,6 +13240,7 @@ heavygames.com
 heavygauss.com
 heavypepper.com
 hec.to
+hedalu244.github.io
 hedgehog.com.hk
 hedgend.com.au
 hedgewars.org
@@ -13206,6 +13269,7 @@ helloneighborgame.com
 helloplaybook.com
 hellothere.se
 hellowordl.net
+helltech.vercel.app
 helm-systems.com
 helosim.com
 helpshift.com
@@ -13220,7 +13284,6 @@ hentaivn.one
 hentaiz.vc
 hentertainment.nl
 heovktgame.club
-here-for-more.info
 herecomesniko.com
 hereshecomes.org
 heresy-online.net
@@ -13259,7 +13322,6 @@ heroicfantasygames.com
 heroicgameslauncher.com
 heroicon.org
 heroicpub.com
-herokuapp.com
 heromachine.com
 heromart.com
 herondata.co.uk
@@ -14093,7 +14155,6 @@ imxplayerpc.com
 imythess.com
 imz-gaming.com
 in.com
-in.net
 inbetweengames.com
 incagames.com
 incajuegos.com
@@ -14117,6 +14178,7 @@ indiaeveryday.in
 indiana-jeux.com
 indianachess.org
 indianapolisbridge.com
+indianbridge.appspot.com
 indiancharlie.com
 indiaquiz.net
 indiarace.com
@@ -15014,6 +15076,7 @@ jeux-jeuxgratuit.com
 jeux-jouer.fr
 jeux-king.com
 jeux-kizi.com
+jeux-ligne-gratuit.blogspot.com
 jeux-mario.com
 jeux-mario.fr
 jeux-mario.org
@@ -15397,6 +15460,7 @@ jijiyiyigame.com
 jiligames.com
 jiligames.tv
 jilltxt.net
+jillvirus.altervista.org
 jimdofree.com
 jimhurley.net
 jimmi.dk
@@ -15497,6 +15561,7 @@ joguegratis.com.br
 joguemais.com.br
 joguepravaler.com
 joguix.com
+johansenjunias20.github.io
 john-solitude.be
 johndaileysoftware.com
 johnjohn.co.uk
@@ -15544,6 +15609,7 @@ jorigames.com
 joscha.com
 josekipedia.com
 josho.com
+jostykeros.blogspot.com
 joto.games
 jottonia.no
 jotungame.com
@@ -15629,6 +15695,7 @@ juegalol.com
 juegalox.com
 juegamas.com
 juegamix.com
+juegaonlinegratis.blogspot.com
 juegapsp.com
 juegaspeque.com
 juegate.com
@@ -15638,6 +15705,7 @@ juegazosonline.com
 juegga.com
 juegines.com
 juego-en-linea.net
+juego-online.blogspot.com
 juego-virtual.com.ar
 juegodescarga.com
 juegofree.com
@@ -15675,6 +15743,7 @@ juegos-gratis.com.ar
 juegos-gratis.com.mx
 juegos-panda.com
 juegos-tiros.com
+juegos-ultimate-arcade.blogspot.com
 juegos.com
 juegos.com.ar
 juegos.com.es
@@ -15688,6 +15757,7 @@ juegos1001.com
 juegos1x.com
 juegos24h.com
 juegos24horas.com
+juegos3dx.blogspot.com
 juegos44.com
 juegos666.com
 juegos7.com
@@ -15866,6 +15936,7 @@ juegosrar.com
 juegosrecomendados.com
 juegosrex.com
 juegossangrientosgratis.com
+juegossssss.blogspot.com
 juegostetris.com
 juegostiros.net
 juegostonic.com
@@ -16200,6 +16271,7 @@ ker-chunk.com
 kerb.co.uk
 kerberos-productions.com
 kernix.biz
+kerostatic.blogspot.com
 keryado.com
 kestrelgames.com
 keswickbridgeclub.co.uk
@@ -16253,7 +16325,6 @@ kickassanime.mx
 kickback-studios.com
 kickgame.co.uk
 kickinggames.com
-kicks-ass.org
 kid-game.co.jp
 kid2play.com
 kidadoweb.com
@@ -17229,6 +17300,7 @@ limbic.com
 limbogame.org
 limestart.cn
 liminalgames.com
+liminalgg.notion.site
 limit0.com
 limitbreakstudio.com
 limitedrungames.com
@@ -17397,6 +17469,7 @@ loftek.net
 loftia.gg
 loftysky.com
 logatroth.com
+logic-games.spb.ru
 logic-masters.de
 logicaland.net
 logicalchess.com
@@ -17558,6 +17631,7 @@ lovattspuzzles.com
 love-simulation.fr
 love4game.com
 lovecalculator.be
+lovecoca.in.eu.org
 loveconquersallgam.es
 lovefilm.com
 lovefishgames.com
@@ -18402,6 +18476,7 @@ megaxogos.com
 megazebra.com
 mego.cl
 megugames.com
+meh.altervista.org
 meiliangame.com
 meilleurjeu.com
 meilleursjeux.com
@@ -18439,6 +18514,7 @@ memozor.com
 memphisgamedev.org
 mempic.com
 memuplay.com
+menapia-scrabble-club.yolasite.com
 menaragames.com
 menato.net
 mengyangame.com
@@ -18488,6 +18564,7 @@ mesjeuxgratuits.com
 mesjeuxgratuits.org
 mesjeuxvirtuels.com
 mesomorph.com
+mess.eu.org
 mess.org
 messhof.com
 mestoiger.com
@@ -18680,6 +18757,7 @@ millionvictories.com
 milliyet.com.tr
 millonesdejuegosgratis.com
 millsberry.com
+millseagles.blogspot.com
 milminusa.com
 milo-games.co.uk
 mimilab.com
@@ -18710,7 +18788,6 @@ mindstormstudios.com
 mine-craft.io
 mine-france.fr
 mine-mods-info.ru
-mine.nu
 minebook.me
 mineboxes.ru
 minebuild.ru
@@ -18768,6 +18845,7 @@ minecraft.fr
 minecraft.net
 minecraft.pe
 minecraft.ru
+minecraft.ru.net
 minecraft.wiki
 minecraft1.ru
 minecraft10.net
@@ -19011,6 +19089,7 @@ mirrorsedge2d.com
 miscgames.com
 miscgames.no
 misfit-studios.com
+misfitsattic.blogspot.com
 misfitsgaming.gg
 miside.games
 misjuegos.org
@@ -19750,6 +19829,7 @@ mymtgcards.com
 mynet.com
 myninjakiwi.com
 myoddweb.com
+myonlyfriend.azurewebsites.net
 myoperaplayer.com
 myoutlines.com
 mypartygames.com
@@ -20126,7 +20206,6 @@ net-chess.com
 net-games.biz
 net-games.co.il
 net-tresor.com
-net.ru
 net4tv.com
 netavous.net
 netbabyworld.com
@@ -20148,7 +20227,6 @@ netfoos.com
 netgame.com
 netgame.live
 netgamers.it
-netgamers.jp
 netgate.net
 nethack.at
 nethack.net
@@ -20162,7 +20240,6 @@ netives.com
 netjogos.com
 netjogosonline.com.br
 netlabs.org
-netlify.app
 netmarble.com
 netmarble.net
 netnexus.com
@@ -20328,6 +20405,7 @@ niagara2022games.ca
 niakistan.com
 nialljconway.com
 nianticlabs.com
+nibelung.sytes.net
 nibu.co.uk
 nicajuegos.com
 nicajuegos.net
@@ -20489,8 +20567,6 @@ nnooo.com
 nnov.net
 nnov.ru
 nnts.de
-no-ip.info
-no-ip.org
 no1games.co.uk
 no1games.com
 no2games.com
@@ -20508,6 +20584,7 @@ nodbrim.com
 noddingheadsgames.com
 nodeka.com
 nodepositforum.com
+nodeunblock.herokuapp.com
 nodiatis.com
 noelshack.com
 noelus.com
@@ -20606,7 +20683,6 @@ note2self.co.uk
 notenoughmana.com
 nothing.tech
 nothingtodo.co.uk
-notion.site
 notiongames.com
 notiontheory.com
 notorious.gg
@@ -20818,6 +20894,7 @@ oddworld.com
 oddzbreaker.com
 odelion.fr
 odingamestudio.com.br
+odixea.altervista.org
 ods.net
 odysseycrew.com
 odysseyinteractive.gg
@@ -21342,7 +21419,6 @@ orderoftwilight.com
 ordibeheshtstudio.com
 ordspil.dk
 oregonlottery.org
-org.ru
 organizedplayfoundation.org
 orgfree.com
 orhec.com
@@ -21565,7 +21641,6 @@ pagat.com
 pagdig.org
 pagenetsoft.com
 pages.de
-pages.dev
 pagesperso-orange.fr
 pagez.co.uk
 paginainizio.com
@@ -22049,6 +22124,7 @@ phantomempire.com
 phantomgames.net
 pharaohhound.games
 pharaonvallee.com
+phargon.altervista.org
 pharosgames.com
 phaserlock.com
 phatgames.net
@@ -22249,6 +22325,7 @@ pirats.net
 pirogue-studio.com
 pirongames.com
 pistolshrimpgames.com
+pitaronfree.blogspot.com
 pitas.com
 pitchastory.com
 pitrivercasino.com
@@ -22394,6 +22471,7 @@ planetromero.com
 planets.nu
 planetside-idealab.com
 planetside-universe.com
+planetside.altervista.org
 planetsidesyndicate.com
 planetsoldier.com
 planetsserver.com
@@ -23209,6 +23287,7 @@ playroanoke.com
 playrobin.com
 playrock-paper-scissors.com
 playrohan.com
+playroom.com.ru
 playroomentertainment.com
 playrps.com
 playrugbyleague.com
@@ -23838,6 +23917,7 @@ prairiecon.com
 prairieknights.com
 prairiemeadows.com
 praxiaentertainment.com
+precisionclient.vercel.app
 predators.cz
 predecessorgame.com
 predestinationgame.com
@@ -24375,6 +24455,7 @@ queststudios.com
 queuing.ch
 quevicio.com
 quichante.com
+quickdraw.withgoogle.com
 quickflashgames.com
 quickpayout.com
 quickplayhorseracingsoftware.com
@@ -24909,7 +24990,6 @@ rentry.co
 repeat.gg
 repeatreplay.com
 rephial.org
-repl.co
 replay.com
 replay.fr
 replay.it
@@ -24932,6 +25012,8 @@ republik-dionysos.de
 reqoning.com
 requiemeternum.com
 reroll1s.com
+resclient.netlify.app
+resclient.vercel.app
 research.games
 research3d.com
 reservecasinohotel.com
@@ -24944,6 +25026,7 @@ residentslot-play.com
 residentslotplay.com
 residentslotsplay.com
 resistancegames.com
+reslauncher.vercel.app
 resn.co
 resolutiongames.com
 resonair.net
@@ -25036,6 +25119,7 @@ rewind.co
 rewiringamerica.org
 reworks.fi
 rexurbis.fr
+rexwordpuzzle.blogspot.com
 rezka.cc
 rfactor.net
 rfactorcentral.com
@@ -25170,6 +25254,7 @@ robitgames.com
 roblox.com
 roblox.plus
 robloxforums.com
+robmanuel.blogspot.com
 robobridge.com
 robocraftgame.com
 robogames.net
@@ -25441,7 +25526,6 @@ rtsoft.com
 rtvcplay.co
 ru-m.org
 ru-minecraft.ru
-ru.net
 rubeki.com
 rubico.games
 rubicondev.com
@@ -25606,7 +25690,6 @@ saintlouischessclub.org
 saintsrow.com
 sakari-infinity.net
 sakura-ent.net
-sakura.ne.jp
 sakurai-shogi.com
 sakurariver.ca
 sal10.net
@@ -25814,6 +25897,7 @@ scorenga.com
 scoreonegames.com
 scorn-game.com
 scorpionsolitaire.net
+scorpnabier.blogspot.com
 scory.com
 scottgames.com
 scottishgames.net
@@ -26000,8 +26084,6 @@ serp.games
 serpentinegame.com
 serragames.com
 servc.eu
-servegame.com
-servegame.org
 server-minecraft.ru
 servera-minecraft.net
 serverblend.com
@@ -26481,7 +26563,6 @@ skjeugd.nl
 skonec.com
 skotos.net
 skow.org
-skr.jp
 skribbl.io
 skrinplay.com
 skullandbonesgame.com
@@ -26742,6 +26823,7 @@ snapfingerclick.com
 snapshotgames.com
 snarf-it.org
 sneakybox.biz
+snekflat.github.io
 snelspelen.nl
 snesbox.com
 snesorama.us
@@ -26865,6 +26947,7 @@ solasta-game.com
 solavant.com
 soldak.com
 soldier-of-fortune.com
+soldout.uk.com
 soleau.com
 solecismic.com
 solfar.com
@@ -27003,6 +27086,7 @@ sourcebits.com
 sourcefilmmaker.com
 sourceforge.net
 sourcepcgames.com
+sourcery.dyndns.org
 sourenagames.com
 soushu5588.com
 soushufabu.top
@@ -27041,6 +27125,7 @@ spacefight-game.com
 spacefleetonline.com
 spacefoxstudio.com
 spacegamejunkie.com
+spacegd.repl.co
 spaceinvaders.de
 spaceinvaders.jp
 spaceinvasion.de
@@ -27083,7 +27168,6 @@ spatula-city.org
 spawnd.gg
 spawnstudios.com
 spaziogames.it
-spb.ru
 spcineplay.com.br
 speakaboos.com
 speakcode.com
@@ -27368,7 +27452,6 @@ squareland.ru
 squareoffnow.com
 squarepanda.com
 squareport.de
-squares.net
 squaresound.com
 squarespace.com
 squarespool.com
@@ -27385,7 +27468,6 @@ squidgames.com
 squidshockstudios.com
 squiglysplayhouse.com
 srcds.com
-srcf.net
 srgstudios.io
 sryth.com
 ss-sms.com
@@ -27565,6 +27647,7 @@ steamcalc.de
 steamcardexchange.net
 steamcharts.com
 steamchina.com
+steamclouduseast2.blob.core.windows.net
 steamcommunity.com
 steamcompletionist.net
 steamcontent.com
@@ -27596,6 +27679,7 @@ steammoves.com
 steammovies.org
 steamosaic.com
 steampeek.hu
+steampipe.akamaized.net
 steamplay.ru
 steampower1830.com
 steampowerd.com
@@ -27662,6 +27746,7 @@ stickcricket.com
 stickgames.org
 stickgames247.com
 stickman.pro
+stickmangames.altervista.org
 stickmud.com
 stickmud.org
 stickpage.com
@@ -27710,6 +27795,7 @@ stopgame.ru
 stoplanner.com
 stopots.com
 stoppauseplay.com
+storage.googleapis.com
 storeingame.com
 storeplayapk.com
 storior.com
@@ -28003,6 +28089,7 @@ sunnygames.com
 sunnyneo.com
 sunnyplayercasino.top
 sunnysidegames.ch
+sunnysideup-dev.github.io
 sunplay.com
 sunrisedoors.com
 sunsiya.xyz
@@ -28111,6 +28198,8 @@ supyrb.com
 surbitonchessclub.co.uk
 surclaro.com
 surefire.games
+surf6009.appspot.com
+surf702.appspot.com
 surferspoker.com
 surgentstudios.com
 surgerygames.org
@@ -28149,6 +28238,7 @@ swampgames.com
 swangames.com
 swankworld.com
 swanseabridgeclub.org.uk
+swaroopg92.github.io
 swatchseries.mx
 swath.net
 swavirtual.com
@@ -28246,7 +28336,6 @@ system3.com
 systemdefendmaster.top
 systemera.net
 systemwars.com
-sytes.net
 szhappygame.com
 szjd-display.com
 szornyek.net
@@ -28406,6 +28495,7 @@ tapsgames.com
 tapstarapps.com
 taptap.cn
 taptap.io
+tapublishing.netlify.app
 taraduncan.com
 taralumen.com
 tarata.com
@@ -28443,6 +28533,7 @@ tazgames.com
 tazsports.com
 tbagames.net
 tbamud.com
+tbg95.github.io
 tbmall.com
 tcbridgecenter.com
 tccorp.com
@@ -28503,6 +28594,7 @@ teamninja-studio.com
 teamrobusto.com
 teamsalvato.com
 teamslm.com
+teamsoletude.carrd.co
 teamspam.net
 teamspeak-services.com
 teamspeak.com
@@ -28544,6 +28636,7 @@ teengames.mobi
 teennick.com
 teenpattimaster.game
 teensgirlsgames.com
+teensymud.kicks-ass.org
 teeworlds.com
 tegnet.com.ar
 tehgamez.com
@@ -28619,6 +28712,7 @@ terra-viejo.net
 terra.com.mx
 terra.es
 terraformers-game.com
+terraforming-mars.herokuapp.com
 terragame.com
 terragamecenter.com
 terragaming.net
@@ -28708,6 +28802,7 @@ tgd.kr
 tgpo.net
 tgsnt.com
 thai-sagame.com
+thakur.demon.nl
 thardferr.com
 tharel.net
 tharnak.de
@@ -28985,6 +29080,7 @@ thehungergames.co.uk
 thehungergames.movie
 thehungergamesexplorer.com
 thehungergamesmovie.com
+thehurttlockerr.blogspot.com
 theimaginatistudios.com
 theimitationgamemovie.com
 theinnergame.com
@@ -29104,6 +29200,7 @@ theportablegamer.com
 thepostgame.com
 thepowerempire.com
 theproblemsite.com
+theproxyx.appspot.com
 thepsychicgame.com
 thepsyfamily.net
 theracingconsultant.com
@@ -29212,6 +29309,7 @@ theworldgames2017.com
 thewrestlinggame.com
 thexuniverse.com
 theyconfuse.me
+theygopedia.blogspot.com
 thief2x.com
 thiefgame.com
 thieveryut.com
@@ -29462,6 +29560,7 @@ todco.ir
 toddkinsley.com
 toddleratplay.com
 todobobesponja.com
+todoelgrandt.blogspot.com
 todoenlaces.com
 todojuegos.com
 todojuegosflash.com
@@ -29970,6 +30069,8 @@ trucolivre.com.br
 trucoon.com.br
 trucos-para-juegos.com
 trucosiguias.com
+trucosjuegosplus.blogspot.com
+trucosyguia.blogspot.com
 trucosyguias.com
 trucoteca.com
 trucsetastucesjeux.com
@@ -30015,6 +30116,7 @@ tsumego-hero.com
 tt-forums.net
 ttcombat.com
 ttdpatch.net
+ttf.mine.nu
 ttgames.com
 ttlg.com
 ttool.info
@@ -30092,7 +30194,6 @@ tusmo.xyz
 tutotoons.com
 tuttifrutti.in
 tux-life.com
-tuxfamily.org
 tuxgames.com
 tv-games.ru
 tv-replay.fr
@@ -30196,6 +30297,7 @@ uberent.com
 ubergames.co.uk
 ubernes.com
 uberscore.com
+ubg365.github.io
 ubguild.org
 ubi.com
 ubisoft.com
@@ -30247,7 +30349,6 @@ ugvm.org.uk
 uhs-hints.com
 ujeux.fr
 ujoygames.com
-uk.com
 uk.to
 ukbypass.accountant
 ukbypass.info
@@ -30310,6 +30411,7 @@ unblockedgames-76.io
 unblockedgames.gg
 unblockeds-games.com
 unblockmefree.net
+unblockmysite.appspot.com
 unblocktube.us
 unboundcreations.com
 unbrokenstudios.com
@@ -30346,6 +30448,7 @@ ungrounded.net
 unicorns.org.uk
 unicornsvisions.com
 unidadcroma.com
+unidentified-tf.github.io
 unidoom.org
 unigamesity.com
 unigamesoft.com
@@ -30513,7 +30616,6 @@ ursiny.com
 urvas.lt
 urwizards.com
 us-lot.org
-us.com
 us.tt
 usacasinos.net
 usacheckers.com
@@ -30722,7 +30824,6 @@ veravegas.com
 verbalobe.com
 verbobonc.net
 verbotomy.com
-vercel.app
 verge-rpg.com
 verkom.be
 vermila.com
@@ -30774,6 +30875,7 @@ viaplay.se
 viaplaygroup.com
 vibragame.net
 vibragame.org
+vicaluna.blogspot.com
 vicewars.com
 viciados.com
 viciojuegos.com
@@ -30855,6 +30957,7 @@ videopokerschool.com
 videoreality.de
 videos-delires.com
 videoslotmachines.com
+videosxjuegos.blogspot.com
 vidgame.net
 vidiotarcade.com
 vidreel.com
@@ -31021,6 +31124,7 @@ voices.com
 voidandmeddler.com
 voidaudio.net
 voidborne.com
+voidinbliss.appspot.com
 voidinteractive.net
 voidriftstudios.com
 voidserver.com
@@ -31299,6 +31403,7 @@ washers.org
 washingtoninteractivenetwork.org
 wasliestdu.de
 wastelands-interactive.com
+watabou.github.io
 watagames.com
 watch32.be
 watchallchannels.com
@@ -31390,7 +31495,6 @@ webbkryss.nu
 webcoregames.com.br
 webcrosswords.com
 webdepart.com
-webflow.io
 webfootgames.com
 webgame.com.cn
 webgame.cz
@@ -31697,7 +31801,6 @@ windmind.com
 windowdisplayweldon.com
 windows--games.com
 windows.com
-windows.net
 windowsgames.co.uk
 windowslotto.com
 windpoweringamerica.gov
@@ -31775,7 +31878,6 @@ witchhut.ro
 witching-hour.net
 witchit.com
 with.in
-withgoogle.com
 withme.com
 wittywings.fr
 witz.io
@@ -31876,6 +31978,7 @@ woozworld.com
 word-finder.net
 word-grabber.com
 word-search-games.com
+word-search-puzzles.appspot.com
 word-searches.com
 wordarch.uk
 wordassociation.org
@@ -31947,6 +32050,7 @@ world-of-video-games.com
 worldanvil.com
 worldatwar.eu
 worldbridge.org
+worldbuildingpasta.blogspot.com
 worldbunco.com
 worldcamelotfederation.com
 worldchampionshipcheckers.com
@@ -32071,6 +32175,7 @@ wowmatcher.com
 wowprivateserver.info
 wowprogress.com
 wowranked.com
+wowroguee.yolasite.com
 wowroms.com
 wowroster.net
 wowstead.com
@@ -32382,6 +32487,7 @@ yardduty.com
 yardgaming.com
 yaroslavl.ru
 yarrostudios.com
+yasminoku.tuxfamily.org
 yasooplay.com
 yatogame.nagoya
 yatsha.com
@@ -32447,7 +32553,6 @@ yohoho.io
 yokagames.com
 yokazegames.com
 yokogames.com
-yolasite.com
 yolkfolk.com
 yoll.net
 yonkijuegos.com
@@ -32635,6 +32740,7 @@ zenfri.com
 zengame.me
 zenimax.com
 zenimaxonline.com
+zenithgames.blogspot.com
 zenithservers.co.uk
 zenius-i-vanisher.com
 zenjuegos.com
@@ -32783,6 +32889,7 @@ zusammen-gegen-rechts.org
 zutom.sk
 zuzubalandia.com.br
 zuzzle.com
+zvezda.org.ru
 zwift.com
 zxgames.com
 zxwyouxi.com

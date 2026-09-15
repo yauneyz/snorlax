@@ -7,6 +7,7 @@ import {
   hostnameMatchesAny,
   policyBlocksHostname,
   BLOCK_PRIORITY,
+  DEFAULT_BLOCK_PRIORITY,
   ALLOW_PRIORITY,
 } from '../../../apps/extension/src/rules.js';
 
@@ -99,7 +100,7 @@ describe('buildRules — defaultAction block + allowedDomains (classic whitelist
         condition: { requestDomains: ['gmail.com'], resourceTypes: ['main_frame'] },
       }),
     ]);
-    expect(ALLOW_PRIORITY).toBeGreaterThan(BLOCK_PRIORITY);
+    expect(ALLOW_PRIORITY).toBeGreaterThan(DEFAULT_BLOCK_PRIORITY);
   });
   it('with an empty allowlist blocks subresources and redirects top-level navigation', () => {
     const rules = buildRules({
@@ -151,6 +152,31 @@ describe('buildRules — Smart filtering shapes', () => {
     expect(rules).toHaveLength(2);
     expect(rules.every((r) => r.action.type !== 'allow')).toBe(true);
     expect(rules[0].condition).toEqual({ requestDomains: ['reddit.com'] });
+  });
+
+  it('allows explicit domains through enabled premade lists under an allow default', () => {
+    const rules = buildRules({
+      active: true,
+      blockedDomains: [],
+      allowedDomains: ['console.aws.amazon.com'],
+      defaultAction: 'allow',
+      enabledPremadeLists: ['shopping'],
+    });
+    expect(rules).toHaveLength(2);
+    expect(rules.every((rule) => rule.action.type === 'allow')).toBe(true);
+    expect(rules.every((rule) => rule.priority === ALLOW_PRIORITY)).toBe(true);
+  });
+
+  it('keeps explicit blocks above allow exemptions', () => {
+    const rules = buildRules({
+      active: true,
+      blockedDomains: ['example.com'],
+      allowedDomains: ['example.com'],
+      defaultAction: 'allow',
+      enabledPremadeLists: ['shopping'],
+    });
+    expect(rules.filter((rule) => rule.action.type === 'block')[0].priority).toBe(BLOCK_PRIORITY);
+    expect(BLOCK_PRIORITY).toBeGreaterThan(ALLOW_PRIORITY);
   });
 
   it('defaultAction block combines the hard blocklist with the default-deny + allow pattern', () => {

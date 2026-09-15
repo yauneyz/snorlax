@@ -1,0 +1,199 @@
+{
+  "schemaVersion": 1,
+  "parserVersion": 1,
+  "generatedAt": "2026-09-15T09:04:35.378Z",
+  "categories": {
+    "nsfw": {
+      "domainCount": 428013,
+      "sha256": "25dfa37094443bc8643795f1ef163637efb4f793933d6aee2940e97a0e430173",
+      "sources": [
+        {
+          "id": "bon-appetit-nsfw",
+          "kind": "bon-appetit-meta",
+          "location": "https://raw.githubusercontent.com/Bon-Appetit/porn-domains/master/meta.json",
+          "operation": "union",
+          "rawHostCount": 424190,
+          "domainCount": 420189,
+          "normalizedSha256": "b81489ddab5f23c1e4725131c37415b3e10825e93deb6ca288df64e2a36a6bb3"
+        },
+        {
+          "id": "hagezi-nsfw",
+          "kind": "domains",
+          "location": "https://raw.githubusercontent.com/hagezi/dns-blocklists/main/wildcard/nsfw-onlydomains.txt",
+          "operation": "union",
+          "rawHostCount": 73570,
+          "domainCount": 72843,
+          "normalizedSha256": "dd5fabc4766316711f53ef25e981c4afa9871a8c3ddfea3a738c4bd9690ca037"
+        },
+        {
+          "id": "ut1-lingerie",
+          "kind": "squidguard-tar",
+          "location": "ftp://ftp.ut-capitole.fr/pub/reseau/cache/squidguard_contrib/lingerie.tar.gz",
+          "operation": "union",
+          "rawHostCount": 193,
+          "domainCount": 186,
+          "normalizedSha256": "70de8a984761d88c519937d724c053314433a3eeae2dd51baf6759df60ecc0a6"
+        }
+      ]
+    },
+    "shopping": {
+      "domainCount": 36778,
+      "sha256": "110971da49e990eafd3398a970fa32d0ef493dcb84dfd5468bc69b97c1be400c",
+      "sources": [
+        {
+          "id": "ut1-shopping",
+          "kind": "squidguard-tar",
+          "location": "ftp://ftp.ut-capitole.fr/pub/reseau/cache/squidguard_contrib/shopping.tar.gz",
+          "operation": "union",
+          "rawHostCount": 36968,
+          "domainCount": 36778,
+          "normalizedSha256": "110971da49e990eafd3398a970fa32d0ef493dcb84dfd5468bc69b97c1be400c"
+        }
+      ]
+    },
+    "social": {
+      "domainCount": 887,
+      "sha256": "11c8ae8a2062bc63628ee246e0ff9446e48409a879e23d8644b89bc690f7d233",
+      "sources": [
+        {
+          "id": "hagezi-social",
+          "kind": "domains",
+          "location": "https://raw.githubusercontent.com/hagezi/dns-blocklists/main/wildcard/social-onlydomains.txt",
+          "operation": "union",
+          "rawHostCount": 900,
+          "domainCount": 887,
+          "normalizedSha256": "11c8ae8a2062bc63628ee246e0ff9446e48409a879e23d8644b89bc690f7d233"
+        }
+      ]
+    },
+    "gambling": {
+      "domainCount": 67317,
+      "sha256": "18668a6879a69805f2b071e1c8932fd14d7b16936da69d0c00e80cdef64e9109",
+      "sources": [
+        {
+          "id": "hagezi-gambling-mini",
+          "kind": "domains",
+          "location": "https://raw.githubusercontent.com/hagezi/dns-blocklists/main/wildcard/gambling.mini-onlydomains.txt",
+          "operation": "union",
+          "rawHostCount": 67355,
+          "domainCount": 67317,
+          "normalizedSha256": "18668a6879a69805f2b071e1c8932fd14d7b16936da69d0c00e80cdef64e9109"
+        }
+      ]
+    },
+    "press": {
+      "domainCount": 4633,
+      "sha256": "fd20b1c2a7c40447da4ec9a1cfdd7934fa7c6d0137b7a53c663206efabb0ff56",
+      "sources": [
+        {
+          "id": "ut1-press",
+          "kind": "squidguard-tar",
+          "location": "ftp://ftp.ut-capitole.fr/pub/reseau/cache/squidguard_contrib/press.tar.gz",
+          "operation": "union",
+          "rawHostCount": 4644,
+          "domainCount": 4633,
+          "normalizedSha256": "fd20b1c2a7c40447da4ec9a1cfdd7934fa7c6d0137b7a53c663206efabb0ff56"
+        }
+      ]
+    },
+    "games": {
+      "domainCount": 32914,
+      "sha256": "8be6e4ecf1a05f0e49c5b42a5c9268c203ed51ea97362b1fc270f1969b72401b",
+      "sources": [
+        {
+          "id": "ut1-games",
+          "kind": "squidguard-tar",
+          "location": "ftp://ftp.ut-capitole.fr/pub/reseau/cache/squidguard_contrib/games.tar.gz",
+          "operation": "union",
+          "rawHostCount": 33741,
+          "domainCount": 31839,
+          "normalizedSha256": "c470c71b72c8af78d900e4bed8aa6c98126ebf401bfc411a31bfb6fd8fa91436"
+        },
+        {
+          "id": "irek-games",
+          "kind": "adblock",
+          "location": "https://raw.githubusercontent.com/IREK-szef/games-blocklist/main/lists/Adblock-dns/games.txt",
+          "operation": "union",
+          "rawHostCount": 8182,
+          "domainCount": 7788,
+          "normalizedSha256": "72e51a64ce126a24e7d3e76f94ec249e2de910004cf1d324f3253a3f8a113c16"
+        }
+      ]
+    },
+    "sports": {
+      "domainCount": 2309,
+      "sha256": "9915964b0ee39b818c91089efa2faee583fa3a8b7c9c05a916d022c5a6320cf7",
+      "sources": [
+        {
+          "id": "ut1-sports",
+          "kind": "squidguard-tar",
+          "location": "ftp://ftp.ut-capitole.fr/pub/reseau/cache/squidguard_contrib/sports.tar.gz",
+          "operation": "union",
+          "rawHostCount": 2362,
+          "domainCount": 2309,
+          "normalizedSha256": "9915964b0ee39b818c91089efa2faee583fa3a8b7c9c05a916d022c5a6320cf7"
+        }
+      ]
+    },
+    "forums": {
+      "domainCount": 179,
+      "sha256": "f94e74e79c774de4caa6ca41f7e001da952577fc46b2634025bb488bfc833712",
+      "sources": [
+        {
+          "id": "ut1-forums",
+          "kind": "squidguard-tar",
+          "location": "ftp://ftp.ut-capitole.fr/pub/reseau/cache/squidguard_contrib/forums.tar.gz",
+          "operation": "union",
+          "rawHostCount": 205,
+          "domainCount": 179,
+          "normalizedSha256": "f94e74e79c774de4caa6ca41f7e001da952577fc46b2634025bb488bfc833712"
+        }
+      ]
+    },
+    "webemail": {
+      "domainCount": 340,
+      "sha256": "0bf55d75c681bc349f916c6fcb8ea9eb2e07e59f61e762feaa183e97908c5ecc",
+      "sources": [
+        {
+          "id": "ut1-webmail",
+          "kind": "squidguard-tar",
+          "location": "ftp://ftp.ut-capitole.fr/pub/reseau/cache/squidguard_contrib/webmail.tar.gz",
+          "operation": "union",
+          "rawHostCount": 404,
+          "domainCount": 340,
+          "normalizedSha256": "0bf55d75c681bc349f916c6fcb8ea9eb2e07e59f61e762feaa183e97908c5ecc"
+        }
+      ]
+    },
+    "blog": {
+      "domainCount": 1421,
+      "sha256": "b808451b275b56e3804981392eb6849eef0560f884506c8c0db892c9b8bca0e8",
+      "sources": [
+        {
+          "id": "ut1-blog",
+          "kind": "squidguard-tar",
+          "location": "ftp://ftp.ut-capitole.fr/pub/reseau/cache/squidguard_contrib/blog.tar.gz",
+          "operation": "union",
+          "rawHostCount": 1497,
+          "domainCount": 1421,
+          "normalizedSha256": "b808451b275b56e3804981392eb6849eef0560f884506c8c0db892c9b8bca0e8"
+        }
+      ]
+    },
+    "streaming": {
+      "domainCount": 3352,
+      "sha256": "732f5d9072a4f86a86ff07dbc63ff0bb78b32b8ede60188c4356ed0b5451a9da",
+      "sources": [
+        {
+          "id": "ut1-audio-video",
+          "kind": "squidguard-tar",
+          "location": "ftp://ftp.ut-capitole.fr/pub/reseau/cache/squidguard_contrib/audio-video.tar.gz",
+          "operation": "union",
+          "rawHostCount": 3710,
+          "domainCount": 3352,
+          "normalizedSha256": "732f5d9072a4f86a86ff07dbc63ff0bb78b32b8ede60188c4356ed0b5451a9da"
+        }
+      ]
+    }
+  }
+}

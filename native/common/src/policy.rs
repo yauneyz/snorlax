@@ -49,24 +49,9 @@ impl Default for DefaultAction {
     }
 }
 
-/// Mirrors `PremadeListId` in packages/shared/src/policy.ts: a built-in, bulk-domain blocklist
-/// category the user can toggle on/off alongside their custom `blockedDomains`. See
-/// `crate::premade_lists`.
-#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
-#[serde(rename_all = "lowercase")]
-pub enum PremadeListId {
-    Nsfw,
-    Shopping,
-    Social,
-    Gambling,
-    Press,
-    Games,
-    Sports,
-    Forums,
-    Webemail,
-    Blog,
-    Streaming,
-}
+// Generated from scripts/blocklists/sources.mjs so the native enum, embedded resources, extension
+// rulesets, and shared TypeScript metadata gain categories together.
+include!("premade_list_ids.rs");
 
 /// Mirrors `PolicyIntent` in packages/shared/src/policy.ts. Non-null on a `Policy` activates
 /// Smart filtering for domains that fall through both hard lists.

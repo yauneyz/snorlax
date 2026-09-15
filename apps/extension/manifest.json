@@ -3,71 +3,53 @@
   "name": "Talysman",
   "version": "0.6.0",
   "description": "Companion for Talysman desktop that applies your configured website-blocking rules in the browser.",
-  "minimum_chrome_version": "105",
-  "permissions": ["declarativeNetRequest", "nativeMessaging", "scripting", "tabs", "webNavigation"],
-  "host_permissions": ["<all_urls>"],
+  "minimum_chrome_version": "120",
+  "permissions": [
+    "declarativeNetRequest",
+    "nativeMessaging",
+    "scripting",
+    "tabs",
+    "webNavigation"
+  ],
+  "host_permissions": [
+    "<all_urls>"
+  ],
   "web_accessible_resources": [
     {
-      "resources": ["blocked.html"],
-      "matches": ["<all_urls>"]
+      "resources": [
+        "blocked.html"
+      ],
+      "matches": [
+        "<all_urls>"
+      ]
     }
   ],
   "declarative_net_request": {
     "rule_resources": [
       {
-        "id": "premade-nsfw",
+        "id": "premade-1",
         "enabled": false,
-        "path": "premade-lists/nsfw.json"
+        "path": "premade-lists/premade.1.json"
       },
       {
-        "id": "premade-shopping",
+        "id": "premade-2",
         "enabled": false,
-        "path": "premade-lists/shopping.json"
+        "path": "premade-lists/premade.2.json"
       },
       {
-        "id": "premade-social",
+        "id": "premade-3",
         "enabled": false,
-        "path": "premade-lists/social.json"
+        "path": "premade-lists/premade.3.json"
       },
       {
-        "id": "premade-gambling",
+        "id": "premade-4",
         "enabled": false,
-        "path": "premade-lists/gambling.json"
+        "path": "premade-lists/premade.4.json"
       },
       {
-        "id": "premade-press",
+        "id": "premade-5",
         "enabled": false,
-        "path": "premade-lists/press.json"
-      },
-      {
-        "id": "premade-games",
-        "enabled": false,
-        "path": "premade-lists/games.json"
-      },
-      {
-        "id": "premade-sports",
-        "enabled": false,
-        "path": "premade-lists/sports.json"
-      },
-      {
-        "id": "premade-forums",
-        "enabled": false,
-        "path": "premade-lists/forums.json"
-      },
-      {
-        "id": "premade-webemail",
-        "enabled": false,
-        "path": "premade-lists/webemail.json"
-      },
-      {
-        "id": "premade-blog",
-        "enabled": false,
-        "path": "premade-lists/blog.json"
-      },
-      {
-        "id": "premade-streaming",
-        "enabled": false,
-        "path": "premade-lists/streaming.json"
+        "path": "premade-lists/premade.5.json"
       }
     ]
   },

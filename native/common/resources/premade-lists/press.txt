@@ -229,6 +229,7 @@ altaposten.no
 altitude.news
 altnewsban.com
 altoonamirror.com
+altrisport.blogspot.com
 altritaliani.net
 altustimes.com
 alvaradopost.com
@@ -581,7 +582,6 @@ blancocountynews.com
 bleckleynews.com
 blissfieldadvance.com
 blockislandtimes.com
-blogspot.com
 bloomingprairieonline.com
 blountcountian.com
 blounttoday.com
@@ -1027,6 +1027,7 @@ crestedbuttenews.com
 crestlinecourier-news.com
 crestonnewsadvertiser.com
 crestviewbulletin.com
+crittendenpress.blogspot.com
 cromos.com.co
 crookstontimes.com
 crossroadschronicle.com
@@ -1517,6 +1518,7 @@ fortmilltimes.com
 fortmorgantimes.com
 fortmyersbeachtalk.com
 fortstocktonpioneer.com
+forumnewsgroup.blogspot.com
 forwardtimes.com
 fosters.com
 fowlertribune.com
@@ -3341,6 +3343,7 @@ recordstar.com
 redbluffdailynews.com
 redding.com
 redlandsdailyfacts.com
+redmondspokesman.blogspot.com
 redrocknews.com
 redspringscitizen.com
 redwoodfallsgazette.com
@@ -3390,6 +3393,7 @@ richmondregister.com
 ridenbaugh.com
 ridgecrestca.com
 ridgwayrecord.com
+rimcountrygazette.blogspot.com
 riograndesun.com
 ripleynews.com
 riverdalepress.com

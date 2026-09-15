@@ -15,17 +15,28 @@
 // infra, bad merge artifacts, etc). Both are plain arrays of registrable domains.
 
 import { readFileSync, existsSync } from 'node:fs';
+import { domainToASCII } from 'node:url';
 import { getDomain } from 'tldts';
 
+// Infrastructure whose tenant boundary is not represented by the public/private suffix lists.
+// Reducing any tenant hostname to one of these would block unrelated customers.
+const SHARED_INFRASTRUCTURE_DOMAINS = new Set(['amazonaws.com']);
+
 export function toRegistrableDomain(hostname) {
-  const host = hostname.trim().toLowerCase().replace(/^\*\.|^www\./, '');
+  const host = domainToASCII(hostname.trim().toLowerCase().replace(/^\*\.|^www\./, ''));
   if (!host) return null;
-  return getDomain(host);
+  // Private suffixes matter for hosted sites: alice.github.io and bob.github.io are separate
+  // owners. Collapsing either to github.io would block every tenant in the browser.
+  const domain = getDomain(host, { allowPrivateDomains: true });
+  return domain && !SHARED_INFRASTRUCTURE_DOMAINS.has(domain) ? domain : null;
 }
 
 export function loadOverrides(overridesPath) {
   if (!existsSync(overridesPath)) return { include: [], exclude: [] };
   const raw = JSON.parse(readFileSync(overridesPath, 'utf8'));
+  if (!Array.isArray(raw.include ?? []) || !Array.isArray(raw.exclude ?? [])) {
+    throw new Error(`${overridesPath}: include and exclude must be arrays`);
+  }
   return { include: raw.include ?? [], exclude: raw.exclude ?? [] };
 }
 
@@ -38,7 +49,36 @@ export function normalizeCategory(rawHostnameLists, overrides) {
       if (domain) registrable.add(domain);
     }
   }
-  for (const domain of overrides.include) registrable.add(domain.trim().toLowerCase());
-  for (const domain of overrides.exclude) registrable.delete(domain.trim().toLowerCase());
+  for (const domain of overrides.include) {
+    const normalized = toRegistrableDomain(domain);
+    if (normalized) registrable.add(normalized);
+  }
+  for (const domain of overrides.exclude) {
+    const normalized = toRegistrableDomain(domain);
+    if (normalized) registrable.delete(normalized);
+  }
   return [...registrable].sort();
+}
+
+/** Compose already-normalized source sets in declaration order. */
+export function composeCategory(inputs, overrides) {
+  const domains = new Set();
+  for (const { operation, domains: sourceDomains } of inputs) {
+    if (operation === 'union') {
+      for (const domain of sourceDomains) domains.add(domain);
+    } else if (operation === 'subtract') {
+      for (const domain of sourceDomains) domains.delete(domain);
+    } else {
+      throw new Error(`unknown category source operation: ${operation}`);
+    }
+  }
+  for (const domain of overrides.include) {
+    const normalized = toRegistrableDomain(domain);
+    if (normalized) domains.add(normalized);
+  }
+  for (const domain of overrides.exclude) {
+    const normalized = toRegistrableDomain(domain);
+    if (normalized) domains.delete(normalized);
+  }
+  return [...domains].sort();
 }

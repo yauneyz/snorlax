@@ -15,31 +15,33 @@
  *   blockedDomains: string[],
  *   allowedDomains: string[],
  *   defaultAction: 'allow'|'block',
+ *   enabledPremadeLists?: string[],
  * }} State
  */
 
 // When defaultAction is 'block' an `allow` rule for `allowedDomains` must outrank the catch-all
 // `block`. DNR breaks ties by action (allow > block) but we set explicit priorities so the intent
 // survives any future tie-break change.
-export const BLOCK_PRIORITY = 1;
+export const DEFAULT_BLOCK_PRIORITY = 1;
 export const ALLOW_PRIORITY = 2;
+export const BLOCK_PRIORITY = 3;
 
 const MAIN_FRAME = ['main_frame'];
 const BLOCKED_PAGE = '/blocked.html';
 
-function blockRule(id, condition) {
+function blockRule(id, condition, priority = BLOCK_PRIORITY) {
   return {
     id,
-    priority: BLOCK_PRIORITY,
+    priority,
     action: { type: 'block' },
     condition,
   };
 }
 
-function redirectMainFrameRule(id, condition) {
+function redirectMainFrameRule(id, condition, priority = BLOCK_PRIORITY) {
   return {
     id,
-    priority: BLOCK_PRIORITY,
+    priority,
     action: { type: 'redirect', redirect: { extensionPath: BLOCKED_PAGE } },
     condition: { ...condition, resourceTypes: MAIN_FRAME },
   };
@@ -174,7 +176,15 @@ export function buildRules(state) {
   }
 
   if (state.defaultAction === 'block') {
-    rules.push(blockRule(id++, { urlFilter: '*' }), redirectMainFrameRule(id++, { regexFilter: '^https?://' }));
+    rules.push(
+      blockRule(id++, { urlFilter: '*' }, DEFAULT_BLOCK_PRIORITY),
+      redirectMainFrameRule(id++, { regexFilter: '^https?://' }, DEFAULT_BLOCK_PRIORITY),
+    );
+  }
+
+  // Allow rules also carve exceptions out of priority-1 static premade lists. Explicit user block
+  // rules remain priority 3, so normalization's "blocked wins" contract is preserved.
+  if (state.defaultAction === 'block' || (state.enabledPremadeLists?.length ?? 0) > 0) {
     for (const condition of allowedConditions) {
       rules.push(
         allowRule(id++, condition),

@@ -20,8 +20,6 @@ ads-twitter.com
 advancediddetection.com
 airhorn.solutions
 airhornbot.com
-akamaized.net
-amazonaws.com
 amemv.com
 aminoapps.com
 anekdot.ru
@@ -93,7 +91,6 @@ discordapp.io
 discordapp.net
 discordcdn.com
 discordmerch.com
-discordsays.com
 discordstatus.com
 dlfacebook.com
 dotfacebook.com
@@ -462,6 +459,7 @@ gfacecbook.com
 glasgow.social
 groups.com
 h4.io
+h4g3z1-social.web.app
 habr.com
 hachyderm.io
 hackerfacebook.com
@@ -488,6 +486,7 @@ igcdn.com
 igsonar.com
 igtv.com
 imgsmail.ru
+impala-media-production.s3.amazonaws.com
 imstagram.com
 imtagram.com
 indieweb.social
@@ -674,6 +673,7 @@ onlyfans.com
 opencreate.org
 opengraphprotocol.com
 opengraphprotocol.org
+p16-tiktokcdn-com.akamaized.net
 parse.com
 periscope.tv
 piaille.fr
@@ -861,7 +861,6 @@ vkuservideo.com
 vkuservideo.net
 watchanimeattheoffice.com
 web-instagram.net
-web.app
 whyfacebook.com
 wibes.ru
 wien.rocks

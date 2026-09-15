@@ -26,6 +26,7 @@
 import { buildRules, hostnameMatchesAny, policyBlocksHostname } from './rules.js';
 import { heartbeatDelayForState } from './heartbeat-timing.js';
 import { extractPageContent } from './content-extract.js';
+import { buildPremadeRulePlan } from './premade-rules.js';
 
 // Prefer the callback-compatible `chrome` namespace where both aliases exist (notably Firefox).
 const browserApi = globalThis.chrome || globalThis.browser;
@@ -59,8 +60,9 @@ let blockingActive = false; // last state.active the service pushed
 // Unknown is fail-safe while focus is active; only explicit false relaxes the cadence.
 let handshakeEnabled = null;
 let blockingMode = null; // display-only label derived from policy shape; never includes domains/intent text
-let lastApplyOk = true; // last updateDynamicRules succeeded
+let lastApplyOk = true; // last static + dynamic DNR update succeeded
 let appliedRuleCount = 0; // number of dynamic rules currently applied
+let appliedPremadeRuleCount = 0;
 let heartbeatSequence = 0;
 let lastHeartbeatSentAt = null;
 let lastHeartbeatAckAt = null;
@@ -76,6 +78,7 @@ let currentPolicy = {
   allowedDomains: [],
   defaultAction: 'allow',
   intent: null,
+  enabledPremadeLists: [],
 };
 
 // Stable-ish identifiers for this worker session (best-effort; the service correlates by browser
@@ -111,40 +114,52 @@ function deriveModeLabel(policy) {
 }
 
 /** Built-in bulk blocklists, shipped as static DNR rulesets (see manifest.json). Toggling one is
- * `updateEnabledRulesets`, not `updateDynamicRules` — Chrome's dynamic-rule quota (~5k) can't
- * hold the tens of thousands of domains these lists carry. */
-const PREMADE_RULESET_IDS = {
-  nsfw: 'premade-nsfw',
-  shopping: 'premade-shopping',
-  social: 'premade-social',
-  gambling: 'premade-gambling',
-  press: 'premade-press',
-  games: 'premade-games',
-  sports: 'premade-sports',
-  forums: 'premade-forums',
-  webemail: 'premade-webemail',
-  blog: 'premade-blog',
-  streaming: 'premade-streaming',
-};
+ * an `updateStaticRules` operation. The generator packs every category into a few shared ruleset
+ * files below AMO's 5MB parser limit; this avoids consuming one enabled ruleset per category while
+ * keeping the large compiled domain index out of the service worker. */
 
 /** Enable exactly the rulesets for `enabledPremadeLists` while focus is active; disable all of
  * them otherwise — mirrors `buildRules` returning `[]` when focus is inactive. */
 async function applyPremadeRulesets(active, enabledPremadeLists) {
-  if (typeof browserApi.declarativeNetRequest?.updateEnabledRulesets !== 'function') return;
-  const wanted = new Set(active ? enabledPremadeLists : []);
-  const enableRulesetIds = [];
-  const disableRulesetIds = [];
-  for (const [listId, rulesetId] of Object.entries(PREMADE_RULESET_IDS)) {
-    (wanted.has(listId) ? enableRulesetIds : disableRulesetIds).push(rulesetId);
+  const plan = buildPremadeRulePlan(active, enabledPremadeLists);
+  if (plan.updates.length > 0 && typeof browserApi.declarativeNetRequest?.updateStaticRules !== 'function') {
+    throw new Error('this browser cannot toggle individual static blocklist rules');
+  }
+  for (const update of plan.updates) {
+    await browserApi.declarativeNetRequest.updateStaticRules(update);
+  }
+  await browserApi.declarativeNetRequest.updateEnabledRulesets({
+    enableRulesetIds: plan.enableRulesetIds,
+    disableRulesetIds: plan.disableRulesetIds,
+  });
+  return plan.enabledRuleCount;
+}
+
+/** Apply static premade rules and dynamic policy rules as one health/retry unit. */
+async function applyRuleState(state) {
+  const failures = [];
+  let premadeRuleCount = 0;
+  let next = [];
+  try {
+    premadeRuleCount = await applyPremadeRulesets(
+      !!state.active,
+      Array.isArray(state.enabledPremadeLists) ? state.enabledPremadeLists : [],
+    );
+  } catch (error) {
+    failures.push(error);
   }
   try {
-    await browserApi.declarativeNetRequest.updateEnabledRulesets({
-      enableRulesetIds,
-      disableRulesetIds,
+    next = buildRules(state);
+    const existing = await browserApi.declarativeNetRequest.getDynamicRules();
+    await browserApi.declarativeNetRequest.updateDynamicRules({
+      removeRuleIds: existing.map((rule) => rule.id),
+      addRules: next,
     });
-  } catch (e) {
-    console.error('[talysman] premade ruleset update failed', e);
+  } catch (error) {
+    failures.push(error);
   }
+  if (failures.length > 0) throw new AggregateError(failures, 'could not apply browser rules');
+  return { dynamicRuleCount: next.length, premadeRuleCount };
 }
 
 /** Accept the latest desired state synchronously, then serialize/coalesce DNR mutations. */
@@ -163,7 +178,6 @@ function applyState(state) {
         : null,
     enabledPremadeLists: Array.isArray(state.enabledPremadeLists) ? state.enabledPremadeLists : [],
   };
-  void applyPremadeRulesets(blockingActive, currentPolicy.enabledPremadeLists);
   policyGeneration += 1;
   invalidatePendingJudges();
   blockingMode = deriveModeLabel(currentPolicy);
@@ -192,23 +206,19 @@ async function applyLatestRuleState() {
       const desired = desiredRuleState;
       desiredRuleState = null;
       try {
-        const next = buildRules(desired.state);
-        const existing = await browserApi.declarativeNetRequest.getDynamicRules();
-        await browserApi.declarativeNetRequest.updateDynamicRules({
-          removeRuleIds: existing.map((r) => r.id),
-          addRules: next,
-        });
+        const counts = await applyRuleState(desired.state);
         if (desired.generation === policyGeneration) {
-          appliedRuleCount = next.length;
+          appliedRuleCount = counts.dynamicRuleCount;
+          appliedPremadeRuleCount = counts.premadeRuleCount;
           lastAppliedGeneration = desired.generation;
           lastApplyOk = true;
           ruleApplyRetryMs = RECONNECT_MIN_MS;
           scheduleHeartbeat(0);
         }
         // Do not log the configured domain list. It is local user data.
-        console.info('[talysman] applied', next.length, 'rule(s)');
+        console.info('[talysman] applied browser rules', counts);
       } catch (e) {
-        console.error('[talysman] dynamic-rule update failed', e);
+        console.error('[talysman] browser-rule update failed', e);
         lastApplyOk = false;
         // Preserve only the newest state. Retry with capped exponential backoff so a transient
         // browser failure cannot leave focus-off rules stuck forever without burning battery.
@@ -238,6 +248,7 @@ function currentHealth() {
     canBlock: permissionsOk && lastApplyOk && lastAppliedGeneration === policyGeneration,
     permissionsOk,
     dnrRulesApplied: appliedRuleCount,
+    premadeRulesApplied: appliedPremadeRuleCount,
   };
 }
 

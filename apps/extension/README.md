@@ -23,8 +23,8 @@ classified as unsupported because no Safari extension is shipped.
 ## How it works
 
 ```
-service (named pipe)  ──►  talysman-natmsg.exe  ──►  extension background.js  ──►  DNR dynamic rules
-   getState + events       (native-messaging host)     buildRules(state)
+service (named pipe)  ──►  talysman-natmsg.exe  ──►  extension background.js  ──►  DNR rules
+   getState + events       (native-messaging host)     dynamic policy + static categories
 ```
 
 - `src/rules.js` — **pure** `policy → DNR rule` translation (unit-tested in
@@ -38,6 +38,11 @@ service (named pipe)  ──►  talysman-natmsg.exe  ──►  extension backg
   each pushed state, and on host disconnect **keeps the last ruleset** while reconnecting (so killing
   the bridge can't unblock a locked session). DNR dynamic rules persist across service-worker
   restarts, so enforcement survives the MV3 worker sleeping.
+- `resources/premade-lists/` — generated static DNR containers for built-in categories. Categories
+  share five containers capped below AMO's 5MB per-file parser limit; the worker toggles individual
+  rule IDs, so arbitrary category combinations do not consume one enabled ruleset per category.
+  `scripts/generate-premade-lists.mjs` also generates the manifest, browser mapping, native enum,
+  and shared UI metadata from `scripts/blocklists/sources.mjs`.
 - `src/popup.html` / `popup.js` — a read-only toolbar status surface showing the desktop connection,
   focus state, reconnect/fail-safe state, and rule-application health. It never receives or displays
   the user's configured domains; blocking remains controlled by the desktop app.
@@ -58,7 +63,7 @@ user-installed extension in place and pushes `active:false` so it clears its rul
 
 ## Store packages and identities
 
-`pnpm build:extension` builds three upload-ready ZIP files, matching store-review source ZIPs, and
+`pnpm build:extension` builds three compressed upload-ready ZIP files, matching store-review source ZIPs, and
 unpacked directories under `apps/extension/dist/`. The same keyed `dist/chrome` package is used for
 Chrome Web Store upload and Chrome's **Load unpacked** button. Edge has two directories: key-free
 `dist/edge` matches the Edge Add-ons upload, while keyed `dist/edge-dev` has the already-trusted

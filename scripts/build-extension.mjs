@@ -31,6 +31,7 @@ import {
 } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, relative, resolve } from "node:path";
+import { deflateRawSync } from "node:zlib";
 import { PALETTE_PATH, paletteCssBlock } from "./lib/palette.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -66,7 +67,9 @@ const extensionFiles = [
   "popup-view.js",
 ];
 const premadeListsDir = resolve(extDir, "resources/premade-lists");
-const premadeListFiles = readdirSync(premadeListsDir).filter((f) => f.endsWith(".json"));
+const premadeListFiles = readdirSync(premadeListsDir)
+  .filter((file) => /^premade\.\d+\.json$/.test(file))
+  .sort();
 const paletteCss = paletteCssBlock();
 
 const identities = JSON.parse(readFileSync(identitiesPath, "utf8"));
@@ -114,20 +117,35 @@ function bundledBackground() {
     resolve(srcDir, "content-extract.js"),
     "utf8",
   ).replace(/^export\s+/gm, "");
+  const premadeRulesets = readFileSync(
+    resolve(srcDir, "premade-rulesets.js"),
+    "utf8",
+  ).replace(/^export\s+/gm, "");
+  const premadeRules = readFileSync(
+    resolve(srcDir, "premade-rules.js"),
+    "utf8",
+  ).replace(
+    /^\s*import\s+\{[^}]*\}\s+from\s+['"]\.\/premade-rulesets\.js['"];?\s*$/gm,
+    "",
+  ).replace(/^export\s+/gm, "");
   const background = readFileSync(
     resolve(srcDir, "background.js"),
     "utf8",
   ).replace(
-    /^\s*import\s+\{[^}]*\}\s+from\s+['"]\.\/(?:rules|heartbeat-timing|content-extract)\.js['"];?\s*$/gm,
+    /^\s*import\s+\{[^}]*\}\s+from\s+['"]\.\/(?:rules|heartbeat-timing|content-extract|premade-rules)\.js['"];?\s*$/gm,
     "",
   );
   return (
-    "// Built by scripts/build-extension.mjs — heartbeat-timing.js + rules.js + content-extract.js + background.js bundled.\n\n" +
+    "// Built by scripts/build-extension.mjs — policy helpers + generated premade mappings + background.js bundled.\n\n" +
     heartbeatTiming +
     "\n" +
     rules +
     "\n" +
     contentExtract +
+    "\n" +
+    premadeRulesets +
+    "\n" +
+    premadeRules +
     "\n" +
     background
   );
@@ -225,7 +243,7 @@ function uint32(value) {
 
 const ZIP_REGULAR_FILE_MODE = (0o100644 << 16) >>> 0;
 
-/** Write a portable, uncompressed ZIP. Store packages are small, so compression adds no value. */
+/** Write a portable, deterministic deflated ZIP without relying on a system `zip` binary. */
 function zipDirectory(sourceDir, outputPath) {
   const localParts = [];
   const centralParts = [];
@@ -234,21 +252,22 @@ function zipDirectory(sourceDir, outputPath) {
   for (const file of listFiles(sourceDir)) {
     const name = Buffer.from(file.name);
     const data = readFileSync(file.path);
+    const compressed = deflateRawSync(data, { level: 9 });
     const crc = crc32(data);
     const local = Buffer.concat([
       uint32(0x04034b50),
       uint16(20),
       uint16(0),
-      uint16(0),
+      uint16(8),
       uint16(0),
       uint16(0x21),
       uint32(crc),
-      uint32(data.length),
+      uint32(compressed.length),
       uint32(data.length),
       uint16(name.length),
       uint16(0),
       name,
-      data,
+      compressed,
     ]);
     localParts.push(local);
     centralParts.push(
@@ -257,11 +276,11 @@ function zipDirectory(sourceDir, outputPath) {
         uint16(0x031e),
         uint16(20),
         uint16(0),
-        uint16(0),
+        uint16(8),
         uint16(0),
         uint16(0x21),
         uint32(crc),
-        uint32(data.length),
+        uint32(compressed.length),
         uint32(data.length),
         uint16(name.length),
         uint16(0),
@@ -334,11 +353,10 @@ The ${title} store package is generated at:
 apps/extension/dist/talysman-${browser}-${version}.zip
 \`\`\`
 
-The build script removes the ES module \`export\` and \`import\` statements from the heartbeat,
-rules, and background modules, then concatenates those three files into an unminified, unobfuscated
-\`background.js\`. It generates the browser-specific
+The build script removes the ES module \`export\` and \`import\` statements from the extension's
+source modules, then concatenates them into an unminified, unobfuscated \`background.js\`. It generates the browser-specific
 \`manifest.json\`, copies the remaining JavaScript, HTML, CSS, SVG, and PNG files without code
-transformation, and writes an uncompressed ZIP.
+transformation, and writes a standard compressed ZIP.
 `;
 }
 
@@ -393,11 +411,16 @@ delete firefoxManifest.minimum_chrome_version;
 firefoxManifest.browser_specific_settings = {
   gecko: {
     id: FIREFOX_ID,
-    strict_min_version: "115.0",
+    // 140 is the first desktop release that understands `data_collection_permissions` below; AMO
+    // warns on any lower floor. Nothing is lost by raising it — the built-in blocklists need
+    // `updateEnabledRulesets` on static rulesets, which Firefox only ships from 128.
+    strict_min_version: "140.0",
     // Required for new AMO submissions. Talysman does not collect or transmit data for storage
     // or processing outside the extension and the user's local companion application.
     data_collection_permissions: { required: ["none"] },
   },
+  // Firefox for Android picked up `data_collection_permissions` two releases after desktop.
+  gecko_android: { strict_min_version: "142.0" },
 };
 firefoxManifest.background = { scripts: ["background.js"] };
 

@@ -1,8 +1,9 @@
 #!/usr/bin/env node
 
-import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
+import { readFileSync, readdirSync, statSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
+import { PREMADE_RULESETS } from "../apps/extension/src/premade-rulesets.js";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const extensionDir = resolve(root, "apps/extension");
@@ -18,6 +19,9 @@ const expectedPermissions = [
   "webNavigation",
 ];
 const expectedHostPermissions = ["<all_urls>"];
+const MAX_RULESET_BYTES = 5_000_000;
+const MAX_STATIC_RULESETS = 50;
+const MAX_ENABLED_STATIC_RULESETS = 10;
 const expectedFiles = [
   "background.js",
   "blocked-logo.svg",
@@ -74,8 +78,93 @@ function assertMinimalManifest(manifest, store, expectedKey = null) {
   }
 }
 
+function assertPremadeRulesets(manifest, resourcesDir, store) {
+  const resources = manifest.declarative_net_request?.rule_resources;
+  if (!Array.isArray(resources) || resources.length === 0) {
+    fail(`${store}: premade static rulesets are required`);
+  }
+  if (resources.length > MAX_STATIC_RULESETS) {
+    fail(`${store}: ${resources.length} rulesets exceed the ${MAX_STATIC_RULESETS} declared limit`);
+  }
+  // Any category combination can touch every packed container.
+  if (resources.length > MAX_ENABLED_STATIC_RULESETS) {
+    fail(`${store}: category mixtures can exceed ${MAX_ENABLED_STATIC_RULESETS} enabled rulesets`);
+  }
+  if (resources.some((resource) => resource.enabled !== false)) {
+    fail(`${store}: premade rulesets must start disabled until the daemon pushes policy`);
+  }
+
+  const resourceIds = resources.map((resource) => resource.id);
+  if (new Set(resourceIds).size !== resourceIds.length) fail(`${store}: duplicate ruleset ids`);
+  if (JSON.stringify([...resourceIds].sort()) !== JSON.stringify(Object.keys(PREMADE_RULESETS.rulesets).sort())) {
+    fail(`${store}: manifest rulesets do not match premade-rulesets.js`);
+  }
+
+  const expectedFiles = new Set();
+  const actualIdsByRuleset = {};
+  for (const resource of resources) {
+    const relativePath = resource.path;
+    if (!/^premade-lists\/premade\.\d+\.json$/.test(relativePath)) {
+      fail(`${store}: invalid premade ruleset path ${relativePath}`);
+    }
+    expectedFiles.add(relativePath.slice('premade-lists/'.length));
+    const filePath = resolve(resourcesDir, relativePath);
+    const size = statSync(filePath, { throwIfNoEntry: false })?.size;
+    if (typeof size !== 'number') fail(`${store}: missing ${relativePath}`);
+    if (size >= MAX_RULESET_BYTES) {
+      fail(`${store}: ${relativePath} is ${size} bytes; AMO requires files below 5MB`);
+    }
+    const rules = readJson(filePath);
+    for (const rule of rules) {
+      const domains = [
+        ...(rule.condition?.requestDomains ?? []),
+        ...(rule.condition?.excludedRequestDomains ?? []),
+      ];
+      if (domains.some((domain) => [...domain].some((character) => character.charCodeAt(0) > 127))) {
+        fail(`${store}: ${relativePath} contains a non-ASCII DNR domain`);
+      }
+    }
+    const ids = rules.map((rule) => rule.id);
+    if (ids.some((id) => !Number.isInteger(id) || id <= 0) || new Set(ids).size !== ids.length) {
+      fail(`${store}: ${relativePath} has invalid or duplicate rule ids`);
+    }
+    actualIdsByRuleset[resource.id] = ids;
+    if (JSON.stringify(ids) !== JSON.stringify(PREMADE_RULESETS.rulesets[resource.id])) {
+      fail(`${store}: ${resource.id} ids do not match premade-rulesets.js`);
+    }
+  }
+
+  const files = readdirSync(resolve(resourcesDir, 'premade-lists')).filter((file) => file.endsWith('.json'));
+  if (JSON.stringify(files.sort()) !== JSON.stringify([...expectedFiles].sort())) {
+    fail(`${store}: packaged premade files do not exactly match the manifest`);
+  }
+
+  const assigned = Object.fromEntries(resourceIds.map((rulesetId) => [rulesetId, new Set()]));
+  for (const [listId, byRuleset] of Object.entries(PREMADE_RULESETS.ruleIdsByList)) {
+    if (Object.keys(byRuleset).length === 0) fail(`${store}: ${listId} has no generated rules`);
+    for (const [rulesetId, ruleIds] of Object.entries(byRuleset)) {
+      if (!assigned[rulesetId]) fail(`${store}: ${listId} references unknown ${rulesetId}`);
+      for (const ruleId of ruleIds) {
+        if (!actualIdsByRuleset[rulesetId].includes(ruleId)) {
+          fail(`${store}: ${listId} references missing rule ${rulesetId}:${ruleId}`);
+        }
+        if (assigned[rulesetId].has(ruleId)) {
+          fail(`${store}: ${rulesetId}:${ruleId} belongs to multiple categories`);
+        }
+        assigned[rulesetId].add(ruleId);
+      }
+    }
+  }
+  for (const rulesetId of resourceIds) {
+    if (assigned[rulesetId].size !== actualIdsByRuleset[rulesetId].length) {
+      fail(`${store}: ${rulesetId} contains rules with no category mapping`);
+    }
+  }
+}
+
 const base = readJson(resolve(extensionDir, "manifest.json"));
 assertMinimalManifest(base, "source");
+assertPremadeRulesets(base, resolve(extensionDir, "resources"), "source");
 const version = base.version;
 if (typeof version !== "string" || version.length === 0) {
   fail("source: manifest version is required");
@@ -106,6 +195,7 @@ for (const [store, directory] of Object.entries({
     store,
     store === "chrome" ? identities.chromePublicKey : null,
   );
+  assertPremadeRulesets(manifest, storeDir, store);
   const expectedActionIcons = { 16: "icon-16.png", 32: "icon-32.png" };
   if (JSON.stringify(manifest.action?.default_icon) !== JSON.stringify(expectedActionIcons)) {
     fail(`${store}: toolbar action must use the packaged Talysman icons`);
