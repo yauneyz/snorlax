@@ -21,6 +21,7 @@ const policy: Policy = {
   defaultAction: 'block',
   intent: null,
   apps: [{ windowsImageName: 'chrome.exe', label: 'Chrome' }],
+  enabledPremadeLists: [],
 };
 
 const schedule: Schedule = {
@@ -70,6 +71,20 @@ describe('product limits', () => {
     expect(constrainScheduleToLimits(schedule, limits)).toEqual({ windows: [] });
   });
 
+  it('gates premade blocklists behind Pro', () => {
+    const limits = limitsForPlan('free');
+    const withPremade: Policy = { ...policy, apps: [], enabledPremadeLists: ['shopping'] };
+
+    expect(validatePolicyForLimits(withPremade, limits).map((v) => v.field)).toEqual([
+      'policy.enabledPremadeLists',
+    ]);
+    expect(constrainPolicyToLimits(withPremade, limits)).toEqual({
+      ...withPremade,
+      enabledPremadeLists: [],
+    });
+    expect(validatePolicyForLimits(withPremade, limitsForPlan('pro'))).toEqual([]);
+  });
+
   it(`limits only the Free block list to ${FREE_BLOCKED_SITE_LIMIT} websites`, () => {
     const limits = limitsForPlan('free');
     const blockedPolicy: Policy = {
@@ -78,6 +93,7 @@ describe('product limits', () => {
       defaultAction: 'allow',
       intent: null,
       apps: [],
+      enabledPremadeLists: [],
     };
 
     expect(validatePolicyForLimits(blockedPolicy, limits).map((v) => v.field)).toEqual([
@@ -128,6 +144,7 @@ describe('product limits', () => {
       defaultAction: 'block',
       intent: null,
       apps: [],
+      enabledPremadeLists: [],
     };
 
     expect(validatePolicyForLimits(blockAllPolicy, limits)).toEqual([]);
@@ -142,6 +159,7 @@ describe('product limits', () => {
       defaultAction: 'block',
       intent: { positive: 'Researching flights to Japan' },
       apps: [],
+      enabledPremadeLists: [],
     };
 
     expect(validatePolicyForLimits(smartPolicy, limits).map((v) => v.field)).toEqual([

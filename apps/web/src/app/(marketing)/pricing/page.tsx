@@ -27,6 +27,7 @@ const freeFeatures = [
 
 const proFeatures = [
   "Block unlimited websites",
+  "Pre-made blocklists for social media, shopping, sports, NSFW, and more",
   "Block distracting desktop apps, not just tabs",
   "Schedule recurring focus windows that arm themselves",
   "Unlimited blocking profiles for different kinds of work",

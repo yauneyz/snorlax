@@ -1,19 +1,26 @@
 - premade blocklists
-- discord
-- contact me 
-
+  - get it actually working
+  - smaller UI
+- discord community
+- landing page
+  - copy
+  - discord
+  - contact info
 - Answer the user's question - get inside their OODA loop
 - strip and simplify
 - optimize actual app
+- gather new media for landing page
 - put out new build
-  - gather new media for landing page
+
 - Email 15 people
+- reach out to media outlets to be covered
 - drive more traffic - post on X, linkedIn, Reddit
 - look at heatmaps and session replays
 - repeat
 
 
 - SEO pages media
+- drive GEO
 
 
 Notes:

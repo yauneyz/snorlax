@@ -132,6 +132,8 @@ export interface ProductLimits {
     maxApps?: LimitedValue;
     /** Smart filtering (`Policy.intent`) has real per-page LLM cost — Pro-only. */
     smartFilteringEnabled?: boolean;
+    /** Built-in bulk category blocklists (`Policy.enabledPremadeLists`) — Pro-only. */
+    premadeListsEnabled?: boolean;
   };
   profiles?: {
     max?: LimitedValue;
@@ -142,7 +144,14 @@ export interface ProductLimits {
 }
 
 export interface LimitViolation {
-  field: 'policy.blockedDomains' | 'policy.allowedDomains' | 'policy.intent' | 'policy.apps' | 'profiles' | 'schedule';
+  field:
+    | 'policy.blockedDomains'
+    | 'policy.allowedDomains'
+    | 'policy.intent'
+    | 'policy.apps'
+    | 'policy.enabledPremadeLists'
+    | 'profiles'
+    | 'schedule';
   message: string;
 }
 
@@ -153,6 +162,7 @@ const FREE_LIMITS: ProductLimits = {
     maxBlockedDomains: FREE_BLOCKED_SITE_LIMIT,
     maxApps: 0,
     smartFilteringEnabled: false,
+    premadeListsEnabled: false,
   },
   profiles: {
     max: FREE_PROFILE_LIMIT,
@@ -201,6 +211,10 @@ export function isScheduleEnabled(limits: ProductLimits | null): boolean {
 
 export function smartFilteringAllowed(limits: ProductLimits | null): boolean {
   return limits?.policy?.smartFilteringEnabled !== false;
+}
+
+export function premadeListsAllowed(limits: ProductLimits | null): boolean {
+  return limits?.policy?.premadeListsEnabled !== false;
 }
 
 export function maxBlockedDomains(limits: ProductLimits | null): LimitedValue {
@@ -259,6 +273,13 @@ export function validatePolicyForLimits(
     });
   }
 
+  if (policy.enabledPremadeLists.length > 0 && !premadeListsAllowed(limits)) {
+    violations.push({
+      field: 'policy.enabledPremadeLists',
+      message: 'Premade blocklists are a Pro feature.',
+    });
+  }
+
   return violations;
 }
 
@@ -302,6 +323,7 @@ export function constrainPolicyToLimits(policy: Policy, limits: ProductLimits | 
       maxAllowed === null ? policy.allowedDomains : policy.allowedDomains.slice(0, maxAllowed),
     intent: smartFilteringAllowed(limits) ? policy.intent : null,
     apps: maxApps === null ? policy.apps : policy.apps.slice(0, maxApps),
+    enabledPremadeLists: premadeListsAllowed(limits) ? policy.enabledPremadeLists : [],
   };
 }
 

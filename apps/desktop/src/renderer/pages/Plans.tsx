@@ -85,6 +85,7 @@ export function Plans() {
           <Feature>Unlimited blocked websites</Feature>
           <Feature>Unlimited blocking profiles</Feature>
           <Feature>App blocking</Feature>
+          <Feature>Premade blocklists (NSFW, gambling, social, and more)</Feature>
           <Feature>Scheduling, profile by profile</Feature>
           <Feature>All future Pro features by default</Feature>
         </div>

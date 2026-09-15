@@ -20,6 +20,7 @@ import {
   maxBlockedDomains,
   maxPolicyApps,
   maxProfiles,
+  premadeListsAllowed,
   smartFilteringAllowed,
 } from '../../shared/productLimits.js';
 
@@ -402,6 +403,7 @@ export function Blocklists({ onUpgrade }: { onUpgrade: () => void }) {
   const blockedLimitReached = maxBlocked !== null && policy.blockedDomains.length >= maxBlocked;
   const allowedLimitReached = maxAllowed !== null && policy.allowedDomains.length >= maxAllowed;
   const appBlockingLocked = maxApps === 0;
+  const premadeListsLocked = !premadeListsAllowed(productLimits);
   const negativeSectionOpen = negativeOpen || Boolean(policy.intent?.negative);
   const existingAppKeys = useMemo(
     () => new Set(policy.apps.map((app) => appKey(app))),
@@ -581,6 +583,7 @@ export function Blocklists({ onUpgrade }: { onUpgrade: () => void }) {
   };
 
   const togglePremadeList = (id: PremadeListId) => {
+    if (premadeListsLocked) return onUpgrade();
     const enabled = policy.enabledPremadeLists.includes(id);
     void save({
       ...policy,
@@ -961,24 +964,36 @@ export function Blocklists({ onUpgrade }: { onUpgrade: () => void }) {
         )}
 
         <div className="mt-4">
-          <Kicker>Premade blocklists</Kicker>
+          <div className="flex items-baseline gap-2.5">
+            <Kicker>Premade blocklists</Kicker>
+            {premadeListsLocked && (
+              <button
+                onClick={onUpgrade}
+                className="ml-auto text-[11px] font-medium text-slate-400 transition hover:text-slate-200"
+              >
+                Upgrade for premade blocklists →
+              </button>
+            )}
+          </div>
           <p className="mt-1 text-[11px] leading-snug text-slate-500">
-            Built-in categories with too many sites to list by hand. Toggle any on alongside your
-            own block list — turning one on is free, turning one off needs your key while focus is
-            enforcing.
+            {premadeListsLocked
+              ? 'Built-in categories with too many sites to list by hand — a Pro feature.'
+              : 'Built-in categories with too many sites to list by hand. Toggle any on alongside your own block list — turning one on is free, turning one off needs your key while focus is enforcing.'}
           </p>
           <div className="mt-2.5 flex flex-col gap-1.5">
             {PREMADE_LISTS.map((list) => {
-              const enabled = policy.enabledPremadeLists.includes(list.id);
+              const enabled = !premadeListsLocked && policy.enabledPremadeLists.includes(list.id);
               return (
                 <button
                   key={list.id}
                   onClick={() => togglePremadeList(list.id)}
                   className={cx(
                     'flex items-center gap-3 rounded-[10px] border px-3 py-2.5 text-left transition',
-                    enabled
-                      ? 'border-seal/30 bg-seal/[0.09] shadow-[inset_0_1px_0_rgb(var(--color-white)/0.06),0_0_18px_rgb(var(--color-signal)/0.10)]'
-                      : 'border-white/[0.07] bg-white/[0.025] hover:border-white/[0.14] hover:bg-white/[0.05]',
+                    premadeListsLocked
+                      ? 'border-white/[0.07] bg-white/[0.015] opacity-60 hover:border-white/[0.14]'
+                      : enabled
+                        ? 'border-seal/30 bg-seal/[0.09] shadow-[inset_0_1px_0_rgb(var(--color-white)/0.06),0_0_18px_rgb(var(--color-signal)/0.10)]'
+                        : 'border-white/[0.07] bg-white/[0.025] hover:border-white/[0.14] hover:bg-white/[0.05]',
                   )}
                 >
                   <span className="flex-1">
