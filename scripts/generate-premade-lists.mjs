@@ -59,14 +59,16 @@ function buildRuleset(list, domains) {
     // and wildcard-matching would collaterally block unrelated services hosted under the same
     // apex (e.g. blocking "shopping" must not also block console.aws.amazon.com).
     const requestDomains = domainChunk.flatMap((d) => [d, `www.${d}`]);
+    // Omitting `resourceTypes` matches every type EXCEPT main_frame (same trick buildRules() uses
+    // in apps/extension/src/rules.js). Listing main_frame here instead would tie with the redirect
+    // rule below at equal priority, and DNR breaks same-priority ties by action type -- block wins
+    // over redirect -- so every top-level navigation got a generic browser error page instead of
+    // blocked.html.
     rules.push({
       id: id++,
       priority: BLOCK_PRIORITY,
       action: { type: 'block' },
-      condition: { requestDomains, resourceTypes: [
-        'main_frame', 'sub_frame', 'stylesheet', 'script', 'image', 'font', 'object',
-        'xmlhttprequest', 'ping', 'csp_report', 'media', 'websocket', 'webtransport', 'other',
-      ] },
+      condition: { requestDomains },
     });
     rules.push({
       id: id++,

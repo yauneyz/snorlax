@@ -93,12 +93,18 @@ pub fn apply_policy(policy: &Policy) -> std::io::Result<()> {
     Ok(())
 }
 
+/// Clear the sinkhole by emptying the runtime config rather than deleting it. The permanent
+/// include (`/etc/dnsmasq.d/talysman.conf`) references this path with `conf-file=`, and a missing
+/// `conf-file` is fatal at dnsmasq startup -- unlinking it here would leave dnsmasq unable to
+/// start at all, taking down name resolution for the whole machine.
 pub fn remove_config() -> std::io::Result<()> {
-    match std::fs::remove_file(RUNTIME_CONFIG_PATH) {
-        Ok(()) => {}
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
-        Err(e) => return Err(e),
+    if let Some(parent) = Path::new(RUNTIME_CONFIG_PATH).parent() {
+        std::fs::create_dir_all(parent)?;
     }
+    std::fs::write(
+        RUNTIME_CONFIG_PATH,
+        "# Talysman DNS sinkhole configuration.\n# Focus inactive; no domains sinkholed.\n",
+    )?;
     reload_dnsmasq();
     Ok(())
 }

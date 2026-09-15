@@ -372,8 +372,14 @@ rmSync(distDir, { recursive: true, force: true });
 mkdirSync(distDir, { recursive: true });
 
 const background = bundledBackground();
+// Chromium refuses to load an extension's own pages into the main frame of an incognito tab under
+// the default "spanning" mode, so the DNR redirect to blocked.html resolved to a chrome-extension://
+// URL the browser then blocked outright (ERR_BLOCKED_BY_CLIENT naming the extension ID). "split"
+// gives incognito its own worker, which may load extension pages. Firefox does not support "split"
+// and keeps the default.
 const chromiumManifest = {
   ...storeNeutralManifest(base),
+  incognito: "split",
   background: { service_worker: "background.js" },
 };
 const { manifestKey: chromeSideloadKey, id: chromeSideloadId } =

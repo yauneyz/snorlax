@@ -36,6 +36,8 @@ type Preset = {
   hint: string;
 };
 
+const TOTAL_PREMADE_DOMAINS = PREMADE_LISTS.reduce((sum, list) => sum + list.domainCount, 0);
+
 const SMART_FILTERING_ENABLED = productFeaturesForEnvironment(
   __APP_CONFIG__.APP_ENV,
 ).smartFiltering;
@@ -377,6 +379,7 @@ export function Blocklists({ onUpgrade }: { onUpgrade: () => void }) {
   const [blockedInput, setBlockedInput] = useState('');
   const [allowedInput, setAllowedInput] = useState('');
   const [negativeOpen, setNegativeOpen] = useState(false);
+  const [premadeOpen, setPremadeOpen] = useState(false);
   const [appName, setAppName] = useState('');
   const [pickerOpen, setPickerOpen] = useState(false);
   const [pickerLoading, setPickerLoading] = useState(false);
@@ -404,6 +407,15 @@ export function Blocklists({ onUpgrade }: { onUpgrade: () => void }) {
   const allowedLimitReached = maxAllowed !== null && policy.allowedDomains.length >= maxAllowed;
   const appBlockingLocked = maxApps === 0;
   const premadeListsLocked = !premadeListsAllowed(productLimits);
+  // Collapsed, the section is a summary: just what's on. The full catalog (with its toggles, and
+  // the upgrade nudge for free users) lives behind "Browse categories".
+  const enabledPremade = useMemo(
+    () =>
+      premadeListsLocked
+        ? []
+        : PREMADE_LISTS.filter((list) => policy.enabledPremadeLists.includes(list.id)),
+    [premadeListsLocked, policy.enabledPremadeLists],
+  );
   const negativeSectionOpen = negativeOpen || Boolean(policy.intent?.negative);
   const existingAppKeys = useMemo(
     () => new Set(policy.apps.map((app) => appKey(app))),
@@ -966,66 +978,99 @@ export function Blocklists({ onUpgrade }: { onUpgrade: () => void }) {
         <div className="mt-4">
           <div className="flex items-baseline gap-2.5">
             <Kicker>Premade blocklists</Kicker>
-            {premadeListsLocked && (
-              <button
-                onClick={onUpgrade}
-                className="ml-auto text-[11px] font-medium text-slate-400 transition hover:text-slate-200"
-              >
-                Upgrade for premade blocklists →
-              </button>
-            )}
+            <span className="text-[11px] text-slate-600">
+              {enabledPremade.length}/{PREMADE_LISTS.length} on
+            </span>
           </div>
-          <p className="mt-1 text-[11px] leading-snug text-slate-500">
-            {premadeListsLocked
-              ? 'Built-in categories with too many sites to list by hand — a Pro feature.'
-              : 'Built-in categories with too many sites to list by hand. Toggle any on alongside your own block list — turning one on is free, turning one off needs your key while focus is enforcing.'}
-          </p>
-          <div className="mt-2.5 flex flex-col gap-1.5">
-            {PREMADE_LISTS.map((list) => {
-              const enabled = !premadeListsLocked && policy.enabledPremadeLists.includes(list.id);
-              return (
-                <button
-                  key={list.id}
-                  onClick={() => togglePremadeList(list.id)}
-                  className={cx(
-                    'flex items-center gap-3 rounded-[10px] border px-3 py-2.5 text-left transition',
-                    premadeListsLocked
-                      ? 'border-white/[0.07] bg-white/[0.015] opacity-60 hover:border-white/[0.14]'
-                      : enabled
-                        ? 'border-seal/30 bg-seal/[0.09] shadow-[inset_0_1px_0_rgb(var(--color-white)/0.06),0_0_18px_rgb(var(--color-signal)/0.10)]'
-                        : 'border-white/[0.07] bg-white/[0.025] hover:border-white/[0.14] hover:bg-white/[0.05]',
-                  )}
-                >
-                  <span className="flex-1">
-                    <span className="text-[12.5px] font-semibold text-slate-250">
-                      {list.label}
-                    </span>
-                    <span className="ml-2 text-[11px] text-slate-500">
-                      {list.domainCount.toLocaleString()} sites
-                    </span>
-                    <span className="mt-0.5 block text-[11px] leading-snug text-slate-500">
-                      {list.description}
-                    </span>
-                  </span>
+          <Button
+            variant="ghost"
+            onClick={() => setPremadeOpen((v) => !v)}
+            aria-expanded={premadeOpen}
+            aria-controls="premade-lists"
+            className="mt-2 px-3 py-1 text-[11px]"
+          >
+            {premadeOpen ? 'Done' : 'Browse categories →'}
+          </Button>
+
+          {!premadeOpen && (
+            <div className="mt-2 flex flex-wrap items-center gap-1.5">
+              {enabledPremade.length === 0 ? (
+                <p className="text-[11px] leading-snug text-slate-500">
+                  None on — {PREMADE_LISTS.length} built-in categories available, covering{' '}
+                  {TOTAL_PREMADE_DOMAINS.toLocaleString()} sites.
+                </p>
+              ) : (
+                enabledPremade.map((list) => (
                   <span
-                    role="switch"
-                    aria-checked={enabled}
-                    className={cx(
-                      'relative h-5 w-9 shrink-0 rounded-full transition',
-                      enabled ? 'bg-seal/70' : 'bg-white/10',
-                    )}
+                    key={list.id}
+                    className="rounded-full border border-seal/30 bg-seal/[0.09] px-2.5 py-1 text-[11px] text-slate-250"
                   >
-                    <span
-                      className={cx(
-                        'absolute top-0.5 h-4 w-4 rounded-full bg-white transition',
-                        enabled ? 'left-[18px]' : 'left-0.5',
-                      )}
-                    />
+                    {list.label}
+                    <span className="ml-1.5 text-slate-500">
+                      {list.domainCount.toLocaleString()}
+                    </span>
                   </span>
-                </button>
-              );
-            })}
-          </div>
+                ))
+              )}
+            </div>
+          )}
+
+          {premadeOpen && (
+            <div id="premade-lists">
+              <p className="mt-1 text-[11px] leading-snug text-slate-500">
+                {premadeListsLocked
+                  ? 'Built-in categories with too many sites to list by hand — a Pro feature.'
+                  : 'Built-in categories with too many sites to list by hand. Toggle any on alongside your own block list — turning one on is free, turning one off needs your key while focus is enforcing.'}
+              </p>
+              <div className="mt-2.5 flex flex-col gap-1.5">
+                {PREMADE_LISTS.map((list) => {
+                  const enabled =
+                    !premadeListsLocked && policy.enabledPremadeLists.includes(list.id);
+                  return (
+                    <button
+                      key={list.id}
+                      onClick={() => togglePremadeList(list.id)}
+                      className={cx(
+                        'flex items-center gap-3 rounded-[10px] border px-3 py-2.5 text-left transition',
+                        premadeListsLocked
+                          ? 'border-white/[0.07] bg-white/[0.015] opacity-60 hover:border-white/[0.14]'
+                          : enabled
+                            ? 'border-seal/30 bg-seal/[0.09] shadow-[inset_0_1px_0_rgb(var(--color-white)/0.06),0_0_18px_rgb(var(--color-signal)/0.10)]'
+                            : 'border-white/[0.07] bg-white/[0.025] hover:border-white/[0.14] hover:bg-white/[0.05]',
+                      )}
+                    >
+                      <span className="flex-1">
+                        <span className="text-[12.5px] font-semibold text-slate-250">
+                          {list.label}
+                        </span>
+                        <span className="ml-2 text-[11px] text-slate-500">
+                          {list.domainCount.toLocaleString()} sites
+                        </span>
+                        <span className="mt-0.5 block text-[11px] leading-snug text-slate-500">
+                          {list.description}
+                        </span>
+                      </span>
+                      <span
+                        role="switch"
+                        aria-checked={enabled}
+                        className={cx(
+                          'relative h-5 w-9 shrink-0 rounded-full transition',
+                          enabled ? 'bg-seal/70' : 'bg-white/10',
+                        )}
+                      >
+                        <span
+                          className={cx(
+                            'absolute top-0.5 h-4 w-4 rounded-full bg-white transition',
+                            enabled ? 'left-[18px]' : 'left-0.5',
+                          )}
+                        />
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
         </div>
 
         <div className="mt-4 flex items-baseline gap-2.5">
