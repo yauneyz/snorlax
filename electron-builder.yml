@@ -133,6 +133,7 @@ deb:
   fpm:
     - --depends=nftables
     - --depends=systemd
+    - --depends=dnsmasq
     - --before-remove=native/linux/installer/before-remove.sh
 
 publish:

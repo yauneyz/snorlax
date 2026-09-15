@@ -104,13 +104,14 @@ pub fn remove_config() -> std::io::Result<()> {
 }
 
 fn reload_dnsmasq() {
-    if command_ok("systemctl", &["reload", "dnsmasq"]) {
+    // dnsmasq's SIGHUP only re-reads /etc/hosts, DHCP leases, and resolv-file -- it does *not*
+    // re-read conf-dir/address= directives (those load once at process start), so a plain
+    // `reload`/`pkill -HUP` never picks up sinkhole changes after the first one. A full restart
+    // is required for address= updates to actually take effect.
+    if command_ok("systemctl", &["restart", "dnsmasq"]) {
         return;
     }
-    if command_ok("pkill", &["-HUP", "dnsmasq"]) {
-        return;
-    }
-    tracing::warn!("dnsmasq reload failed or dnsmasq is not running; DNS sinkhole is inactive");
+    tracing::warn!("dnsmasq restart failed or dnsmasq is not running; DNS sinkhole is inactive");
 }
 
 fn command_ok(program: &str, args: &[&str]) -> bool {
