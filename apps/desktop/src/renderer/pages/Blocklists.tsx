@@ -976,21 +976,29 @@ export function Blocklists({ onUpgrade }: { onUpgrade: () => void }) {
         )}
 
         <div className="mt-4">
-          <div className="flex items-baseline gap-2.5">
-            <Kicker>Premade blocklists</Kicker>
-            <span className="text-[11px] text-slate-600">
-              {enabledPremade.length}/{PREMADE_LISTS.length} on
-            </span>
-          </div>
-          <Button
-            variant="ghost"
-            onClick={() => setPremadeOpen((v) => !v)}
-            aria-expanded={premadeOpen}
-            aria-controls="premade-lists"
-            className="mt-2 px-3 py-1 text-[11px]"
+          {/* While the categories are open the header pins to the top of the page scroller, so
+              "Done" stays reachable no matter how far down the list you are. */}
+          <div
+            className={cx(
+              premadeOpen && 'sticky top-0 z-10 bg-[rgb(var(--color-background))] pb-2',
+            )}
           >
-            {premadeOpen ? 'Done' : 'Browse categories →'}
-          </Button>
+            <div className="flex items-baseline gap-2.5">
+              <Kicker>Premade blocklists</Kicker>
+              <span className="text-[11px] text-slate-600">
+                {enabledPremade.length}/{PREMADE_LISTS.length} on
+              </span>
+            </div>
+            <Button
+              variant="ghost"
+              onClick={() => setPremadeOpen((v) => !v)}
+              aria-expanded={premadeOpen}
+              aria-controls="premade-lists"
+              className="mt-2 px-3 py-1 text-[11px]"
+            >
+              {premadeOpen ? 'Done' : 'Browse categories →'}
+            </Button>
+          </div>
 
           {!premadeOpen && (
             <div className="mt-2 flex flex-wrap items-center gap-1.5">
@@ -1016,8 +1024,8 @@ export function Blocklists({ onUpgrade }: { onUpgrade: () => void }) {
           )}
 
           {premadeOpen && (
-            <div id="premade-lists">
-              <p className="mt-1 text-[11px] leading-snug text-slate-500">
+            <div id="premade-lists" className="mt-2.5 max-h-[300px] overflow-y-auto pr-0.5">
+              <p className="text-[11px] leading-snug text-slate-500">
                 {premadeListsLocked
                   ? 'Built-in categories with too many sites to list by hand — a Pro feature.'
                   : 'Built-in categories with too many sites to list by hand. Toggle any on alongside your own block list — turning one on is free, turning one off needs your key while focus is enforcing.'}
