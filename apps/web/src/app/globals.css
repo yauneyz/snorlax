@@ -757,7 +757,9 @@ input:-webkit-autofill:focus {
   text-wrap: balance;
 }
 
-.hero__headline span {
+/* Only accent spans get the signal color — `.nowrap` is a layout-only wrapper (as is any
+   other utility span added here), so it must stay the base headline color. */
+.hero__headline span:not(.nowrap):not(.brk) {
   color: var(--signal);
 }
 
