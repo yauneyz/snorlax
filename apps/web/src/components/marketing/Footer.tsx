@@ -14,6 +14,7 @@ export function Footer() {
       <nav className="site-footer__nav">
         <Link href="/download">Download</Link>
         <Link href="/pricing">Pricing</Link>
+        <Link href="/about">About Us</Link>
         <Link href="/privacy">Privacy</Link>
         <Link href="/terms">Terms</Link>
       </nav>

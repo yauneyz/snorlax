@@ -146,28 +146,7 @@ export default async function PricingPage() {
         alreadyPro={detail?.plan === "pro"}
       />
 
-      <section className="assurance">
-        <p className="section__eyebrow">The 14-day test</p>
-        <h2>Don&apos;t evaluate Talysman at install. Evaluate it when you want to quit.</h2>
-        <ol className="assurance__steps">
-          <li>
-            <span>01</span> Schedule the work you usually avoid.
-          </li>
-          <li>
-            <span>02</span> Put your key somewhere you have to stand up to reach.
-          </li>
-          <li>
-            <span>03</span> Notice what happens when the first urge to escape arrives.
-          </li>
-        </ol>
-        <p className="assurance__terms">
-          Pro is free for {PRO_TRIAL_DAYS} days. We email you before the trial ends. Cancel before
-          then and you are not charged.
-        </p>
-      </section>
-
       <section className="faq faq--pricing" id="faq">
-        <p className="section__eyebrow">Before you decide</p>
         <h2 className="section__title">Frequently asked questions</h2>
         <div className="faq__list">
           {faqs.map((faq) => (

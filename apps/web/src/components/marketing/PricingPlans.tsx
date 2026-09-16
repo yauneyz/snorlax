@@ -119,9 +119,6 @@ export function PricingPlans({ freeFeatures, proFeatures, trialAvailable, alread
           <p className="plan__price">
             $0 <span className="plan__price-unit">forever</span>
           </p>
-          <p className="plan__pitch">
-            Run a real session where quitting is no longer one click away.
-          </p>
         </header>
         <ul className="plan__features">
           {freeFeatures.map((f) => (
@@ -136,12 +133,9 @@ export function PricingPlans({ freeFeatures, proFeatures, trialAvailable, alread
 
       <article className="plan plan--pro">
         <span className="plan__badge">Most complete</span>
-        <span className="plan__kicker">BUILD THE SYSTEM</span>
+        <span className="plan__kicker">UNLEASH YOUR POTENTIAL</span>
         <header className="plan__head">
           <h2 className="plan__name">Talysman Pro</h2>
-          <p className="plan__pitch">
-            Make focused work automatic, repeatable, and harder to negotiate away.
-          </p>
 
           <div className="cycle" role="radiogroup" aria-label="Billing period">
             {BILLING_CYCLES.map(({ price, label }) => (

@@ -3857,3 +3857,81 @@ input:-webkit-autofill:focus {
     scroll-behavior: auto !important;
   }
 }
+
+/* ── About page ──
+ * A single narrow column: the story reads like prose, the contact block is the
+ * only thing that looks like UI. */
+.about {
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 0.5rem 0 2rem;
+}
+
+.about__header {
+  margin: 1.5rem 0 2.5rem;
+}
+
+.about__headline {
+  margin-bottom: 0;
+  font-size: clamp(2.6rem, 5.5vw, 4.4rem);
+  letter-spacing: -0.05em;
+  line-height: 1;
+  color: var(--fg-0);
+}
+
+.about__body p {
+  margin: 0 0 1.15rem;
+  color: var(--fg-2);
+  font-size: 1.02rem;
+  line-height: 1.7;
+  text-wrap: pretty;
+}
+
+.about__lede {
+  color: var(--fg-1) !important;
+  font-size: 1.15rem !important;
+}
+
+.about__contact {
+  margin-top: 3rem;
+  padding-top: 2rem;
+  border-top: 1px solid var(--border);
+}
+
+.about__contact h2 {
+  margin: 0 0 1.25rem;
+  font-size: 1.15rem;
+  letter-spacing: -0.02em;
+}
+
+.about__contact-list {
+  display: grid;
+  gap: 0.75rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.about__contact-list li {
+  display: flex;
+  align-items: baseline;
+  gap: 0.9rem;
+}
+
+.about__contact-label {
+  min-width: 7.5rem;
+  font: 700 0.64rem/1.6 var(--font-mono);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--fg-5);
+}
+
+.about__contact-list a {
+  color: var(--fg-1);
+  border-bottom: 1px solid var(--border);
+  transition: color var(--t-fast) var(--ease);
+}
+
+.about__contact-list a:hover {
+  color: var(--signal);
+}
