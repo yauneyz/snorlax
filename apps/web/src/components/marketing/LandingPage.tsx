@@ -88,10 +88,8 @@ const faqs = [
     a: (
       <>
         <p>
-          No. The browser extension turns your blocklist into browser-native rules that the browser
-          evaluates internally. The extension never receives the URLs you visit, your history, page
-          content, search terms, cookies, or form data — and it makes no internet requests of its
-          own. The block page doesn&apos;t even see which address was blocked.
+          No — {config.app.name} works by setting up rules that the browser has to follow. Your
+          history stays between you and your browser.
         </p>
         <p>
           Your blocklist stays on your computer. Details are in the{" "}
@@ -191,19 +189,15 @@ export function LandingPage({ variantOverride }: { variantOverride?: VariantKey 
           <div className="diagnosis__copy">
             <p className="section__eyebrow">It will be different this time</p>
             <h2 className="section__title">Why It Works</h2>
-            <p>
-              You installed the extensions. You set the timers. Then the work got difficult and
-              YouTube was open before you had consciously decided to stop.
-            </p>
-            <p>
-              Every normal blocker is controlled from the computer it is supposed to protect. The
-              distracted version of you can undo the focused version&apos;s decision with the same
-              mouse, in the same few clicks.
-            </p>
-            <p className="diagnosis__thesis">
-              {config.app.name} moves that decision into the physical world. You can still stop. You
-              just have to stand up and go get the key first.
-            </p>
+            <ul className="point-list">
+              <li>{config.app.name} separates the off switch from the distracting device</li>
+              <li>You put the key in another room</li>
+              <li>
+                Now there&apos;s just enough friction that you don&apos;t automatically unblock when
+                the urge hits
+              </li>
+              <li>This really does make a difference. Try it</li>
+            </ul>
           </div>
           <AppShot
             src="/media/app-key-required.png"
@@ -255,15 +249,14 @@ export function LandingPage({ variantOverride }: { variantOverride?: VariantKey 
           visitor learns app blocking and scheduling are paid. */}
       <section className="section split">
         <h2 className="section__title">Blocking your most distracting sites will always be free</h2>
-        <p className="section__lede">
-          You will always be able to block up to {FREE_BLOCKED_SITE_LIMIT} websites, create a
-          whitelist, or block the entire internet, for free. Forever. Block Reddit, YouTube, or
-          whatever else is stealing your attention.
-        </p>
-        <p className="section__lede">
-          When you want to expand your blocklist, block distracting applications, or set up
-          recurring schedules, upgrade to Pro.
-        </p>
+        <ul className="point-list">
+          <li>Blocking up to {FREE_BLOCKED_SITE_LIMIT} websites will be free forever.</li>
+          <li>Block Reddit, YouTube, or whatever else steals your attention</li>
+          <li>
+            When you&apos;re convinced it works, upgrade to Pro to get unlimited sites and pre-made
+            lists.
+          </li>
+        </ul>
         <div className="split__grid">
           <div className="split__col">
             <span className="split__label">TRY THE MECHANISM</span>
@@ -274,11 +267,10 @@ export function LandingPage({ variantOverride }: { variantOverride?: VariantKey 
             </p>
           </div>
           <div className="split__col split__col--pro">
-            <span className="split__label">BUILD THE SYSTEM</span>
+            <span className="split__label">UNLEASH YOUR POTENTIAL</span>
             <h3>Pro</h3>
             <p>
-              Unlimited sites, desktop app blocking, recurring schedules that arm themselves, and
-              unlimited profiles — the parts that turn one good session into a repeatable week.
+              Unlimited sites, pre-made blocklists, recurring schedules, and unlimited profiles
             </p>
           </div>
         </div>

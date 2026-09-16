@@ -1171,13 +1171,36 @@ input:-webkit-autofill:focus {
   margin-bottom: 0.35rem;
 }
 
-.diagnosis__thesis {
-  margin-top: 0.3rem !important;
-  padding-left: 1rem;
-  border-left: 2px solid var(--signal);
-  color: var(--fg-0);
-  font-size: 1.08rem;
-  font-weight: 500;
+/* An argument as bullets rather than prose, shared by the diagnosis and pricing sections. The
+ * markers carry the signal green — the only colour in the block — so the eye lands on the list,
+ * not on any one line. */
+.point-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+  margin: 0.35rem 0 0;
+  padding: 0;
+  list-style: none;
+  max-width: 46ch;
+}
+
+.point-list li {
+  position: relative;
+  padding-left: 1.35rem;
+  color: var(--fg-2);
+  font-size: 1.05rem;
+  text-wrap: pretty;
+}
+
+.point-list li::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0.58em;
+  width: 0.45rem;
+  height: 0.45rem;
+  border-radius: 50%;
+  background: var(--signal);
 }
 
 .diagnosis__media {
@@ -3710,7 +3733,8 @@ input:-webkit-autofill:focus {
     gap: 2rem;
   }
 
-  .diagnosis__copy p {
+  .diagnosis__copy p,
+  .point-list {
     max-width: none;
   }
 
