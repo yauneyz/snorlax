@@ -3,6 +3,7 @@ import { requireUser } from "@/lib/auth/require-user";
 import { captureException } from "@/lib/sentry";
 import { getStripe } from "@/lib/stripe/client";
 import { syncSubscription } from "@/lib/stripe/sync-subscription";
+import { fulfillLifetimeCheckoutSession } from "@/lib/stripe/lifetime";
 import { config } from "@/lib/config";
 
 /**
@@ -21,12 +22,12 @@ export async function GET(request: NextRequest) {
       const session = await getStripe().checkout.sessions.retrieve(sessionId, {
         expand: ["subscription.customer"],
       });
-      if (
-        session.client_reference_id === user.id &&
-        session.subscription &&
-        typeof session.subscription !== "string"
-      ) {
-        await syncSubscription(session.subscription);
+      if (session.client_reference_id === user.id) {
+        if (session.subscription && typeof session.subscription !== "string") {
+          await syncSubscription(session.subscription);
+        } else if (session.mode === "payment") {
+          await fulfillLifetimeCheckoutSession(session.id, user.id);
+        }
       }
     } catch (err) {
       // Non-fatal: the webhook will sync shortly; worst case the user is

@@ -19,6 +19,7 @@ export async function createCheckoutSession({ userId, userEmail, price }: Args) 
       appUrl: config.app.url,
       priceMonthly: config.stripe.priceMonthly,
       priceYearly: config.stripe.priceYearly,
+      priceLifetime: config.stripe.priceLifetime,
     },
     userId,
     userEmail,

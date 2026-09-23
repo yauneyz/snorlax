@@ -4,6 +4,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import {
   checkoutPriceSchema,
   formatPriceUsd,
+  LIFETIME_PRICE_CENTS,
   PRO_ANNUAL_SAVINGS_CENTS,
   PRO_ANNUAL_WEEKLY_CENTS,
   PRO_LIST_PRICE_CENTS,
@@ -20,37 +21,41 @@ type Props = {
   proFeatures: string[];
   /** Whether to advertise the trial. Server-checked; Checkout re-checks authoritatively. */
   trialAvailable: boolean;
-  /** Set when the visitor already pays — the Pro CTA becomes a no-op label. */
+  /** Set when the visitor already has Pro — the recurring CTA becomes a no-op label. */
   alreadyPro?: boolean;
+  alreadyLifetime?: boolean;
 };
 
-const BILLING_CYCLES: { price: CheckoutPrice; label: string }[] = [
+type RecurringPrice = Extract<CheckoutPrice, "monthly" | "yearly">;
+
+const BILLING_CYCLES: { price: RecurringPrice; label: string }[] = [
   { price: "yearly", label: "Annual" },
   { price: "monthly", label: "Monthly" },
 ];
 
 /** `?plan=` survives the signup round-trip, so honour it as the preselected cycle. */
-function cycleFromParam(value: string | null): CheckoutPrice | null {
+function checkoutFromParam(value: string | null): CheckoutPrice | null {
   const parsed = checkoutPriceSchema.safeParse(value);
   return parsed.success ? parsed.data : null;
 }
 
-export function PricingPlans({ freeFeatures, proFeatures, trialAvailable, alreadyPro }: Props) {
+export function PricingPlans({ freeFeatures, proFeatures, trialAvailable, alreadyPro, alreadyLifetime }: Props) {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const requestedCycle = cycleFromParam(searchParams.get("plan"));
+  const requestedPrice = checkoutFromParam(searchParams.get("plan"));
 
   // Annual leads: it is the better deal and the one the page argues for.
-  const [cycle, setCycle] = useState<CheckoutPrice>(requestedCycle ?? "yearly");
+  const [cycle, setCycle] = useState<RecurringPrice>(
+    requestedPrice === "monthly" || requestedPrice === "yearly" ? requestedPrice : "yearly",
+  );
   const [pending, setPending] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<{ price: CheckoutPrice; message: string } | null>(null);
 
   // First step of the pricing → plan_selected → checkout_started → trial_started/
   // subscription_started funnel. `beacon: true` matches the other fire-and-forget marketing
   // events (OAuthButtons, SignupForm) so this never blocks paint or a fast navigation away.
   useEffect(() => {
     void trackEvent("pricing_page_viewed", { surface: "web" }, { beacon: true });
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- fire once per mount only
   }, []);
 
   const startCheckout = useCallback(
@@ -58,26 +63,31 @@ export function PricingPlans({ freeFeatures, proFeatures, trialAvailable, alread
       void trackEvent("plan_selected", { price, surface: "web" }, { beacon: true });
       setError(null);
       setPending(true);
-      const client = supabaseBrowser();
-      const { data } = await client.auth.getSession();
-      if (!data.session) {
-        // Come back here with the cycle intact so the choice isn't made twice.
-        router.push(`/signup?next=${encodeURIComponent(`/pricing?plan=${price}`)}`);
-        return;
-      }
-      const res = await fetch("/api/stripe/checkout", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ price }),
-      });
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
-        setError(body.error ?? "Checkout failed — please try again");
+      try {
+        const client = supabaseBrowser();
+        const { data } = await client.auth.getSession();
+        if (!data.session) {
+          // Come back here with the chosen price intact so it isn't picked twice.
+          router.push(`/signup?next=${encodeURIComponent(`/pricing?plan=${price}`)}`);
+          return;
+        }
+        const res = await fetch("/api/stripe/checkout", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ price }),
+        });
+        if (!res.ok) {
+          const body = await res.json().catch(() => ({}));
+          setError({ price, message: body.error ?? "Checkout failed — please try again" });
+          setPending(false);
+          return;
+        }
+        const { url } = (await res.json()) as { url: string };
+        window.location.assign(url);
+      } catch {
+        setError({ price, message: "Checkout failed — please try again" });
         setPending(false);
-        return;
       }
-      const { url } = (await res.json()) as { url: string };
-      window.location.assign(url);
     },
     [router],
   );
@@ -87,17 +97,17 @@ export function PricingPlans({ freeFeatures, proFeatures, trialAvailable, alread
   // new `startCheckout` identity) can never fire a second redirect.
   const resumed = useRef(false);
   useEffect(() => {
-    if (!requestedCycle || alreadyPro || resumed.current) return;
+    if (!requestedPrice || (requestedPrice === "lifetime" ? alreadyLifetime : alreadyPro) || resumed.current) return;
     resumed.current = true;
     let cancelled = false;
     void (async () => {
       const { data } = await supabaseBrowser().auth.getSession();
-      if (!cancelled && data.session) void startCheckout(requestedCycle);
+      if (!cancelled && data.session) void startCheckout(requestedPrice);
     })();
     return () => {
       cancelled = true;
     };
-  }, [requestedCycle, alreadyPro, startCheckout]);
+  }, [requestedPrice, alreadyPro, alreadyLifetime, startCheckout]);
 
   const isAnnual = cycle === "yearly";
   const discountPercent = proDiscountPercent(cycle);
@@ -214,7 +224,36 @@ export function PricingPlans({ freeFeatures, proFeatures, trialAvailable, alread
             <>Cancel anytime · you keep Pro until the period you paid for ends</>
           )}
         </p>
-        {error ? <p className="plan__error">{error}</p> : null}
+        {error && error.price !== "lifetime" ? <p className="plan__error">{error.message}</p> : null}
+      </article>
+
+      <article className="plan plan--lifetime">
+        <span className="plan__kicker">PAY ONCE</span>
+        <header className="plan__head">
+          <h2 className="plan__name">Talysman Lifetime</h2>
+          <p className="plan__price">
+            {formatPriceUsd(LIFETIME_PRICE_CENTS)}
+            <span className="plan__price-unit"> once</span>
+          </p>
+          <p className="plan__price-detail">Everything in Pro · no renewal, ever</p>
+        </header>
+        <ul className="plan__features">
+          {proFeatures.map((f) => (
+            <li key={f}>{f}</li>
+          ))}
+        </ul>
+        <button
+          type="button"
+          className="plan__cta"
+          onClick={() => startCheckout("lifetime")}
+          disabled={pending || alreadyLifetime}
+        >
+          {pending ? "Loading…" : alreadyLifetime ? "Lifetime access active" : "Get lifetime access"}
+        </button>
+        <p className="plan__footnote">
+          {alreadyLifetime ? <>Your lifetime access is active.</> : <>One payment · yours forever</>}
+        </p>
+        {error?.price === "lifetime" ? <p className="plan__error">{error.message}</p> : null}
       </article>
     </div>
   );

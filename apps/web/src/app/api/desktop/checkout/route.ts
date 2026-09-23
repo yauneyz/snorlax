@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createCheckoutSession as createBillingCheckoutSession } from "@talysman/billing-server";
+import {
+  AlreadyLifetimePurchaseError,
+  createCheckoutSession as createBillingCheckoutSession,
+} from "@talysman/billing-server";
 import { checkoutSchema } from "@/lib/zod/checkout";
 import { requireBearerUser, UnauthorizedError } from "@/lib/auth/require-bearer-user";
 import { captureException } from "@/lib/sentry";
@@ -34,6 +37,7 @@ export async function POST(request: NextRequest) {
         appUrl: config.app.url,
         priceMonthly: config.stripe.priceMonthly,
         priceYearly: config.stripe.priceYearly,
+        priceLifetime: config.stripe.priceLifetime,
         successUrl: `${config.app.url}/api/desktop/checkout/success?session_id={CHECKOUT_SESSION_ID}`,
         cancelUrl: `${config.app.url}/api/desktop/checkout/cancel`,
       },
@@ -45,6 +49,9 @@ export async function POST(request: NextRequest) {
   } catch (err) {
     if (err instanceof UnauthorizedError) {
       return NextResponse.json({ error: err.message }, { status: 401 });
+    }
+    if (err instanceof AlreadyLifetimePurchaseError) {
+      return NextResponse.json({ error: err.message }, { status: 409 });
     }
     await captureException(err, { route: "desktop/checkout" });
     return NextResponse.json({ error: "Checkout failed - please try again" }, { status: 500 });

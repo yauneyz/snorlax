@@ -3,15 +3,34 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 // Mock the admin client. All calls return canned shapes mirroring supabase-js.
 const upsertMock = vi.fn(async (_row: Record<string, unknown>) => ({ error: null }));
 const selectEqMaybeSingleMock = vi.fn(async () => ({ data: { id: "user-123" }, error: null }));
+const lifetimeState = vi.hoisted(() => ({ active: false }));
+const cancelMock = vi.fn();
+
+vi.mock("@/lib/stripe/client", () => ({
+  getStripe: () => ({ subscriptions: { cancel: cancelMock, retrieve: vi.fn() } }),
+}));
 
 vi.mock("@/lib/supabase/admin", () => ({
   supabaseAdmin: () => ({
-    from: vi.fn(() => ({
-      upsert: upsertMock,
-      select: vi.fn(() => ({
-        eq: vi.fn(() => ({ maybeSingle: selectEqMaybeSingleMock })),
-      })),
-    })),
+    from: vi.fn((table: string) => {
+      if (table === "lifetime_purchases") {
+        const chain = {
+          select: vi.fn(() => chain),
+          eq: vi.fn(() => chain),
+          is: vi.fn(() => chain),
+          limit: vi.fn(async () => ({
+            data: lifetimeState.active ? [{ checkout_session_id: "cs_paid" }] : [], error: null,
+          })),
+        };
+        return chain;
+      }
+      return {
+        upsert: upsertMock,
+        select: vi.fn(() => ({
+          eq: vi.fn(() => ({ maybeSingle: selectEqMaybeSingleMock })),
+        })),
+      };
+    }),
   }),
 }));
 
@@ -46,6 +65,8 @@ function fixture(overrides: Record<string, unknown> = {}) {
 beforeEach(() => {
   upsertMock.mockClear();
   selectEqMaybeSingleMock.mockClear();
+  lifetimeState.active = false;
+  cancelMock.mockReset();
 });
 
 describe("syncSubscription", () => {
@@ -76,5 +97,16 @@ describe("syncSubscription", () => {
     const row = upsertMock.mock.calls[0][0];
     expect(row.cancel_at).toBeNull();
     expect(row.canceled_at).toBeNull();
+  });
+
+  it("cancels a late recurring checkout for an existing lifetime buyer", async () => {
+    lifetimeState.active = true;
+    cancelMock.mockResolvedValue(fixture({ status: "canceled" }));
+
+    await syncSubscription(fixture());
+
+    expect(cancelMock).toHaveBeenCalledWith("sub_123");
+    expect(upsertMock).toHaveBeenCalledTimes(2);
+    expect(upsertMock.mock.calls[1][0]).toMatchObject({ status: "canceled" });
   });
 });

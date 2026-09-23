@@ -4,6 +4,7 @@ import { captureException } from "@/lib/sentry";
 import { createCheckoutSession } from "@/lib/stripe/checkout";
 import { checkoutSchema } from "@/lib/zod/checkout";
 import { track } from "@/server/analytics/track";
+import { AlreadyLifetimePurchaseError } from "@talysman/billing-server";
 
 export async function POST(request: NextRequest) {
   const user = await requireUser();
@@ -26,6 +27,9 @@ export async function POST(request: NextRequest) {
     });
     return NextResponse.json({ url });
   } catch (err) {
+    if (err instanceof AlreadyLifetimePurchaseError) {
+      return NextResponse.json({ error: err.message }, { status: 409 });
+    }
     // Internal details (profile lookups, Stripe errors) go to Sentry, not the client.
     await captureException(err, { userId: user.id, route: "stripe/checkout" });
     return NextResponse.json({ error: "Checkout failed — please try again" }, { status: 500 });

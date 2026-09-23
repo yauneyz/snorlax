@@ -1,5 +1,10 @@
 import { describe, it, expect, vi } from "vitest";
-import { getSubscriptionDetail, getUserEntitlement } from "@talysman/billing-server";
+import {
+  AlreadyLifetimePurchaseError,
+  getSubscriptionDetail,
+  getUserEntitlement,
+  setCancelAtPeriodEnd,
+} from "@talysman/billing-server";
 import { hashCompCode, normalizeCompCode, generateCompCode } from "@/lib/comp/code";
 
 /**
@@ -17,6 +22,7 @@ function fakeDb(rowsByTable: Record<string, Array<Record<string, unknown>>>) {
       const builder = {
         select: vi.fn(() => builder),
         eq: vi.fn(() => builder),
+        is: vi.fn(() => builder),
         in: vi.fn(() => builder),
         order: vi.fn(() => builder),
         limit: vi.fn(async () => ({ data: rows, error: null })),
@@ -27,6 +33,7 @@ function fakeDb(rowsByTable: Record<string, Array<Record<string, unknown>>>) {
 }
 
 const grantRow = { user_id: "u1", source: "grant", status: "comped", current_period_end: null };
+const lifetimeRow = { user_id: "u1", source: "lifetime_purchase", status: "lifetime", current_period_end: null };
 const subRow = {
   user_id: "u1",
   source: "subscription",
@@ -73,6 +80,15 @@ describe("getUserEntitlement with complimentary grants", () => {
       status: "active",
       currentPeriodEnd: subRow.current_period_end,
     });
+  });
+
+  it("prefers permanent access over a remaining subscription", async () => {
+    const entitlement = await getUserEntitlement({
+      db: fakeDb({ active_entitlements: [subRow, lifetimeRow] }),
+      userId: "u1",
+    });
+    expect(entitlement).toMatchObject({ active: true, plan: "pro", status: "lifetime" });
+    expect(entitlement.currentPeriodEnd).toBeUndefined();
   });
 
   it("keeps an uncertain payment status on Pro for one month from its billing update", async () => {
@@ -135,6 +151,44 @@ describe("getSubscriptionDetail for comped accounts", () => {
       userId: "u1",
     });
     expect(detail).toEqual({ hasSubscription: false, plan: "free" });
+  });
+
+  it("reports a paid lifetime purchase without a renewal", async () => {
+    const detail = await getSubscriptionDetail({
+      db: fakeDb({
+        subscriptions: [],
+        lifetime_purchases: [{ checkout_session_id: "cs_paid" }],
+      }),
+      config,
+      userId: "u1",
+    });
+    expect(detail).toEqual({ hasSubscription: false, plan: "pro", status: "lifetime" });
+  });
+
+  it("keeps billing controls visible if a recurring subscription remains", async () => {
+    const detail = await getSubscriptionDetail({
+      db: fakeDb({
+        subscriptions: [{
+          id: "sub_pending", status: "active", cancel_at_period_end: true,
+          current_period_end: "2026-10-01T00:00:00.000Z",
+        }],
+        lifetime_purchases: [{ checkout_session_id: "cs_paid" }],
+      }),
+      config,
+      userId: "u1",
+    });
+    expect(detail).toMatchObject({
+      hasSubscription: true, plan: "pro", status: "lifetime", cancelAtPeriodEnd: true,
+    });
+  });
+
+  it("refuses to resume recurring billing after a lifetime purchase", async () => {
+    await expect(setCancelAtPeriodEnd({
+      db: fakeDb({ lifetime_purchases: [{ checkout_session_id: "cs_paid" }] }),
+      stripe: {} as never,
+      userId: "u1",
+      cancel: false,
+    })).rejects.toBeInstanceOf(AlreadyLifetimePurchaseError);
   });
 });
 

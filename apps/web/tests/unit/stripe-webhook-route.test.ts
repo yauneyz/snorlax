@@ -14,6 +14,13 @@ const mocks = vi.hoisted(() => ({
   captureException: vi.fn(),
   track: vi.fn(),
   sendInsightsPush: vi.fn(),
+  fulfillLifetimeCheckoutSession: vi.fn(),
+  refundLifetimePurchase: vi.fn(),
+}));
+
+vi.mock("@/lib/stripe/lifetime", () => ({
+  fulfillLifetimeCheckoutSession: mocks.fulfillLifetimeCheckoutSession,
+  refundLifetimePurchase: mocks.refundLifetimePurchase,
 }));
 
 vi.mock("@/lib/stripe/client", () => ({
@@ -108,6 +115,8 @@ beforeEach(() => {
   mocks.sendEmail.mockResolvedValue({ id: "email_123" });
   mocks.captureException.mockResolvedValue(undefined);
   mocks.sendInsightsPush.mockResolvedValue(undefined);
+  mocks.fulfillLifetimeCheckoutSession.mockResolvedValue(true);
+  mocks.refundLifetimePurchase.mockResolvedValue(false);
 });
 
 describe("POST /api/stripe/webhook", () => {
@@ -160,6 +169,28 @@ describe("POST /api/stripe/webhook", () => {
     expect(mocks.syncSubscription).toHaveBeenCalledWith(subscription);
   });
 
+  it("fulfills both immediate and delayed one-time payments", async () => {
+    for (const [index, type] of ["checkout.session.completed", "checkout.session.async_payment_succeeded"].entries()) {
+      const response = await POST(request(event(type, `evt_lifetime_${index}`, {
+        id: `cs_lifetime_${index}`, mode: "payment", payment_status: "paid", subscription: null,
+      })));
+      expect(response.status).toBe(200);
+    }
+    expect(mocks.fulfillLifetimeCheckoutSession).toHaveBeenCalledTimes(2);
+    expect(mocks.fulfillLifetimeCheckoutSession).toHaveBeenCalledWith("cs_lifetime_0");
+    expect(mocks.fulfillLifetimeCheckoutSession).toHaveBeenCalledWith("cs_lifetime_1");
+  });
+
+  it("retries a paid lifetime event when fulfillment fails", async () => {
+    mocks.fulfillLifetimeCheckoutSession.mockRejectedValueOnce(new Error("Database unavailable"));
+    const payload = event("checkout.session.async_payment_succeeded", "evt_lifetime_retry", {
+      id: "cs_lifetime_retry", mode: "payment", payment_status: "paid", subscription: null,
+    });
+    expect((await POST(request(payload))).status).toBe(500);
+    expect(state.processed.has("evt_lifetime_retry")).toBe(false);
+    expect((await POST(request(payload))).status).toBe(200);
+  });
+
   it("sends a celebratory push only when a subscription becomes paid", async () => {
     const paid = {
       ...subscription,
@@ -210,6 +241,9 @@ describe("POST /api/stripe/webhook", () => {
 
     expect(failed.status).toBe(200);
     expect(refunded.status).toBe(200);
+    expect(mocks.refundLifetimePurchase).toHaveBeenCalledWith(expect.objectContaining({
+      customer: "cus_123", amount_refunded: 725,
+    }));
     expect(mocks.sendEmail).toHaveBeenCalledWith({
       to: "billing@example.com",
       template: "PaymentFailed",
@@ -224,6 +258,17 @@ describe("POST /api/stripe/webhook", () => {
       template: "RefundIssued",
       props: expect.objectContaining({ amount: 725, currency: "usd" }),
     });
+  });
+
+  it("retries a refund event if lifetime access could not be updated", async () => {
+    mocks.refundLifetimePurchase.mockRejectedValueOnce(new Error("Database unavailable"));
+    const payload = event("charge.refunded", "evt_refund_retry", {
+      customer: "cus_123", amount: 14900, amount_refunded: 14900,
+      payment_intent: "pi_lifetime", currency: "usd",
+    });
+    expect((await POST(request(payload))).status).toBe(500);
+    expect(state.processed.has("evt_refund_retry")).toBe(false);
+    expect((await POST(request(payload))).status).toBe(200);
   });
 
   it("warns before the first charge when a trial is about to end", async () => {

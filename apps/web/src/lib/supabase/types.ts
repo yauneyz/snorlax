@@ -44,6 +44,15 @@ export type EntitlementGrantRow = {
   revoked_at: string | null;
 };
 
+/** Paid one-time purchase; each Checkout Session has its own refund state. */
+export type LifetimePurchaseRow = {
+  checkout_session_id: string;
+  user_id: string;
+  payment_intent_id: string | null;
+  purchased_at: string;
+  refunded_at: string | null;
+};
+
 /** Redemption code for a complimentary grant. Server-only: the row holds a secret's hash. */
 export type CompCodeRow = {
   id: string;
@@ -59,7 +68,7 @@ export type CompCodeRow = {
 /** Union of live subscriptions and active grants — the single "is this user entitled?" read. */
 export type ActiveEntitlementRow = {
   user_id: string;
-  source: "subscription" | "grant";
+  source: "subscription" | "grant" | "lifetime_purchase";
   status: string;
   current_period_end: string | null;
 };

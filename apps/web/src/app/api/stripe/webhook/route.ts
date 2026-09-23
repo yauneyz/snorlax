@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import type Stripe from "stripe";
 import { getStripe } from "@/lib/stripe/client";
 import { syncSubscription } from "@/lib/stripe/sync-subscription";
+import { fulfillLifetimeCheckoutSession, refundLifetimePurchase } from "@/lib/stripe/lifetime";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { sendEmail } from "@/lib/resend/send";
 import { config } from "@/lib/config";
@@ -15,6 +16,7 @@ export const runtime = "nodejs";
 
 const relevantEvents = new Set<Stripe.Event["type"]>([
   "checkout.session.completed",
+  "checkout.session.async_payment_succeeded",
   "customer.subscription.created",
   "customer.subscription.updated",
   "customer.subscription.deleted",
@@ -64,13 +66,16 @@ export async function POST(request: NextRequest) {
 
   try {
     switch (event.type) {
-      case "checkout.session.completed": {
+      case "checkout.session.completed":
+      case "checkout.session.async_payment_succeeded": {
         const session = event.data.object as Stripe.Checkout.Session;
         if (session.subscription) {
           const subId =
             typeof session.subscription === "string" ? session.subscription : session.subscription.id;
           const subscription = await stripe.subscriptions.retrieve(subId, { expand: ["customer"] });
           await syncSubscription(subscription);
+        } else if (session.mode === "payment") {
+          await fulfillLifetimeCheckoutSession(session.id);
         }
         break;
       }
@@ -99,7 +104,9 @@ export async function POST(request: NextRequest) {
         break;
       }
       case "charge.refunded": {
-        await notify(event, () => notifyRefund(event.data.object as Stripe.Charge));
+        const charge = event.data.object as Stripe.Charge;
+        await refundLifetimePurchase(charge);
+        await notify(event, () => notifyRefund(charge));
         break;
       }
     }

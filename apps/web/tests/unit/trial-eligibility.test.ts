@@ -5,14 +5,14 @@ import {
   PRO_PRICE_CENTS,
   PRO_TRIAL_DAYS,
 } from "@talysman/product";
-import { createCheckoutSession, isEligibleForTrial } from "@talysman/billing-server";
+import { AlreadyLifetimePurchaseError, createCheckoutSession, isEligibleForTrial } from "@talysman/billing-server";
 
 /**
  * Minimal stand-in for the Supabase table client. `subscriptionRows` is what a
  * `subscriptions` lookup returns; everything else is the happy-path profile read
  * `createCheckoutSession` performs first.
  */
-function db(opts: { subscriptionRows?: unknown[]; subscriptionError?: { message: string } } = {}) {
+function db(opts: { subscriptionRows?: unknown[]; subscriptionError?: { message: string }; lifetimeRows?: unknown[] } = {}) {
   return {
     from(table: string) {
       if (table === "subscriptions") {
@@ -24,6 +24,15 @@ function db(opts: { subscriptionRows?: unknown[]; subscriptionError?: { message:
           select: () => chain,
           eq: () => chain,
           limit: async () => result,
+        };
+        return chain;
+      }
+      if (table === "lifetime_purchases") {
+        const chain = {
+          select: () => chain,
+          eq: () => chain,
+          is: () => chain,
+          limit: async () => ({ data: opts.lifetimeRows ?? [], error: null }),
         };
         return chain;
       }
@@ -50,12 +59,15 @@ const billingConfig = {
   appUrl: "https://example.test",
   priceMonthly: "price_m",
   priceYearly: "price_y",
+  priceLifetime: "price_l",
 };
 
 /** The subset of the Checkout params these tests assert on. */
 type CheckoutArgs = {
+  mode: string;
   line_items: { price: string }[];
-  subscription_data: { trial_period_days?: number };
+  subscription_data?: { trial_period_days?: number };
+  payment_intent_data?: { metadata: { user_id: string; purpose: string } };
 };
 
 function stripeStub(create: (args: CheckoutArgs) => Promise<{ url: string }>) {
@@ -98,7 +110,7 @@ describe("checkout session trial wiring", () => {
     });
 
     const args = create.mock.calls[0]![0];
-    expect(args.subscription_data.trial_period_days).toBe(PRO_TRIAL_DAYS);
+    expect(args.subscription_data?.trial_period_days).toBe(PRO_TRIAL_DAYS);
     expect(args.line_items[0]!.price).toBe("price_y");
   });
 
@@ -116,6 +128,30 @@ describe("checkout session trial wiring", () => {
     const args = create.mock.calls[0]![0];
     // Absent, not zero — Stripe treats `trial_period_days: 0` as an error.
     expect(args.subscription_data).not.toHaveProperty("trial_period_days");
+  });
+
+  it("uses one-time payment mode without a trial for lifetime", async () => {
+    const create = vi.fn(async (_args: CheckoutArgs) => ({ url: "https://checkout.test/x" }));
+    await createCheckoutSession({
+      db: db(), stripe: stripeStub(create), config: billingConfig,
+      userId: "user-1", userEmail: "a@b.test", price: "lifetime",
+    });
+    expect(create.mock.calls[0]![0]).toMatchObject({
+      mode: "payment",
+      line_items: [{ price: "price_l" }],
+      payment_intent_data: { metadata: { user_id: "user-1", purpose: "lifetime_pro" } },
+    });
+    expect(create.mock.calls[0]![0].subscription_data).toBeUndefined();
+  });
+
+  it("refuses another checkout while lifetime access is active", async () => {
+    const create = vi.fn(async (_args: CheckoutArgs) => ({ url: "https://checkout.test/x" }));
+    await expect(createCheckoutSession({
+      db: db({ lifetimeRows: [{ checkout_session_id: "cs_paid" }] }),
+      stripe: stripeStub(create), config: billingConfig,
+      userId: "user-1", userEmail: "a@b.test", price: "monthly",
+    })).rejects.toBeInstanceOf(AlreadyLifetimePurchaseError);
+    expect(create).not.toHaveBeenCalled();
   });
 });
 

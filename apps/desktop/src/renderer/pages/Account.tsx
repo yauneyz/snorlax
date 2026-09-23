@@ -233,11 +233,14 @@ export function Account({ onUpgrade }: { onUpgrade: () => void }) {
                 · billed {detail.price === 'yearly' ? 'yearly' : 'monthly'}
               </span>
             )}
-            {signedIn && detail?.hasSubscription && !detail.price && (
+            {signedIn && detail?.hasSubscription && !detail.price && detail.status !== 'lifetime' && (
               <span className="text-slate-400">· billing plan unavailable</span>
             )}
             {signedIn && detail?.status === 'comped' && (
               <span className="text-slate-400">· complimentary</span>
+            )}
+            {signedIn && detail?.status === 'lifetime' && (
+              <span className="text-slate-400">· lifetime</span>
             )}
             {signedIn && detail?.status === 'past_due' && (
               <Badge tone="danger">Payment issue</Badge>
@@ -268,12 +271,12 @@ export function Account({ onUpgrade }: { onUpgrade: () => void }) {
               >
                 Manage billing
               </Button>
-            ) : detail && detail.status !== 'comped' ? (
+            ) : detail && detail.status !== 'comped' && detail.status !== 'lifetime' ? (
               <Button disabled={busy} onClick={onUpgrade}>
                 Upgrade to Pro
               </Button>
             ) : null}
-            {detail?.hasSubscription &&
+            {detail?.hasSubscription && detail.status !== 'lifetime' &&
               (detail.cancelAtPeriodEnd ? (
                 <Button
                   disabled={busy}

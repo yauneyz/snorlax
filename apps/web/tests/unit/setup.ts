@@ -9,6 +9,7 @@ process.env.STRIPE_SECRET_KEY ??= "sk_test_xxx";
 process.env.STRIPE_WEBHOOK_SECRET ??= "whsec_xxx";
 process.env.STRIPE_PRICE_MONTHLY ??= "price_monthly";
 process.env.STRIPE_PRICE_YEARLY ??= "price_yearly";
+process.env.STRIPE_PRICE_LIFETIME ??= "price_lifetime";
 process.env.RESEND_API_KEY ??= "re_test_xxx";
 process.env.RESEND_FROM ??= "Test <test@example.com>";
 process.env.APP_ENVIRONMENT ??= "development";

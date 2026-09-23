@@ -75,6 +75,7 @@ const serverSchemaBase = publicSchema.extend({
   STRIPE_WEBHOOK_SECRET: z.string().min(1),
   STRIPE_PRICE_MONTHLY: z.string().min(1),
   STRIPE_PRICE_YEARLY: z.string().min(1),
+  STRIPE_PRICE_LIFETIME: z.string().min(1),
   STRIPE_PORTAL_CONFIG_ID: z.string().optional().default(""),
   RESEND_API_KEY: z.string().min(1),
   RESEND_FROM: z.string().min(1),
@@ -258,6 +259,7 @@ export const config = {
     webhookSecret: isServer ? (parsed as z.infer<typeof serverSchema>).STRIPE_WEBHOOK_SECRET : "",
     priceMonthly: isServer ? (parsed as z.infer<typeof serverSchema>).STRIPE_PRICE_MONTHLY : "",
     priceYearly: isServer ? (parsed as z.infer<typeof serverSchema>).STRIPE_PRICE_YEARLY : "",
+    priceLifetime: isServer ? (parsed as z.infer<typeof serverSchema>).STRIPE_PRICE_LIFETIME : "",
     portalConfigId: isServer
       ? (parsed as z.infer<typeof serverSchema>).STRIPE_PORTAL_CONFIG_ID
       : "",

@@ -37,6 +37,7 @@ const LIVE_CREDENTIAL_FIELDS = /** @type {const} */ ([
   ["webhook_secret_live", /^whsec_/, "whsec_"],
   ["price_id_monthly_live", /^price_/, "price_"],
   ["price_id_yearly_live", /^price_/, "price_"],
+  ["price_id_lifetime_live", /^price_/, "price_"],
 ]);
 
 /**

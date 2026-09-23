@@ -3,7 +3,9 @@ import type { Policy, Profile, Schedule } from '@talysman/shared';
 import { resolveActiveProfile } from '@talysman/shared';
 
 export const SUBSCRIPTION_PLANS = ['free', 'pro'] as const;
-export const CHECKOUT_PRICES = ['monthly', 'yearly'] as const;
+export const CHECKOUT_PRICES = ['monthly', 'yearly', 'lifetime'] as const;
+/** The two recurring cycles — excludes 'lifetime', which is a one-time payment, not a cycle. */
+export const RECURRING_CHECKOUT_PRICES = ['monthly', 'yearly'] as const;
 export const FREE_BLOCKED_SITE_LIMIT = 5;
 /** Free keeps a single blocking profile; Pro is unlimited. */
 export const FREE_PROFILE_LIMIT = 1;
@@ -43,7 +45,7 @@ export const PRO_TRIAL_DAYS = 14;
 export const PRO_PRICE_CENTS = {
   monthly: 499,
   yearly: 4999,
-} as const satisfies Record<CheckoutPrice, number>;
+} as const satisfies Record<(typeof RECURRING_CHECKOUT_PRICES)[number], number>;
 
 /**
  * The list price early-adopter pricing is discounted from — not a Stripe price, display only,
@@ -52,13 +54,13 @@ export const PRO_PRICE_CENTS = {
 export const PRO_LIST_PRICE_CENTS = {
   monthly: 1000,
   yearly: 10000,
-} as const satisfies Record<CheckoutPrice, number>;
+} as const satisfies Record<(typeof RECURRING_CHECKOUT_PRICES)[number], number>;
 
 /** What a year on the annual plan saves against twelve monthly charges, in cents. */
 export const PRO_ANNUAL_SAVINGS_CENTS = PRO_PRICE_CENTS.monthly * 12 - PRO_PRICE_CENTS.yearly;
 
 /** The early-adopter discount off list price, as a whole percent — same function for both cycles. */
-export function proDiscountPercent(cycle: CheckoutPrice): number {
+export function proDiscountPercent(cycle: (typeof RECURRING_CHECKOUT_PRICES)[number]): number {
   return Math.round(
     ((PRO_LIST_PRICE_CENTS[cycle] - PRO_PRICE_CENTS[cycle]) / PRO_LIST_PRICE_CENTS[cycle]) * 100,
   );
@@ -66,6 +68,9 @@ export function proDiscountPercent(cycle: CheckoutPrice): number {
 
 /** The annual plan's cost per week, in cents — backs the "less than $1/week" copy. */
 export const PRO_ANNUAL_WEEKLY_CENTS = PRO_PRICE_CENTS.yearly / 52;
+
+/** One-time price for permanent Pro access, in cents — no cycle, no renewal. */
+export const LIFETIME_PRICE_CENTS = 14900;
 
 /**
  * Cents as a display price: `$10`, `$8.33`. Fractional cents round *down* so an

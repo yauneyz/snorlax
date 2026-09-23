@@ -40,7 +40,9 @@ export default async function AccountPage() {
     detailResult.unavailable &&
     (graceCookie === undefined || entitlementGraceCookieIsValid(graceCookie, user.id));
   const planLabel = detail
-    ? detail.status === "comped"
+    ? detail.status === "lifetime"
+      ? "Pro (lifetime)"
+      : detail.status === "comped"
       ? "Pro (complimentary)"
       : detail.hasSubscription
         ? detail.plan === "pro"
@@ -72,7 +74,7 @@ export default async function AccountPage() {
           <dt>Email</dt>
           <dd>{profile?.email ?? user.email}</dd>
           {detail?.status &&
-          !["active", "trialing", "comped"].includes(detail.status) ? (
+          !["active", "trialing", "comped", "lifetime"].includes(detail.status) ? (
             <>
               <dt>Billing status</dt>
               <dd>{detail.status.replaceAll("_", " ")}</dd>
@@ -92,7 +94,7 @@ export default async function AccountPage() {
             <div className="account__plan-actions">
               <ManageBillingButton />
             </div>
-          ) : detailResult.unavailable || detail?.status === "comped" ? null : (
+          ) : detailResult.unavailable || ["comped", "lifetime"].includes(detail?.status ?? "") ? null : (
             <div className="account__plan-actions">
               <Link href="/pricing" className="account__subscribe">
                 Upgrade to Pro

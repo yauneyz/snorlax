@@ -22,6 +22,7 @@ export interface BillingConfig {
   appUrl: string;
   priceMonthly: string;
   priceYearly: string;
+  priceLifetime: string;
   portalConfigId?: string;
   successUrl?: string;
   cancelUrl?: string;
@@ -43,12 +44,11 @@ interface PortalProfile {
 }
 
 /**
- * A row of `active_entitlements`: either a live Stripe subscription or a
- * complimentary grant (see migration 0004). `current_period_end` is null for a
- * lifetime grant.
+ * A row of `active_entitlements`: a subscription, complimentary grant, or
+ * lifetime purchase. `current_period_end` is null for permanent access.
  */
 interface ActiveEntitlementRow {
-  source?: 'subscription' | 'grant';
+  source?: 'subscription' | 'grant' | 'lifetime_purchase';
   status?: string;
   current_period_end?: string | null;
 }
@@ -82,6 +82,13 @@ export class NoActiveSubscriptionError extends Error {
   }
 }
 
+export class AlreadyLifetimePurchaseError extends Error {
+  constructor() {
+    super('Lifetime Pro is already active for this account.');
+    this.name = 'AlreadyLifetimePurchaseError';
+  }
+}
+
 export function createStripeClient(config: StripeClientConfig): Stripe {
   return new Stripe(config.secretKey, {
     apiVersion: STRIPE_API_VERSION,
@@ -94,6 +101,7 @@ export function createStripeClient(config: StripeClientConfig): Stripe {
 
 export function priceIdForCheckoutPrice(price: CheckoutPrice, config: BillingConfig): string {
   const parsed = checkoutPriceSchema.parse(price);
+  if (parsed === 'lifetime') return config.priceLifetime;
   return parsed === 'yearly' ? config.priceYearly : config.priceMonthly;
 }
 
@@ -142,6 +150,7 @@ export async function createCheckoutSession(args: {
     .single();
   const profile = rawProfile as CheckoutProfile | null;
   if (error || !profile) throw new Error(`Profile not found for user ${userId}`);
+  if (await hasActiveLifetimePurchase({ db, userId })) throw new AlreadyLifetimePurchaseError();
 
   let customerId = profile.stripe_customer_id;
   if (!customerId) {
@@ -176,10 +185,11 @@ export async function createCheckoutSession(args: {
     }
   }
 
-  const trialing = await isEligibleForTrial({ db, userId });
+  const lifetime = checkoutPriceSchema.parse(price) === 'lifetime';
+  const trialing = !lifetime && (await isEligibleForTrial({ db, userId }));
 
   const session = await stripe.checkout.sessions.create({
-    mode: 'subscription',
+    mode: lifetime ? 'payment' : 'subscription',
     customer: customerId,
     line_items: [{ price: priceIdForCheckoutPrice(price, config), quantity: 1 }],
     allow_promotion_codes: true,
@@ -188,12 +198,16 @@ export async function createCheckoutSession(args: {
       `${config.appUrl}/api/stripe/checkout/success?session_id={CHECKOUT_SESSION_ID}`,
     cancel_url: config.cancelUrl ?? `${config.appUrl}/pricing?checkout=cancelled`,
     client_reference_id: userId,
-    subscription_data: {
-      metadata: { user_id: userId },
-      // A card is still collected up front (Checkout's default for subscriptions), so
-      // the trial converts on its own and `missing_payment_method` never applies.
-      ...(trialing ? { trial_period_days: PRO_TRIAL_DAYS } : {}),
-    },
+    ...(lifetime
+      ? { payment_intent_data: { metadata: { user_id: userId, purpose: 'lifetime_pro' } } }
+      : {
+          subscription_data: {
+            metadata: { user_id: userId },
+            // A card is still collected up front (Checkout's default for subscriptions), so
+            // the trial converts on its own and `missing_payment_method` never applies.
+            ...(trialing ? { trial_period_days: PRO_TRIAL_DAYS } : {}),
+          },
+        }),
   });
 
   if (!session.url) throw new Error('Stripe did not return a Checkout URL');
@@ -277,6 +291,9 @@ export async function getUserEntitlement(args: {
     .from('active_entitlements')
     .select('source,status,current_period_end')
     .eq('user_id', userId)
+    // One grant at most; sorting puts a lifetime purchase in the first two rows
+    // even if several subscription projections remain active.
+    .order('source', { ascending: true })
     .limit(2);
   if (error) throw new Error(`Failed to load entitlement: ${error.message}`);
 
@@ -286,9 +303,12 @@ export async function getUserEntitlement(args: {
       ? [data as ActiveEntitlementRow]
       : [];
 
-  // A paying subscription and a comp can coexist; report the paid one so the
-  // billing UI keeps showing renewal state.
-  const entitled = rows.find((row) => row.source === 'subscription') ?? rows[0];
+  // A lifetime purchase takes precedence over subscriptions and comps. For a
+  // subscription plus a comp, retain the renewal state until billing ends.
+  const entitled =
+    rows.find((row) => row.source === 'lifetime_purchase') ??
+    rows.find((row) => row.source === 'subscription') ??
+    rows[0];
 
   const timing = {
     fetchedAt: now.toISOString(),
@@ -330,6 +350,64 @@ export async function getUserEntitlement(args: {
     ...(entitled.current_period_end ? { currentPeriodEnd: entitled.current_period_end } : {}),
     ...timing,
   });
+}
+
+/** A refunded purchase is never reactivated by a retried success event. */
+export async function recordLifetimePurchase(args: {
+  db: SupabaseTableClient;
+  userId: string;
+  checkoutSessionId: string;
+  paymentIntentId: string | null;
+}): Promise<boolean> {
+  const { db, userId, checkoutSessionId, paymentIntentId } = args;
+  const { error } = await db.from('lifetime_purchases').upsert(
+    {
+      checkout_session_id: checkoutSessionId,
+      user_id: userId,
+      payment_intent_id: paymentIntentId,
+    },
+    { onConflict: 'checkout_session_id', ignoreDuplicates: true },
+  );
+  if (error) {
+    throw new Error(`Failed to record lifetime purchase ${checkoutSessionId}: ${error.message}`);
+  }
+  const { data, error: readError } = await db.from('lifetime_purchases')
+    .select('refunded_at').eq('checkout_session_id', checkoutSessionId).single();
+  if (readError || !data) {
+    throw new Error(`Failed to verify lifetime purchase ${checkoutSessionId}: ${readError?.message}`);
+  }
+  return data.refunded_at === null;
+}
+
+/** A full refund applies to its own Checkout Session, even if it arrived first. */
+export async function recordLifetimeRefund(args: {
+  db: SupabaseTableClient;
+  userId: string;
+  checkoutSessionId: string;
+  paymentIntentId: string;
+}): Promise<void> {
+  const { db, userId, checkoutSessionId, paymentIntentId } = args;
+  const { error } = await db.from('lifetime_purchases').upsert(
+    {
+      checkout_session_id: checkoutSessionId,
+      user_id: userId,
+      payment_intent_id: paymentIntentId,
+      refunded_at: new Date().toISOString(),
+    },
+    { onConflict: 'checkout_session_id' },
+  );
+  if (error) throw new Error(`Failed to record lifetime refund ${checkoutSessionId}: ${error.message}`);
+}
+
+export async function hasActiveLifetimePurchase(args: {
+  db: SupabaseTableClient;
+  userId: string;
+}): Promise<boolean> {
+  const { db, userId } = args;
+  const { data, error } = await db.from('lifetime_purchases')
+    .select('checkout_session_id').eq('user_id', userId).is('refunded_at', null).limit(1);
+  if (error) throw new Error(`Failed to load lifetime purchase: ${error.message}`);
+  return Array.isArray(data) ? data.length > 0 : Boolean(data);
 }
 
 /** Whether the user holds an active complimentary grant (see migration 0004). */
@@ -385,7 +463,21 @@ export async function getSubscriptionDetail(args: {
   now?: Date;
 }): Promise<SubscriptionDetail> {
   const { db, config, userId, now = new Date() } = args;
+  const lifetime = await hasActiveLifetimePurchase({ db, userId });
   const sub = await findCurrentSubscription(db, userId);
+  if (lifetime) {
+    // If cancellation is still pending, keep billing controls visible so the
+    // customer can see and manage the remaining recurring subscription.
+    return sub
+      ? {
+          hasSubscription: true,
+          plan: 'pro',
+          status: 'lifetime',
+          cancelAtPeriodEnd: sub.cancel_at_period_end,
+          currentPeriodEnd: sub.current_period_end,
+        }
+      : { hasSubscription: false, plan: 'pro', status: 'lifetime' };
+  }
   if (!sub) {
     // Comped accounts have no Stripe customer, so `hasSubscription` stays false
     // (it gates the billing-portal button, which would throw for them) while the
@@ -430,6 +522,9 @@ export async function setCancelAtPeriodEnd(args: {
   cancel: boolean;
 }): Promise<void> {
   const { db, stripe, userId, cancel } = args;
+  if (!cancel && await hasActiveLifetimePurchase({ db, userId })) {
+    throw new AlreadyLifetimePurchaseError();
+  }
   const sub = await findCurrentSubscription(db, userId);
   if (!sub) throw new NoActiveSubscriptionError();
 

@@ -144,6 +144,7 @@ export default async function PricingPage() {
         proFeatures={proFeatures}
         trialAvailable={trialAvailable}
         alreadyPro={detail?.plan === "pro"}
+        alreadyLifetime={detail?.status === "lifetime"}
       />
 
       <section className="faq faq--pricing" id="faq">

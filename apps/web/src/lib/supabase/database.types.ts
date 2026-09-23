@@ -24,6 +24,7 @@ import type {
   AnalyticsVisitorBreakdownRow,
   CompCodeRow,
   EntitlementGrantRow,
+  LifetimePurchaseRow,
   ProfileRow,
   SmartFilterJudgeUsageRow,
   StripeEventRow,
@@ -55,6 +56,13 @@ export type Database = {
         Insert: Omit<EntitlementGrantRow, "granted_at" | "plan"> &
           Partial<Pick<EntitlementGrantRow, "granted_at" | "plan">>;
         Update: Partial<EntitlementGrantRow>;
+        Relationships: [];
+      };
+      lifetime_purchases: {
+        Row: LifetimePurchaseRow;
+        Insert: Pick<LifetimePurchaseRow, "checkout_session_id" | "user_id"> &
+          Partial<Omit<LifetimePurchaseRow, "checkout_session_id" | "user_id">>;
+        Update: Partial<LifetimePurchaseRow>;
         Relationships: [];
       };
       comp_codes: {

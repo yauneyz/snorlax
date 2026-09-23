@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireBearerUser, UnauthorizedError } from "@/lib/auth/require-bearer-user";
 import { captureException } from "@/lib/sentry";
+import { AlreadyLifetimePurchaseError } from "@talysman/billing-server";
 import {
   getSubscriptionDetailForUser,
   setSubscriptionCancelAtPeriodEnd,
@@ -19,6 +20,9 @@ export async function POST(request: NextRequest) {
     }
     if (err instanceof NoActiveSubscriptionError) {
       return NextResponse.json({ error: err.message }, { status: 404 });
+    }
+    if (err instanceof AlreadyLifetimePurchaseError) {
+      return NextResponse.json({ error: err.message }, { status: 409 });
     }
     await captureException(err, { route: "desktop/subscription/resume" });
     return NextResponse.json({ error: "Could not resume the subscription" }, { status: 500 });

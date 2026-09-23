@@ -28,12 +28,24 @@ function fakeDb() {
   const builder = {
     select: vi.fn(() => builder),
     eq: vi.fn(() => builder),
+    is: vi.fn(() => builder),
     in: vi.fn(() => builder),
     order: vi.fn(() => builder),
     limit: vi.fn(async () => ({ data: rows, error: null })),
   };
   return {
-    from: vi.fn(() => ({ ...builder, upsert: upsertMock })),
+    from: vi.fn((table: string) => {
+      if (table === 'lifetime_purchases') {
+        const lifetimeBuilder = {
+          select: vi.fn(() => lifetimeBuilder),
+          eq: vi.fn(() => lifetimeBuilder),
+          is: vi.fn(() => lifetimeBuilder),
+          limit: vi.fn(async () => ({ data: [], error: null })),
+        };
+        return lifetimeBuilder;
+      }
+      return { ...builder, upsert: upsertMock };
+    }),
   };
 }
 

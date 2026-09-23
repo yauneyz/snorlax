@@ -141,8 +141,10 @@ const credentialsSchema = z.object({
     webhook_secret_live: z.string().min(1).optional().or(z.literal("")),
     price_id_monthly_test: z.string().min(1),
     price_id_yearly_test: z.string().min(1),
+    price_id_lifetime_test: z.string().min(1),
     price_id_monthly_live: z.string().optional().default(""),
     price_id_yearly_live: z.string().optional().default(""),
+    price_id_lifetime_live: z.string().optional().default(""),
     portal_configuration_id: z.string().optional().default(""),
   }),
   resend: z.object({
@@ -548,6 +550,7 @@ function stripeValues(c: Credentials, stripeMode: StripeMode) {
     webhookSecret: live ? c.stripe.webhook_secret_live : c.stripe.webhook_secret_test,
     priceMonthly: live ? c.stripe.price_id_monthly_live : c.stripe.price_id_monthly_test,
     priceYearly: live ? c.stripe.price_id_yearly_live : c.stripe.price_id_yearly_test,
+    priceLifetime: live ? c.stripe.price_id_lifetime_live : c.stripe.price_id_lifetime_test,
   };
 }
 
@@ -580,6 +583,7 @@ function toWebEnvPairs(c: Credentials, mode: Mode): Array<[string, string]> {
     ["STRIPE_WEBHOOK_SECRET", stripe.webhookSecret ?? ""],
     ["STRIPE_PRICE_MONTHLY", stripe.priceMonthly ?? ""],
     ["STRIPE_PRICE_YEARLY", stripe.priceYearly ?? ""],
+    ["STRIPE_PRICE_LIFETIME", stripe.priceLifetime ?? ""],
     ["STRIPE_PORTAL_CONFIG_ID", c.stripe.portal_configuration_id ?? ""],
 
     ["RESEND_API_KEY", c.resend.api_key],

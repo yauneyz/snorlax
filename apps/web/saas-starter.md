@@ -367,19 +367,21 @@ Matcher excludes `/_next`, `/api/stripe/webhook`, `/api/auth/callback`, static f
 ### Setup (one-time, manual in Stripe Dashboard)
 
 Documented in `saas-starter.md`:
-1. Create Product → add two Prices (monthly, yearly recurring).
+1. Create Product → add three Prices (monthly and yearly recurring, lifetime one-time). Put the test and live lifetime price IDs in `.credentials`.
 2. Configure Customer Portal → enable: cancel, update payment method, view invoices, switch between the two prices. Save `bpc_...` id into `.credentials`.
 3. Enable **automatic receipts** in Stripe settings (handles invoice/receipt emails for free).
-4. Add webhook endpoint `https://<app-url>/api/stripe/webhook` subscribed to: `checkout.session.completed`, `customer.subscription.created`, `customer.subscription.updated`, `customer.subscription.deleted`, `invoice.payment_succeeded`, `invoice.payment_failed`, `charge.refunded`. Copy the `whsec_...` into `.credentials` (both test and live).
+4. Add webhook endpoint `https://<app-url>/api/stripe/webhook` subscribed to: `checkout.session.completed`, `checkout.session.async_payment_succeeded`, `customer.subscription.created`, `customer.subscription.updated`, `customer.subscription.deleted`, `invoice.payment_succeeded`, `invoice.payment_failed`, `charge.refunded`. Copy the `whsec_...` into `.credentials` (both test and live).
 5. For Google OAuth: add redirect URI `https://<supabase-project>.supabase.co/auth/v1/callback` in GCP; paste client id/secret into Supabase Auth settings → Google provider.
+
+When rolling out lifetime access, apply migrations `0013` and `0014` before deploying the web code. Add `checkout.session.async_payment_succeeded` to the live Stripe webhook endpoint after the new handler is deployed, so an older handler cannot acknowledge and discard that event.
 
 ### Checkout — `POST /api/stripe/checkout`
 
-Body (Zod): `{ price: 'monthly' | 'yearly' }`.
+Body (Zod): `{ price: 'monthly' | 'yearly' | 'lifetime' }`.
 1. `requireUser()`.
 2. Load profile; if no `stripe_customer_id`, create a Stripe customer with `email` and `metadata.user_id`, store id on profile.
 3. Create Checkout Session:
-   - `mode: 'subscription'`, single line item from chosen price id, `customer: stripe_customer_id`, `allow_promotion_codes: true`.
+   - Recurring prices use `mode: 'subscription'`; lifetime uses `mode: 'payment'`. Both use one configured price, `customer: stripe_customer_id`, and promotion codes.
    - `success_url: ${APP_URL}/app?checkout=success`, `cancel_url: ${APP_URL}/pricing?checkout=cancelled`.
    - `client_reference_id: user_id` (belt-and-braces; webhook already has customer → user via metadata).
 4. Return `{ url }`. Client `window.location.assign(url)`.
@@ -397,16 +399,17 @@ Body (Zod): `{ price: 'monthly' | 'yearly' }`.
 - Verify signature with `STRIPE_WEBHOOK_SECRET` via `stripe.webhooks.constructEvent`.
 - Idempotency: upsert by Stripe ids; all handlers are idempotent by construction.
 - Handlers:
-  - `checkout.session.completed` → fetch expanded subscription → `syncSubscription()` upserts `subscriptions` row by `sub_...` id, resolves `user_id` from Stripe customer's metadata.
+  - `checkout.session.completed` → sync a subscription, or verify and record a paid lifetime Checkout Session.
+  - `checkout.session.async_payment_succeeded` → record a lifetime purchase after a delayed payment settles.
   - `customer.subscription.*` → `syncSubscription()`.
   - `invoice.payment_succeeded` → no-op (Stripe sends the receipt). Optionally log to PostHog.
   - `invoice.payment_failed` → `sendEmail(PaymentFailedEmail, { to: profile.email, invoiceUrl })` via Resend; PostHog `payment_failed` event.
-  - `charge.refunded` → `sendEmail(RefundIssuedEmail)`; PostHog event.
+  - `charge.refunded` → revoke only the fully refunded lifetime purchase, then send `RefundIssuedEmail`; PostHog event.
 - Always 200 after processing; return 400 on signature failure, 500 on handler exception (so Stripe retries).
 
 ### Refund flow
 
-Refunds are initiated from the **Stripe Dashboard** (or optionally via a small admin-only server action — out of scope for the starter). The webhook handler covers the outbound `charge.refunded` notification email.
+Refunds are initiated from the **Stripe Dashboard**. A full lifetime refund removes the matching paid entitlement; a partial refund keeps access. The webhook also sends the refund email.
 
 ---
 

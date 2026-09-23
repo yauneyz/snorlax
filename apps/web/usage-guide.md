@@ -268,7 +268,7 @@ Email side effects from webhooks:
 
 - `invoice.payment_failed` -> payment failed email
 - `customer.subscription.deleted` -> cancellation email
-- `charge.refunded` -> refund email
+- `charge.refunded` -> refund email and removal of access for a fully refunded lifetime purchase
 
 Important caveat:
 
