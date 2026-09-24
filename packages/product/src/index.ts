@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import type { Policy, Profile, Schedule } from '@talysman/shared';
-import { resolveActiveProfile } from '@talysman/shared';
+import { resolveActiveProfile, siteRuleUsesJudge } from '@talysman/shared';
 
 export const SUBSCRIPTION_PLANS = ['free', 'pro'] as const;
 export const CHECKOUT_PRICES = ['monthly', 'yearly', 'lifetime'] as const;
@@ -10,7 +10,7 @@ export const FREE_BLOCKED_SITE_LIMIT = 5;
 /** Free keeps a single blocking profile; Pro is unlimited. */
 export const FREE_PROFILE_LIMIT = 1;
 export const ENTITLEMENT_GRACE_PERIOD_MS = 30 * 24 * 60 * 60 * 1000;
-/** Pro-only per-user daily cap on LLM judge calls, enforced by the web `judge-intent` route. */
+/** Pro-only per-user daily cap on LLM judge calls, enforced by the web `judge` route. */
 export const SMART_FILTER_DAILY_JUDGE_LIMIT = 500;
 
 export type ProductEnvironment = 'development' | 'production';
@@ -22,8 +22,7 @@ export type ProductEnvironment = 'development' | 'production';
 export function productFeaturesForEnvironment(environment: ProductEnvironment) {
   void environment;
   return {
-    // Temporarily disabled in all environments, including development.
-    smartFiltering: false,
+    smartFiltering: true,
   } as const;
 }
 
@@ -135,7 +134,7 @@ export interface ProductLimits {
     maxBlockedDomains?: LimitedValue;
     maxAllowedDomains?: LimitedValue;
     maxApps?: LimitedValue;
-    /** Smart filtering (`Policy.intent`) has real per-page LLM cost — Pro-only. */
+    /** AI filtering (`Policy.judge` and any `judge` action) has real per-page LLM cost — Pro-only. */
     smartFilteringEnabled?: boolean;
     /** Built-in bulk category blocklists (`Policy.enabledPremadeLists`) — Pro-only. */
     premadeListsEnabled?: boolean;
@@ -152,7 +151,8 @@ export interface LimitViolation {
   field:
     | 'policy.blockedDomains'
     | 'policy.allowedDomains'
-    | 'policy.intent'
+    | 'policy.sites'
+    | 'policy.judge'
     | 'policy.apps'
     | 'policy.enabledPremadeLists'
     | 'profiles'
@@ -163,7 +163,8 @@ export interface LimitViolation {
 const FREE_LIMITS: ProductLimits = {
   policy: {
     // Only the block list was ever rate-limited on Free; the allow list (old "whitelist" mode)
-    // has always been unlimited there — carried forward unchanged.
+    // has always been unlimited there — carried forward unchanged. Site rules share this
+    // allowance: each enabled site counts as one blocked website.
     maxBlockedDomains: FREE_BLOCKED_SITE_LIMIT,
     maxApps: 0,
     smartFilteringEnabled: false,
@@ -239,6 +240,13 @@ export function maxProfiles(limits: ProductLimits | null): LimitedValue {
   return limits?.profiles?.max ?? null;
 }
 
+/** Whether the policy asks the AI judge for anything. */
+export function policyUsesJudge(policy: Policy): boolean {
+  return policy.judge !== null
+    || policy.defaultAction === 'judge'
+    || Object.entries(policy.sites ?? {}).some(([id, rule]) => siteRuleUsesJudge(id, rule));
+}
+
 export function validatePolicyForLimits(
   policy: Policy,
   limits: ProductLimits | null,
@@ -250,10 +258,11 @@ export function validatePolicyForLimits(
   const maxAllowed = maxAllowedDomains(limits);
   const maxApps = maxPolicyApps(limits);
 
-  if (maxBlocked !== null && policy.blockedDomains.length > maxBlocked) {
+  const siteCount = Object.keys(policy.sites ?? {}).length;
+  if (maxBlocked !== null && policy.blockedDomains.length + siteCount > maxBlocked) {
     violations.push({
-      field: 'policy.blockedDomains',
-      message: `Free supports up to ${maxBlocked} always-blocked websites.`,
+      field: siteCount > 0 && policy.blockedDomains.length <= maxBlocked ? 'policy.sites' : 'policy.blockedDomains',
+      message: `Free supports up to ${maxBlocked} blocked websites, including site rules.`,
     });
   }
 
@@ -264,10 +273,10 @@ export function validatePolicyForLimits(
     });
   }
 
-  if (policy.intent && !smartFilteringAllowed(limits)) {
+  if (policyUsesJudge(policy) && !smartFilteringAllowed(limits)) {
     violations.push({
-      field: 'policy.intent',
-      message: 'Smart filtering is a Pro feature.',
+      field: 'policy.judge',
+      message: 'AI filtering is a Pro feature.',
     });
   }
 
@@ -320,13 +329,33 @@ export function constrainPolicyToLimits(policy: Policy, limits: ProductLimits | 
   const maxAllowed = maxAllowedDomains(limits);
   const maxApps = maxPolicyApps(limits);
 
+  const blockedDomains =
+    maxBlocked === null ? policy.blockedDomains : policy.blockedDomains.slice(0, maxBlocked);
+  // Sites fill whatever blocked-website allowance the hard blocks leave, in order.
+  const siteEntries = Object.entries(policy.sites ?? {});
+  let sites = Object.fromEntries(
+    maxBlocked === null ? siteEntries : siteEntries.slice(0, Math.max(0, maxBlocked - blockedDomains.length)),
+  );
+  let defaultAction = policy.defaultAction;
+  let judge = policy.judge;
+  if (!smartFilteringAllowed(limits)) {
+    judge = null;
+    if (defaultAction === 'judge') defaultAction = policy.judge?.fallback ?? 'allow';
+    // A judged feature falls back to what AI filtering would have fallen back to.
+    const fallback = policy.judge?.fallback ?? 'allow';
+    sites = Object.fromEntries(Object.entries(sites).map(([id, rule]) => [id, {
+      features: Object.fromEntries(Object.entries(rule.features).map(([feature, action]) => [feature, action === 'judge' ? fallback : action])),
+    }]));
+  }
+
   return {
     ...policy,
-    blockedDomains:
-      maxBlocked === null ? policy.blockedDomains : policy.blockedDomains.slice(0, maxBlocked),
+    blockedDomains,
     allowedDomains:
       maxAllowed === null ? policy.allowedDomains : policy.allowedDomains.slice(0, maxAllowed),
-    intent: smartFilteringAllowed(limits) ? policy.intent : null,
+    defaultAction,
+    judge,
+    sites,
     apps: maxApps === null ? policy.apps : policy.apps.slice(0, maxApps),
     enabledPremadeLists: premadeListsAllowed(limits) ? policy.enabledPremadeLists : [],
   };

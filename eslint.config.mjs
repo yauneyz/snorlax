@@ -37,6 +37,7 @@ export default [
           allowDefaultProject: [
             "vitest.config.ts",
             "scripts/*.ts",
+            "scripts/lib/*.ts",
             "apps/desktop/electron.vite.config.ts",
           ],
         },

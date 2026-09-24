@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 /// The policy model is defined once in `talysman_common::policy` and re-exported here so every
 /// backend accepts and emits byte-identical JSON. Re-exported (rather than referenced through
 /// its full path) to keep `crate::model::Policy` working for the rest of this crate.
-pub use crate::policy::{AppRef, DefaultAction, Intent, Policy, PremadeListId};
+pub use crate::policy::{AppRef, DefaultAction, JudgePolicy, Policy, PremadeListId, RuleAction, SiteRule};
 
 /// A named policy the user can switch between (mirrors packages/shared/src/profile.ts). Focus
 /// enforces exactly one profile at a time; schedule windows may switch which one.

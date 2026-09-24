@@ -15,6 +15,9 @@ pub mod panic_log;
 pub mod policy;
 pub mod policy_match;
 pub mod premade_lists;
+pub mod site_catalog;
+pub mod natmsg_frames;
+pub mod natmsg_legacy;
 pub mod watchdog;
 
 /// Browser-store and sideload identities generated from `extension-identities.json`.

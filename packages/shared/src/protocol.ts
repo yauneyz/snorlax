@@ -12,6 +12,7 @@ import type { Profile } from './profile.js';
 import type { Schedule } from './schedule.js';
 import type { Settings, BrowserHealth } from './settings.js';
 import type { ErrorCode } from './constants.js';
+import type { JudgePage, JudgeVerdict } from './judge.js';
 
 // ---------------------------------------------------------------------------
 // Domain value types
@@ -118,7 +119,10 @@ export interface RequestMap {
    * only ever talk to the daemon, never to Electron.
    */
   setTrayIconEnabled: { params: { enabled: boolean }; result: Ok };
-  /** Desktop build capability; false makes `intent` inert without changing the policy contract. */
+  /**
+   * Desktop build capability; false resolves every `judge` action to `JudgePolicy.fallback`
+   * without changing the policy contract.
+   */
   setSmartFilteringEnabled: { params: { enabled: boolean }; result: Ok };
   /**
    * Liveness heartbeat from the browser extension, relayed by the native-messaging host
@@ -133,6 +137,8 @@ export interface RequestMap {
       sequence?: number;
       sentAt?: number;
       extensionVersion?: string;
+      /** Site-rule protocol generation of the extension build (diagnostic). */
+      siteCapability?: number;
       lockedActive?: boolean;
       health: BrowserHealth;
     };
@@ -161,17 +167,17 @@ export interface RequestMap {
   };
 
   /**
-   * Extension → (via natmsg) → service: a page under an `intent`-enabled profile fell through
-   * both hard lists and needs judging. Fire-and-forget; the service broadcasts `judgeRequested`
-   * for Electron to pick up and answers (or times out to `defaultAction`) via `judgeResult`.
+   * Extension → (via natmsg) → service: a rule resolved to `judge` for this page. Fire-and-forget;
+   * the service attaches the active `JudgePolicy`, broadcasts `judgeRequested` for Electron to
+   * pick up, and answers (or times out to `JudgePolicy.fallback`) via `judgeResult`.
    */
-  judgeRequest: { params: { requestId: string; url: string; extractedText: string }; result: Ok };
+  judgeRequest: { params: JudgePage & { requestId: string }; result: Ok };
   /**
    * Electron main → service: the verdict for a pending `judgeRequested`. Unknown/already-resolved
-   * `requestId`s are ignored (the timeout sweep may have already answered fail-closed).
+   * `requestId`s are ignored (the timeout sweep may have already answered with the fallback).
    */
   submitJudgeVerdict: {
-    params: { requestId: string; relevant: boolean; reason: string };
+    params: { requestId: string; verdict: JudgeVerdict; reason: string };
     result: Ok;
   };
 

@@ -52,7 +52,7 @@ pub fn is_app_blocked(policy: &Policy, image_name: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::model::{AppRef, DefaultAction};
+    use crate::model::{AppRef, RuleAction};
 
     #[test]
     fn wildcard_matches_subdomains() {
@@ -83,7 +83,7 @@ mod tests {
         // whitelist: allow only the listed domain, block everything else.
         p = Policy {
             allowed_domains: vec!["youtube.com".into()],
-            default_action: DefaultAction::Block,
+            default_action: RuleAction::Block,
             ..Policy::default()
         };
         assert!(!is_host_blocked(&p, "youtube.com"));
@@ -91,7 +91,7 @@ mod tests {
 
         // block-all: nothing on either list, block by default.
         p = Policy {
-            default_action: DefaultAction::Block,
+            default_action: RuleAction::Block,
             ..Policy::default()
         };
         assert!(is_host_blocked(&p, "youtube.com"));
@@ -102,7 +102,6 @@ mod tests {
     fn premade_list_blocks_without_wildcarding_shared_infra() {
         let p = Policy {
             enabled_premade_lists: vec![talysman_common::policy::PremadeListId::Shopping],
-            soft_blocked_sites: Vec::new(),
             ..Policy::default()
         };
         assert!(is_host_blocked(&p, "amazon.com"));

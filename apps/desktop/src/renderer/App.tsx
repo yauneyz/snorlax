@@ -29,12 +29,12 @@ const NAV: { route: Route; label: string }[] = [
 
 /** A short label summarizing the sidebar's active policy — mirrors the presets in Blocklists.tsx. */
 function policyModeLabel(policy: Policy): string {
-  if (SMART_FILTERING_ENABLED && policy.intent) return 'Smart';
+  if (SMART_FILTERING_ENABLED && policy.defaultAction === 'judge') return 'Smart';
   if (policy.defaultAction === 'block') {
     return SMART_FILTERING_ENABLED &&
       policy.blockedDomains.length === 0 &&
       policy.allowedDomains.length === 0 &&
-      (policy.softBlockedSites?.length ?? 0) === 0
+      Object.keys(policy.sites ?? {}).length === 0
       ? 'Block all'
       : 'Whitelist';
   }

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { normalizeDomain, normalizePolicy } from '@talysman/core';
 import type { Policy } from '@talysman/shared';
+import { EMPTY_POLICY } from '@talysman/shared';
 
 describe('normalizeDomain', () => {
   it('lowercases and strips scheme/path', () => {
@@ -29,7 +30,9 @@ describe('normalizePolicy', () => {
       blockedDomains: ['YouTube.com', 'youtube.com', 'not a domain', '*.reddit.com'],
       allowedDomains: [],
       defaultAction: 'allow',
-      intent: null,
+      judge: null,
+      enabledPremadeLists: [],
+      sites: {},
       apps: [
         { windowsImageName: 'Chrome.exe', label: 'Chrome' },
         { windowsImageName: 'chrome.exe', label: 'dup' },
@@ -51,7 +54,9 @@ describe('normalizePolicy', () => {
       blockedDomains: ['reddit.com'],
       allowedDomains: ['reddit.com', 'mail.google.com'],
       defaultAction: 'block',
-      intent: null,
+      judge: null,
+      enabledPremadeLists: [],
+      sites: {},
       apps: [],
     };
     const n = normalizePolicy(policy);
@@ -60,28 +65,41 @@ describe('normalizePolicy', () => {
     expect(n.rejected.map((r) => r.value)).toContain('reddit.com');
   });
 
-  it('drops an intent with a blank description', () => {
-    const policy: Policy = {
-      blockedDomains: [],
-      allowedDomains: [],
-      defaultAction: 'allow',
-      intent: { positive: '   ' },
-      apps: [],
-    };
-    const n = normalizePolicy(policy);
-    expect(n.intent).toBeNull();
+  it('drops a judge with no usable task and downgrades a judged default', () => {
+    const n = normalizePolicy({
+      ...EMPTY_POLICY,
+      defaultAction: 'judge',
+      judge: { tasks: [{ id: 'a', title: '   ' }], avoid: [], fallback: 'allow' },
+    });
+    expect(n.judge).toBeNull();
+    expect(n.defaultAction).toBe('allow');
   });
 
-  it('keeps a well-formed intent, dropping an empty negative field', () => {
-    const policy: Policy = {
-      blockedDomains: [],
-      allowedDomains: [],
-      defaultAction: 'block',
+  it('trims tasks and the avoid list, deduping ids', () => {
+    const n = normalizePolicy({
+      ...EMPTY_POLICY,
+      defaultAction: 'judge',
+      judge: {
+        tasks: [{ id: 'a', title: ' Port the parser ', notes: '  ' }, { id: 'a', title: 'Write docs' }],
+        avoid: ['  news ', 'news', ''],
+        fallback: 'block',
+      },
+    });
+    expect(n.judge).toEqual({
+      tasks: [{ id: 'a', title: 'Port the parser' }, { id: 'a-2', title: 'Write docs' }],
+      avoid: ['news'],
+      fallback: 'block',
+    });
+    expect(n.defaultAction).toBe('judge');
+  });
+
+  it('migrates a legacy intent into a judged default with the old default as fallback', () => {
+    const n = normalizePolicy({
+      blockedDomains: [], allowedDomains: [], defaultAction: 'block', apps: [],
       intent: { positive: 'Researching flights to Japan', negative: '   ' },
-      apps: [],
-    };
-    const n = normalizePolicy(policy);
-    expect(n.intent).toEqual({ positive: 'Researching flights to Japan' });
+    });
+    expect(n.defaultAction).toBe('judge');
+    expect(n.judge).toEqual({ tasks: [{ id: 'task-1', title: 'Researching flights to Japan' }], avoid: [], fallback: 'block' });
   });
 
   it('dedupes enabledPremadeLists and rejects unknown ids', () => {
@@ -89,12 +107,31 @@ describe('normalizePolicy', () => {
       blockedDomains: [],
       allowedDomains: [],
       defaultAction: 'allow',
-      intent: null,
+      judge: null,
+      sites: {},
       apps: [],
       enabledPremadeLists: ['shopping', 'shopping', 'nsfw', 'not-a-real-list' as never],
     };
     const n = normalizePolicy(policy);
     expect(n.enabledPremadeLists).toEqual(['shopping', 'nsfw']);
     expect(n.rejected.map((r) => r.value)).toContain('not-a-real-list');
+  });
+
+  it('migrates legacy soft-blocked sites to default site rules and rejects unknown ones', () => {
+    const normalized = normalizePolicy({
+      blockedDomains: [], allowedDomains: [], defaultAction: 'allow', apps: [], enabledPremadeLists: [],
+      softBlockedSites: ['x', 'youtube', 'unknown'],
+    });
+    expect(normalized.sites).toEqual({ x: { features: {} }, youtube: { features: {} } });
+    expect(normalized.rejected.map((item) => item.value)).toContain('unknown');
+  });
+
+  it('keeps meaningful feature overrides only', () => {
+    const normalized = normalizePolicy({
+      ...EMPTY_POLICY,
+      sites: { youtube: { features: { feed: 'allow', recommendations: 'block', essentials: 'block', bogus: 'allow', comments: 'maybe' as never } } },
+    });
+    expect(normalized.sites).toEqual({ youtube: { features: { feed: 'allow' } } });
+    expect(normalized.rejected.map((item) => item.value)).toEqual(expect.arrayContaining(['youtube.bogus', 'youtube.comments']));
   });
 });

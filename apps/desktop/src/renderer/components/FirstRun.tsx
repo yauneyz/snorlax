@@ -41,17 +41,15 @@ function applyPresetToPolicy(base: Policy, preset: ModePreset): Policy {
         ...base,
         allowedDomains: SMART_FILTERING_ENABLED ? base.allowedDomains : [],
         defaultAction: 'allow',
-        intent: null,
       };
     case 'whitelist':
       return {
         ...base,
         blockedDomains: SMART_FILTERING_ENABLED ? base.blockedDomains : [],
         defaultAction: 'block',
-        intent: null,
       };
     case 'block-all':
-      return { ...base, blockedDomains: [], allowedDomains: [], defaultAction: 'block', intent: null };
+      return { ...base, blockedDomains: [], allowedDomains: [], defaultAction: 'block' };
   }
 }
 

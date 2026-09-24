@@ -16,9 +16,9 @@ export function formatTime(ms: number): string {
 
 /** One-line description of what a profile blocks — used on the seal and in the profile rail. */
 export function profileSummary(profile: Profile): string {
-  const { blockedDomains, allowedDomains, defaultAction, intent, apps } = profile.policy;
-  const softCount = profile.policy.softBlockedSites?.length ?? 0;
-  const hasSmartIntent = SMART_FILTERING_ENABLED && intent !== null;
+  const { blockedDomains, allowedDomains, defaultAction, apps } = profile.policy;
+  const softCount = Object.keys(profile.policy.sites ?? {}).length;
+  const hasSmartIntent = SMART_FILTERING_ENABLED && defaultAction === 'judge';
   const isBlockAll =
     SMART_FILTERING_ENABLED &&
     defaultAction === 'block' &&
@@ -31,7 +31,7 @@ export function profileSummary(profile: Profile): string {
   if (isBlockAll) {
     sites = 'blocks everything';
   } else if (hasSmartIntent) {
-    sites = 'smart filtering';
+    sites = 'AI filter';
   } else if (defaultAction === 'block') {
     sites = `${allowedDomains.length} allowed site${allowedDomains.length === 1 ? '' : 's'}`;
   } else {
@@ -39,10 +39,10 @@ export function profileSummary(profile: Profile): string {
   }
 
   if (softCount > 0) {
-    const softLabel = `${softCount} soft block${softCount === 1 ? '' : 's'}`;
-    const onlySoftSites = defaultAction === 'allow'
-      ? blockedDomains.length === 0
-      : allowedDomains.length === 0;
+    const softLabel = `${softCount} site rule${softCount === 1 ? '' : 's'}`;
+    const onlySoftSites = defaultAction === 'block'
+      ? allowedDomains.length === 0
+      : blockedDomains.length === 0;
     sites = onlySoftSites ? softLabel : `${sites} · ${softLabel}`;
   }
 

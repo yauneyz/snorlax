@@ -1,5 +1,9 @@
 //! Tolerant parsing at the heartbeat boundary. Optional diagnostics may be absent, but malformed
-//! health data always fails closed. Blocking state itself has one canonical protocol-v4 shape.
+//! health data always fails closed.
+//!
+//! Site-rule capability is diagnostic only: an extension that can't enforce a site rule is sent a
+//! hard block for that site (see `natmsg_frames`), so it still enforces the policy and counts as
+//! healthy.
 
 use serde_json::{json, Value};
 
@@ -11,7 +15,8 @@ pub fn relay_heartbeat_params(frame: &Value, browser_pid: u32) -> Value {
         "sequence": optional_field(frame, "sequence"),
         "sentAt": optional_field(frame, "sentAt"),
         "extensionVersion": optional_field(frame, "extensionVersion"),
-        "softBlockCapability": optional_field(frame, "softBlockCapability"),
+        "siteCapability": optional_field(frame, "siteCapability"),
+        "softBlockCapability": optional_field(frame, "softBlockCapability"), // LEGACY-COMPAT(v5): read by v4 daemons
         "lockedActive": optional_field(frame, "lockedActive"),
         "health": frame.get("health").cloned().unwrap_or_else(|| json!({})),
     })
@@ -27,7 +32,7 @@ pub struct HeartbeatReport {
     pub browser: String,
     pub sequence: u64,
     pub extension_version: Option<String>,
-    pub soft_block_capable: bool,
+    pub site_capability: u64,
     pub healthy: bool,
 }
 
@@ -59,7 +64,7 @@ pub fn parse_service_heartbeat(params: &Value) -> HeartbeatReport {
             .and_then(Value::as_str)
             .filter(|version| !version.is_empty())
             .map(str::to_owned),
-        soft_block_capable: params.get("softBlockCapability").and_then(Value::as_u64) == Some(1),
+        site_capability: params.get("siteCapability").and_then(Value::as_u64).unwrap_or(0),
         healthy: can_block && permissions_ok,
     }
 }
@@ -76,6 +81,7 @@ mod tests {
             "sequence": 17,
             "sentAt": 1722470400000_u64,
             "extensionVersion": "0.5.0",
+            "siteCapability": 3,
             "softBlockCapability": 1,
             "lockedActive": true,
             "health": { "canBlock": true, "permissionsOk": true, "dnrRulesApplied": 3 }
@@ -86,12 +92,13 @@ mod tests {
         assert_eq!(report.sequence, 17);
         assert_eq!(report.extension_version.as_deref(), Some("0.5.0"));
         assert!(report.healthy);
-        assert!(report.soft_block_capable);
+        assert_eq!(report.site_capability, 3);
+        assert_eq!(params["softBlockCapability"], 1);
+        assert_eq!(parse_service_heartbeat(&json!({"softBlockCapability": 1})).site_capability, 0);
     }
 
     #[test]
     fn incomplete_or_false_health_fails_closed() {
-        assert!(!parse_service_heartbeat(&json!({"health": {"canBlock": true, "permissionsOk": true}})).soft_block_capable);
         for health in [
             json!({}),
             json!({ "canBlock": true }),

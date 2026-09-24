@@ -21,7 +21,7 @@ Codename used throughout: **Talysman**. Rename freely (`talysman` → your brand
 4. [The privileged service (enforcement layer)](#4-the-privileged-service-enforcement-layer)
 5. [USB pairing & presence detection](#5-usb-pairing--presence-detection)
 6. [The IPC protocol (UI ⇄ service)](#6-the-ipc-protocol-ui--service)
-7. [Policy model: blacklist / whitelist / block-all](#7-policy-model-blacklist--whitelist--block-all)
+7. [Blocking model](#7-blocking-model)
 8. [Schedule system](#8-schedule-system)
 9. [Focus on/off — the critical flows](#9-focus-onoff--the-critical-flows)
 10. [Auth (Supabase) & payments (Stripe)](#10-auth-supabase--payments-stripe)
@@ -462,38 +462,107 @@ rather than every local interactive user.
 
 ---
 
-## 7. Policy model: blacklist / whitelist / block-all
+## 7. Blocking model
 
-Defined in `packages/shared/src/policy.ts`, normalized in `packages/core/src/policyNormalize.ts`.
+Defined in `packages/shared/src/policy.ts` (TS) and `native/common/src/policy.rs` (Rust),
+normalized in `packages/core/src/policyNormalize.ts`.
 
 ```ts
-type Mode = 'blacklist' | 'whitelist' | 'block-all';
+type RuleAction = 'allow' | 'judge' | 'block';
 
 interface Policy {
-  mode: Mode;
-  domains: string[];   // e.g. ["youtube.com", "*.reddit.com"]
-  apps: AppRef[];      // platform-neutral app identity (see below)
-}
-
-interface AppRef {
-  // matched per-platform; populate the field relevant to the OS
-  windowsImageName?: string;   // "chrome.exe"
-  macBundleId?: string;        // "com.google.Chrome"
-  label: string;               // user-facing name
+  blockedDomains: string[];          // hard block, never judged
+  allowedDomains: string[];          // hard allow, never judged
+  defaultAction: RuleAction;         // everything no other layer decides
+  judge: JudgePolicy | null;         // { tasks, avoid, fallback } for every `judge` action
+  apps: AppRef[];
+  enabledPremadeLists: PremadeListId[];
+  sites: Record<SiteId, SiteRule>;   // { features: { feed: 'block', content: 'judge', … } }
 }
 ```
 
-**Mode semantics:**
+**Every layer yields one action.** Each layer is evaluated in the same order everywhere. The
+extension engine (`apps/extension/src/site-engine.js`) evaluates it per page, and the daemon
+(`policy_match::is_host_blocked`) per host:
 
-- **blacklist** — everything allowed *except* listed domains/apps.
-- **whitelist** — everything blocked *except* listed domains/apps (e.g. allow only Gmail +
-  your work tools). Implemented as default-deny network filters + allow rules.
-- **block-all** — total network block; apps optionally still allowed unless also listed.
+1. `blockedDomains` → block.
+2. `sites`: the page is classified into its catalog site's feature, and that feature's action
+   applies.
+3. `allowedDomains` → allow.
+4. `enabledPremadeLists` → block.
+5. `defaultAction`.
 
-`policyNormalize.ts` is pure and unit-tested: it lowercases/validates domains, expands
-wildcards into the matcher form each enforcer expects, dedupes, and rejects nonsense. The
-**normalized** policy is what crosses the IPC boundary to the service, so the privileged code
-receives clean, validated input and never has to parse user free-text.
+Classic presets are just shapes of this:
+- blacklist: `allow` default plus a block list;
+- whitelist: `block` default plus an allow list;
+- block-all;
+- smart: a `judge` default.
+
+**Site rules** (soft blocks) come from the site catalog, `packages/shared/src/sites` (see its
+README). Each supported site is one declarative module with its own feature schema, route table,
+element selectors, and blocked-page entry points. The user sets each feature to allow, AI, or
+block. Catalog defaults reproduce the classic "soft block": direct content, search, and messaging
+are allowed; feeds and recommendations are blocked. Enforcement splits by layer:
+- The daemon lets a site's hosts and asset domains through the network layer.
+- The extension enforces the features:
+  - DNR route bands for navigations;
+  - the webNavigation backstop for hops between items and for SPA navigations;
+  - a generic content script for page elements and links.
+
+**The AI judge** resolves every `judge` action, whether a judged default or a judged site feature
+(for example: Reddit posts are reachable, but each one is checked against the user's tasks).
+1. The page loads.
+2. The extension extracts its text and sends `judge-request` through natmsg to the daemon.
+3. The daemon attaches `judge` and broadcasts `judgeRequested`.
+4. Electron main calls `POST /api/desktop/judge`, which asks the LLM for allow or block.
+5. Electron sends `submitJudgeVerdict` to the daemon, which sends `judgeResult` to the extension.
+
+`judge.fallback` answers whenever the judge can't: timeouts, AI filtering unavailable, or over
+budget. Hard lists are never judged.
+
+**Relaxation.** Actions rank allow < judge < block. Without the key, while focus is on, a change
+is refused if it:
+- lowers any site feature's rank;
+- removes a site (unless its primary host becomes hard-blocked);
+- lowers `defaultAction`'s rank;
+- drops the judge while something relies on it.
+
+Editing tasks is never gated. See `is_at_least_as_restrictive` (Rust, authoritative) and
+`packages/core/src/restrictiveness.ts` (TS mirror).
+
+`policyNormalize.ts` is pure and unit-tested. It:
+- lowercases and validates domains, and dedupes them;
+- validates site and feature ids against the catalog;
+- bounds the judge configuration;
+- migrates legacy fields.
+
+Persisted policies are migrated permanently on read:
+- `mode`/`domains` (pre-profiles);
+- protocol-4 `softBlockedSites`/`intent`, which become default site rules and a one-task judge
+  with `defaultAction: 'judge'`.
+
+The daemon keys sites by string, so a policy naming a site this build doesn't know still loads.
+
+### 7.0 Extension capability negotiation
+
+The extension's `hello` advertises `siteCapability` and the catalog `siteIds` it ships. For each
+connection, natmsg (`native/common/src/natmsg_frames.rs`) shapes the state frame to match:
+- sites the extension doesn't know are hard-blocked (fail closed);
+- `judge` is pre-resolved to the fallback when AI filtering is unavailable.
+
+A new site therefore never needs a coordinated extension/daemon upgrade.
+
+**Removing legacy compat.** Protocol-4 peers (the pre-site-rules extension and native host) are
+supported for a transition period. Every shim carries a `LEGACY-COMPAT(v5)` tag. To drop support:
+1. Native: delete `native/common/src/natmsg_legacy.rs` and its `mod` line. Remove the tagged call
+   sites in `natmsg_frames.rs`, plus the `softBlockCapability` relay in `extension_compat.rs`.
+2. Extension: delete `apps/extension/src/legacy-compat.js` and its entry in
+   `scripts/build-extension.mjs`. Remove the tagged call sites in `background.js`.
+3. Tests: delete `tests/electron/unit/extension-legacy-compat.test.ts` and the tests in
+   `natmsg_legacy.rs`.
+
+The persisted-policy migrations in `policy.rs`/`policyNormalize.ts` are **not** part of this; they
+stay.
 
 ### 7.1 Blocking profiles
 

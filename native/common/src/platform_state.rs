@@ -197,10 +197,10 @@ impl PersistentState {
 #[cfg(test)]
 mod migration_tests {
     use super::*;
-    use crate::model::{DefaultAction, DEFAULT_PROFILE_ID};
+    use crate::model::{RuleAction, DEFAULT_PROFILE_ID};
 
     /// Pre-profile state files stored a single bare `policy` and no profiles at all. That
-    /// legacy `policy` also predates `blockedDomains`/`allowedDomains`/`defaultAction`/`intent`:
+    /// legacy `policy` also predates `blockedDomains`/`allowedDomains`/`defaultAction`/`judge`:
     /// it used a `mode` + flat `domains` list, which `Policy::deserialize` converts on the fly
     /// (see model.rs) before `migrate` ever sees it.
     #[test]
@@ -221,13 +221,13 @@ mod migration_tests {
         assert_eq!(state.profiles[0].id, DEFAULT_PROFILE_ID);
         assert_eq!(state.active_profile_id, DEFAULT_PROFILE_ID);
         // whitelist -> allow only the listed domains, blocked by default.
-        assert_eq!(state.active_policy().default_action, DefaultAction::Block);
+        assert_eq!(state.active_policy().default_action, RuleAction::Block);
         assert!(state.active_policy().blocked_domains.is_empty());
         assert_eq!(
             state.active_policy().allowed_domains,
             vec!["github.com".to_string()]
         );
-        assert!(state.active_policy().intent.is_none());
+        assert!(state.active_policy().judge.is_none());
         // Unrelated fields survive the migration untouched.
         assert!(state.focus_active);
         assert!(state.settings.browser_handshake_enabled);
@@ -271,7 +271,7 @@ mod migration_tests {
             "top-level policy should be gone"
         );
         // …but it survives where it now belongs, inside the default profile.
-        assert_eq!(state.active_policy().default_action, DefaultAction::Block);
+        assert_eq!(state.active_policy().default_action, RuleAction::Block);
         assert!(state.active_policy().blocked_domains.is_empty());
         assert!(state.active_policy().allowed_domains.is_empty());
         assert!(json["profiles"].is_array());
@@ -304,13 +304,13 @@ mod migration_tests {
 
         assert_eq!(state.profiles.len(), 2);
         let default = &state.profiles[0].policy;
-        assert_eq!(default.default_action, DefaultAction::Allow);
+        assert_eq!(default.default_action, RuleAction::Allow);
         assert_eq!(default.blocked_domains, vec!["youtube.com".to_string()]);
         assert!(default.allowed_domains.is_empty());
-        assert!(default.intent.is_none());
+        assert!(default.judge.is_none());
 
         let evening = &state.profiles[1].policy;
-        assert_eq!(evening.default_action, DefaultAction::Block);
+        assert_eq!(evening.default_action, RuleAction::Block);
         assert!(evening.blocked_domains.is_empty());
         assert!(evening.allowed_domains.is_empty());
     }
@@ -339,12 +339,13 @@ mod migration_tests {
         let mut state: PersistentState = serde_json::from_str(current).unwrap();
         state.migrate();
 
+        // A pre-v5 intent migrates to a judged default with one task.
         let policy = state.active_policy();
-        assert_eq!(policy.default_action, DefaultAction::Allow);
+        assert_eq!(policy.default_action, RuleAction::Judge);
         assert_eq!(policy.blocked_domains, vec!["youtube.com".to_string()]);
         assert!(policy.allowed_domains.is_empty());
         assert_eq!(
-            policy.intent.as_ref().map(|i| i.positive.as_str()),
+            policy.judge.as_ref().map(|judge| judge.tasks[0].title.as_str()),
             Some("finishing my thesis")
         );
     }

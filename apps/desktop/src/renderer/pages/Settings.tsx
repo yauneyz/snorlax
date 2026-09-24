@@ -25,7 +25,7 @@ export function Settings() {
   const setDevSubscriptionPlan = useFocusStore((s) => s.setDevSubscriptionPlan);
   const setLocalEntitlementEnabled = useFocusStore((s) => s.setLocalEntitlementEnabled);
   const handshakeEnabled = useFocusStore((s) => s.settings.browserHandshakeEnabled);
-  const softBlocksRequireHandshake = useFocusStore((s) => (s.policy.softBlockedSites?.length ?? 0) > 0);
+  const softBlocksRequireHandshake = useFocusStore((s) => Object.keys(s.policy.sites ?? {}).length > 0);
   const keyPresent = useFocusStore((s) => s.keyPresent);
   const setBrowserHandshake = useFocusStore((s) => s.setBrowserHandshake);
   const trayIconEnabled = useFocusStore((s) => s.settings.trayIconEnabled);
@@ -228,7 +228,7 @@ export function Settings() {
             off requires your paired USB key.
           </p>
           {softBlocksRequireHandshake && (
-            <p className="text-slate-400">Browser handshake stays on while the active profile has soft blocks.</p>
+            <p className="text-slate-400">Browser handshake stays on while the active profile has site rules.</p>
           )}
           <div className="flex items-center justify-between gap-3">
             <span className="font-medium text-slate-200">

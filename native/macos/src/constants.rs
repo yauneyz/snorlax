@@ -1,6 +1,6 @@
 //! Constants mirrored from packages/shared/src/constants.ts.
 
-pub const PROTOCOL_VERSION: u32 = 4;
+pub const PROTOCOL_VERSION: u32 = 5;
 pub const SERVICE_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 pub const SERVICE_NAME: &str = "talysman";

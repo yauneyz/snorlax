@@ -14,11 +14,34 @@
   "host_permissions": [
     "<all_urls>"
   ],
-  "content_scripts": [{
-    "matches": ["*://*.reddit.com/*", "*://reddit.com/*", "*://news.ycombinator.com/*"],
-    "js": ["soft-content.js"],
-    "run_at": "document_start"
-  }],
+  "content_scripts": [
+    {
+      "matches": [
+        "*://reddit.com/*",
+        "*://*.reddit.com/*",
+        "*://redd.it/*",
+        "*://*.redd.it/*",
+        "*://news.ycombinator.com/*",
+        "*://*.news.ycombinator.com/*",
+        "*://x.com/*",
+        "*://*.x.com/*",
+        "*://twitter.com/*",
+        "*://*.twitter.com/*",
+        "*://linkedin.com/*",
+        "*://*.linkedin.com/*",
+        "*://instagram.com/*",
+        "*://*.instagram.com/*",
+        "*://youtube.com/*",
+        "*://*.youtube.com/*",
+        "*://youtu.be/*",
+        "*://*.youtu.be/*"
+      ],
+      "js": [
+        "site-content.js"
+      ],
+      "run_at": "document_start"
+    }
+  ],
   "web_accessible_resources": [
     {
       "resources": [

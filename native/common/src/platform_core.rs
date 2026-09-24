@@ -24,15 +24,27 @@ use crate::usb;
 /// The extension waits 12 seconds, leaving room for this authoritative fallback to arrive first.
 const JUDGE_TIMEOUT: Duration = Duration::from_secs(8);
 
-/// A `judgeRequest` awaiting `submitJudgeVerdict`. `default_action` is captured from the
-/// requesting profile at request time so the timeout sweep can answer fail-closed/fail-open
-/// without having to guess which profile (possibly since switched away from) asked.
+/// Bounds on `judgeRequest` params; mirrors `JUDGE_LIMITS` in packages/shared/src/judge.ts.
+const JUDGE_MAX_REQUEST_ID: usize = 128;
+const JUDGE_MAX_URL: usize = 4096;
+const JUDGE_MAX_TITLE: usize = 300;
+const JUDGE_MAX_CONTENT: usize = 4000;
+
+/// A `judgeRequest` awaiting `submitJudgeVerdict`. The judge policy is captured at request time
+/// so the timeout sweep answers with the requesting profile's fallback, and so a verdict computed
+/// against since-edited tasks is discarded.
 #[derive(Clone)]
 struct PendingJudge {
     requested_at: Instant,
     url: String,
-    default_action: DefaultAction,
-    intent: crate::model::Intent,
+    judge: crate::model::JudgePolicy,
+}
+
+fn verdict_for(action: DefaultAction) -> &'static str {
+    match action {
+        DefaultAction::Allow => "allow",
+        DefaultAction::Block => "block",
+    }
 }
 
 /// An RPC error mapped to the wire `{ ok:false, code, message }`.
@@ -256,7 +268,7 @@ impl Core {
         let policy = self.state.active_policy();
         self.shared.set_policy(policy.clone());
         self.shared.set_handshake_enabled(
-            self.state.settings.browser_handshake_enabled || !policy.soft_blocked_sites.is_empty(),
+            self.state.settings.browser_handshake_enabled || !policy.sites.is_empty(),
         );
         self.emit("policyChanged", json!({ "policy": policy }));
     }
@@ -478,7 +490,7 @@ impl Core {
             }
         }
         self.state.settings.browser_handshake_enabled = enabled;
-        self.shared.set_handshake_enabled(enabled || !self.state.active_policy().soft_blocked_sites.is_empty());
+        self.shared.set_handshake_enabled(enabled || !self.state.active_policy().sites.is_empty());
         self.persist_state();
         self.emit(
             "settingsChanged",
@@ -515,135 +527,111 @@ impl Core {
         );
     }
 
-    /// Extension (via natmsg) → service: a page under an `intent`-enabled profile fell through
-    /// both hard lists. Record it as pending and broadcast `judgeRequested` for Electron to pick
-    /// up; the real answer comes back later as `submitJudgeVerdict` (or the timeout sweep).
-    /// Fire-and-forget from the RPC caller's perspective; malformed/overloaded requests are refused.
-    fn judge_request(
-        &mut self,
-        request_id: String,
-        url: String,
-        extracted_text: String,
-    ) -> Result<(), RpcError> {
+    /// Answer a judge request immediately without asking the judge.
+    fn emit_judge_result(&self, request_id: &str, url: &str, verdict: DefaultAction, reason: &str) {
+        self.emit(
+            "judgeResult",
+            json!({ "requestId": request_id, "url": url, "verdict": verdict_for(verdict), "reason": reason }),
+        );
+    }
+
+    /// Extension (via natmsg) → service: a policy rule resolved to `judge` for this page. Record
+    /// it as pending with the active judge policy attached and broadcast `judgeRequested` for
+    /// Electron to pick up; the real answer comes back later as `submitJudgeVerdict` (or the
+    /// timeout sweep answers with the judge's fallback). Fire-and-forget from the RPC caller's
+    /// perspective; malformed/overloaded requests are refused.
+    fn judge_request(&mut self, params: &Value) -> Result<(), RpcError> {
+        let text = |name: &str| params.get(name).and_then(Value::as_str).unwrap_or("").to_string();
+        let request_id = text("requestId");
+        let url = text("url");
+        let title = text("title");
+        let content = text("content");
+        // Limits count characters: the extension caps page text by characters, and non-ASCII
+        // pages are several bytes per character.
+        let too_long = |value: &str, max: usize| value.chars().count() > max;
         if request_id.is_empty()
-            || request_id.len() > 128
-            || url.len() > 4096
-            || extracted_text.len() > 4000
+            || too_long(&request_id, JUDGE_MAX_REQUEST_ID)
+            || too_long(&url, JUDGE_MAX_URL)
+            || too_long(&title, JUDGE_MAX_TITLE)
+            || too_long(&content, JUDGE_MAX_CONTENT)
         {
-            return Err(RpcError::new(
-                err::BAD_REQUEST,
-                "Invalid judge request size.",
-            ));
+            return Err(RpcError::new(err::BAD_REQUEST, "Invalid judge request size."));
         }
         if self.pending_judges.contains_key(&request_id) {
-            return Err(RpcError::new(
-                err::BAD_REQUEST,
-                "Duplicate judge request id.",
-            ));
+            return Err(RpcError::new(err::BAD_REQUEST, "Duplicate judge request id."));
         }
         if self.pending_judges.len() >= 128 {
-            return Err(RpcError::new(
-                err::BAD_REQUEST,
-                "Too many pending judge requests.",
-            ));
+            return Err(RpcError::new(err::BAD_REQUEST, "Too many pending judge requests."));
         }
+        let context = params
+            .get("context")
+            .filter(|context| context.get("site").and_then(Value::as_str).is_some())
+            .map(|context| json!({ "site": context["site"], "feature": context.get("feature").cloned().unwrap_or(Value::Null) }));
         let policy = self.state.active_policy();
-        let default_action = policy.default_action;
         tracing::info!(
             request_id = %request_id,
             url = %url,
-            extracted_text_len = extracted_text.len(),
+            content_len = content.len(),
             smart_filtering_enabled = self.state.settings.smart_filtering_enabled,
             focus_active = self.state.focus_active,
-            intent_active = policy.intent.is_some(),
-            "smart-filtering judge request received"
+            judge_active = policy.judge.is_some(),
+            "judge request received"
         );
-        if !self.state.settings.smart_filtering_enabled {
-            tracing::info!(request_id = %request_id, "smart-filtering request using classic fallback");
-            self.emit(
-                "judgeResult",
-                json!({
-                    "requestId": request_id,
-                    "url": url,
-                    "relevant": default_action == DefaultAction::Allow,
-                    "reason": "Classic filtering is active"
-                }),
-            );
+        if !self.state.focus_active {
+            self.emit_judge_result(&request_id, &url, DefaultAction::Allow, "Focus is off");
             return Ok(());
         }
-        let Some(intent) = policy.intent else {
-            tracing::info!(request_id = %request_id, "smart-filtering request has no active intent");
-            // A stale extension request after focus/profile changed must not wake Electron or sit
-            // pending. Answer immediately using the canonical classic fallback.
-            self.emit(
-                "judgeResult",
-                json!({
-                    "requestId": request_id,
-                    "url": url,
-                    "relevant": default_action == DefaultAction::Allow,
-                    "reason": "Smart filtering is not active"
-                }),
-            );
+        // A stale extension request after the profile or settings changed must not wake Electron
+        // or sit pending. Answer immediately with what the policy falls back to.
+        let Some(judge) = policy.judge.clone().filter(|judge| !judge.tasks.is_empty()) else {
+            self.emit_judge_result(&request_id, &url, DefaultAction::Allow, "AI filtering is not configured");
             return Ok(());
         };
-        if !self.state.focus_active {
-            tracing::info!(request_id = %request_id, "smart-filtering request allowed because focus is off");
-            self.emit(
-                "judgeResult",
-                json!({ "requestId": request_id, "url": url, "relevant": true, "reason": "Focus is off" }),
-            );
+        if !self.state.settings.smart_filtering_enabled {
+            self.emit_judge_result(&request_id, &url, judge.fallback, "AI filtering is unavailable");
             return Ok(());
         }
         self.pending_judges.insert(
             request_id.clone(),
-            PendingJudge {
-                requested_at: Instant::now(),
-                url: url.clone(),
-                default_action,
-                intent: intent.clone(),
-            },
+            PendingJudge { requested_at: Instant::now(), url: url.clone(), judge: judge.clone() },
         );
-        self.emit(
-            "judgeRequested",
-            json!({
-                "requestId": request_id,
-                "url": url,
-                "extractedText": extracted_text,
-                "intent": intent
-            }),
-        );
-        tracing::info!(request_id = %request_id, "smart-filtering judgeRequested emitted");
+        let mut payload = json!({
+            "requestId": request_id,
+            "url": url,
+            "title": title,
+            "content": content,
+            "judge": judge,
+        });
+        if let Some(context) = context {
+            payload["context"] = context;
+        }
+        self.emit("judgeRequested", payload);
+        tracing::info!(request_id = %request_id, "judgeRequested emitted");
         Ok(())
     }
 
     /// Electron main → service: the verdict for a pending `judgeRequested`. Unknown/already-
-    /// resolved `requestId`s are ignored — either the timeout sweep already answered fail-closed,
-    /// or this is a stale/duplicate report — so the extension is never answered twice.
-    fn submit_judge_verdict(&mut self, request_id: &str, relevant: bool, reason: String) {
+    /// resolved `requestId`s are ignored — either the timeout sweep already answered with the
+    /// fallback, or this is a stale/duplicate report — so the extension is never answered twice.
+    fn submit_judge_verdict(&mut self, request_id: &str, verdict: DefaultAction, reason: String) {
         let Some(pending) = self.pending_judges.remove(request_id) else {
-            tracing::warn!(request_id, "smart-filtering verdict ignored: request is no longer pending");
+            tracing::warn!(request_id, "judge verdict ignored: request is no longer pending");
             return;
         };
-        // Discard a paid verdict if the policy changed while it was in flight. The extension also
-        // invalidates its request on every state generation, so emitting here would only be stale.
-        if !self.state.focus_active
-            || self.state.active_policy().intent.as_ref() != Some(&pending.intent)
-        {
-            tracing::warn!(request_id, "smart-filtering verdict ignored: focus or intent changed");
+        // Discard a paid verdict if the judge policy changed while it was in flight. The extension
+        // also invalidates its request on every state generation, so emitting here would be stale.
+        if !self.state.focus_active || self.state.active_policy().judge.as_ref() != Some(&pending.judge) {
+            tracing::warn!(request_id, "judge verdict ignored: focus or judge policy changed");
             return;
         }
-        tracing::info!(request_id, relevant, reason = %reason, "smart-filtering verdict accepted");
-        self.emit(
-            "judgeResult",
-            json!({ "requestId": request_id, "url": pending.url, "relevant": relevant, "reason": reason }),
-        );
+        tracing::info!(request_id, verdict = verdict_for(verdict), reason = %reason, "judge verdict accepted");
+        self.emit_judge_result(request_id, &pending.url, verdict, &reason);
     }
 
     /// Answer every `judgeRequest` that has been pending longer than `JUDGE_TIMEOUT` with the
-    /// requesting profile's `defaultAction` fallback (`allow` -> relevant, `block` -> not
-    /// relevant), so a judge that never reports back (Electron not running, no auth session, the
-    /// web call failing) never leaves the extension hanging indefinitely. Called on a timer from
-    /// `service.rs`, independent of focus/monitoring state, so it always runs.
+    /// requesting profile's judge fallback, so a judge that never reports back (Electron not
+    /// running, no auth session, the web call failing) never leaves the extension hanging. Called
+    /// on a timer from `service.rs`, independent of focus/monitoring state, so it always runs.
     pub fn sweep_expired_judges(&mut self) {
         let now = Instant::now();
         let mut expired: Vec<(String, PendingJudge)> = Vec::new();
@@ -656,18 +644,8 @@ impl Core {
             }
         });
         for (request_id, pending) in expired {
-            tracing::warn!(
-                "judge request {request_id} timed out; answering with defaultAction fallback"
-            );
-            self.emit(
-                "judgeResult",
-                json!({
-                    "requestId": request_id,
-                    "url": pending.url,
-                    "relevant": pending.default_action == DefaultAction::Allow,
-                    "reason": "judge unavailable",
-                }),
-            );
+            tracing::warn!("judge request {request_id} timed out; answering with the judge fallback");
+            self.emit_judge_result(&request_id, &pending.url, pending.judge.fallback, "AI judge unavailable");
         }
     }
 
@@ -756,7 +734,7 @@ impl Core {
     pub fn rearm_on_boot(&mut self) {
         // Restore the persisted handshake setting into the shared enforcement state.
         self.shared
-            .set_handshake_enabled(self.state.settings.browser_handshake_enabled || !self.state.active_policy().soft_blocked_sites.is_empty());
+            .set_handshake_enabled(self.state.settings.browser_handshake_enabled || !self.state.active_policy().sites.is_empty());
         // The active profile may have arrived from a state-file migration; make sure enforcement
         // is holding its policy and not a stale one.
         self.shared.set_policy(self.state.active_policy());
@@ -826,11 +804,13 @@ impl Core {
             }
             "setPolicy" => {
                 let policy: Policy = parse_field(params, "policy")?;
+                policy.validate().map_err(|message| RpcError::new(err::BAD_REQUEST, message))?;
                 self.set_policy(policy)?;
                 Ok(ok())
             }
             "setProfile" => {
                 let profile: Profile = parse_field(params, "profile")?;
+                profile.policy.validate().map_err(|message| RpcError::new(err::BAD_REQUEST, message))?;
                 self.set_profile(profile)?;
                 Ok(ok())
             }
@@ -878,8 +858,9 @@ impl Core {
                 // it for the watchdog; never errors so a malformed beat can't disrupt the bridge.
                 let heartbeat = talysman_common::extension_compat::parse_service_heartbeat(params);
                 let pid = heartbeat.browser_pid;
-                let healthy = heartbeat.healthy
-                    && (self.state.active_policy().soft_blocked_sites.is_empty() || heartbeat.soft_block_capable);
+                // Site capability isn't required: natmsg hard-blocks whatever the extension can't
+                // enforce, so any extension that can block is enforcing the policy.
+                let healthy = heartbeat.healthy;
                 let browser = heartbeat.browser.as_str();
                 let sequence = heartbeat.sequence;
                 let extension_version = heartbeat.extension_version.as_deref().unwrap_or("");
@@ -957,20 +938,14 @@ impl Core {
                 Ok(ok())
             }
             "judgeRequest" => {
-                let request_id = str_field(params, "requestId")?;
-                let url = str_field(params, "url")?;
-                let extracted_text = str_field(params, "extractedText")?;
-                self.judge_request(request_id, url, extracted_text)?;
+                self.judge_request(params)?;
                 Ok(ok())
             }
             "submitJudgeVerdict" => {
                 let request_id = str_field(params, "requestId")?;
-                let relevant = params
-                    .get("relevant")
-                    .and_then(|v| v.as_bool())
-                    .ok_or_else(|| RpcError::new(err::BAD_REQUEST, "Missing field: relevant"))?;
+                let verdict: DefaultAction = parse_field(params, "verdict")?;
                 let reason = str_field(params, "reason")?;
-                self.submit_judge_verdict(&request_id, relevant, reason);
+                self.submit_judge_verdict(&request_id, verdict, reason);
                 Ok(ok())
             }
             other => Err(RpcError::new(
@@ -1012,4 +987,108 @@ fn now_ms() -> u64 {
         .duration_since(std::time::UNIX_EPOCH)
         .map(|d| d.as_millis() as u64)
         .unwrap_or(0)
+}
+
+#[cfg(test)]
+mod judge_tests {
+    use super::*;
+    use crate::model::{JudgePolicy, RuleAction};
+    use talysman_common::policy::JudgeTask;
+
+    fn judge(title: &str, fallback: DefaultAction) -> JudgePolicy {
+        JudgePolicy {
+            tasks: vec![JudgeTask { id: "t".into(), title: title.into(), notes: None }],
+            avoid: vec!["sports".into()],
+            fallback,
+        }
+    }
+
+    fn core(judge: Option<JudgePolicy>, focus: bool, smart: bool) -> (Core, broadcast::Receiver<Value>) {
+        let mut state = PersistentState::default();
+        state.profiles[0].policy.default_action = RuleAction::Judge;
+        state.profiles[0].policy.judge = judge;
+        state.focus_active = focus;
+        state.settings.smart_filtering_enabled = smart;
+        let policy = state.active_policy().clone();
+        let core = Core::new(state, SecureStore::default(), Arc::new(EnforceShared::new(policy, focus)));
+        let rx = core.subscribe();
+        (core, rx)
+    }
+
+    fn next_event(rx: &mut broadcast::Receiver<Value>, name: &str) -> Value {
+        while let Ok(event) = rx.try_recv() {
+            if event["event"] == name {
+                return event["payload"].clone();
+            }
+        }
+        panic!("no {name} event");
+    }
+
+    fn request(id: &str) -> Value {
+        json!({
+            "requestId": id, "url": "https://www.reddit.com/r/a/comments/x/", "title": "A post",
+            "content": "text", "context": { "site": "reddit", "feature": "content" },
+        })
+    }
+
+    #[test]
+    fn a_judged_page_is_brokered_to_electron_and_the_verdict_relayed() {
+        let (mut core, mut rx) = core(Some(judge("thesis", DefaultAction::Allow)), true, true);
+        core.judge_request(&request("r1")).unwrap_or_else(|_| panic!());
+        let requested = next_event(&mut rx, "judgeRequested");
+        assert_eq!(requested["judge"]["tasks"][0]["title"], "thesis");
+        assert_eq!(requested["context"], json!({ "site": "reddit", "feature": "content" }));
+        assert_eq!(requested["content"], "text");
+
+        core.submit_judge_verdict("r1", DefaultAction::Block, "Off-task".into());
+        let result = next_event(&mut rx, "judgeResult");
+        assert_eq!(result["verdict"], "block");
+        assert_eq!(result["reason"], "Off-task");
+        // Answered once only.
+        core.submit_judge_verdict("r1", DefaultAction::Allow, String::new());
+        assert!(rx.try_recv().is_err());
+    }
+
+    #[test]
+    fn unavailable_ai_filtering_answers_with_the_judge_fallback() {
+        let (mut core, mut rx) = core(Some(judge("thesis", DefaultAction::Block)), true, false);
+        assert!(core.judge_request(&request("r1")).is_ok());
+        assert_eq!(next_event(&mut rx, "judgeResult")["verdict"], "block");
+        assert!(core.pending_judges.is_empty());
+    }
+
+    #[test]
+    fn the_timeout_sweep_answers_with_the_fallback() {
+        let (mut core, mut rx) = core(Some(judge("thesis", DefaultAction::Block)), true, true);
+        assert!(core.judge_request(&request("r1")).is_ok());
+        core.pending_judges.get_mut("r1").unwrap().requested_at = Instant::now() - JUDGE_TIMEOUT;
+        core.sweep_expired_judges();
+        let result = next_event(&mut rx, "judgeResult");
+        assert_eq!(result["verdict"], "block");
+        assert_eq!(result["reason"], "AI judge unavailable");
+    }
+
+    #[test]
+    fn a_verdict_for_since_edited_tasks_is_discarded() {
+        let (mut core, mut rx) = core(Some(judge("thesis", DefaultAction::Allow)), true, true);
+        assert!(core.judge_request(&request("r1")).is_ok());
+        core.state.profiles[0].policy.judge = Some(judge("taxes", DefaultAction::Allow));
+        core.submit_judge_verdict("r1", DefaultAction::Block, "Off-task".into());
+        while let Ok(event) = rx.try_recv() {
+            assert_ne!(event["event"], "judgeResult");
+        }
+    }
+
+    #[test]
+    fn oversized_or_duplicate_requests_are_refused() {
+        let (mut core, _rx) = core(Some(judge("thesis", DefaultAction::Allow)), true, true);
+        let mut big = request("r1");
+        big["content"] = json!("x".repeat(JUDGE_MAX_CONTENT + 1));
+        assert!(core.judge_request(&big).is_err());
+        let mut wide = request("r3");
+        wide["content"] = json!("é".repeat(JUDGE_MAX_CONTENT));
+        assert!(core.judge_request(&wide).is_ok());
+        assert!(core.judge_request(&request("r2")).is_ok());
+        assert!(core.judge_request(&request("r2")).is_err());
+    }
 }

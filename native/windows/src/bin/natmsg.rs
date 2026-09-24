@@ -4,11 +4,10 @@
 //! Browsers can't talk to our named pipe, so the extension speaks Chrome/Firefox **native
 //! messaging** (4-byte little-endian length prefix + UTF-8 JSON on stdio) to this host, which the
 //! browser spawns. Two directions:
-//!   - service → extension: the minimal blocking state the extension needs:
-//!       { "type": "state", "active": bool, "blockedDomains": [..], "allowedDomains": [..],
-//!         "defaultAction": "allow"|"block", "intent": {positive, negative}|null }
-//!   - extension → service: Smart-filtering `judge-request` frames are relayed as `judgeRequest`
-//!     RPCs and answered later by a `judgeResult` event (relayed back as `judge-result`).
+//!   - service → extension: the resolved blocking state (see `talysman_common::natmsg_frames`),
+//!     shaped for what the connected extension build can enforce (from its `hello`).
+//!   - extension → service: AI judge `judge-request` frames are relayed as `judgeRequest` RPCs and
+//!     answered later by a `judgeResult` event (relayed back as `judge-result`).
 //!   - extension → service: liveness heartbeats (`{type:"heartbeat", ...}`) are relayed to the
 //!     service as `extHeartbeat` RPCs, tagged with the browser's **root PID** — resolved from this
 //!     host's startup ancestry — so the watchdog can correlate and, if needed, target that process.
@@ -31,6 +30,7 @@ use tokio::sync::{mpsc, watch, Mutex};
 
 use talysman::constants::{pipe_path, PIPE_BASE_DEV, PIPE_BASE_PROD};
 use talysman_common::browsers::by_windows_image;
+use talysman_common::natmsg_frames::{self, Blocking, ExtensionCaps};
 
 use windows::Win32::Foundation::CloseHandle;
 use windows::Win32::System::Diagnostics::ToolHelp::{
@@ -45,99 +45,6 @@ const MAX_FRAME: u32 = 1024 * 1024;
 /// relays use ids from `NEXT_ID` so their responses are ignored by the state parser.
 const GET_STATE_ID: i64 = 1;
 static NEXT_ID: AtomicU64 = AtomicU64::new(2);
-
-/// Minimal blocking state derived from the service's `ServiceState` / events.
-#[derive(Clone, Default, PartialEq)]
-struct Blocking {
-    active: bool,
-    blocked_domains: Vec<String>,
-    allowed_domains: Vec<String>,
-    default_action: String,
-    /// Raw JSON so a `null` intent round-trips as JSON `null` rather than `{}`. `Value::Null` by
-    /// default, matching "no Smart filtering" for a freshly-constructed `Blocking`.
-    intent: Value,
-    enabled_premade_lists: Vec<String>,
-    soft_blocked_sites: Vec<String>,
-    handshake_enabled: bool,
-    smart_filtering_enabled: bool,
-}
-
-impl Blocking {
-    fn to_msg(&self, soft_capable: bool) -> Value {
-        let default_action = if self.default_action.is_empty() {
-            "allow"
-        } else {
-            self.default_action.as_str()
-        };
-        let mut blocked_domains = self.blocked_domains.clone();
-        if !soft_capable {
-            for site in &self.soft_blocked_sites {
-                let domain = match site.as_str() {
-                    "reddit" => "reddit.com",
-                    "hackernews" => "news.ycombinator.com",
-                    _ => continue,
-                };
-                blocked_domains.push(domain.to_string());
-            }
-        }
-        json!({
-            "type": "state",
-            "active": self.active,
-            "blockedDomains": blocked_domains,
-            "allowedDomains": self.allowed_domains,
-            "defaultAction": default_action,
-            "intent": if self.smart_filtering_enabled { self.intent.clone() } else { Value::Null },
-            "enabledPremadeLists": self.enabled_premade_lists,
-            "softBlockedSites": if soft_capable { self.soft_blocked_sites.as_slice() } else { &[] },
-            "handshakeEnabled": self.handshake_enabled || !self.soft_blocked_sites.is_empty(),
-        })
-    }
-}
-
-/// Mirrors the `Policy` shape onto the state frame the extension consumes
-/// (`apps/extension/src/background.js`'s `applyState`): independent `blockedDomains`/
-/// `allowedDomains` hard lists, a `defaultAction` fallback, and an optional `intent` that turns
-/// on Smart filtering for pages hitting neither hard list. This is a direct field-for-field
-/// passthrough.
-fn parse_policy(policy: &Value, b: &mut Blocking) {
-    b.blocked_domains = policy
-        .get("blockedDomains")
-        .and_then(|v| v.as_array())
-        .map(|a| {
-            a.iter()
-                .filter_map(|d| d.as_str().map(str::to_string))
-                .collect()
-        })
-        .unwrap_or_default();
-    b.allowed_domains = policy
-        .get("allowedDomains")
-        .and_then(|v| v.as_array())
-        .map(|a| {
-            a.iter()
-                .filter_map(|d| d.as_str().map(str::to_string))
-                .collect()
-        })
-        .unwrap_or_default();
-    b.default_action = if policy.get("defaultAction").and_then(|v| v.as_str()) == Some("block") {
-        "block".to_string()
-    } else {
-        "allow".to_string()
-    };
-    b.intent = policy.get("intent").cloned().unwrap_or(Value::Null);
-    b.enabled_premade_lists = policy
-        .get("enabledPremadeLists")
-        .and_then(|v| v.as_array())
-        .map(|a| {
-            a.iter()
-                .filter_map(|d| d.as_str().map(str::to_string))
-                .collect()
-        })
-        .unwrap_or_default();
-    b.soft_blocked_sites = policy.get("softBlockedSites")
-        .and_then(Value::as_array)
-        .map(|sites| sites.iter().filter_map(Value::as_str).map(str::to_string).collect())
-        .unwrap_or_default();
-}
 
 #[derive(Debug)]
 struct ProcessEntry {
@@ -232,30 +139,14 @@ fn heartbeat_ack(response: &Value) -> Option<Value> {
 }
 
 /// Build a `judgeRequest` RPC from the extension's `judge-request` frame. Fire-and-forget: the
-/// RPC just acks `Ok`, the real answer arrives later as a `judgeResult` event (see
-/// `judge_result_frame`). No id correlation needed — the daemon owns the pending-request state.
+/// RPC just acks `Ok`, the real answer arrives later as a `judgeResult` event. No id correlation
+/// needed — the daemon owns the pending-request state.
 fn judge_request(frame: &Value) -> Value {
     json!({
         "kind": "request",
         "id": NEXT_ID.fetch_add(1, Ordering::Relaxed),
         "method": "judgeRequest",
-        "params": {
-            "requestId": frame.get("requestId").cloned().unwrap_or(Value::Null),
-            "url": frame.get("url").cloned().unwrap_or(Value::Null),
-            "extractedText": frame.get("extractedText").cloned().unwrap_or(Value::Null),
-        },
-    })
-}
-
-/// Translate a `judgeResult` event straight into the outbound `judge-result` frame for the
-/// browser. Pure relay: no state cached, no id correlation.
-fn judge_result_frame(payload: &Value) -> Value {
-    json!({
-        "type": "judge-result",
-        "requestId": payload.get("requestId").cloned().unwrap_or(Value::Null),
-        "url": payload.get("url").cloned().unwrap_or(Value::Null),
-        "relevant": payload.get("relevant").cloned().unwrap_or(Value::Null),
-        "reason": payload.get("reason").cloned().unwrap_or(Value::Null),
+        "params": natmsg_frames::judge_request_params(frame),
     })
 }
 
@@ -275,7 +166,8 @@ async fn main() {
     });
 
     let last: Arc<Mutex<Option<Blocking>>> = Arc::new(Mutex::new(None));
-    let soft_capable = Arc::new(std::sync::atomic::AtomicBool::new(false));
+    // What the connected extension build can enforce; set by its `hello`.
+    let caps: Arc<Mutex<ExtensionCaps>> = Arc::new(Mutex::new(ExtensionCaps::default()));
 
     // Retain only the newest heartbeat while disconnected; bound judge work separately.
     let (heartbeat_tx, heartbeat_rx) = watch::channel::<Option<Value>>(None);
@@ -286,7 +178,7 @@ async fn main() {
     {
         let out_tx = out_tx.clone();
         let last = last.clone();
-        let soft_capable = soft_capable.clone();
+        let caps = caps.clone();
         tokio::spawn(async move {
             let mut stdin = tokio::io::stdin();
             loop {
@@ -298,10 +190,12 @@ async fn main() {
                         Some("judge-request") => {
                             let _ = judge_tx.send(judge_request(&msg)).await;
                         }
+                        // The extension's `hello`: record what it can enforce, then resend state.
                         _ => {
-                            soft_capable.store(msg.get("softBlockCapability").and_then(Value::as_u64) == Some(1), Ordering::SeqCst);
+                            let hello_caps = ExtensionCaps::from_hello(&msg);
+                            *caps.lock().await = hello_caps.clone();
                             if let Some(b) = last.lock().await.clone() {
-                                let _ = out_tx.send(b.to_msg(soft_capable.load(Ordering::SeqCst))).await;
+                                let _ = out_tx.send(natmsg_frames::state_frame(&b, &hello_caps)).await;
                             }
                         }
                     },
@@ -314,7 +208,7 @@ async fn main() {
 
     // Pipe loop: keep the service connection up and translate state/events into extension pushes.
     loop {
-        if let Err(_e) = pump_pipe(&out_tx, &last, &soft_capable, heartbeat_rx.clone(), &mut judge_rx).await {
+        if let Err(_e) = pump_pipe(&out_tx, &last, &caps, heartbeat_rx.clone(), &mut judge_rx).await {
             // Connection failed or dropped; back off and retry. The extension keeps its last rules.
         }
         tokio::time::sleep(Duration::from_secs(2)).await;
@@ -345,67 +239,20 @@ mod tests {
         assert_eq!(browser_root_from_snapshot(900, &processes), 37132);
     }
 
-    fn blocking(default_action: &str, blocked: &[&str], allowed: &[&str]) -> Blocking {
-        Blocking {
-            active: true,
-            blocked_domains: blocked.iter().map(|d| d.to_string()).collect(),
-            allowed_domains: allowed.iter().map(|d| d.to_string()).collect(),
-            default_action: default_action.to_string(),
-            intent: Value::Null,
-            enabled_premade_lists: Vec::new(),
-            soft_blocked_sites: Vec::new(),
-            handshake_enabled: true,
-            smart_filtering_enabled: false,
-        }
-    }
-
-    #[test]
-    fn the_state_frame_carries_only_the_protocol_v4_policy_shape() {
-        let msg = blocking("allow", &["reddit.com"], &[]).to_msg(false);
-
-        assert_eq!(msg["blockedDomains"][0], "reddit.com");
-        assert_eq!(msg["defaultAction"], "allow");
-        assert!(msg.get("mode").is_none());
-        assert!(msg.get("domains").is_none());
-    }
-
-    /// An unset `default_action` is the freshly-constructed `Blocking`, before any `getState`
-    /// response has landed. It must still read as the open-by-default preset, not an empty string.
-    #[test]
-    fn an_unset_default_action_falls_back_to_allow() {
-        let msg = Blocking::default().to_msg(false);
-
-        assert_eq!(msg["defaultAction"], "allow");
-    }
-
     #[test]
     fn a_judge_request_frame_becomes_a_judge_request_rpc() {
         let rpc = judge_request(&json!({
             "type": "judge-request",
             "requestId": "req-1",
             "url": "https://example.com/a",
-            "extractedText": "some page text",
+            "title": "A",
+            "content": "some page text",
         }));
 
         assert_eq!(rpc["method"], "judgeRequest");
         assert_eq!(rpc["params"]["requestId"], "req-1");
         assert_eq!(rpc["params"]["url"], "https://example.com/a");
-        assert_eq!(rpc["params"]["extractedText"], "some page text");
-    }
-
-    #[test]
-    fn a_judge_result_event_becomes_the_extension_judge_result_frame() {
-        let frame = judge_result_frame(&json!({
-            "requestId": "req-1",
-            "url": "https://example.com/a",
-            "relevant": false,
-            "reason": "off task",
-        }));
-
-        assert_eq!(frame["type"], "judge-result");
-        assert_eq!(frame["requestId"], "req-1");
-        assert_eq!(frame["relevant"], false);
-        assert_eq!(frame["reason"], "off task");
+        assert_eq!(rpc["params"]["content"], "some page text");
     }
 }
 
@@ -413,7 +260,7 @@ mod tests {
 async fn pump_pipe(
     out_tx: &mpsc::Sender<Value>,
     last: &Arc<Mutex<Option<Blocking>>>,
-    soft_capable: &Arc<std::sync::atomic::AtomicBool>,
+    caps: &Arc<Mutex<ExtensionCaps>>,
     mut heartbeat_rx: watch::Receiver<Option<Value>>,
     judge_rx: &mut mpsc::Receiver<Value>,
 ) -> std::io::Result<()> {
@@ -466,7 +313,7 @@ async fn pump_pipe(
                                 b.active = active;
                             }
                             if let Some(policy) = result.get("policy") {
-                                parse_policy(policy, &mut b);
+                                b.apply_policy_json(policy);
                             }
                             if let Some(enabled) = result.pointer("/settings/browserHandshakeEnabled").and_then(Value::as_bool) {
                                 b.handshake_enabled = enabled;
@@ -493,7 +340,7 @@ async fn pump_pipe(
                         }
                         Some("policyChanged") => {
                             if let Some(policy) = v.pointer("/payload/policy") {
-                                parse_policy(policy, &mut b);
+                                b.apply_policy_json(policy);
                                 changed = true;
                             }
                         }
@@ -509,7 +356,8 @@ async fn pump_pipe(
                         }
                         Some("judgeResult") => {
                             if let Some(payload) = v.get("payload") {
-                                let _ = out_tx.send(judge_result_frame(payload)).await;
+                                let caps = caps.lock().await.clone();
+                                let _ = out_tx.send(natmsg_frames::judge_result_frame(payload, &caps)).await;
                             }
                         }
                         _ => {}
@@ -527,7 +375,8 @@ async fn pump_pipe(
                         }
                     };
                     if push {
-                        let _ = out_tx.send(b.to_msg(soft_capable.load(Ordering::SeqCst))).await;
+                        let caps = caps.lock().await.clone();
+                        let _ = out_tx.send(natmsg_frames::state_frame(&b, &caps)).await;
                     }
                 }
             }

@@ -10,16 +10,28 @@
  *  - de-duplicated, order-stable
  */
 
-import type { AppRef, Policy, PolicyIntent, PremadeListId } from '@talysman/shared';
-import { PREMADE_LISTS } from '@talysman/shared';
+import type { AppRef, JudgePolicy, JudgeTask, Policy, PremadeListId, RuleAction, SiteRule } from '@talysman/shared';
+import { PREMADE_LISTS, siteDefinition } from '@talysman/shared';
 
 export interface NormalizedPolicy extends Policy {
   /** Inputs that were dropped during normalization, with a reason. */
   rejected: { value: string; reason: string }[];
 }
 
-/** Prompt-budget cap for each intent field; also keeps the UI textarea sane. */
-export const INTENT_FIELD_MAX_LENGTH = 500;
+/** Prompt-budget caps for the judge configuration; also keep the UI inputs sane. */
+export const JUDGE_TEXT_MAX_LENGTH = 500;
+export const JUDGE_MAX_TASKS = 20;
+export const JUDGE_MAX_AVOID = 20;
+
+/**
+ * The pre-v5 policy fields. Old daemons, persisted profiles, and old fixtures still carry them;
+ * `migrateLegacyPolicy` folds them into the current shape. Permanent (not transitional): old
+ * state files must keep loading.
+ */
+export interface LegacyPolicyFields {
+  softBlockedSites?: string[];
+  intent?: { positive?: string; negative?: string } | null;
+}
 
 // A liberal hostname label check. Each label: alphanumeric + hyphen, not leading/trailing hyphen.
 const LABEL_RE = /^(?!-)[a-z0-9-]{1,63}(?<!-)$/;
@@ -97,30 +109,105 @@ function normalizeDomainList(
   return domains;
 }
 
-/**
- * Normalize a user-authored intent. `positive` is required for a non-null result — an intent
- * with a blank/whitespace-only description is dropped (Smart filtering stays off) rather than
- * silently enforced against nothing.
- */
-function normalizeIntent(
-  intent: PolicyIntent | null | undefined,
-  rejected: { value: string; reason: string }[],
-): PolicyIntent | null {
-  if (!intent) return null;
+const ACTIONS: readonly RuleAction[] = ['allow', 'judge', 'block'];
 
-  const positive = (intent.positive ?? '').trim().slice(0, INTENT_FIELD_MAX_LENGTH);
-  if (!positive) {
-    rejected.push({ value: intent.positive ?? '', reason: 'intent needs a non-empty description' });
+function isAction(value: unknown): value is RuleAction {
+  return typeof value === 'string' && (ACTIONS as readonly string[]).includes(value);
+}
+
+/**
+ * Fold legacy `softBlockedSites`/`intent` into `sites`/`judge`. A legacy intent meant "judge every
+ * unlisted page, falling back to defaultAction", which is `defaultAction: 'judge'` with that
+ * fallback. Current-shape input passes through untouched.
+ */
+export function migrateLegacyPolicy(input: Partial<Policy> & LegacyPolicyFields): Partial<Policy> {
+  const { softBlockedSites, intent, ...rest } = input;
+  const out: Partial<Policy> = { ...rest };
+  if (!out.sites && Array.isArray(softBlockedSites)) {
+    out.sites = Object.fromEntries(softBlockedSites.map((id) => [id, { features: {} }]));
+  }
+  if (out.judge === undefined && intent !== undefined) {
+    const positive = intent?.positive?.trim();
+    if (positive) {
+      const fallback = out.defaultAction === 'block' ? 'block' : 'allow';
+      out.judge = {
+        tasks: [{ id: 'task-1', title: positive }],
+        avoid: intent?.negative?.trim() ? [intent.negative.trim()] : [],
+        fallback,
+      };
+      out.defaultAction = 'judge';
+    } else {
+      out.judge = null;
+    }
+  }
+  return out;
+}
+
+function clip(value: unknown): string {
+  return typeof value === 'string' ? value.trim().slice(0, JUDGE_TEXT_MAX_LENGTH) : '';
+}
+
+/** Normalize the judge configuration. A judge with no task is dropped: there is nothing to judge against. */
+function normalizeJudge(
+  judge: JudgePolicy | null | undefined,
+  rejected: { value: string; reason: string }[],
+): JudgePolicy | null {
+  if (!judge) return null;
+  const tasks: JudgeTask[] = [];
+  const ids = new Set<string>();
+  for (const task of judge.tasks ?? []) {
+    const title = clip(task?.title);
+    if (!title) continue;
+    let id = clip(task.id) || `task-${tasks.length + 1}`;
+    while (ids.has(id)) id = `${id}-${tasks.length + 1}`;
+    ids.add(id);
+    const notes = clip(task.notes);
+    tasks.push(notes ? { id, title, notes } : { id, title });
+    if (tasks.length === JUDGE_MAX_TASKS) break;
+  }
+  if (tasks.length === 0) {
+    rejected.push({ value: 'judge', reason: 'AI filtering needs at least one task' });
     return null;
   }
+  const avoid = [...new Set((judge.avoid ?? []).map(clip).filter(Boolean))].slice(0, JUDGE_MAX_AVOID);
+  return { tasks, avoid, fallback: judge.fallback === 'block' ? 'block' : 'allow' };
+}
 
-  const negative = (intent.negative ?? '').trim().slice(0, INTENT_FIELD_MAX_LENGTH);
-  return negative ? { positive, negative } : { positive };
+/**
+ * Normalize site rules against the catalog: unknown sites and features are rejected; overrides of
+ * locked features and overrides equal to the catalog default are dropped so stored policies stay
+ * minimal and pick up improved defaults.
+ */
+function normalizeSites(
+  sites: Record<string, SiteRule> | undefined,
+  rejected: { value: string; reason: string }[],
+): Record<string, SiteRule> {
+  const out: Record<string, SiteRule> = {};
+  for (const [id, rule] of Object.entries(sites ?? {})) {
+    const site = siteDefinition(id);
+    if (!site) {
+      rejected.push({ value: id, reason: 'unknown site' });
+      continue;
+    }
+    const features: SiteRule['features'] = {};
+    for (const [featureId, action] of Object.entries(rule?.features ?? {})) {
+      const feature = site.features.find((f) => f.id === featureId);
+      if (!feature || !isAction(action)) {
+        rejected.push({ value: `${id}.${featureId}`, reason: 'unknown site feature or action' });
+        continue;
+      }
+      if (feature.locked || action === feature.default) continue;
+      features[featureId] = action;
+    }
+    out[id] = { features };
+  }
+  return out;
 }
 
 /** Normalize and validate an entire policy. */
-export function normalizePolicy(policy: Policy): NormalizedPolicy {
+export function normalizePolicy(input: Policy | (Partial<Policy> & LegacyPolicyFields)): NormalizedPolicy {
   const rejected: { value: string; reason: string }[] = [];
+  const policy = migrateLegacyPolicy(input);
 
   const blockedDomains = normalizeDomainList(policy.blockedDomains, rejected);
   const blockedSet = new Set(blockedDomains);
@@ -135,8 +222,10 @@ export function normalizePolicy(policy: Policy): NormalizedPolicy {
     allowedDomains.push(d);
   }
 
-  const defaultAction: Policy['defaultAction'] = policy.defaultAction === 'block' ? 'block' : 'allow';
-  const intent = normalizeIntent(policy.intent, rejected);
+  const judge = normalizeJudge(policy.judge, rejected);
+  let defaultAction: RuleAction = isAction(policy.defaultAction) ? policy.defaultAction : 'allow';
+  // Without a judge, `judge` actions resolve to allow at enforcement; say so explicitly.
+  if (defaultAction === 'judge' && !judge) defaultAction = 'allow';
 
   const appSeen = new Set<string>();
   const apps: AppRef[] = [];
@@ -170,24 +259,16 @@ export function normalizePolicy(policy: Policy): NormalizedPolicy {
     }
   }
 
-  const knownSoftSites = new Set(['reddit', 'hackernews']);
-  const softBlockedSites: Policy['softBlockedSites'] = [];
-  for (const id of policy.softBlockedSites ?? []) {
-    if (!knownSoftSites.has(id)) {
-      rejected.push({ value: id, reason: 'unknown soft block site' });
-    } else if (!softBlockedSites.includes(id)) {
-      softBlockedSites.push(id);
-    }
-  }
+  const sites = normalizeSites(policy.sites, rejected);
 
   return {
     blockedDomains,
     allowedDomains,
     defaultAction,
-    intent,
+    judge,
     apps,
     enabledPremadeLists,
-    softBlockedSites,
+    sites,
     rejected,
   };
 }

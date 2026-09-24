@@ -172,7 +172,7 @@ fn dnsmasq_config(policy: &Policy) -> String {
                 .to_ascii_lowercase();
             (!domain.is_empty()).then_some(domain)
         }));
-        exemptions.extend(policy.soft_blocked_sites.iter().flat_map(|site| site.network_domains().iter().map(|domain| domain.to_string())));
+        exemptions.extend(policy.site_network_domains());
         exemptions.extend(
             talysman_common::premade_lists::expand_exemptions(&policy.enabled_premade_lists)
                 .map(str::to_owned),
@@ -263,7 +263,7 @@ mod tests {
     #[test]
     fn dnsmasq_config_does_not_try_to_encode_allowed_domains() {
         let mut p = Policy::default();
-        p.default_action = crate::model::DefaultAction::Block;
+        p.default_action = crate::model::RuleAction::Block;
         p.allowed_domains = vec!["example.com".into()];
         let config = dnsmasq_config(&p);
         assert!(!config.contains("address=/example.com/0.0.0.0"));

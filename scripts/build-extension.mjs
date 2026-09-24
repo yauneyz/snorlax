@@ -58,7 +58,6 @@ const manifestIcons = {
   128: "icon.png",
 };
 const extensionFiles = [
-  "soft-content.js",
   "blocked.html",
   "blocked.css",
   "blocked.js",
@@ -105,53 +104,47 @@ function chromeIdentity() {
   return { manifestKey, id: actualId };
 }
 
+/**
+ * Concatenate extension source modules into one classic script: `export` keywords and relative
+ * `import { … } from './x.js'` statements are removed, so every module must use distinct
+ * top-level names. No other transformation is applied.
+ */
+function concatModules(files) {
+  return files
+    .map((file) =>
+      readFileSync(resolve(srcDir, file), "utf8")
+        .replace(/^\s*import\s+\{[^}]*\}\s+from\s+['"]\.\/[\w-]+\.js['"];?[ \t]*$/gm, "")
+        .replace(/^export\s+/gm, ""),
+    )
+    .join("\n");
+}
+
 function bundledBackground() {
-  const heartbeatTiming = readFileSync(
-    resolve(srcDir, "heartbeat-timing.js"),
-    "utf8",
-  ).replace(/^export\s+/gm, "");
-  const rules = readFileSync(resolve(srcDir, "rules.js"), "utf8").replace(
-    /^export\s+/gm,
-    "",
-  );
-  const contentExtract = readFileSync(
-    resolve(srcDir, "content-extract.js"),
-    "utf8",
-  ).replace(/^export\s+/gm, "");
-  const premadeRulesets = readFileSync(
-    resolve(srcDir, "premade-rulesets.js"),
-    "utf8",
-  ).replace(/^export\s+/gm, "");
-  const premadeRules = readFileSync(
-    resolve(srcDir, "premade-rules.js"),
-    "utf8",
-  ).replace(
-    /^\s*import\s+\{[^}]*\}\s+from\s+['"]\.\/premade-rulesets\.js['"];?\s*$/gm,
-    "",
-  ).replace(/^export\s+/gm, "");
-  const softBlock = readFileSync(resolve(srcDir, "soft-block.js"), "utf8").replace(/^export\s+/gm, "");
-  const background = readFileSync(
-    resolve(srcDir, "background.js"),
-    "utf8",
-  ).replace(
-    /^\s*import\s+\{[^}]*\}\s+from\s+['"]\.\/(?:rules|heartbeat-timing|content-extract|premade-rules|soft-block)\.js['"];?\s*$/gm,
-    "",
-  );
   return (
-    "// Built by scripts/build-extension.mjs — policy helpers + generated premade mappings + background.js bundled.\n\n" +
-    heartbeatTiming +
-    "\n" +
-    rules +
-    "\n" +
-    contentExtract +
-    "\n" +
-    premadeRulesets +
-    "\n" +
-    premadeRules +
-    "\n" +
-    softBlock +
-    "\n" +
-    background
+    "// Built by scripts/build-extension.mjs — policy helpers + generated catalogs + background.js bundled.\n\n" +
+    concatModules([
+      "heartbeat-timing.js",
+      "site-catalog.js",
+      "site-engine.js",
+      "rules.js",
+      "content-extract.js",
+      "premade-rulesets.js",
+      "premade-rules.js",
+      "legacy-compat.js",
+      "background.js",
+    ])
+  );
+}
+
+/** The catalog-site content script, guarded so a repeat injection into the same page is a no-op. */
+function bundledSiteContent() {
+  return (
+    "// Built by scripts/build-extension.mjs — site catalog + engine + site-content.js bundled.\n" +
+    "(() => {\n" +
+    "if (globalThis.__talysmanSiteContentLoaded) return;\n" +
+    "globalThis.__talysmanSiteContentLoaded = true;\n\n" +
+    concatModules(["site-catalog.js", "site-engine.js", "site-content.js"]) +
+    "\n})();\n"
   );
 }
 
@@ -181,6 +174,9 @@ function stageStore(name, manifest, background) {
     JSON.stringify(manifest, null, 2) + "\n",
   );
   writeFileSync(resolve(outputDir, "background.js"), background);
+  writeFileSync(resolve(outputDir, "site-content.js"), bundledSiteContent());
+  // Loaded by blocked.html as a classic script.
+  writeFileSync(resolve(outputDir, "site-catalog.js"), concatModules(["site-catalog.js"]));
   for (const [name, source] of Object.entries(iconFiles)) {
     copyFileSync(source, resolve(outputDir, name));
   }
@@ -358,7 +354,8 @@ apps/extension/dist/talysman-${browser}-${version}.zip
 \`\`\`
 
 The build script removes the ES module \`export\` and \`import\` statements from the extension's
-source modules, then concatenates them into an unminified, unobfuscated \`background.js\`. It generates the browser-specific
+source modules, then concatenates them into unminified, unobfuscated \`background.js\` and
+\`site-content.js\` bundles (plus a classic-script copy of the generated \`site-catalog.js\`). It generates the browser-specific
 \`manifest.json\`, copies the remaining JavaScript, HTML, CSS, SVG, and PNG files without code
 transformation, and writes a standard compressed ZIP.
 `;

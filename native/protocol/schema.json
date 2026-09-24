@@ -1,6 +1,6 @@
 {
   "$comment": "Language-neutral mirror of packages/shared/src/protocol.ts + events.ts. NDJSON carries one envelope per line.",
-  "protocolVersion": 4,
+  "protocolVersion": 5,
   "transport": {
     "windows": "named pipe \\\\.\\pipe\\talysman (dev: talysman-dev)",
     "linux": "Unix socket /run/talysman/talysman.sock",
@@ -14,15 +14,22 @@
   },
   "types": {
     "AppRef": { "windowsImageName": "string?", "linuxProcessName": "string?", "macBundleId": "string?", "label": "string" },
-    "PolicyIntent": { "positive": "string", "negative": "string?" },
+    "RuleAction": "allow|judge|block",
+    "JudgeTask": { "id": "string", "title": "string", "notes": "string?" },
+    "JudgePolicy": { "tasks": "JudgeTask[]", "avoid": "string[]", "fallback": "allow|block" },
+    "SiteRule": { "features": "Record<featureId, RuleAction>", "$comment": "Feature ids come from the site catalog (packages/shared/src/sites); omitted features use the catalog default." },
     "Policy": {
       "blockedDomains": "string[]",
       "allowedDomains": "string[]",
-      "defaultAction": "allow|block",
-      "intent": "PolicyIntent|null",
+      "defaultAction": "RuleAction",
+      "judge": "JudgePolicy|null",
       "apps": "AppRef[]",
-      "$comment": "The sole current policy shape. Production classic filtering uses intent:null; feature rollout does not change the wire contract. Legacy mode/domains are accepted only while reading old persisted state."
+      "enabledPremadeLists": "PremadeListId[]",
+      "sites": "Record<siteId, SiteRule>",
+      "$comment": "The sole current policy shape. Legacy mode/domains (pre-profiles) and softBlockedSites/intent (protocol 4) are accepted only while reading old persisted state or old clients."
     },
+    "JudgeContext": { "site": "string", "feature": "string" },
+    "JudgePage": { "url": "string", "title": "string", "content": "string", "context": "JudgeContext?" },
     "Profile": { "id": "string", "name": "string", "color": "string", "policy": "Policy" },
     "ScheduleWindow": { "id": "string", "days": "string[]", "start": "HH:MM", "end": "HH:MM", "profileId": "string?", "locked": "boolean" },
     "Schedule": { "windows": "ScheduleWindow[]" },
@@ -60,7 +67,7 @@
     "setTrayIconEnabled": { "params": { "enabled": "boolean" }, "result": { "ok": true } },
     "setSmartFilteringEnabled": { "params": { "enabled": "boolean" }, "result": { "ok": true } },
     "extHeartbeat": {
-      "params": { "browserPid": "number", "browser": "string", "workerSessionId": "string?", "sequence": "number?", "sentAt": "number?", "extensionVersion": "string?", "lockedActive": "boolean?", "health": "BrowserHealth" },
+      "params": { "browserPid": "number", "browser": "string", "workerSessionId": "string?", "sequence": "number?", "sentAt": "number?", "extensionVersion": "string?", "siteCapability": "number?", "lockedActive": "boolean?", "health": "BrowserHealth" },
       "result": { "heartbeat": { "sequence": "number", "browserPid": "number", "healthy": "boolean" } }
     },
     "enableFocus": { "params": { "reason": "string?" }, "result": { "ok": true }, "errors": ["NO_PAIRED_KEY"] },
@@ -70,8 +77,8 @@
     "listRemovableDrives": { "params": null, "result": { "drives": "Drive[]" } },
     "pairKey": { "params": { "driveId": "string", "label": "string" }, "result": { "key": "PairedKey" } },
     "unpairKey": { "params": { "keyId": "string" }, "result": { "ok": true }, "errors": ["KEY_REQUIRED", "LAST_PAIRED_KEY"] },
-    "judgeRequest": { "params": { "requestId": "string", "url": "string", "extractedText": "string" }, "result": { "ok": true } },
-    "submitJudgeVerdict": { "params": { "requestId": "string", "relevant": "boolean", "reason": "string" }, "result": { "ok": true } }
+    "judgeRequest": { "params": "JudgePage & { requestId: string }", "result": { "ok": true }, "errors": ["BAD_REQUEST"] },
+    "submitJudgeVerdict": { "params": { "requestId": "string", "verdict": "allow|block", "reason": "string" }, "result": { "ok": true } }
   },
   "events": {
     "stateChanged": { "state": "ServiceState" },
@@ -84,8 +91,8 @@
     "browserWatchdogWarning": { "browser": "string", "pid": "number" },
     "browserWatchdogKilled": { "browser": "string", "pid": "number" },
     "extensionHeartbeat": { "browser": "string", "pid": "number", "extensionVersion": "string?", "healthy": "boolean" },
-    "judgeRequested": { "requestId": "string", "url": "string", "extractedText": "string", "intent": "PolicyIntent" },
-    "judgeResult": { "requestId": "string", "url": "string", "relevant": "boolean", "reason": "string" }
+    "judgeRequested": "JudgePage & { requestId: string, judge: JudgePolicy }",
+    "judgeResult": { "requestId": "string", "url": "string", "verdict": "allow|block", "reason": "string" }
   },
   "errorCodes": ["KEY_REQUIRED", "NO_PAIRED_KEY", "LAST_PAIRED_KEY", "LAST_PROFILE", "LOCKED", "BAD_REQUEST", "INTERNAL"]
 }

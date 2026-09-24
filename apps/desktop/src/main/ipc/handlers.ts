@@ -6,7 +6,7 @@
 
 import { app, BrowserWindow, dialog, ipcMain, Notification, shell } from 'electron';
 import { ErrorCode, type EventName, type Method, type Params, type TransitionKind } from '@talysman/shared';
-import { productFeaturesForEnvironment } from '@talysman/product';
+import { policyUsesJudge, productFeaturesForEnvironment } from '@talysman/product';
 import { config } from '../config.js';
 import { logger } from '../logging.js';
 import { listInstalledApps } from '../appDiscovery.js';
@@ -189,7 +189,7 @@ function limitError(message: string) {
 
 function productionPolicyError(policy: Params<'setPolicy'>['policy']): string | undefined {
   if (features.smartFiltering) return undefined;
-  if (policy.intent !== null) return 'Smart filtering is only available in development builds.';
+  if (policyUsesJudge(policy)) return 'AI filtering is not available in this build.';
   if (policy.defaultAction === 'allow' && policy.allowedDomains.length > 0) {
     return 'Blacklist mode cannot contain an allow list.';
   }

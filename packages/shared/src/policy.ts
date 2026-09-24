@@ -1,16 +1,21 @@
 /**
- * Policy data model (architecture §7). The *normalized* form (produced by
+ * Policy data model (architecture §7 and "Blocking model"). The *normalized* form (produced by
  * @core/policyNormalize) is what crosses the IPC boundary to the privileged service.
  *
- * There is no enforced "mode" anymore: `blockedDomains` and `allowedDomains` are independent
- * hard lists (never judged), `defaultAction` decides everything that hits neither list (and is
- * also the fail-closed/fail-open fallback when `intent` judging is unreachable), and `intent`
- * is an optional third layer that only evaluates domains falling through both hard lists.
- * Classic blacklist/whitelist/block-all are just presets over this shape — see
- * `apps/desktop/src/renderer/pages/Blocklists.tsx`.
+ * Every layer yields a `RuleAction` — allow, judge, or block — evaluated in this order:
+ *   1. `blockedDomains` — hard block, never judged.
+ *   2. `sites` — per-site feature rules from the site catalog (`./sites`), e.g. Reddit posts
+ *      allowed while its feeds are blocked. Features may also be `judge`d.
+ *   3. `allowedDomains` — hard allow, never judged.
+ *   4. `enabledPremadeLists` — built-in category blocklists.
+ *   5. `defaultAction` — everything else: allowed, blocked, or judged.
+ * `judge` hands the page to the AI judge, which weighs it against `judge.tasks` and `judge.avoid`
+ * and falls back to `judge.fallback` when it can't answer. Classic blacklist/whitelist/block-all/
+ * smart are presets over this shape — see `apps/desktop/src/renderer/pages/Blocklists.tsx`.
  */
 
 import type { PremadeListId } from './premadeLists';
+import type { RuleAction, SiteRule } from './sites/types';
 
 export type { PremadeListId, PremadeListMeta } from './premadeLists';
 export { PREMADE_LISTS } from './premadeLists';
@@ -30,14 +35,20 @@ export interface AppRef {
   label: string;
 }
 
-/**
- * What the user is working on, judged against pages that hit neither hard list. `positive` is
- * required for `intent` to be non-null; `negative` names things to still exclude even if
- * plausibly related.
- */
-export interface PolicyIntent {
-  positive: string;
-  negative?: string;
+/** Something the user is working on; the AI judge allows pages that help with any task. */
+export interface JudgeTask {
+  id: string;
+  title: string;
+  notes?: string;
+}
+
+/** Configuration for the AI judge that resolves every `judge` action. */
+export interface JudgePolicy {
+  tasks: JudgeTask[];
+  /** Things to block even when plausibly related to a task ("help me avoid"). */
+  avoid: string[];
+  /** What a `judge` action becomes when the judge can't answer (offline, over budget, unentitled). */
+  fallback: 'allow' | 'block';
 }
 
 export interface Policy {
@@ -45,23 +56,23 @@ export interface Policy {
   blockedDomains: string[];
   /** Hard allow — always permitted, never judged (and never sent for content extraction). */
   allowedDomains: string[];
-  /** Fallback for domains on neither hard list; also the fallback when the judge is unreachable. */
-  defaultAction: 'allow' | 'block';
-  /** Non-null activates Smart filtering for domains on neither hard list. */
-  intent: PolicyIntent | null;
+  /** Action for pages no other layer decides. */
+  defaultAction: RuleAction;
+  /** AI judge configuration; required for any `judge` action to be judged (otherwise they allow). */
+  judge: JudgePolicy | null;
   apps: AppRef[];
   /** Built-in bulk blocklist categories the user has toggled on (e.g. "nsfw", "shopping"). */
   enabledPremadeLists: PremadeListId[];
-  /** Supported sites whose feeds are closed while direct content and search remain available. */
-  softBlockedSites: ('reddit' | 'hackernews')[];
+  /** Site-catalog rules keyed by site id. A present key enables the site's rules. */
+  sites: Record<string, SiteRule>;
 }
 
 export const EMPTY_POLICY: Policy = {
   blockedDomains: [],
   allowedDomains: [],
   defaultAction: 'allow',
-  intent: null,
+  judge: null,
   apps: [],
   enabledPremadeLists: [],
-  softBlockedSites: [],
+  sites: {},
 };

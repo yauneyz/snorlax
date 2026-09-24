@@ -27,21 +27,39 @@ service (named pipe)  ──►  talysman-natmsg.exe  ──►  extension backg
    getState + events       (native-messaging host)     dynamic policy + static categories
 ```
 
+- `src/site-engine.js` — **pure** decision engine shared by the worker, the content script, and the
+  tests. `decide(state, url, sourceUrl)` walks the policy layers (hard block → site rules → hard
+  allow → default) and returns `allow`, `block`, or `judge`, plus which layer/site/feature decided.
 - `src/rules.js` — **pure** `policy → DNR rule` translation (unit-tested in
-  `tests/electron/unit/extension-rules.test.ts`, no `chrome.*`). Blacklist blocks the listed domains
-  (+ subdomains); whitelist default-denies and allows the listed domains at higher priority;
-  block-all blocks everything; focus-off emits no rules. Matching top-level HTTP(S) navigations
-  redirect to the packaged `blocked.html`, while matching subresources are terminated silently.
-- `src/blocked.html` / `blocked.css` — the fixed local page shown for a blocked navigation. It
-  receives no attempted URL or domain and uses the Talysman brand mark packaged from `assets/brand/`.
+  `tests/electron/unit/extension-rules.test.ts` and `site-catalog.test.ts`, no `chrome.*`).
+  Blacklist blocks the listed domains (+ subdomains); whitelist default-denies and allows the listed
+  domains at higher priority; block-all blocks everything; focus-off emits no rules. Each enabled
+  site compiles into a priority band — one rule per catalog route, earlier routes higher — so DNR's
+  highest-priority-wins resolution reproduces the engine's first-match routing exactly. Matching
+  top-level HTTP(S) navigations redirect to the packaged `blocked.html`, while matching
+  subresources are terminated silently.
+- `src/blocked.html` / `blocked.css` / `blocked.js` — the fixed local page shown for a blocked
+  navigation. It receives no attempted URL or domain — only which layer, site, and feature decided
+  (and the AI judge's reason) — and offers the site's catalog entry points (search, messages, …)
+  that are still allowed. It uses the Talysman brand mark packaged from `assets/brand/`.
 - `src/background.js` — connects to the native-messaging host `com.talysman.host`, applies rules on
   each pushed state, and on host disconnect **keeps the last ruleset** while reconnecting (so killing
   the bridge can't unblock a locked session). DNR dynamic rules persist across service-worker
   restarts, so enforcement survives the MV3 worker sleeping.
-- Soft blocks for Reddit and Hacker News are profile policy entries. While focus is active, DNR
-  admits only specific post/discussion URLs (plus Reddit search and messages); a site content
-  script removes discovery links and stops navigation to other posts. The native host sends older
-  extensions a hard block for these sites until they advertise soft-block capability.
+- **Site rules** (soft blocks) come from the site catalog in `packages/shared/src/sites` — one
+  declarative module per site, decomposed into features (feed, recommendations, messages, …) that
+  the user sets to Allow, AI, or Block. `src/site-catalog.js` is generated from it
+  (`pnpm generate:sites`); no extension code names a site. The generic `src/site-content.js`
+  (bundled with the catalog and engine) hides the elements of blocked features, hides links whose
+  navigation would be blocked, and stops in-page navigation to them. The worker's webNavigation
+  backstop enforces what DNR can't express: hops between items (post → post, autoplay) and `judge`.
+- **AI judge** — any `judge` decision lets the page load, extracts its text (focused on the
+  route's content selector when the catalog has one), and asks the daemon (`judge-request`), which
+  attaches the user's tasks/"help me avoid" list and answers via Electron and the web judge.
+- **Capabilities** — `hello` advertises `siteCapability` and the catalog `siteIds`; the native host
+  hard-blocks any enabled site this build doesn't know and pre-resolves `judge` to the judge's
+  fallback when AI filtering is unavailable. `src/legacy-compat.js` (`LEGACY-COMPAT(v5)`) keeps
+  this build working with protocol-4 native hosts.
 - `resources/premade-lists/` — generated static DNR containers for built-in categories. Categories
   share five containers capped below AMO's 5MB per-file parser limit; the worker toggles individual
   rule IDs, so arbitrary category combinations do not consume one enabled ruleset per category.
@@ -51,7 +69,8 @@ service (named pipe)  ──►  talysman-natmsg.exe  ──►  extension backg
   focus state, reconnect/fail-safe state, and rule-application health. It never receives or displays
   the user's configured domains; blocking remains controlled by the desktop app.
 - `talysman-natmsg` (`talysman-natmsg.exe` on Windows) — bridges browser stdio ⇄ the service IPC,
-  relaying the canonical protocol-v4 policy from `getState` and pushed events.
+  shaping the policy from `getState` and pushed events into the frame each extension build can
+  enforce (`native/common/src/natmsg_frames.rs`).
 
 ## Installation and native-host registration
 

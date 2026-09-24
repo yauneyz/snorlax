@@ -6,7 +6,7 @@
 //! genuinely platform-specific — the browser image-name table and app matching, which differ by
 //! executable naming convention (`chrome.exe` vs `google-chrome`).
 
-use crate::policy::{AppRef, DefaultAction, Policy};
+use crate::policy::{AppRef, Policy, RuleAction};
 use crate::premade_lists;
 
 /// Does `host` match `pattern`? `pattern` may be exact ("youtube.com") or a leading wildcard
@@ -21,37 +21,38 @@ pub fn host_matches(host: &str, pattern: &str) -> bool {
     }
 }
 
-/// Should a DNS query for `host` be blocked under `policy`? `blockedDomains` and `allowedDomains`
-/// are hard, never-judged lists (block wins if a domain is somehow on both — see
-/// `packages/core/src/policyNormalize.ts`); `allowedDomains` also exempts a host from the
-/// built-in premade lists (`enabledPremadeLists`), which are checked next — this is the escape
-/// hatch for a user who wants a category blocked except for one site. Anything on neither hard
-/// list and not in an enabled premade list falls back to `defaultAction`, UNLESS `intent` is set,
-/// in which case unlisted hosts are let through so the page can load and the browser extension's
-/// `judgeRequest` gets a chance to run. `defaultAction` still applies in that case — just as the
-/// fail-closed/fail-open fallback if the judge never answers (see
-/// `platform_core::sweep_expired_judges`), not as a live gate here.
+/// Is `host` served by an enabled site rule (the site's own hosts or its asset domains)?
+pub fn is_site_network_host(policy: &Policy, host: &str) -> bool {
+    policy
+        .catalog_sites()
+        .any(|(site, _)| site.all_domains().any(|domain| host_matches(host, domain)))
+}
+
+/// Should a DNS query for `host` be blocked under `policy`? This is the host-level projection of
+/// the layer order every enforcer shares (see apps/extension/src/site-engine.js):
+///
+/// 1. `blockedDomains` — hard block.
+/// 2. Site rules — an enabled catalog site's hosts and asset domains pass; the extension enforces
+///    the site's per-feature rules page by page.
+/// 3. `allowedDomains` — hard allow; also exempts a host from the premade lists, which is the
+///    escape hatch for a user who wants a category blocked except for one site.
+/// 4. `enabledPremadeLists` — block.
+/// 5. `defaultAction` — `judge` lets the page load so the AI judge can read it; its fallback
+///    applies later, per page (see `platform_core::sweep_expired_judges`), not here.
 pub fn is_host_blocked(policy: &Policy, host: &str) -> bool {
     if policy.blocked_domains.iter().any(|p| host_matches(host, p)) {
         return true;
     }
-    if policy.allowed_domains.iter().any(|p| host_matches(host, p)) {
+    if is_site_network_host(policy, host) {
         return false;
     }
-    if policy.soft_blocked_sites.iter().any(|site| site.network_domains().iter().any(|domain| host_matches(host, domain))) {
+    if policy.allowed_domains.iter().any(|p| host_matches(host, p)) {
         return false;
     }
     if premade_lists::is_blocked_by_premade(&policy.enabled_premade_lists, host) {
         return true;
     }
-    if policy.intent.is_some() {
-        // Smart filtering judges unlisted hosts at the page level (judgeRequest), which requires
-        // the page to actually load. The DNS/packet layer must not preempt that by sinkholing on
-        // `defaultAction` here — `defaultAction` still applies as the fail-closed/fail-open
-        // fallback if the judge never answers (see platform_core::sweep_expired_judges).
-        return false;
-    }
-    policy.default_action == DefaultAction::Block
+    policy.default_action == RuleAction::Block
 }
 
 /// A dot-less host that matches no realistic domain pattern (only an exact-equality pattern for
@@ -76,8 +77,13 @@ fn same_app(a: &AppRef, b: &AppRef) -> bool {
 /// Whether `next` blocks at least everything `prev` blocked. Domains: every host `prev` sinkholes,
 /// `next` must sinkhole too — checked over the base of each listed pattern plus a non-matching
 /// sentinel, which is a sound and complete witness set for `is_host_blocked`. Apps: `next` must
-/// still block every app `prev` blocked. Equal or stricter policies return true; any relaxation
-/// (unblocking a site or app, or a `defaultAction` change that frees traffic) returns false.
+/// still block every app `prev` blocked. Site rules: every feature of every site `prev` rules
+/// must be at least as restricted in `next` (block > judge > allow), unless `next` hard-blocks the
+/// whole site. The AI judge: `defaultAction` may not weaken (block > judge > allow), and the judge
+/// may not be removed while `prev` relies on it — but editing tasks is not a relaxation, since
+/// users must be able to update what they're working on mid-session. Equal or stricter policies
+/// return true; any relaxation returns false. Mirrored in TS by
+/// packages/core/src/restrictiveness.ts.
 ///
 /// This is what gates un-keyed policy edits: loosening enforcement requires the USB key, so a
 /// false here is what forces the prompt.
@@ -99,9 +105,8 @@ pub fn is_at_least_as_restrictive(prev: &Policy, next: &Policy) -> bool {
             hosts.push(base);
         }
     }
-    for site in prev.soft_blocked_sites.iter().chain(next.soft_blocked_sites.iter()) {
-        hosts.extend(site.network_domains().iter().map(|domain| domain.to_string()));
-    }
+    hosts.extend(prev.site_network_domains());
+    hosts.extend(next.site_network_domains());
     hosts.push(NO_MATCH_SENTINEL.to_string());
 
     for host in &hosts {
@@ -118,11 +123,26 @@ pub fn is_at_least_as_restrictive(prev: &Policy, next: &Policy) -> bool {
         return false;
     }
 
-    // Removing a soft block opens feeds even though both policies allow the hostname.
-    if !prev.soft_blocked_sites.iter().all(|site| {
-        next.soft_blocked_sites.contains(site)
-            || next.blocked_domains.iter().any(|domain| host_matches(site.domain(), domain))
-    }) {
+    // Loosening or removing a site rule opens feeds even though both policies let the hostname
+    // through. Hard-blocking the site's primary host instead is at least as restrictive.
+    for (site, rule) in prev.catalog_sites() {
+        let hard_blocked = site
+            .hosts
+            .first()
+            .is_some_and(|host| next.blocked_domains.iter().any(|domain| host_matches(host, domain)));
+        if hard_blocked {
+            continue;
+        }
+        match next.sites.get(&site.id) {
+            Some(after) if site.at_least_as_restrictive(Some(rule), Some(after)) => {}
+            _ => return false,
+        }
+    }
+
+    if next.default_action.rank() < prev.default_action.rank() {
+        return false;
+    }
+    if prev.judge.is_some() && next.judge.is_none() && prev.uses_judge() {
         return false;
     }
 
@@ -149,7 +169,7 @@ pub fn effective_dns_sinkhole_domains(policy: &Policy) -> std::collections::BTre
             .allowed_domains
             .iter()
             .any(|p| host_matches(&domain, p))
-            || policy.soft_blocked_sites.iter().any(|site| site.network_domains().iter().any(|network| host_matches(&domain, network)))
+            || is_site_network_host(policy, &domain)
         {
             continue;
         }
@@ -192,35 +212,90 @@ pub fn is_doh_bypass_host(host: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::policy::DefaultAction;
 
-    fn policy(blocked: &[&str], allowed: &[&str], default_action: DefaultAction) -> Policy {
+    fn policy(blocked: &[&str], allowed: &[&str], default_action: RuleAction) -> Policy {
         Policy {
             blocked_domains: blocked.iter().map(|s| (*s).into()).collect(),
             allowed_domains: allowed.iter().map(|s| (*s).into()).collect(),
             default_action,
-            intent: None,
+            judge: None,
             apps: Vec::new(),
             enabled_premade_lists: Vec::new(),
-            soft_blocked_sites: Vec::new(),
+            sites: Default::default(),
         }
     }
 
+    fn with_site(mut p: Policy, id: &str, features: &[(&str, RuleAction)]) -> Policy {
+        p.sites.insert(
+            id.into(),
+            crate::policy::SiteRule { features: features.iter().map(|(f, a)| ((*f).into(), *a)).collect() },
+        );
+        p
+    }
+
     #[test]
-    fn soft_block_is_a_key_gated_relaxation_of_a_hard_block() {
-        use crate::policy::SoftBlockedSite;
-        let hard = policy(&["reddit.com"], &[], DefaultAction::Allow);
-        let mut soft = policy(&[], &[], DefaultAction::Allow);
-        soft.soft_blocked_sites.push(SoftBlockedSite::Reddit);
+    fn a_site_rule_is_a_key_gated_relaxation_of_a_hard_block() {
+        let hard = policy(&["reddit.com"], &[], RuleAction::Allow);
+        let soft = with_site(policy(&[], &[], RuleAction::Allow), "reddit", &[]);
         assert!(!is_at_least_as_restrictive(&hard, &soft));
         assert!(is_at_least_as_restrictive(&soft, &hard));
-        assert!(!is_at_least_as_restrictive(&soft, &policy(&[], &[], DefaultAction::Allow)));
+        assert!(!is_at_least_as_restrictive(&soft, &policy(&[], &[], RuleAction::Allow)));
+    }
+
+    #[test]
+    fn site_rules_let_site_and_asset_hosts_through_default_deny_and_premade_lists() {
+        let mut p = with_site(policy(&[], &[], RuleAction::Block), "youtube", &[]);
+        p.enabled_premade_lists = vec![PremadeListId::Social];
+        assert!(!is_host_blocked(&p, "www.youtube.com"));
+        assert!(!is_host_blocked(&p, "i.ytimg.com"));
+        assert!(is_host_blocked(&p, "example.com"));
+        p.blocked_domains = vec!["youtube.com".into()];
+        assert!(is_host_blocked(&p, "www.youtube.com"));
+    }
+
+    #[test]
+    fn loosening_any_feature_is_a_relaxation_and_tightening_is_not() {
+        let base = with_site(policy(&[], &[], RuleAction::Allow), "youtube", &[]);
+        let open_feed = with_site(policy(&[], &[], RuleAction::Allow), "youtube", &[("feed", RuleAction::Allow)]);
+        let judged_feed = with_site(policy(&[], &[], RuleAction::Allow), "youtube", &[("feed", RuleAction::Judge)]);
+        let blocked_content = with_site(policy(&[], &[], RuleAction::Allow), "youtube", &[("content", RuleAction::Block)]);
+        assert!(!is_at_least_as_restrictive(&base, &open_feed));
+        assert!(!is_at_least_as_restrictive(&base, &judged_feed));
+        assert!(is_at_least_as_restrictive(&judged_feed, &base));
+        assert!(is_at_least_as_restrictive(&base, &blocked_content));
+        assert!(!is_at_least_as_restrictive(&blocked_content, &base));
+        // Locked features can't be loosened by an override.
+        let essentials = with_site(policy(&[], &[], RuleAction::Allow), "youtube", &[("essentials", RuleAction::Block)]);
+        assert!(is_at_least_as_restrictive(&essentials, &base));
+    }
+
+    #[test]
+    fn weakening_the_default_or_dropping_the_judge_is_a_relaxation() {
+        let judge = crate::policy::JudgePolicy {
+            tasks: vec![crate::policy::JudgeTask { id: "a".into(), title: "thesis".into(), notes: None }],
+            avoid: vec![],
+            fallback: DefaultAction::Allow,
+        };
+        let mut judged = policy(&[], &[], RuleAction::Judge);
+        judged.judge = Some(judge.clone());
+        assert!(!is_at_least_as_restrictive(&judged, &policy(&[], &[], RuleAction::Allow)));
+        assert!(is_at_least_as_restrictive(&policy(&[], &[], RuleAction::Allow), &judged));
+        assert!(!is_at_least_as_restrictive(&policy(&[], &[], RuleAction::Block), &judged));
+        let mut dropped = judged.clone();
+        dropped.judge = None;
+        assert!(!is_at_least_as_restrictive(&judged, &dropped));
+        // Editing tasks mid-session is allowed.
+        let mut edited = judged.clone();
+        edited.judge.as_mut().unwrap().tasks[0].title = "chapter two".into();
+        assert!(is_at_least_as_restrictive(&judged, &edited));
     }
 
     use crate::policy::PremadeListId;
 
     #[test]
     fn enabling_a_premade_list_blocks_its_domains() {
-        let p = policy(&[], &[], DefaultAction::Allow);
+        let p = policy(&[], &[], RuleAction::Allow);
         assert!(!is_host_blocked(&p, "amazon.com"));
 
         let mut with_shopping = p.clone();
@@ -235,7 +310,7 @@ mod tests {
 
     #[test]
     fn allowed_domains_exempt_a_host_from_an_enabled_premade_list() {
-        let mut p = policy(&[], &["amazon.com"], DefaultAction::Allow);
+        let mut p = policy(&[], &["amazon.com"], RuleAction::Allow);
         p.enabled_premade_lists = vec![PremadeListId::Shopping];
         assert!(!is_host_blocked(&p, "amazon.com"));
         // Other shopping domains stay blocked.
@@ -244,7 +319,7 @@ mod tests {
 
     #[test]
     fn enabling_a_premade_list_is_more_restrictive_and_disabling_one_is_a_relaxation() {
-        let mut off = policy(&[], &[], DefaultAction::Allow);
+        let mut off = policy(&[], &[], RuleAction::Allow);
         let mut on = off.clone();
         on.enabled_premade_lists = vec![PremadeListId::Shopping];
         assert!(is_at_least_as_restrictive(&off, &on));
@@ -257,7 +332,7 @@ mod tests {
 
     #[test]
     fn widening_the_allow_list_under_a_premade_list_is_a_relaxation() {
-        let mut prev = policy(&[], &[], DefaultAction::Allow);
+        let mut prev = policy(&[], &[], RuleAction::Allow);
         prev.enabled_premade_lists = vec![PremadeListId::Shopping];
         let mut next = prev.clone();
         next.allowed_domains = vec!["amazon.com".into()];
@@ -279,7 +354,7 @@ mod tests {
 
     #[test]
     fn blocked_list_wins_and_allow_list_exempts() {
-        let p = policy(&["reddit.com"], &["docs.reddit.com"], DefaultAction::Allow);
+        let p = policy(&["reddit.com"], &["docs.reddit.com"], RuleAction::Allow);
         assert!(is_host_blocked(&p, "reddit.com"));
         // Block wins when a host matches both lists — the normalizer is expected to prevent this,
         // but enforcement must fail safe if it ever slips through.
@@ -289,43 +364,39 @@ mod tests {
 
     #[test]
     fn default_action_governs_hosts_on_neither_list() {
-        let open = policy(&[], &[], DefaultAction::Allow);
+        let open = policy(&[], &[], RuleAction::Allow);
         assert!(!is_host_blocked(&open, "example.com"));
 
-        let closed = policy(&[], &["docs.rs"], DefaultAction::Block);
+        let closed = policy(&[], &["docs.rs"], RuleAction::Block);
         assert!(is_host_blocked(&closed, "example.com"));
         assert!(!is_host_blocked(&closed, "docs.rs"));
         assert!(!is_host_blocked(&closed, "sub.docs.rs"));
     }
 
-    /// With `intent` set, `defaultAction: Block` must not sinkhole unlisted hosts at the DNS
-    /// layer — that would stop the page from ever loading, so the extension's `judgeRequest`
-    /// (which is what's actually supposed to decide unlisted hosts) never runs.
+    /// `defaultAction: judge` must not sinkhole unlisted hosts at the DNS layer — that would
+    /// stop the page from ever loading, so the extension's `judgeRequest` (which is what's
+    /// actually supposed to decide unlisted hosts) never runs.
     #[test]
-    fn intent_lets_unlisted_hosts_through_regardless_of_default_action() {
-        let mut smart = policy(&[], &[], DefaultAction::Block);
-        smart.intent = Some(crate::policy::Intent {
-            positive: "rust compilers".into(),
-            negative: None,
-        });
+    fn a_judged_default_lets_unlisted_hosts_through() {
+        let mut smart = policy(&[], &[], RuleAction::Judge);
         assert!(!is_host_blocked(&smart, "example.com"));
-        // Hard lists still win even with intent set.
+        // Hard lists still win under a judged default.
         smart.blocked_domains = vec!["evil.com".into()];
         assert!(is_host_blocked(&smart, "evil.com"));
     }
 
     #[test]
     fn adding_a_blocked_domain_is_more_restrictive() {
-        let prev = policy(&["reddit.com"], &[], DefaultAction::Allow);
-        let next = policy(&["reddit.com", "x.com"], &[], DefaultAction::Allow);
+        let prev = policy(&["reddit.com"], &[], RuleAction::Allow);
+        let next = policy(&["reddit.com", "x.com"], &[], RuleAction::Allow);
         assert!(is_at_least_as_restrictive(&prev, &next));
         assert!(!is_at_least_as_restrictive(&next, &prev));
     }
 
     #[test]
     fn switching_the_default_to_block_is_more_restrictive() {
-        let open = policy(&[], &[], DefaultAction::Allow);
-        let closed = policy(&[], &[], DefaultAction::Block);
+        let open = policy(&[], &[], RuleAction::Allow);
+        let closed = policy(&[], &[], RuleAction::Block);
         assert!(is_at_least_as_restrictive(&open, &closed));
         assert!(!is_at_least_as_restrictive(&closed, &open));
     }
@@ -334,15 +405,15 @@ mod tests {
     /// treated as a relaxation and require the key.
     #[test]
     fn widening_an_allow_list_is_a_relaxation() {
-        let prev = policy(&[], &["docs.rs"], DefaultAction::Block);
-        let next = policy(&[], &["docs.rs", "reddit.com"], DefaultAction::Block);
+        let prev = policy(&[], &["docs.rs"], RuleAction::Block);
+        let next = policy(&[], &["docs.rs", "reddit.com"], RuleAction::Block);
         assert!(!is_at_least_as_restrictive(&prev, &next));
         assert!(is_at_least_as_restrictive(&next, &prev));
     }
 
     #[test]
     fn an_identical_policy_is_at_least_as_restrictive() {
-        let p = policy(&["reddit.com"], &["docs.rs"], DefaultAction::Block);
+        let p = policy(&["reddit.com"], &["docs.rs"], RuleAction::Block);
         assert!(is_at_least_as_restrictive(&p, &p));
     }
 
@@ -354,9 +425,9 @@ mod tests {
             mac_bundle_id: None,
             label: name.into(),
         };
-        let mut prev = policy(&[], &[], DefaultAction::Allow);
+        let mut prev = policy(&[], &[], RuleAction::Allow);
         prev.apps = vec![app("chrome.exe")];
-        let next = policy(&[], &[], DefaultAction::Allow);
+        let next = policy(&[], &[], RuleAction::Allow);
         assert!(!is_at_least_as_restrictive(&prev, &next));
         assert!(is_at_least_as_restrictive(&next, &prev));
     }
@@ -365,14 +436,14 @@ mod tests {
     /// recognized as the same executable and does not read as a relaxation.
     #[test]
     fn app_identity_ignores_the_exe_suffix_and_label() {
-        let mut prev = policy(&[], &[], DefaultAction::Allow);
+        let mut prev = policy(&[], &[], RuleAction::Allow);
         prev.apps = vec![AppRef {
             windows_image_name: Some("Chrome.exe".into()),
             linux_process_name: None,
             mac_bundle_id: None,
             label: "Chrome".into(),
         }];
-        let mut next = policy(&[], &[], DefaultAction::Allow);
+        let mut next = policy(&[], &[], RuleAction::Allow);
         next.apps = vec![AppRef {
             windows_image_name: Some("chrome".into()),
             linux_process_name: None,

@@ -4,6 +4,7 @@ import { readFileSync, readdirSync, statSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
 import { PREMADE_RULESETS } from "../apps/extension/src/premade-rulesets.js";
+import { SITE_CATALOG } from "../apps/extension/src/site-catalog.js";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const extensionDir = resolve(root, "apps/extension");
@@ -38,7 +39,8 @@ const expectedFiles = [
   "popup.html",
   "popup.js",
   "premade-lists",
-  "soft-content.js",
+  "site-catalog.js",
+  "site-content.js",
 ];
 
 function fail(message) {
@@ -228,7 +230,8 @@ for (const [store, directory] of Object.entries({
     "popup-view.js",
     "popup.html",
     "popup.css",
-    "soft-content.js",
+    "site-catalog.js",
+    "site-content.js",
   ]
     .map((file) => readFileSync(resolve(storeDir, file), "utf8"))
     .join("\n");
@@ -242,11 +245,28 @@ for (const [store, directory] of Object.entries({
     ["sendBeacon", /\bsendBeacon\b/],
     ["remote URL", /\bhttps?:\/\//],
   ];
-  // The blocked page's user-submitted Reddit search form is the sole reviewed navigation URL.
-  // Keep rejecting all other remote URLs and all programmatic network clients.
-  const auditedText = packagedText.replace('action="https://www.reddit.com/search/"', 'action="reviewed-reddit-search"');
+  // The site catalog's entry points are the blocked page's fixed search/shortcut destinations
+  // (validated as plain https URLs by scripts/lib/site-catalog.ts). Reject any other remote URL in
+  // packaged code, as well as every programmatic network client above.
+  const reviewedNavigationUrls = Object.values(SITE_CATALOG).flatMap((site) =>
+    site.entryPoints.map((entry) => entry.url),
+  );
+  let auditedText = packagedText;
+  for (const url of reviewedNavigationUrls) {
+    auditedText = auditedText.replaceAll(JSON.stringify(url), '"reviewed-navigation"');
+  }
   for (const [label, pattern] of prohibitedCode) {
     if (pattern.test(auditedText)) fail(`${store}: unexpected ${label} in packaged code`);
+  }
+
+  // The bundles concatenate source modules into one scope (scripts/build-extension.mjs). A
+  // repeated top-level function silently replaces the earlier one, so reject any collision.
+  for (const bundle of ["background.js", "site-content.js"]) {
+    const names = [...readFileSync(resolve(storeDir, bundle), "utf8").matchAll(
+      /^(?:async\s+)?(?:function\*?|const|let|class)\s+([A-Za-z_$][\w$]*)/gm,
+    )].map((match) => match[1]);
+    const duplicate = names.find((name, index) => names.indexOf(name) !== index);
+    if (duplicate) fail(`${store}: ${bundle} declares ${duplicate} twice at top level`);
   }
 
   const background = readFileSync(resolve(storeDir, "background.js"), "utf8");

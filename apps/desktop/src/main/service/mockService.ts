@@ -27,7 +27,6 @@ import {
   type PairedKey,
   type Params,
   type Profile,
-  type Policy,
   type FocusSource,
   type Result,
   type ServiceState,
@@ -35,29 +34,13 @@ import {
   type UsageTransition,
   OK,
 } from '@talysman/shared';
-import { evaluateSchedule, normalizePolicy } from '@talysman/core';
+import { evaluateSchedule, normalizePolicy, policyRelaxesSiteOrJudge } from '@talysman/core';
 import type { ServiceConnection, ServiceError } from './connection.js';
 
 function err(code: string, message: string): ServiceError {
   const e = new Error(message) as ServiceError;
   e.code = code;
   return e;
-}
-
-function softBlockRelaxed(previous: Policy, next: Policy): boolean {
-  const sites = { reddit: 'reddit.com', hackernews: 'news.ycombinator.com' } as const;
-  const blocked = (policy: Policy, domain: string) => policy.blockedDomains.some((entry) => {
-    const base = entry.toLowerCase().replace(/^\*\./, '');
-    return domain === base || domain.endsWith(`.${base}`);
-  });
-  for (const [id, domain] of Object.entries(sites) as [keyof typeof sites, string][]) {
-    const wasSoft = (previous.softBlockedSites ?? []).includes(id);
-    const isSoft = (next.softBlockedSites ?? []).includes(id);
-    if (wasSoft && !isSoft && !blocked(next, domain)) return true;
-    if (!wasSoft && isSoft && (blocked(previous, domain)
-      || previous.defaultAction === 'block' || previous.enabledPremadeLists.length > 0)) return true;
-  }
-  return false;
 }
 
 const MOCK_DRIVES: Drive[] = [
@@ -197,8 +180,8 @@ export class MockServiceConnection implements ServiceConnection {
         const active = this.state.profiles.find((p) => p.id === this.state.activeProfileId);
         if (!active) throw err(ErrorCode.INTERNAL, 'No active profile.');
         if ((this.state.focusActive || this.snapshot().scheduleLocked) && !this.keyPresent
-          && softBlockRelaxed(active.policy, policy)) {
-          throw err(ErrorCode.KEY_REQUIRED, 'Insert your paired key to relax a soft block.');
+          && policyRelaxesSiteOrJudge(active.policy, policy)) {
+          throw err(ErrorCode.KEY_REQUIRED, 'Insert your paired key to relax your site rules or AI filtering.');
         }
         this.commitProfiles(
           upsertProfile(this.state.profiles, { ...active, policy: this.clean(policy) }),
@@ -219,8 +202,8 @@ export class MockServiceConnection implements ServiceConnection {
         }
         const previous = this.state.profiles.find((entry) => entry.id === profile.id);
         if (previous && (this.state.focusActive || this.snapshot().scheduleLocked) && !this.keyPresent
-          && softBlockRelaxed(previous.policy, profile.policy)) {
-          throw err(ErrorCode.KEY_REQUIRED, 'Insert your paired key to relax a soft block.');
+          && policyRelaxesSiteOrJudge(previous.policy, profile.policy)) {
+          throw err(ErrorCode.KEY_REQUIRED, 'Insert your paired key to relax your site rules or AI filtering.');
         }
         this.commitProfiles(
           upsertProfile(this.state.profiles, { ...profile, name, policy: this.clean(profile.policy) }),

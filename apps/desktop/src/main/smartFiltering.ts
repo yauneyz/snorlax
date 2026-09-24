@@ -1,22 +1,20 @@
 /**
- * Smart filtering (architecture §7 / judge protocol). When a browser-extension page falls through
- * both of a `Policy.intent`-enabled profile's hard lists, the daemon broadcasts `judgeRequested`
- * and waits for `submitJudgeVerdict`. Electron main is the only client with the user's Supabase
- * session, so it is the one that turns the request into a call to the web backend's judge
- * endpoint and reports the verdict back.
+ * AI judge bridge (see packages/shared/src/judge.ts for the full flow). Whenever a policy rule
+ * resolves to `judge` for a page — a judged `defaultAction`, or a site feature set to "AI decides"
+ * — the daemon broadcasts `judgeRequested` and waits for `submitJudgeVerdict`. Electron main is the
+ * only client with the user's Supabase session, so it turns the request into a call to the web
+ * backend's judge endpoint and reports the verdict back.
  *
- * The daemon captures the active intent into each `judgeRequested` event. That keeps a request
- * self-contained and prevents a profile switch racing with Electron from judging the page against
- * the wrong intent.
+ * The daemon captures the active judge policy (tasks, avoid list) into each `judgeRequested`
+ * event. That keeps a request self-contained and prevents a profile switch or task edit racing
+ * with Electron from judging the page against the wrong tasks.
  *
- * Failure handling is deliberately silent: if `intent` is null (the active profile changed out
- * from under the request), or the web call fails/times out, we simply never call
- * `submitJudgeVerdict`. The daemon's own timeout sweep answers with the fail-closed/fail-open
- * fallback per `Policy.defaultAction` — that backstop is what makes it safe to drop these
- * requests on the floor rather than retry them.
+ * Failure handling is deliberately silent: if the web call fails or times out, we simply never
+ * call `submitJudgeVerdict`. The daemon's own timeout sweep answers with the judge's fallback —
+ * that backstop is what makes it safe to drop these requests on the floor rather than retry them.
  */
 
-import type { PolicyIntent } from '@talysman/shared';
+import type { EventPayload, JudgeHttpRequest, JudgeHttpResponse } from '@talysman/shared';
 import { config } from './config.js';
 import { logger } from './logging.js';
 import { getAccessToken } from './auth/supabase.js';
@@ -25,107 +23,82 @@ import type { ServiceConnection } from './service/connection.js';
 // Leave time for the daemon to receive the result before its 8-second authoritative fallback.
 const JUDGE_FETCH_TIMEOUT_MS = 6_000;
 
-interface JudgeIntentResponse {
-  relevant: boolean;
-  reason: string;
-}
+type JudgeRequested = EventPayload<'judgeRequested'>;
 
-async function callJudgeEndpoint(
-  requestId: string,
-  token: string,
-  url: string,
-  extractedText: string,
-  intent: PolicyIntent,
-): Promise<JudgeIntentResponse> {
-  const endpoint = `${config.apiBaseUrl}/api/desktop/judge-intent`;
+async function callJudgeEndpoint(token: string, request: JudgeRequested): Promise<JudgeHttpResponse> {
+  const endpoint = `${config.apiBaseUrl}/api/desktop/judge`;
   const startedAt = Date.now();
-  logger.info('[smart-filtering] calling judge endpoint', {
-    requestId,
-    endpoint,
-    url,
-    extractedTextLength: extractedText.length,
-  });
+  const body: JudgeHttpRequest = {
+    url: request.url,
+    title: request.title,
+    content: request.content,
+    ...(request.context ? { context: request.context } : {}),
+    judge: { tasks: request.judge.tasks, avoid: request.judge.avoid },
+  };
   const res = await fetch(endpoint, {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${token}`,
       'Content-Type': 'application/json',
-      'X-Talysman-Judge-Request-Id': requestId,
+      'X-Talysman-Judge-Request-Id': request.requestId,
     },
-    body: JSON.stringify({ url, extractedText, intent }),
+    body: JSON.stringify(body),
     signal: AbortSignal.timeout(JUDGE_FETCH_TIMEOUT_MS),
   });
-  logger.info('[smart-filtering] judge endpoint responded', {
-    requestId,
+  logger.info('[judge] endpoint responded', {
+    requestId: request.requestId,
     status: res.status,
     elapsedMs: Date.now() - startedAt,
   });
   if (!res.ok) {
     const errorBody = await res.text();
-    throw new Error(`judge-intent request failed: ${res.status} ${errorBody.slice(0, 300)}`);
+    throw new Error(`judge request failed: ${res.status} ${errorBody.slice(0, 300)}`);
   }
-  const body = (await res.json()) as Partial<JudgeIntentResponse>;
-  if (typeof body.relevant !== 'boolean' || typeof body.reason !== 'string') {
-    throw new Error('judge-intent response missing relevant/reason');
+  const verdict = (await res.json()) as Partial<JudgeHttpResponse>;
+  if ((verdict.verdict !== 'allow' && verdict.verdict !== 'block') || typeof verdict.reason !== 'string') {
+    throw new Error('judge response missing verdict/reason');
   }
-  return { relevant: body.relevant, reason: body.reason };
+  return { verdict: verdict.verdict, reason: verdict.reason };
 }
 
 /**
- * Subscribe to the daemon's smart-filtering judge requests. Call once at startup alongside
- * `createTray` / `registerIpcHandlers` (see index.ts).
+ * Subscribe to the daemon's AI judge requests. Call once at startup alongside `createTray` /
+ * `registerIpcHandlers` (see index.ts).
  */
 export function initSmartFiltering(service: ServiceConnection): void {
-  logger.info('[smart-filtering] judge listener initialized', {
-    apiBaseUrl: config.apiBaseUrl,
-  });
-  service.on('judgeRequested', ({ requestId, url, extractedText, intent }) => {
-    logger.info('[smart-filtering] judgeRequested received', {
-      requestId,
-      url,
-      extractedTextLength: extractedText.length,
+  logger.info('[judge] listener initialized', { apiBaseUrl: config.apiBaseUrl });
+  service.on('judgeRequested', (request) => {
+    logger.info('[judge] judgeRequested received', {
+      requestId: request.requestId,
+      url: request.url,
+      contentLength: request.content.length,
+      context: request.context,
     });
-    void handleJudgeRequested(service, requestId, url, extractedText, intent);
+    void handleJudgeRequested(service, request);
   });
 }
 
-async function handleJudgeRequested(
-  service: ServiceConnection,
-  requestId: string,
-  url: string,
-  extractedText: string,
-  intent: PolicyIntent,
-): Promise<void> {
+async function handleJudgeRequested(service: ServiceConnection, request: JudgeRequested): Promise<void> {
   const token = await getAccessToken();
   if (!token) {
-    logger.warn(`[smart-filtering] skipping judgeRequested ${requestId}: no auth session`);
+    logger.warn(`[judge] skipping judgeRequested ${request.requestId}: no auth session`);
     return;
   }
 
-  let verdict: JudgeIntentResponse;
+  let verdict: JudgeHttpResponse;
   try {
-    verdict = await callJudgeEndpoint(requestId, token, url, extractedText, intent);
+    verdict = await callJudgeEndpoint(token, request);
   } catch (e) {
     // Expected occasionally (network blips, endpoint timeouts). Never retried, never surfaced to
     // the user — the daemon's timeout sweep produces the fallback verdict.
-    logger.warn(`[smart-filtering] judge-intent call failed for ${requestId}: ${(e as Error).message}`);
+    logger.warn(`[judge] call failed for ${request.requestId}: ${(e as Error).message}`);
     return;
   }
 
-  logger.info('[smart-filtering] submitting judge verdict', {
-    requestId,
-    relevant: verdict.relevant,
-    reason: verdict.reason,
-  });
-
   try {
-    await service.request('submitJudgeVerdict', {
-      requestId,
-      relevant: verdict.relevant,
-      reason: verdict.reason,
-    });
-    logger.info('[smart-filtering] judge verdict accepted by daemon', { requestId });
+    await service.request('submitJudgeVerdict', { requestId: request.requestId, ...verdict });
+    logger.info('[judge] verdict accepted by daemon', { requestId: request.requestId, verdict: verdict.verdict });
   } catch (e) {
-    logger.warn(`[smart-filtering] submitJudgeVerdict failed for ${requestId}: ${(e as Error).message}`);
+    logger.warn(`[judge] submitJudgeVerdict failed for ${request.requestId}: ${(e as Error).message}`);
   }
 }

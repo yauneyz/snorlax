@@ -4,7 +4,8 @@ import type { Policy } from './policy.js';
 import type { Profile } from './profile.js';
 import type { Settings } from './settings.js';
 import type { FocusSource, ServiceState } from './protocol.js';
-import type { PolicyIntent } from './policy.js';
+import type { JudgePolicy } from './policy.js';
+import type { JudgePage, JudgeVerdict } from './judge.js';
 
 export interface EventMap {
   /** Complete authoritative snapshot after any persisted daemon state mutation. */
@@ -40,17 +41,17 @@ export interface EventMap {
     healthy: boolean;
   };
   /**
-   * A page fell through both hard lists under a `Policy.intent`-enabled profile and needs an
-   * LLM relevance verdict. Broadcast so Electron main (the only client with entitlement/auth) can
-   * pick it up, call the judge endpoint, and answer with `submitJudgeVerdict`.
+   * A rule resolved to `judge` for a page and it needs an AI verdict. Broadcast so Electron main
+   * (the only client with entitlement/auth) can call the judge endpoint and answer with
+   * `submitJudgeVerdict`. Carries the judge policy captured when the request arrived.
    */
-  judgeRequested: { requestId: string; url: string; extractedText: string; intent: PolicyIntent };
+  judgeRequested: JudgePage & { requestId: string; judge: JudgePolicy };
   /**
    * The verdict for a `judgeRequested` request — either from Electron's `submitJudgeVerdict` or
-   * synthesized by the daemon's own timeout sweep (fail-closed/open per `Policy.defaultAction`)
-   * when nothing answers in time. Relayed by natmsg back to the extension.
+   * synthesized by the daemon (timeout sweep, AI filtering off) from `JudgePolicy.fallback`.
+   * Relayed by natmsg back to the extension.
    */
-  judgeResult: { requestId: string; url: string; relevant: boolean; reason: string };
+  judgeResult: { requestId: string; url: string; verdict: JudgeVerdict; reason: string };
 }
 
 export type EventName = keyof EventMap;

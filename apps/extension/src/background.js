@@ -17,17 +17,25 @@
 // from Cache Storage without any network request, which DNR never sees. See the "Hard-policy
 // navigation backstop" section below for the webNavigation-based second line of defense.
 //
-// Smart filtering: when the pushed policy has a non-null `intent`, pages that fall through both
-// hard lists (`blockedDomains`/`allowedDomains`) are extracted and sent to the daemon for a
-// relevance judgment (`judge-request`/`judge-result`) rather than being statically allowed or
-// blocked. This is strictly additive on top of DNR — DNR still enforces the two hard lists — and
-// is a no-op (zero listeners doing real work) for classic, non-Smart profiles.
+// Every top-level navigation goes through one decision: `decide()` in site-engine.js, which
+// walks the policy layers (hard block → site rules → hard allow → default) and yields allow,
+// block, or judge. DNR enforces the same decisions ahead of the network (see rules.js); the
+// webNavigation listeners below are the backstop for what DNR can't see, and the only enforcer
+// of what DNR can't express — hops between items on a site, and `judge`, which extracts the page
+// and asks the AI judge via the daemon (`judge-request`/`judge-result`).
 
-import { buildRules, hostnameMatchesAny, policyBlocksHostname } from './rules.js';
+import { buildRules } from './rules.js';
 import { heartbeatDelayForState } from './heartbeat-timing.js';
 import { extractPageContent } from './content-extract.js';
 import { buildPremadeRulePlan } from './premade-rules.js';
-import { softRoute, softSiteForUrl, softNavigationAllowed } from './soft-block.js';
+import { SITE_CATALOG } from './site-catalog.js';
+import { decide, effectiveFeatures, siteForHostname } from './site-engine.js';
+import {
+  LEGACY_HELLO_FIELDS,
+  legacyJudgeRequestFields,
+  upgradeLegacyJudgeResult,
+  upgradeLegacyStateFrame,
+} from './legacy-compat.js';
 
 // Prefer the callback-compatible `chrome` namespace where both aliases exist (notably Firefox).
 const browserApi = globalThis.chrome || globalThis.browser;
@@ -35,14 +43,20 @@ const HOST_NAME = 'com.talysman.host';
 const RECONNECT_MIN_MS = 1000;
 const RECONNECT_MAX_MS = 30000;
 
-// Smart-filtering tuning. See the "Smart filtering" section below for how these are used.
+// Site-rule capability this build advertises to the native host; the host hard-blocks any site
+// this build's catalog doesn't know.
+const SITE_CAPABILITY = 3;
+const SITE_IDS = Object.keys(SITE_CATALOG);
+
+// AI judge tuning. See the "AI judge" section below for how these are used.
 const SPA_DEBOUNCE_MS = 1500;
 // The daemon falls back after 8s. Keep this client guard later so its authoritative result wins.
 const JUDGE_TIMEOUT_MS = 12_000;
 const VERDICT_CACHE_TTL_MS = 10 * 60 * 1000;
 const MAX_VERDICT_CACHE_ENTRIES = 500;
 const MAX_PENDING_JUDGES = 32;
-const MAX_JUDGE_TEXT_LENGTH = 2000;
+const MAX_JUDGE_TEXT_LENGTH = 4000;
+const MAX_JUDGE_TITLE_LENGTH = 300;
 
 let port = null;
 let reconnectTimer = null;
@@ -60,7 +74,7 @@ let lastAppliedGeneration = -1;
 let blockingActive = false; // last state.active the service pushed
 // Unknown is fail-safe while focus is active; only explicit false relaxes the cadence.
 let handshakeEnabled = null;
-let blockingMode = null; // display-only label derived from policy shape; never includes domains/intent text
+let blockingMode = null; // display-only label derived from policy shape; never includes domains/task text
 let lastApplyOk = true; // last static + dynamic DNR update succeeded
 let appliedRuleCount = 0; // number of dynamic rules currently applied
 let appliedPremadeRuleCount = 0;
@@ -69,18 +83,18 @@ let lastHeartbeatSentAt = null;
 let lastHeartbeatAckAt = null;
 let lastHeartbeatAckSequence = null;
 
-// Current policy, tracked for the Smart-filtering navigation path (webNavigation fires between
-// state pushes, so it needs somewhere to read the latest policy from). Never exposed to the popup
-// or heartbeat frames beyond the derived `blockingMode` label above — same stance the old
-// mode/domains split had ("never includes configured domains").
+// Current policy, tracked for the navigation backstop and the AI judge (webNavigation fires
+// between state pushes, so it needs somewhere to read the latest policy from). Never exposed to
+// the popup or heartbeat frames beyond the derived `blockingMode` label above — same stance the
+// old mode/domains split had ("never includes configured domains").
 let currentPolicy = {
   active: false,
   blockedDomains: [],
   allowedDomains: [],
   defaultAction: 'allow',
-  intent: null,
   enabledPremadeLists: [],
-  softBlockedSites: [],
+  sites: {},
+  judge: null,
 };
 const lastTabUrl = new Map();
 
@@ -107,9 +121,9 @@ console.info('[talysman] worker started', {
   extensionVersion: EXTENSION_VERSION,
 });
 
-/** Display-only mode label for the popup. Derived, never leaks domain lists or intent text. */
+/** Display-only mode label for the popup. Derived, never leaks domain lists or task text. */
 function deriveModeLabel(policy) {
-  if (policy.intent) return 'smart';
+  if (policy.defaultAction === 'judge') return 'smart';
   if (policy.defaultAction === 'block') {
     return policy.allowedDomains.length > 0 ? 'whitelist' : 'block-all';
   }
@@ -165,22 +179,41 @@ async function applyRuleState(state) {
   return { dynamicRuleCount: next.length, premadeRuleCount };
 }
 
+function sanitizeSites(sites) {
+  const out = {};
+  if (!sites || typeof sites !== 'object') return out;
+  for (const [id, rule] of Object.entries(sites)) {
+    if (!SITE_CATALOG[id]) continue;
+    const features = rule && typeof rule.features === 'object' && rule.features ? rule.features : {};
+    out[id] = { features: effectiveFeatures(id, { features }) };
+  }
+  return out;
+}
+
+function sanitizeJudge(judge) {
+  if (!judge || !Array.isArray(judge.tasks) || judge.tasks.length === 0) return null;
+  return {
+    tasks: judge.tasks.filter((task) => task && typeof task.title === 'string'),
+    avoid: Array.isArray(judge.avoid) ? judge.avoid.filter((item) => typeof item === 'string') : [],
+    fallback: judge.fallback === 'block' ? 'block' : 'allow',
+  };
+}
+
 /** Accept the latest desired state synchronously, then serialize/coalesce DNR mutations. */
-function applyState(state) {
+function applyState(frame) {
+  const state = upgradeLegacyStateFrame(frame); // LEGACY-COMPAT(v5)
   const previousHeartbeatDelay = heartbeatDelay();
   blockingActive = !!state.active;
   handshakeEnabled = typeof state.handshakeEnabled === 'boolean' ? state.handshakeEnabled : null;
+  const defaultAction = ['allow', 'judge', 'block'].includes(state.defaultAction) ? state.defaultAction : 'allow';
   currentPolicy = {
     active: blockingActive,
     blockedDomains: Array.isArray(state.blockedDomains) ? state.blockedDomains : [],
     allowedDomains: Array.isArray(state.allowedDomains) ? state.allowedDomains : [],
-    defaultAction: state.defaultAction === 'block' ? 'block' : 'allow',
-    intent:
-      state.intent && typeof state.intent.positive === 'string' && state.intent.positive
-        ? state.intent
-        : null,
+    defaultAction,
     enabledPremadeLists: Array.isArray(state.enabledPremadeLists) ? state.enabledPremadeLists : [],
-    softBlockedSites: Array.isArray(state.softBlockedSites) ? state.softBlockedSites : [],
+    sites: sanitizeSites(state.sites),
+    judge: sanitizeJudge(state.judge),
   };
   policyGeneration += 1;
   invalidatePendingJudges();
@@ -192,16 +225,15 @@ function applyState(state) {
     ruleApplyRetryTimer = null;
     ruleApplyRetryMs = RECONNECT_MIN_MS;
   }
-  desiredRuleState = { state, generation: policyGeneration };
+  desiredRuleState = { state: currentPolicy, generation: policyGeneration };
   if (heartbeatDelay() < previousHeartbeatDelay) {
     scheduleHeartbeat(0);
   }
   void applyLatestRuleState();
   // DNR only affects requests made from here on, so a tab already sitting on a now-blocked page
   // would stay put. Re-check what's open against the new policy.
-  void enforceHardPolicyOnOpenTabs();
-  void enforceSoftPolicyOnOpenTabs();
-  void notifySoftContentScripts();
+  void enforcePolicyOnOpenTabs();
+  void notifySiteContentScripts();
 }
 
 async function applyLatestRuleState() {
@@ -284,15 +316,24 @@ function currentPopupStatus() {
   };
 }
 
-browserApi.runtime.onMessage.addListener((message, _sender, sendResponse) => {
-  if (message?.type === 'talysman:soft-denied') {
-    if (_sender.tab?.id !== undefined && currentPolicy.active) {
-      void redirectIfStillOnUrl(_sender.tab.id, _sender.tab.url, 'Soft blocked: follow an external link or use search', policyGeneration);
+/** What site content scripts and the blocked page need: resolved feature actions per enabled site. */
+function sitePolicyMessage() {
+  return { active: currentPolicy.active, sites: currentPolicy.sites };
+}
+
+browserApi.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (message?.type === 'talysman:site-denied') {
+    // The content script stopped an in-page navigation; re-derive the decision here rather than
+    // trusting the page, then show the blocked page for it.
+    const tab = sender.tab;
+    if (tab?.id !== undefined && currentPolicy.active && typeof message.url === 'string') {
+      const decision = decide(currentPolicy, message.url, tab.url);
+      if (decision.action === 'block') void redirectIfStillOnUrl(tab.id, tab.url, decision, policyGeneration);
     }
     return false;
   }
-  if (message?.type === 'talysman:soft-policy') {
-    sendResponse({ active: currentPolicy.active, sites: currentPolicy.softBlockedSites });
+  if (message?.type === 'talysman:site-policy') {
+    sendResponse(sitePolicyMessage());
     return false;
   }
   if (!message || message.type !== 'talysman:get-status') return undefined;
@@ -322,7 +363,8 @@ function connect() {
         defaultAction: msg.defaultAction,
         blockedDomainCount: Array.isArray(msg.blockedDomains) ? msg.blockedDomains.length : 0,
         allowedDomainCount: Array.isArray(msg.allowedDomains) ? msg.allowedDomains.length : 0,
-        smartFilteringActive: !!(msg.intent && msg.intent.positive),
+        siteCount: msg.sites ? Object.keys(msg.sites).length : 0,
+        judgeActive: !!msg.judge,
       });
       applyState(msg);
       return;
@@ -334,7 +376,7 @@ function connect() {
       return;
     }
     if (msg && msg.type === 'judge-result') {
-      handleJudgeResult(msg);
+      handleJudgeResult(upgradeLegacyJudgeResult(msg)); // LEGACY-COMPAT(v5)
       return;
     }
   });
@@ -348,7 +390,12 @@ function connect() {
 
   // Ask the host for current state immediately.
   try {
-    port.postMessage({ type: 'hello', softBlockCapability: 1 });
+    port.postMessage({
+      type: 'hello',
+      siteCapability: SITE_CAPABILITY,
+      siteIds: SITE_IDS,
+      ...LEGACY_HELLO_FIELDS, // LEGACY-COMPAT(v5)
+    });
   } catch (e) {
     console.error('[talysman] hello failed', e);
   }
@@ -365,7 +412,8 @@ function heartbeatFrame() {
     browser: BROWSER,
     workerSessionId: PROFILE_ID,
     extensionVersion: EXTENSION_VERSION,
-    softBlockCapability: 1,
+    siteCapability: SITE_CAPABILITY,
+    ...LEGACY_HELLO_FIELDS, // LEGACY-COMPAT(v5)
     lockedActive: blockingActive,
     health: currentHealth(),
   };
@@ -410,18 +458,21 @@ function scheduleHeartbeat(delay) {
   }, delay);
 }
 
+
 // ---------------------------------------------------------------------------------------------
-// Smart filtering
+// AI judge
 //
-// Activates only when currentPolicy.intent is non-null. For a qualifying main-frame navigation
-// that lands on neither hard list, we extract lightweight page content and ask the daemon whether
-// the page is relevant to the user's stated intent. Everything here is a no-op the moment
-// intent is null, so classic (non-Smart) profiles pay zero extra overhead.
+// Runs only for navigations whose decision is `judge` — a judged `defaultAction` on an unlisted
+// page, or a site feature the user set to "AI decides" (e.g. Reddit posts). The page loads, we
+// extract its text (focused on the route's content selector when the catalog has one), and the
+// daemon attaches the user's tasks and "help me avoid" list and asks the judge. A `block` verdict
+// sends the tab to the blocked page with the judge's reason. Nothing here runs for policies with
+// no `judge` action.
 // ---------------------------------------------------------------------------------------------
 
 const spaDebounceTimers = new Map(); // tabId -> timeoutId
-const verdictCache = new Map(); // cacheKey -> { relevant, reason, expiresAt }
-const pendingJudgeRequests = new Map(); // requestId -> { tabId, url, timeoutId }
+const verdictCache = new Map(); // cacheKey -> { verdict, reason, expiresAt }
+const pendingJudgeRequests = new Map(); // requestId -> { tabId, url, generation, judgeKey, decision, timeoutId }
 
 function invalidatePendingJudges() {
   for (const timer of spaDebounceTimers.values()) clearTimeout(timer);
@@ -437,38 +488,39 @@ function generateRequestId() {
   return `judge-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 }
 
-function verdictCacheKey(url, intent) {
-  return JSON.stringify([url, intent.positive, intent.negative || '']);
+/** Verdicts are only reusable while the tasks/avoid list that produced them are unchanged. */
+function judgeKey(judge) {
+  return JSON.stringify([judge.tasks.map((task) => [task.title, task.notes || '']), judge.avoid]);
 }
 
-function getCachedVerdict(url, intent) {
-  const key = verdictCacheKey(url, intent);
-  const entry = verdictCache.get(key);
+function verdictCacheKey(url, key) {
+  return JSON.stringify([url, key]);
+}
+
+function getCachedVerdict(url, key) {
+  const cacheKey = verdictCacheKey(url, key);
+  const entry = verdictCache.get(cacheKey);
   if (!entry) return null;
   if (entry.expiresAt <= Date.now()) {
-    verdictCache.delete(key);
+    verdictCache.delete(cacheKey);
     return null;
   }
   return entry;
 }
 
-function setCachedVerdict(url, intent, relevant, reason) {
+function setCachedVerdict(url, key, verdict, reason) {
   const now = Date.now();
-  for (const [key, entry] of verdictCache) {
-    if (entry.expiresAt <= now) verdictCache.delete(key);
+  for (const [cacheKey, entry] of verdictCache) {
+    if (entry.expiresAt <= now) verdictCache.delete(cacheKey);
   }
   while (verdictCache.size >= MAX_VERDICT_CACHE_ENTRIES) {
     const oldest = verdictCache.keys().next().value;
     if (oldest === undefined) break;
     verdictCache.delete(oldest);
   }
-  const key = verdictCacheKey(url, intent);
-  verdictCache.delete(key);
-  verdictCache.set(key, {
-    relevant,
-    reason,
-    expiresAt: now + VERDICT_CACHE_TTL_MS,
-  });
+  const cacheKey = verdictCacheKey(url, key);
+  verdictCache.delete(cacheKey);
+  verdictCache.set(cacheKey, { verdict, reason, expiresAt: now + VERDICT_CACHE_TTL_MS });
 }
 
 /** Same-page check used to guard against a verdict/timeout landing after the user navigated away. */
@@ -482,57 +534,47 @@ function urlsRoughlyMatch(a, b) {
   }
 }
 
+/**
+ * The local blocked page for a decision. The page renders the layer-specific explanation and the
+ * site's entry points from these parameters.
+ * @param {{ layer?: string, site?: string, feature?: string, hop?: boolean, reason?: string }} block
+ */
+function blockedPageUrl(block) {
+  const base = browserApi.runtime.getURL('blocked.html');
+  const query = new URLSearchParams();
+  if (block.layer) query.set('layer', block.layer);
+  if (block.site) query.set('site', block.site);
+  if (block.feature) query.set('feature', block.feature);
+  if (block.hop) query.set('hop', '1');
+  if (block.reason) query.set('reason', block.reason);
+  return query.size ? `${base}?${query}` : base;
+}
+
 /** Redirect `tabId` to the local blocked page, but only if it's still on `expectedUrl`. */
-async function redirectIfStillOnUrl(tabId, expectedUrl, reason, generation = policyGeneration) {
+async function redirectIfStillOnUrl(tabId, expectedUrl, block, generation = policyGeneration) {
   if (generation !== policyGeneration || !currentPolicy.active) {
-    console.info('[talysman][smart-filtering] redirect skipped: stale policy', {
-      tabId,
-      expectedUrl,
-      generation,
-      currentGeneration: policyGeneration,
-    });
+    console.info('[talysman] redirect skipped: stale policy', { tabId, generation, currentGeneration: policyGeneration });
     return;
   }
   try {
     const tab = await browserApi.tabs.get(tabId);
     if (!tab || !tab.url) return;
     if (!urlsRoughlyMatch(tab.url, expectedUrl)) {
-      console.info('[talysman][smart-filtering] redirect skipped: tab navigated away', {
-        tabId,
-        expectedUrl,
-        currentUrl: tab.url,
-      });
+      console.info('[talysman] redirect skipped: tab navigated away', { tabId, expectedUrl, currentUrl: tab.url });
       return;
     }
-    const softSite = reason.startsWith('Soft blocked:') ? softSiteForUrl(expectedUrl) : null;
-    await browserApi.tabs.update(tabId, { url: blockedPageUrl(reason, softSite) });
-    console.info('[talysman][smart-filtering] redirected to blocked page', {
-      tabId,
-      expectedUrl,
-      reason,
-    });
+    await browserApi.tabs.update(tabId, { url: blockedPageUrl(block) });
+    console.info('[talysman] redirected to blocked page', { tabId, expectedUrl, layer: block.layer, site: block.site, feature: block.feature });
   } catch (e) {
-    console.warn('[talysman][smart-filtering] redirect failed', {
-      tabId,
-      expectedUrl,
-      error: e && e.message,
-    });
+    console.warn('[talysman] redirect failed', { tabId, expectedUrl, error: e && e.message });
   }
 }
 
-function blockedPageUrl(reason, softSite = null) {
-  const base = browserApi.runtime.getURL('blocked.html');
-  const query = new URLSearchParams();
-  if (reason) query.set('reason', reason);
-  if (softSite) query.set('softSite', softSite);
-  return query.size ? `${base}?${query}` : base;
-}
-
-/** Client-side backstop when defaultAction is the only signal we have (timeout or extraction failure). */
-function applyDefaultActionFallback(tabId, url, reason, generation, defaultAction) {
+/** Apply the judge's fallback when no verdict could be obtained (timeout, extraction failure). */
+function applyJudgeFallback(tabId, url, generation, decision, judge, reason) {
   if (generation !== policyGeneration || !currentPolicy.active) return;
-  if (defaultAction !== 'block') return; // fail-open: leave the tab alone
-  void redirectIfStillOnUrl(tabId, url, reason, generation);
+  if (judge.fallback !== 'block') return; // fail-open: leave the tab alone
+  void redirectIfStillOnUrl(tabId, url, { ...decision, layer: 'judge', reason }, generation);
 }
 
 function clearPendingJudgeRequest(requestId) {
@@ -553,106 +595,65 @@ function handleJudgeResult(msg) {
   if (pending.generation !== policyGeneration || !currentPolicy.active) return;
 
   const url = msg.url || pending.url;
-  const relevant = !!msg.relevant;
+  const verdict = msg.verdict === 'block' ? 'block' : 'allow';
   const reason = typeof msg.reason === 'string' ? msg.reason : '';
+  console.info('[talysman][judge] verdict received', { requestId, url, verdict });
 
-  console.info('[talysman][smart-filtering] judge result received', {
-    requestId,
-    url,
-    relevant,
-    reason,
-  });
-
-  setCachedVerdict(url, pending.intent, relevant, reason);
-
-  if (!relevant) {
-    void redirectIfStillOnUrl(pending.tabId, pending.url, reason, pending.generation);
+  setCachedVerdict(url, pending.judgeKey, verdict, reason);
+  if (verdict === 'block') {
+    void redirectIfStillOnUrl(pending.tabId, pending.url, { ...pending.decision, layer: 'judge', reason }, pending.generation);
   }
-  // relevant === true → verdict is cached above; leave the tab alone.
 }
 
-function sendJudgeRequest(requestId, tabId, url, extractedText, generation, intent, defaultAction) {
+function sendJudgeRequest(tabId, url, page, decision, generation, judge) {
   while (pendingJudgeRequests.size >= MAX_PENDING_JUDGES) {
     const oldest = pendingJudgeRequests.keys().next().value;
     if (oldest === undefined) break;
     clearPendingJudgeRequest(oldest);
   }
-  const entry = { tabId, url, generation, intent, defaultAction, timeoutId: null };
+  const requestId = generateRequestId();
+  const entry = { tabId, url, generation, judgeKey: judgeKey(judge), decision, timeoutId: null };
   pendingJudgeRequests.set(requestId, entry);
   entry.timeoutId = setTimeout(() => {
     if (!pendingJudgeRequests.has(requestId)) return;
     pendingJudgeRequests.delete(requestId);
-    console.warn('[talysman] judge-request timed out', { requestId });
-    applyDefaultActionFallback(tabId, url, "Couldn't verify in time", generation, defaultAction);
+    console.warn('[talysman][judge] request timed out', { requestId });
+    applyJudgeFallback(tabId, url, generation, decision, judge, "Couldn't verify in time");
   }, JUDGE_TIMEOUT_MS);
 
-  const frame = { type: 'judge-request', requestId, url, extractedText };
+  const frame = {
+    type: 'judge-request',
+    requestId,
+    url,
+    title: page.title,
+    content: page.content,
+    ...(decision.site ? { context: { site: decision.site, feature: decision.feature } } : {}),
+    ...legacyJudgeRequestFields(page.content), // LEGACY-COMPAT(v5)
+  };
   try {
     if (port) {
-      console.info('[talysman][smart-filtering] sending judge request', {
-        requestId,
-        tabId,
-        url,
-        extractedTextLength: extractedText.length,
-        generation,
-      });
+      console.info('[talysman][judge] sending request', { requestId, tabId, url, contentLength: page.content.length });
       port.postMessage(frame);
     } else {
-      console.warn('[talysman] no native port available for judge-request', { requestId });
+      console.warn('[talysman][judge] no native port available', { requestId });
     }
   } catch (e) {
-    console.warn('[talysman] judge-request send failed', e && e.message);
+    console.warn('[talysman][judge] request send failed', e && e.message);
   }
 }
 
-/** Consider a completed main-frame navigation for Smart filtering. */
-async function handleQualifyingNavigation(tabId, url) {
-  console.info('[talysman][smart-filtering] navigation observed', {
-    tabId,
-    url,
-    focusActive: currentPolicy.active,
-    intentActive: !!currentPolicy.intent,
-    generation: policyGeneration,
-  });
-  if (!currentPolicy.active || !currentPolicy.intent) {
-    console.info('[talysman][smart-filtering] navigation skipped: smart filtering inactive', {
-      tabId,
-      url,
-    });
-    return;
-  }
+/** Extract a loaded page and ask the judge about it. `decision.action` is `judge`. */
+async function judgePage(tabId, url, decision) {
+  const judge = currentPolicy.judge;
+  if (!judge) return;
   const generation = policyGeneration;
-  const intent = currentPolicy.intent;
-  const defaultAction = currentPolicy.defaultAction;
-  if (!/^https?:\/\//i.test(url)) return; // browser-internal pages etc. are out of scope
-  if (currentPolicy.softBlockedSites.includes(softSiteForUrl(url))) return;
+  const key = judgeKey(judge);
 
-  let hostname;
-  try {
-    hostname = new URL(url).hostname;
-  } catch {
-    return;
-  }
-
-  // Already authoritatively handled by DNR (blocked) or explicitly exempt (allowed).
-  if (hostnameMatchesAny(hostname, currentPolicy.blockedDomains)) {
-    console.info('[talysman][smart-filtering] navigation skipped: always blocked', { tabId, url });
-    return;
-  }
-  if (hostnameMatchesAny(hostname, currentPolicy.allowedDomains)) {
-    console.info('[talysman][smart-filtering] navigation skipped: always allowed', { tabId, url });
-    return;
-  }
-
-  const cached = getCachedVerdict(url, intent);
+  const cached = getCachedVerdict(url, key);
   if (cached) {
-    console.info('[talysman][smart-filtering] using cached verdict', {
-      tabId,
-      url,
-      relevant: cached.relevant,
-      reason: cached.reason,
-    });
-    if (!cached.relevant) void redirectIfStillOnUrl(tabId, url, cached.reason, generation);
+    if (cached.verdict === 'block') {
+      void redirectIfStillOnUrl(tabId, url, { ...decision, layer: 'judge', reason: cached.reason }, generation);
+    }
     return;
   }
 
@@ -661,142 +662,125 @@ async function handleQualifyingNavigation(tabId, url) {
     const results = await browserApi.scripting.executeScript({
       target: { tabId },
       func: extractPageContent,
+      args: [decision.contentSelector || null],
     });
     extraction = results && results[0] && results[0].result;
   } catch (e) {
-    console.warn('[talysman] content extraction failed', e && e.message);
+    console.warn('[talysman][judge] content extraction failed', e && e.message);
   }
 
   // Content extraction is asynchronous. A focus/profile change invalidates the work.
   if (generation !== policyGeneration || !currentPolicy.active) return;
-
   if (!extraction) {
-    // Couldn't determine relevance at all — fall back to defaultAction, same as an unreachable judge.
-    applyDefaultActionFallback(tabId, url, "Couldn't verify in time", generation, defaultAction);
+    applyJudgeFallback(tabId, url, generation, decision, judge, "Couldn't read the page");
     return;
   }
 
-  const combinedText = [extraction.title, extraction.description, extraction.text]
+  const content = [extraction.description, extraction.headings, extraction.text]
     .filter(Boolean)
     .join(' — ')
     .slice(0, MAX_JUDGE_TEXT_LENGTH);
-
-  console.info('[talysman][smart-filtering] page qualified for judging', {
-    tabId,
-    url,
-    extractedTextLength: combinedText.length,
-    generation,
-  });
-
-  sendJudgeRequest(generateRequestId(), tabId, url, combinedText, generation, intent, defaultAction);
+  const title = String(extraction.title || '').slice(0, MAX_JUDGE_TITLE_LENGTH);
+  sendJudgeRequest(tabId, url, { title, content }, decision, generation, judge);
 }
 
-function debounceSpaNavigation(tabId, url) {
+// ---------------------------------------------------------------------------------------------
+// Navigation backstop
+//
+// DNR only sees requests that reach the network stack. A site's OWN service worker can answer a
+// top-level navigation out of Cache Storage without issuing any request — Chromium runs the site's
+// fetch handler before DNR, so a precached app shell (x.com/twitter is the canonical example) still
+// paints even though every rule matches it and every XHR it fires is blocked. Back/forward cache
+// restores and SPA route changes are the same blind spot. Firefox's request interception sits above
+// the service worker, which is why the DNR redirect appeared to work there and not in Chrome.
+//
+// So every top-level navigation is re-decided here with the same engine the DNR rules were
+// compiled from. This is also the only place hop rules (item → different item) and `judge`
+// decisions are enforced, since both depend on more than the target URL.
+// ---------------------------------------------------------------------------------------------
+
+/**
+ * Decide a top-level navigation and act on it.
+ * @param {'commit'|'complete'|'spa'} phase
+ * @returns {boolean} true when the navigation was blocked (caller should stop here).
+ */
+function evaluateNavigation(tabId, url, sourceUrl, phase) {
+  if (!currentPolicy.active || typeof tabId !== 'number' || tabId < 0) return false;
+  if (!url || !/^https?:\/\//i.test(url)) return false; // extension/browser-internal pages
+  const decision = decide(currentPolicy, url, sourceUrl);
+  if (decision.action === 'block') {
+    void redirectIfStillOnUrl(tabId, url, decision, policyGeneration);
+    return true;
+  }
+  if (decision.action === 'judge') {
+    if (phase === 'complete') void judgePage(tabId, url, decision);
+    else if (phase === 'spa') debounceSpaJudge(tabId, url, decision);
+  }
+  return false;
+}
+
+function debounceSpaJudge(tabId, url, decision) {
   const existing = spaDebounceTimers.get(tabId);
   if (existing) clearTimeout(existing);
   spaDebounceTimers.set(
     tabId,
     setTimeout(() => {
       spaDebounceTimers.delete(tabId);
-      handleQualifyingNavigation(tabId, url);
+      void judgePage(tabId, url, decision);
     }, SPA_DEBOUNCE_MS),
   );
 }
 
-// ---------------------------------------------------------------------------------------------
-// Hard-policy navigation backstop
-//
-// DNR only sees requests that reach the network stack. A site's OWN service worker can answer a
-// top-level navigation out of Cache Storage without issuing any request — Chromium runs the site's
-// fetch handler before DNR, so a precached app shell (x.com/twitter is the canonical example) still
-// paints even though every rule matches it and every XHR it fires is blocked. Back/forward cache
-// restores are the same blind spot. Firefox's request interception sits above the service worker,
-// which is why the DNR redirect appeared to work there and not in Chrome.
-//
-// So we re-check the hard lists per top-level navigation and drive the tab to the blocked page
-// ourselves. This mirrors what buildRules() enforces via DNR — it is a second line of defense for
-// the same policy, not a different one — and applies to every browser.
-// ---------------------------------------------------------------------------------------------
-
 /**
- * Send `tabId` to the blocked page when the hard policy forbids `url`.
- * @returns {boolean} true when the navigation is policy-blocked (caller should stop here).
+ * Re-check every open tab. Catches pages already on screen when a policy starts applying, and
+ * injects the site content script into tabs that predate this worker (manifest content scripts
+ * only run on new page loads).
  */
-function enforceHardPolicy(tabId, url) {
-  if (!currentPolicy.active) return false;
-  if (typeof tabId !== 'number' || tabId < 0) return false;
-  if (!url || !/^https?:\/\//i.test(url)) return false; // extension/browser-internal pages
-  let hostname;
-  try {
-    hostname = new URL(url).hostname;
-  } catch {
-    return false;
-  }
-  if (!policyBlocksHostname(currentPolicy, hostname)) return false;
-  void redirectIfStillOnUrl(tabId, url, '', policyGeneration);
-  return true;
-}
-
-/** Re-check every open tab. Catches pages already on screen when a policy starts applying. */
-async function enforceHardPolicyOnOpenTabs() {
+async function enforcePolicyOnOpenTabs() {
   if (!currentPolicy.active) return;
   try {
-    const tabs = await browserApi.tabs.query({});
-    for (const tab of tabs || []) {
-      if (tab && typeof tab.id === 'number') enforceHardPolicy(tab.id, tab.url);
+    for (const tab of (await browserApi.tabs.query({})) || []) {
+      if (typeof tab?.id !== 'number' || !tab.url) continue;
+      lastTabUrl.set(tab.id, tab.url);
+      // 'commit' re-checks blocks without judging: a policy push must not send every open tab
+      // to the AI judge. Pages are judged as they're navigated to.
+      if (evaluateNavigation(tab.id, tab.url, null, 'commit')) continue;
+      const site = siteForUrl(tab.url);
+      if (site && currentPolicy.sites[site.id]) {
+        try {
+          await browserApi.scripting.executeScript({ target: { tabId: tab.id }, files: ['site-content.js'] });
+        } catch { /* The tab may close or navigate before injection. */ }
+      }
     }
   } catch (e) {
     console.warn('[talysman] tab sweep failed', e && e.message);
   }
 }
 
-function enforceSoftPolicy(tabId, url, sourceUrl) {
-  if (!currentPolicy.active || typeof tabId !== 'number' || !url) return false;
-  const route = softRoute(url);
-  if (!route || !currentPolicy.softBlockedSites.includes(route.site)) return false;
-  if (route.kind === 'blocked' || (sourceUrl && softSiteForUrl(sourceUrl) === route.site
-      && !softNavigationAllowed(sourceUrl, url))) {
-    void redirectIfStillOnUrl(tabId, url, 'Soft blocked: open a specific post or use search', policyGeneration);
-    return true;
+function siteForUrl(url) {
+  try {
+    return siteForHostname(new URL(url).hostname);
+  } catch {
+    return null;
   }
-  return false;
 }
 
-async function enforceSoftPolicyOnOpenTabs() {
-  if (!currentPolicy.active || currentPolicy.softBlockedSites.length === 0) return;
+async function notifySiteContentScripts() {
   try {
+    const message = { type: 'talysman:site-policy-updated', ...sitePolicyMessage() };
     for (const tab of await browserApi.tabs.query({})) {
-      if (typeof tab.id !== 'number') continue;
-      if (tab.url) lastTabUrl.set(tab.id, tab.url);
-      if (enforceSoftPolicy(tab.id, tab.url, null)) continue;
-      const site = softSiteForUrl(tab.url);
-      if (site && currentPolicy.softBlockedSites.includes(site)) {
-        try {
-          await browserApi.scripting.executeScript({ target: { tabId: tab.id }, files: ['soft-content.js'] });
-        } catch { /* The tab may close or navigate before injection. */ }
-      }
-    }
-  } catch (e) { console.warn('[talysman] soft-block tab sweep failed', e && e.message); }
-}
-
-async function notifySoftContentScripts() {
-  try {
-    for (const tab of await browserApi.tabs.query({})) {
-      if (typeof tab.id === 'number' && softSiteForUrl(tab.url)) {
-        Promise.resolve(browserApi.tabs.sendMessage(tab.id, {
-          type: 'talysman:soft-policy-updated', active: currentPolicy.active,
-          sites: currentPolicy.softBlockedSites,
-        })).catch(() => {});
+      if (typeof tab.id === 'number' && siteForUrl(tab.url)) {
+        Promise.resolve(browserApi.tabs.sendMessage(tab.id, message)).catch(() => {});
       }
     }
   } catch { /* A tab may close during the policy change. */ }
 }
 
-function handleSoftNavigation(details) {
-  const source = lastTabUrl.get(details.tabId);
-  const blocked = enforceSoftPolicy(details.tabId, details.url, source);
+/** Decide against the tab's previous URL (for hop rules), then remember the new one. */
+function evaluateTabNavigation(details, phase) {
+  const source = lastTabUrl.get(details.tabId) ?? null;
   lastTabUrl.set(details.tabId, details.url);
-  return blocked;
+  return evaluateNavigation(details.tabId, details.url, source, phase);
 }
 
 if (browserApi.webNavigation) {
@@ -804,26 +788,23 @@ if (browserApi.webNavigation) {
   // bfcache-restored navigations that never touch the network.
   browserApi.webNavigation.onCommitted.addListener((details) => {
     if (details.frameId !== 0) return;
-    if (enforceHardPolicy(details.tabId, details.url)) return;
-    handleSoftNavigation(details);
+    evaluateTabNavigation(details, 'commit');
   });
 
+  // The page is readable now; judge it if needed. The hop was already checked at commit.
   browserApi.webNavigation.onCompleted.addListener((details) => {
     if (details.frameId !== 0) return;
-    if (enforceHardPolicy(details.tabId, details.url)) return;
-    if (enforceSoftPolicy(details.tabId, details.url, null)) return;
-    handleQualifyingNavigation(details.tabId, details.url);
+    evaluateNavigation(details.tabId, details.url, null, 'complete');
   });
 
   browserApi.webNavigation.onHistoryStateUpdated.addListener((details) => {
     if (details.frameId !== 0) return;
-    if (enforceHardPolicy(details.tabId, details.url)) return;
-    if (handleSoftNavigation(details)) return;
-    debounceSpaNavigation(details.tabId, details.url);
+    evaluateTabNavigation(details, 'spa');
   });
 }
 browserApi.tabs.onRemoved.addListener((tabId) => lastTabUrl.delete(tabId));
 browserApi.tabs.onCreated.addListener((tab) => {
+  // A tab opened from a post inherits it as its source, so "open in new tab" can't dodge hops.
   if (typeof tab.openerTabId === 'number' && typeof tab.id === 'number') {
     const opener = lastTabUrl.get(tab.openerTabId);
     if (opener) lastTabUrl.set(tab.id, opener);

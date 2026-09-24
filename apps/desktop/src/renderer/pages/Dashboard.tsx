@@ -1,13 +1,8 @@
 import React from 'react';
 import { resolveActiveProfile } from '@talysman/shared';
-import { productFeaturesForEnvironment } from '@talysman/product';
 import { useFocusStore } from '../store/useFocusStore.js';
 import { FocusToggle } from '../components/FocusToggle.js';
 import { Kicker } from '../components/ui/index.js';
-
-const SMART_FILTERING_ENABLED = productFeaturesForEnvironment(
-  __APP_CONFIG__.APP_ENV,
-).smartFiltering;
 
 /** One compact instrument reading — kicker on top, value below. */
 function Readout({ label, value, tone }: { label: string; value: string; tone?: 'ok' | 'danger' }) {
@@ -34,12 +29,11 @@ export function Dashboard() {
     policy.defaultAction === 'block' &&
     policy.blockedDomains.length === 0 &&
     policy.allowedDomains.length === 0 &&
-    (policy.softBlockedSites?.length ?? 0) === 0 &&
-    !(SMART_FILTERING_ENABLED && policy.intent);
+    Object.keys(policy.sites ?? {}).length === 0;
   const listLabel = policy.defaultAction === 'block' ? 'site exceptions' : 'sites restricted';
   const listCount =
     (policy.defaultAction === 'block' ? policy.allowedDomains.length : policy.blockedDomains.length)
-    + (policy.softBlockedSites?.length ?? 0);
+    + Object.keys(policy.sites ?? {}).length;
 
   return (
     <div className="dashboard-stage flex min-h-full flex-col items-center justify-center gap-8 py-6">

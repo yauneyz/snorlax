@@ -4,7 +4,7 @@
  */
 
 /** Protocol version negotiated on connect; bump on breaking RPC changes. */
-export const PROTOCOL_VERSION = 4;
+export const PROTOCOL_VERSION = 5;
 
 /** Deep-link scheme used for the billing return (Phase 3) and tray re-focus. */
 export const DEEP_LINK_SCHEME = 'talysman';

@@ -19,7 +19,8 @@ const policy: Policy = {
   blockedDomains: [],
   allowedDomains: ['one.com', 'two.com', 'three.com', 'four.com', 'five.com', 'six.com'],
   defaultAction: 'block',
-  intent: null,
+  judge: null,
+  sites: {},
   apps: [{ windowsImageName: 'chrome.exe', label: 'Chrome' }],
   enabledPremadeLists: [],
 };
@@ -39,9 +40,9 @@ const profiles: Profile[] = [
 ];
 
 describe('product limits', () => {
-  it('keeps Smart filtering behind the development feature flag', () => {
+  it('ships AI filtering in every environment', () => {
     expect(productFeaturesForEnvironment('development').smartFiltering).toBe(true);
-    expect(productFeaturesForEnvironment('production').smartFiltering).toBe(false);
+    expect(productFeaturesForEnvironment('production').smartFiltering).toBe(true);
   });
 
   it('sets the Free blacklist allowance to five websites', () => {
@@ -91,7 +92,8 @@ describe('product limits', () => {
       blockedDomains: policy.allowedDomains,
       allowedDomains: [],
       defaultAction: 'allow',
-      intent: null,
+      judge: null,
+      sites: {},
       apps: [],
       enabledPremadeLists: [],
     };
@@ -142,7 +144,8 @@ describe('product limits', () => {
       blockedDomains: [],
       allowedDomains: [],
       defaultAction: 'block',
-      intent: null,
+      judge: null,
+      sites: {},
       apps: [],
       enabledPremadeLists: [],
     };
@@ -151,21 +154,37 @@ describe('product limits', () => {
     expect(constrainPolicyToLimits(blockAllPolicy, limits)).toEqual(blockAllPolicy);
   });
 
-  it('gates Smart filtering behind Pro', () => {
+  it('gates AI filtering behind Pro, falling back per the judge policy on Free', () => {
     const limits = limitsForPlan('free');
     const smartPolicy: Policy = {
       blockedDomains: [],
       allowedDomains: [],
-      defaultAction: 'block',
-      intent: { positive: 'Researching flights to Japan' },
+      defaultAction: 'judge',
+      judge: { tasks: [{ id: 't', title: 'Researching flights to Japan' }], avoid: [], fallback: 'block' },
       apps: [],
       enabledPremadeLists: [],
+      sites: { reddit: { features: { content: 'judge' } } },
     };
 
     expect(validatePolicyForLimits(smartPolicy, limits).map((v) => v.field)).toEqual([
-      'policy.intent',
+      'policy.judge',
     ]);
-    expect(constrainPolicyToLimits(smartPolicy, limits).intent).toBeNull();
+    const constrained = constrainPolicyToLimits(smartPolicy, limits);
+    expect(constrained.judge).toBeNull();
+    expect(constrained.defaultAction).toBe('block');
+    expect(constrained.sites.reddit?.features.content).toBe('block');
     expect(validatePolicyForLimits(smartPolicy, limitsForPlan('pro'))).toEqual([]);
+  });
+
+  it('counts each site rule toward the Free blocked-website allowance', () => {
+    const limits = limitsForPlan('free');
+    const sitesPolicy: Policy = {
+      ...EMPTY_POLICY,
+      blockedDomains: ['a.com', 'b.com', 'c.com', 'd.com'],
+      sites: { reddit: { features: {} }, youtube: { features: {} } },
+    };
+    expect(validatePolicyForLimits(sitesPolicy, limits).map((v) => v.field)).toEqual(['policy.sites']);
+    expect(Object.keys(constrainPolicyToLimits(sitesPolicy, limits).sites)).toEqual(['reddit']);
+    expect(validatePolicyForLimits({ ...sitesPolicy, blockedDomains: ['a.com'] }, limits)).toEqual([]);
   });
 });

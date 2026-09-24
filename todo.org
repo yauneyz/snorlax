@@ -1,11 +1,21 @@
-- Email 15 people
+- write essay
+- improve soft blocking
+- improve soft blocker ui, blocklist UI in general
+- landing/pricing copy for soft blocking
+- add soft blocklist to marketing copy, pricing page (pro feature)
+- improve pricing page copy in general
+- ship new builds, extension, etc
+- send to instagram guy
+
+- read "learn creator outreach" materials
+- Message 15 people
+
 - "How I" content
 - show hn
 - put the product on all the directories
 - reach out to media outlets to be covered
 - reach out to lists to get in them
 - got my first user post
--
 
 
 

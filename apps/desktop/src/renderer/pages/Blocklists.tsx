@@ -14,6 +14,8 @@ import { desktopPaletteColor } from '../lib/desktopPalette.js';
 import { useFocusStore } from '../store/useFocusStore.js';
 import { Badge, Button, Input, Kicker, ProfileDot, Textarea } from '../components/ui/index.js';
 import { cx, profileSummary } from '../lib/utils.js';
+import { SiteRules } from '../components/SiteRules.js';
+import { JudgeSettings } from '../components/JudgeSettings.js';
 import type { AppPickerItem } from '../../shared/appPicker.js';
 import {
   maxAllowedDomains,
@@ -26,9 +28,9 @@ import {
 
 /**
  * One-click starting points over the generalized `{blockedDomains, allowedDomains,
- * defaultAction, intent}` shape (see `packages/shared/src/policy.ts`) — not enforced modes,
- * just prefills. "Smart" doesn't write a policy on click (an intent needs real text first); it
- * just opens the Smart filtering section below.
+ * defaultAction, judge}` shape (see `packages/shared/src/policy.ts`) — not enforced modes,
+ * just prefills. "Smart" judges unlisted pages against your tasks; with no task yet it just
+ * points at the AI filter section, since a judge needs something to judge against.
  */
 type Preset = {
   value: 'blacklist' | 'whitelist' | 'block-all' | 'smart';
@@ -58,7 +60,7 @@ const PRESETS: Preset[] = SMART_FILTERING_ENABLED
       {
         value: 'smart',
         label: 'Smart',
-        hint: 'Judge anything else against what you’re working on.',
+        hint: 'AI judges anything else against what you’re working on.',
       },
     ]
   : CLASSIC_PRESETS;
@@ -378,7 +380,6 @@ export function Blocklists({ onUpgrade }: { onUpgrade: () => void }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [blockedInput, setBlockedInput] = useState('');
   const [allowedInput, setAllowedInput] = useState('');
-  const [negativeOpen, setNegativeOpen] = useState(false);
   const [premadeOpen, setPremadeOpen] = useState(false);
   const [appName, setAppName] = useState('');
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -391,7 +392,8 @@ export function Blocklists({ onUpgrade }: { onUpgrade: () => void }) {
 
   const selected = resolveActiveProfile(profiles, selectedId ?? activeProfileId);
   const policy = selected?.policy ?? EMPTY_POLICY;
-  const softSupported = Array.isArray(selected?.policy.softBlockedSites);
+  // A daemon older than protocol 5 reports no `sites` on its policies.
+  const sitesSupported = selected?.policy.sites !== undefined;
   const isActive = selected?.id === activeProfileId;
   const accent = BLOCKLIST_SIGNAL;
   const profileLimit = maxProfiles(productLimits);
@@ -404,7 +406,9 @@ export function Blocklists({ onUpgrade }: { onUpgrade: () => void }) {
   const classicMode = policy.defaultAction === 'allow' ? 'blacklist' : 'whitelist';
   const classicDomains =
     classicMode === 'blacklist' ? policy.blockedDomains : policy.allowedDomains;
-  const blockedLimitReached = maxBlocked !== null && policy.blockedDomains.length >= maxBlocked;
+  // Site rules share the blocked-website allowance with the hard block list.
+  const blockedEntryCount = policy.blockedDomains.length + Object.keys(policy.sites ?? {}).length;
+  const blockedLimitReached = maxBlocked !== null && blockedEntryCount >= maxBlocked;
   const allowedLimitReached = maxAllowed !== null && policy.allowedDomains.length >= maxAllowed;
   const appBlockingLocked = maxApps === 0;
   const premadeListsLocked = !premadeListsAllowed(productLimits);
@@ -417,7 +421,6 @@ export function Blocklists({ onUpgrade }: { onUpgrade: () => void }) {
         : PREMADE_LISTS.filter((list) => policy.enabledPremadeLists.includes(list.id)),
     [premadeListsLocked, policy.enabledPremadeLists],
   );
-  const negativeSectionOpen = negativeOpen || Boolean(policy.intent?.negative);
   const existingAppKeys = useMemo(
     () => new Set(policy.apps.map((app) => appKey(app))),
     [policy.apps],
@@ -511,7 +514,9 @@ export function Blocklists({ onUpgrade }: { onUpgrade: () => void }) {
   function applyPreset(preset: 'blacklist' | 'whitelist' | 'block-all' | 'smart') {
     if (preset === 'smart') {
       if (!smartAllowed) return onUpgrade();
-      return;
+      // Without a task the judge has nothing to judge against; the AI filter section asks for one.
+      if (!policy.judge) return setError('Add what you’re working on to the AI filter first.');
+      return save({ ...policy, defaultAction: 'judge' });
     }
     if (preset === 'blacklist') {
       return save({
@@ -519,7 +524,6 @@ export function Blocklists({ onUpgrade }: { onUpgrade: () => void }) {
         blockedDomains: SMART_FILTERING_ENABLED ? policy.blockedDomains : classicDomains,
         allowedDomains: SMART_FILTERING_ENABLED ? policy.allowedDomains : [],
         defaultAction: 'allow',
-        intent: null,
       });
     }
     if (preset === 'whitelist') {
@@ -528,10 +532,9 @@ export function Blocklists({ onUpgrade }: { onUpgrade: () => void }) {
         blockedDomains: SMART_FILTERING_ENABLED ? policy.blockedDomains : [],
         allowedDomains: SMART_FILTERING_ENABLED ? policy.allowedDomains : classicDomains,
         defaultAction: 'block',
-        intent: null,
       });
     }
-    return save({ ...policy, blockedDomains: [], allowedDomains: [], defaultAction: 'block', intent: null });
+    return save({ ...policy, blockedDomains: [], allowedDomains: [], defaultAction: 'block' });
   }
 
   const addBlockedDomain = () => {
@@ -554,7 +557,7 @@ export function Blocklists({ onUpgrade }: { onUpgrade: () => void }) {
     });
   /** Pasting a big list into the edit modal — dedupes against what's already there and stops at the plan limit. */
   const addManyBlockedDomains = (raw: string[]) => {
-    const room = maxBlocked === null ? Infinity : maxBlocked - policy.blockedDomains.length;
+    const room = maxBlocked === null ? Infinity : maxBlocked - blockedEntryCount;
     const existing = new Set(policy.blockedDomains);
     const additions = [...new Set(raw)].filter((d) => d && !existing.has(d)).slice(0, room);
     if (additions.length === 0) return;
@@ -606,44 +609,6 @@ export function Blocklists({ onUpgrade }: { onUpgrade: () => void }) {
     });
   };
 
-  const toggleSoftSite = (id: Policy['softBlockedSites'][number], domain: string) => {
-    if (!softSupported) return;
-    const enabled = (policy.softBlockedSites ?? []).includes(id);
-    if (enabled) {
-      void save({ ...policy, softBlockedSites: policy.softBlockedSites.filter((site) => site !== id) });
-      return;
-    }
-    const blocked = policy.blockedDomains.filter((entry) => {
-      const normalized = entry.toLowerCase().replace(/^\*\./, '');
-      return domain === normalized || domain.endsWith(`.${normalized}`);
-    });
-    if (blocked.some((entry) => entry.toLowerCase().replace(/^\*\./, '') !== domain)) {
-      setError(`Remove the broader hard block covering ${domain} before enabling its soft block.`);
-      return;
-    }
-    void save({
-      ...policy,
-      blockedDomains: policy.blockedDomains.filter((entry) => !blocked.includes(entry)),
-      softBlockedSites: [...(policy.softBlockedSites ?? []), id],
-    });
-  };
-
-  const setIntentPositive = (positive: string) => {
-    if (!smartAllowed) return onUpgrade();
-    // Smart filtering always fails open: everything not on the explicit block list is allowed
-    // until the judge says otherwise.
-    void save({ ...policy, defaultAction: 'allow', intent: { ...policy.intent, positive } });
-  };
-  const setIntentNegative = (negative: string) => {
-    void save({
-      ...policy,
-      intent: policy.intent ? { ...policy.intent, negative: negative || undefined } : null,
-    });
-  };
-  const clearIntent = () => {
-    setNegativeOpen(false);
-    void save({ ...policy, intent: null });
-  };
   const addApp = () => {
     if (!appName.trim()) return;
     if (maxApps !== null && policy.apps.length >= maxApps) {
@@ -867,78 +832,22 @@ export function Blocklists({ onUpgrade }: { onUpgrade: () => void }) {
 
       <section className="flex min-h-0 min-w-0 flex-1 flex-col">
         {SMART_FILTERING_ENABLED && (
-          <div className="mt-3 rounded-[10px] border border-white/[0.07] bg-white/[0.02] p-3.5">
-            <div className="flex items-baseline gap-2.5">
-              <Kicker>Smart filtering</Kicker>
-              {policy.intent && (
-                <button
-                  onClick={clearIntent}
-                  className="ml-auto text-[11px] font-medium text-slate-500 transition hover:text-dangerInk"
-                >
-                  turn off
-                </button>
-              )}
-            </div>
-
-            <div className="mt-2.5 flex flex-col gap-2.5">
-              <div>
-                <label className="mb-1 block text-[11px] text-slate-450">What are you working on?</label>
-                <Textarea
-                  rows={2}
-                  value={policy.intent?.positive ?? ''}
-                  onChange={(e) => setIntentPositive(e.target.value)}
-                  placeholder="Researching flight prices for a trip to Japan"
-                  disabled={!smartAllowed}
-                />
-              </div>
-
-              {!negativeSectionOpen ? (
-                <button
-                  onClick={() => setNegativeOpen(true)}
-                  className="self-start text-[11px] font-medium text-slate-450 transition hover:text-slate-200"
-                >
-                  + Add exclusions
-                </button>
-              ) : (
-                <div>
-                  <label className="mb-1 block text-[11px] text-slate-450">
-                    Anything to avoid, even if related?
-                  </label>
-                  <Textarea
-                    rows={2}
-                    value={policy.intent?.negative ?? ''}
-                    onChange={(e) => setIntentNegative(e.target.value)}
-                    placeholder="General travel influencer content, unrelated shopping"
-                    disabled={!smartAllowed}
-                  />
-                </div>
-              )}
-
-              {!smartAllowed ? (
-                <button
-                  onClick={onUpgrade}
-                  className="self-start text-[11px] font-medium text-slate-400 transition hover:text-slate-200"
-                >
-                  Upgrade to enable smart filtering →
-                </button>
-              ) : (
-                <p className="text-[11px] leading-relaxed text-slate-450">
-                  Pages that aren’t explicitly blocked or allowed below will load, then get checked
-                  against your task — usually within a few seconds.
-                </p>
-              )}
-            </div>
-          </div>
+          <JudgeSettings
+            key={selected?.id}
+            policy={policy}
+            allowed={smartAllowed}
+            onSave={(next) => void save(next)}
+            onUpgrade={onUpgrade}
+          />
         )}
 
         {/* One-click starting points — each just prefills the fields below. */}
         <div className="mt-3 flex gap-2">
           {PRESETS.map((p) => {
             const locked = p.value === 'smart' && !smartAllowed;
-            const active =
-              !SMART_FILTERING_ENABLED &&
-              (p.value === 'blacklist' || p.value === 'whitelist') &&
-              p.value === classicMode;
+            const active = SMART_FILTERING_ENABLED
+              ? p.value === 'smart' && policy.defaultAction === 'judge'
+              : (p.value === 'blacklist' || p.value === 'whitelist') && p.value === classicMode;
             return (
               <button
                 key={p.value}
@@ -998,40 +907,15 @@ export function Blocklists({ onUpgrade }: { onUpgrade: () => void }) {
           />
         )}
 
-        <div className="mt-6">
-          <Kicker>Soft blocks</Kicker>
-          <p className="mt-1 text-[11px] leading-snug text-slate-400">
-            {softSupported
-              ? 'Open specific posts and discussions while feeds and links to other posts stay blocked. Changing a hard block to a soft block requires your key while focus is on.'
-              : 'Update the Talysman desktop service to enable soft blocks.'}
-          </p>
-          <div className="mt-2.5 flex flex-col gap-1.5">
-            {([
-              { id: 'reddit', label: 'Reddit', domain: 'reddit.com' },
-              { id: 'hackernews', label: 'Hacker News', domain: 'news.ycombinator.com' },
-            ] as const).map((site) => {
-              const enabled = (policy.softBlockedSites ?? []).includes(site.id);
-              return (
-                <button
-                  key={site.id}
-                  type="button"
-                  role="switch"
-                  aria-checked={enabled}
-                  onClick={() => toggleSoftSite(site.id, site.domain)}
-                  disabled={!softSupported}
-                  className={cx('flex items-center gap-3 rounded-[10px] border px-3 py-2.5 text-left transition',
-                    enabled ? 'border-seal/30 bg-seal/[0.09]' : 'border-white/[0.07] bg-white/[0.025] hover:border-white/[0.14]',
-                    !softSupported && 'opacity-50')}
-                >
-                  <span className="flex-1 text-[12.5px] font-semibold text-slate-250">{site.label}</span>
-                  <span className="text-[11px] text-slate-400">
-                    {enabled ? 'On' : 'Off'}
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-        </div>
+        <SiteRules
+          policy={policy}
+          supported={sitesSupported}
+          smartAllowed={smartAllowed}
+          limitReached={blockedLimitReached}
+          onSave={(next) => void save(next)}
+          onError={setError}
+          onUpgrade={onUpgrade}
+        />
 
         <div className="mt-4">
           {/* While the categories are open the header pins to the top of the page scroller, so

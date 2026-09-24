@@ -125,7 +125,7 @@ fn sinkhole_block(policy: &Policy) -> String {
             .allowed_domains
             .iter()
             .any(|p| crate::policy_match::host_matches(&domain, p))
-            || policy.soft_blocked_sites.iter().any(|site| site.network_domains().iter().any(|network| crate::policy_match::host_matches(&domain, network)))
+            || talysman_common::policy_match::is_site_network_host(policy, &domain)
         {
             continue;
         }
@@ -265,7 +265,7 @@ mod tests {
     #[test]
     fn a_default_deny_policy_still_sinkholes_its_block_list() {
         let mut p = blocking(&["example.com"]);
-        p.default_action = crate::model::DefaultAction::Block;
+        p.default_action = crate::model::RuleAction::Block;
         assert!(sinkhole_block(&p).contains("0.0.0.0 example.com\n"));
     }
 

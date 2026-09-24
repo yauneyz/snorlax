@@ -230,7 +230,7 @@ mod tests {
 #[cfg(test)]
 mod profile_tests {
     use super::*;
-    use crate::model::{DefaultAction, Policy, ScheduleWindow, DEFAULT_PROFILE_COLOR};
+    use crate::model::{Policy, RuleAction, ScheduleWindow, DEFAULT_PROFILE_COLOR};
 
     fn profile(id: &str, policy: Policy) -> Profile {
         Profile {
@@ -245,11 +245,11 @@ mod profile_tests {
         Policy {
             blocked_domains: domains.iter().map(|d| (*d).to_string()).collect(),
             allowed_domains: Vec::new(),
-            default_action: DefaultAction::Allow,
-            intent: None,
+            default_action: RuleAction::Allow,
+            judge: None,
             apps: Vec::new(),
             enabled_premade_lists: Vec::new(),
-            soft_blocked_sites: Vec::new(),
+            sites: Default::default(),
         }
     }
 
