@@ -340,6 +340,145 @@
           "locked": true
         }
       ]
+    },
+    {
+      "id": "theverge",
+      "hosts": [
+        "theverge.com"
+      ],
+      "networkDomains": [],
+      "features": [
+        {
+          "id": "content",
+          "default": "allow",
+          "locked": false
+        },
+        {
+          "id": "search",
+          "default": "allow",
+          "locked": false
+        },
+        {
+          "id": "feed",
+          "default": "block",
+          "locked": false
+        },
+        {
+          "id": "recommendations",
+          "default": "block",
+          "locked": false
+        },
+        {
+          "id": "profiles",
+          "default": "block",
+          "locked": false
+        },
+        {
+          "id": "essentials",
+          "default": "allow",
+          "locked": true
+        }
+      ]
+    },
+    {
+      "id": "theringer",
+      "hosts": [
+        "theringer.com"
+      ],
+      "networkDomains": [],
+      "features": [
+        {
+          "id": "content",
+          "default": "allow",
+          "locked": false
+        },
+        {
+          "id": "episodes",
+          "default": "allow",
+          "locked": false
+        },
+        {
+          "id": "search",
+          "default": "allow",
+          "locked": false
+        },
+        {
+          "id": "feed",
+          "default": "block",
+          "locked": false
+        },
+        {
+          "id": "recommendations",
+          "default": "block",
+          "locked": false
+        },
+        {
+          "id": "essentials",
+          "default": "allow",
+          "locked": true
+        }
+      ]
+    },
+    {
+      "id": "substack",
+      "hosts": [
+        "substack.com"
+      ],
+      "networkDomains": [
+        "substackcdn.com"
+      ],
+      "features": [
+        {
+          "id": "content",
+          "default": "allow",
+          "locked": false
+        },
+        {
+          "id": "publications",
+          "default": "allow",
+          "locked": false
+        },
+        {
+          "id": "inbox",
+          "default": "allow",
+          "locked": false
+        },
+        {
+          "id": "messages",
+          "default": "allow",
+          "locked": false
+        },
+        {
+          "id": "notifications",
+          "default": "allow",
+          "locked": false
+        },
+        {
+          "id": "search",
+          "default": "allow",
+          "locked": false
+        },
+        {
+          "id": "feed",
+          "default": "block",
+          "locked": false
+        },
+        {
+          "id": "recommendations",
+          "default": "block",
+          "locked": false
+        },
+        {
+          "id": "profiles",
+          "default": "block",
+          "locked": false
+        },
+        {
+          "id": "essentials",
+          "default": "allow",
+          "locked": true
+        }
+      ]
     }
   ]
 }

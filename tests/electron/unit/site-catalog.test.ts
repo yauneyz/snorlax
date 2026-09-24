@@ -92,7 +92,7 @@ describe('site engine', () => {
   const defaults = (ids: string[]) => stateFor(Object.fromEntries(ids.map((id) => [id, { features: {} }])));
 
   it('keeps feeds reachable with the feed hidden, and admits content, search, and messaging', () => {
-    const state = defaults(['reddit', 'hackernews', 'youtube', 'x', 'linkedin', 'instagram']);
+    const state = defaults(['reddit', 'hackernews', 'youtube', 'x', 'linkedin', 'instagram', 'theverge', 'theringer', 'substack']);
     expect(decide(state, 'https://www.reddit.com/')).toMatchObject({ action: 'allow', layer: 'site', feature: 'feed', hidden: true });
     expect(decide(state, 'https://www.reddit.com/r/popular')).toMatchObject({ action: 'allow', feature: 'feed', hidden: true });
     expect(decide(state, 'https://x.com/home')).toMatchObject({ action: 'allow', feature: 'feed', hidden: true });

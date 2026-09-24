@@ -1054,5 +1054,422 @@ export const SITE_CATALOG = {
         ]
       }
     ]
+  },
+  "theverge": {
+    "id": "theverge",
+    "label": "The Verge",
+    "hosts": [
+      "theverge.com"
+    ],
+    "appHosts": [
+      "theverge.com",
+      "www.theverge.com"
+    ],
+    "networkDomains": [],
+    "features": [
+      {
+        "id": "content",
+        "label": "Articles you open directly",
+        "default": "allow"
+      },
+      {
+        "id": "search",
+        "label": "Search",
+        "default": "allow"
+      },
+      {
+        "id": "feed",
+        "label": "Homepage & section pages",
+        "default": "block"
+      },
+      {
+        "id": "recommendations",
+        "label": "Recommended stories",
+        "default": "block"
+      },
+      {
+        "id": "profiles",
+        "label": "Author pages",
+        "default": "block"
+      },
+      {
+        "id": "essentials",
+        "label": "Sign-in & account",
+        "default": "allow",
+        "locked": true
+      }
+    ],
+    "routes": [
+      {
+        "feature": "content",
+        "path": "^/(?:[a-z0-9-]+|[0-9]{4}/[0-9]{1,2}/[0-9]{1,2})/[0-9]+/[^/]+$",
+        "judge": {
+          "contentSelector": "article"
+        }
+      },
+      {
+        "feature": "search",
+        "path": "^/search$"
+      },
+      {
+        "feature": "profiles",
+        "path": "^/authors/[^/]+$"
+      },
+      {
+        "feature": "essentials",
+        "path": "^/(?:account|subscribe|sign-?in|login|logout|newsletters?)(?:/.*)?$"
+      }
+    ],
+    "fallbackFeature": "feed",
+    "elements": [
+      {
+        "feature": "feed",
+        "selector": "main",
+        "on": [
+          "feed"
+        ]
+      },
+      {
+        "feature": "recommendations",
+        "selector": ".duet--layout--rail, .duet--layout--article-recirc-color-container, .duet--layout--header-pattern, .duet--article--related, .duet--ad--native-ad-linkset",
+        "on": [
+          "content",
+          "search"
+        ]
+      },
+      {
+        "feature": "recommendations",
+        "selector": ".duet--homepage--most-popular, .duet--homepage--most-discussed"
+      },
+      {
+        "feature": "content",
+        "selector": "main",
+        "on": [
+          "content"
+        ]
+      },
+      {
+        "feature": "search",
+        "selector": "main",
+        "on": [
+          "search"
+        ]
+      },
+      {
+        "feature": "profiles",
+        "selector": "main",
+        "on": [
+          "profiles"
+        ]
+      }
+    ]
+  },
+  "theringer": {
+    "id": "theringer",
+    "label": "The Ringer",
+    "hosts": [
+      "theringer.com"
+    ],
+    "appHosts": [
+      "theringer.com",
+      "www.theringer.com"
+    ],
+    "networkDomains": [],
+    "features": [
+      {
+        "id": "content",
+        "label": "Articles you open directly",
+        "default": "allow"
+      },
+      {
+        "id": "episodes",
+        "label": "Podcast episodes you open directly",
+        "default": "allow"
+      },
+      {
+        "id": "search",
+        "label": "Search",
+        "default": "allow"
+      },
+      {
+        "id": "feed",
+        "label": "Homepage, topics & shows",
+        "default": "block"
+      },
+      {
+        "id": "recommendations",
+        "label": "Recommended stories",
+        "default": "block"
+      },
+      {
+        "id": "essentials",
+        "label": "Sign-in & account",
+        "default": "allow",
+        "locked": true
+      }
+    ],
+    "routes": [
+      {
+        "feature": "content",
+        "path": "^/[0-9]{4}/[0-9]{2}/[0-9]{2}/[^/]+/[^/]+$",
+        "judge": {
+          "contentSelector": "article"
+        }
+      },
+      {
+        "feature": "episodes",
+        "path": "^/podcasts/[^/]+/[0-9]{4}/[0-9]{2}/[0-9]{2}/[^/]+$",
+        "judge": {
+          "contentSelector": "main > section"
+        }
+      },
+      {
+        "feature": "search",
+        "path": "^/search$"
+      },
+      {
+        "feature": "essentials",
+        "path": "^/(?:account|subscribe|sign-?in|login|logout|newsletters?)(?:/.*)?$"
+      }
+    ],
+    "fallbackFeature": "feed",
+    "elements": [
+      {
+        "feature": "feed",
+        "selector": "main",
+        "on": [
+          "feed"
+        ]
+      },
+      {
+        "feature": "recommendations",
+        "selector": "#the-pulse, [data-module=\"the-pulse\"]"
+      },
+      {
+        "feature": "recommendations",
+        "selector": "[data-sentry-component=\"RelatedContent\"], [data-sentry-component=\"ReadMore\"], main > section",
+        "on": [
+          "content"
+        ]
+      },
+      {
+        "feature": "recommendations",
+        "selector": "main > section:nth-of-type(n+3)",
+        "on": [
+          "episodes"
+        ]
+      },
+      {
+        "feature": "content",
+        "selector": "main",
+        "on": [
+          "content"
+        ]
+      },
+      {
+        "feature": "episodes",
+        "selector": "main",
+        "on": [
+          "episodes"
+        ]
+      },
+      {
+        "feature": "search",
+        "selector": "main",
+        "on": [
+          "search"
+        ]
+      }
+    ]
+  },
+  "substack": {
+    "id": "substack",
+    "label": "Substack",
+    "hosts": [
+      "substack.com"
+    ],
+    "appHosts": [
+      "substack.com",
+      "www.substack.com"
+    ],
+    "networkDomains": [
+      "substackcdn.com"
+    ],
+    "features": [
+      {
+        "id": "content",
+        "label": "Posts & notes you open directly",
+        "default": "allow"
+      },
+      {
+        "id": "publications",
+        "label": "Newsletter sites",
+        "default": "allow"
+      },
+      {
+        "id": "inbox",
+        "label": "Subscriptions inbox",
+        "default": "allow"
+      },
+      {
+        "id": "messages",
+        "label": "Chat & messages",
+        "default": "allow"
+      },
+      {
+        "id": "notifications",
+        "label": "Activity",
+        "default": "allow"
+      },
+      {
+        "id": "search",
+        "label": "Search",
+        "default": "allow"
+      },
+      {
+        "id": "feed",
+        "label": "Home, Notes & Explore",
+        "default": "block"
+      },
+      {
+        "id": "recommendations",
+        "label": "Recommendations",
+        "default": "block"
+      },
+      {
+        "id": "profiles",
+        "label": "Profiles",
+        "default": "block"
+      },
+      {
+        "id": "essentials",
+        "label": "Sign-in & account",
+        "default": "allow",
+        "locked": true
+      }
+    ],
+    "routes": [
+      {
+        "feature": "essentials",
+        "path": "^/(?:sign-?in|sign-?up|account|settings|subscriptions|redirect|app-link|verify|logout|email-login|profile/edit)(?:/.*)?$"
+      },
+      {
+        "feature": "content",
+        "path": "^/(?:@[^/]+/)?note/[cp]-[0-9]+$"
+      },
+      {
+        "feature": "content",
+        "path": "^/@[^/]+/p-[0-9]+$"
+      },
+      {
+        "feature": "content",
+        "path": "^/(?:home|inbox)/post/(?:p-)?[0-9]+$"
+      },
+      {
+        "feature": "content",
+        "path": "^/pub/[^/]+/p/[^/]+$"
+      },
+      {
+        "feature": "inbox",
+        "path": "^/inbox(?:/.*)?$"
+      },
+      {
+        "feature": "messages",
+        "path": "^/(?:chat|messages)(?:/.*)?$"
+      },
+      {
+        "feature": "notifications",
+        "path": "^/activity(?:/.*)?$"
+      },
+      {
+        "feature": "search",
+        "path": "^/search(?:/.*)?$"
+      },
+      {
+        "feature": "profiles",
+        "path": "^/(?:@[^/]+|profile/[^/]+)(?:/.*)?$"
+      },
+      {
+        "feature": "feed"
+      }
+    ],
+    "fallbackFeature": "publications",
+    "elements": [
+      {
+        "feature": "feed",
+        "selector": "main.reader-nav-page",
+        "on": [
+          "feed"
+        ]
+      },
+      {
+        "feature": "recommendations",
+        "selector": ".reader2-inbox-sidebar, [class*=\"exploreSidebar-\"]",
+        "on": [
+          "feed",
+          "content",
+          "inbox",
+          "notifications",
+          "search",
+          "profiles"
+        ]
+      },
+      {
+        "feature": "recommendations",
+        "selector": ".homepage-recommendations, .homepage-recommendations-view-all",
+        "on": [
+          "publications"
+        ]
+      },
+      {
+        "feature": "content",
+        "selector": "main.reader-nav-page",
+        "on": [
+          "content"
+        ]
+      },
+      {
+        "feature": "publications",
+        "selector": "#main",
+        "on": [
+          "publications"
+        ]
+      },
+      {
+        "feature": "inbox",
+        "selector": "main.reader-nav-page",
+        "on": [
+          "inbox"
+        ]
+      },
+      {
+        "feature": "messages",
+        "selector": "main.reader-nav-page",
+        "on": [
+          "messages"
+        ]
+      },
+      {
+        "feature": "notifications",
+        "selector": "main.reader-nav-page",
+        "on": [
+          "notifications"
+        ]
+      },
+      {
+        "feature": "search",
+        "selector": "main.reader-nav-page",
+        "on": [
+          "search"
+        ]
+      },
+      {
+        "feature": "profiles",
+        "selector": "main.reader-nav-page",
+        "on": [
+          "profiles"
+        ]
+      }
+    ]
   }
 };

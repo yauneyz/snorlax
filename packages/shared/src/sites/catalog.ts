@@ -9,8 +9,11 @@ import x from './sites/x.js';
 import linkedin from './sites/linkedin.js';
 import instagram from './sites/instagram.js';
 import youtube from './sites/youtube.js';
+import theverge from './sites/theverge.js';
+import theringer from './sites/theringer.js';
+import substack from './sites/substack.js';
 
-export const SITE_DEFINITIONS: readonly SiteDefinition[] = [reddit, hackernews, x, linkedin, instagram, youtube];
+export const SITE_DEFINITIONS: readonly SiteDefinition[] = [reddit, hackernews, x, linkedin, instagram, youtube, theverge, theringer, substack];
 
 export const SITES_BY_ID: ReadonlyMap<string, SiteDefinition> = new Map(SITE_DEFINITIONS.map((site) => [site.id, site]));
 

@@ -34,7 +34,13 @@
         "*://youtube.com/*",
         "*://*.youtube.com/*",
         "*://youtu.be/*",
-        "*://*.youtu.be/*"
+        "*://*.youtu.be/*",
+        "*://theverge.com/*",
+        "*://*.theverge.com/*",
+        "*://theringer.com/*",
+        "*://*.theringer.com/*",
+        "*://substack.com/*",
+        "*://*.substack.com/*"
       ],
       "js": [
         "site-content.js"
