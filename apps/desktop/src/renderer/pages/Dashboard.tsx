@@ -34,10 +34,12 @@ export function Dashboard() {
     policy.defaultAction === 'block' &&
     policy.blockedDomains.length === 0 &&
     policy.allowedDomains.length === 0 &&
+    (policy.softBlockedSites?.length ?? 0) === 0 &&
     !(SMART_FILTERING_ENABLED && policy.intent);
-  const listLabel = policy.defaultAction === 'block' ? 'sites allowed' : 'sites blocked';
+  const listLabel = policy.defaultAction === 'block' ? 'site exceptions' : 'sites restricted';
   const listCount =
-    policy.defaultAction === 'block' ? policy.allowedDomains.length : policy.blockedDomains.length;
+    (policy.defaultAction === 'block' ? policy.allowedDomains.length : policy.blockedDomains.length)
+    + (policy.softBlockedSites?.length ?? 0);
 
   return (
     <div className="dashboard-stage flex min-h-full flex-col items-center justify-center gap-8 py-6">

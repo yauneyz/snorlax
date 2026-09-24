@@ -255,6 +255,9 @@ impl Core {
         self.pending_judges.clear();
         let policy = self.state.active_policy();
         self.shared.set_policy(policy.clone());
+        self.shared.set_handshake_enabled(
+            self.state.settings.browser_handshake_enabled || !policy.soft_blocked_sites.is_empty(),
+        );
         self.emit("policyChanged", json!({ "policy": policy }));
     }
 
@@ -275,10 +278,9 @@ impl Core {
         self.set_profile(profile)
     }
 
-    /// Create or replace a profile. Tightening is always free. Relaxing — unblocking a site or
-    /// app, or a mode change that frees traffic — requires the paired key even when the profile
-    /// is not the active one: a locked schedule window may switch to it later, so pre-loosening
-    /// a dormant profile has to cost the same as loosening the live one.
+    /// Create or replace a profile. Tightening is always free. Relaxing requires the paired key
+    /// while focus or a locked schedule is enforcing, including edits to dormant profiles that
+    /// a schedule may activate later. With focus off and no locked window, edits are unlocked.
     fn set_profile(&mut self, profile: Profile) -> Result<(), RpcError> {
         if profile.id.trim().is_empty() {
             return Err(RpcError::new(
@@ -307,7 +309,8 @@ impl Core {
         }
         if let Some(idx) = existing {
             let prev = self.state.profiles[idx].policy.clone();
-            if !crate::policy_match::is_at_least_as_restrictive(&prev, &profile.policy) {
+            let enforcing = self.state.focus_active || self.state.schedule.windows.iter().any(|w| w.locked);
+            if enforcing && !crate::policy_match::is_at_least_as_restrictive(&prev, &profile.policy) {
                 self.require_key("Insert your paired key to relax the blocklist.")?;
             }
         }
@@ -475,7 +478,7 @@ impl Core {
             }
         }
         self.state.settings.browser_handshake_enabled = enabled;
-        self.shared.set_handshake_enabled(enabled);
+        self.shared.set_handshake_enabled(enabled || !self.state.active_policy().soft_blocked_sites.is_empty());
         self.persist_state();
         self.emit(
             "settingsChanged",
@@ -753,7 +756,7 @@ impl Core {
     pub fn rearm_on_boot(&mut self) {
         // Restore the persisted handshake setting into the shared enforcement state.
         self.shared
-            .set_handshake_enabled(self.state.settings.browser_handshake_enabled);
+            .set_handshake_enabled(self.state.settings.browser_handshake_enabled || !self.state.active_policy().soft_blocked_sites.is_empty());
         // The active profile may have arrived from a state-file migration; make sure enforcement
         // is holding its policy and not a stale one.
         self.shared.set_policy(self.state.active_policy());
@@ -875,7 +878,8 @@ impl Core {
                 // it for the watchdog; never errors so a malformed beat can't disrupt the bridge.
                 let heartbeat = talysman_common::extension_compat::parse_service_heartbeat(params);
                 let pid = heartbeat.browser_pid;
-                let healthy = heartbeat.healthy;
+                let healthy = heartbeat.healthy
+                    && (self.state.active_policy().soft_blocked_sites.is_empty() || heartbeat.soft_block_capable);
                 let browser = heartbeat.browser.as_str();
                 let sequence = heartbeat.sequence;
                 let extension_version = heartbeat.extension_version.as_deref().unwrap_or("");

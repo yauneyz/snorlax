@@ -76,6 +76,29 @@ pub struct Policy {
     pub apps: Vec<AppRef>,
     /// Built-in bulk blocklist categories the user has toggled on. See `crate::premade_lists`.
     pub enabled_premade_lists: Vec<PremadeListId>,
+    pub soft_blocked_sites: Vec<SoftBlockedSite>,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum SoftBlockedSite {
+    Reddit,
+    Hackernews,
+}
+
+impl SoftBlockedSite {
+    pub fn domain(self) -> &'static str {
+        match self {
+            Self::Reddit => "reddit.com",
+            Self::Hackernews => "news.ycombinator.com",
+        }
+    }
+    pub fn network_domains(self) -> &'static [&'static str] {
+        match self {
+            Self::Reddit => &["reddit.com", "redditstatic.com", "redditmedia.com", "redd.it"],
+            Self::Hackernews => &["news.ycombinator.com"],
+        }
+    }
 }
 
 /// Only for backward-compatible deserialization: pre-Smart-filtering policies (persisted state
@@ -111,6 +134,8 @@ struct PolicyWire {
     apps: Vec<AppRef>,
     #[serde(default)]
     enabled_premade_lists: Vec<PremadeListId>,
+    #[serde(default)]
+    soft_blocked_sites: Vec<SoftBlockedSite>,
 }
 
 impl<'de> Deserialize<'de> for Policy {
@@ -133,6 +158,7 @@ impl<'de> Deserialize<'de> for Policy {
                     intent: None,
                     apps: wire.apps,
                     enabled_premade_lists: Vec::new(),
+                    soft_blocked_sites: Vec::new(),
                 },
                 LegacyMode::Whitelist => Policy {
                     blocked_domains: Vec::new(),
@@ -141,6 +167,7 @@ impl<'de> Deserialize<'de> for Policy {
                     intent: None,
                     apps: wire.apps,
                     enabled_premade_lists: Vec::new(),
+                    soft_blocked_sites: Vec::new(),
                 },
                 LegacyMode::BlockAll => Policy {
                     blocked_domains: Vec::new(),
@@ -149,6 +176,7 @@ impl<'de> Deserialize<'de> for Policy {
                     intent: None,
                     apps: wire.apps,
                     enabled_premade_lists: Vec::new(),
+                    soft_blocked_sites: Vec::new(),
                 },
             };
             Ok(policy)
@@ -160,6 +188,7 @@ impl<'de> Deserialize<'de> for Policy {
                 intent: wire.intent,
                 apps: wire.apps,
                 enabled_premade_lists: wire.enabled_premade_lists,
+                soft_blocked_sites: wire.soft_blocked_sites,
             })
         }
     }
@@ -230,6 +259,7 @@ mod tests {
             "intent",
             "apps",
             "enabledPremadeLists",
+            "softBlockedSites",
         ] {
             assert!(json.get(key).is_some(), "missing `{key}` in {json}");
         }

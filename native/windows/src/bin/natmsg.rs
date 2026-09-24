@@ -57,26 +57,39 @@ struct Blocking {
     /// default, matching "no Smart filtering" for a freshly-constructed `Blocking`.
     intent: Value,
     enabled_premade_lists: Vec<String>,
+    soft_blocked_sites: Vec<String>,
     handshake_enabled: bool,
     smart_filtering_enabled: bool,
 }
 
 impl Blocking {
-    fn to_msg(&self) -> Value {
+    fn to_msg(&self, soft_capable: bool) -> Value {
         let default_action = if self.default_action.is_empty() {
             "allow"
         } else {
             self.default_action.as_str()
         };
+        let mut blocked_domains = self.blocked_domains.clone();
+        if !soft_capable {
+            for site in &self.soft_blocked_sites {
+                let domain = match site.as_str() {
+                    "reddit" => "reddit.com",
+                    "hackernews" => "news.ycombinator.com",
+                    _ => continue,
+                };
+                blocked_domains.push(domain.to_string());
+            }
+        }
         json!({
             "type": "state",
             "active": self.active,
-            "blockedDomains": self.blocked_domains,
+            "blockedDomains": blocked_domains,
             "allowedDomains": self.allowed_domains,
             "defaultAction": default_action,
             "intent": if self.smart_filtering_enabled { self.intent.clone() } else { Value::Null },
             "enabledPremadeLists": self.enabled_premade_lists,
-            "handshakeEnabled": self.handshake_enabled,
+            "softBlockedSites": if soft_capable { self.soft_blocked_sites.as_slice() } else { &[] },
+            "handshakeEnabled": self.handshake_enabled || !self.soft_blocked_sites.is_empty(),
         })
     }
 }
@@ -119,6 +132,10 @@ fn parse_policy(policy: &Value, b: &mut Blocking) {
                 .filter_map(|d| d.as_str().map(str::to_string))
                 .collect()
         })
+        .unwrap_or_default();
+    b.soft_blocked_sites = policy.get("softBlockedSites")
+        .and_then(Value::as_array)
+        .map(|sites| sites.iter().filter_map(Value::as_str).map(str::to_string).collect())
         .unwrap_or_default();
 }
 
@@ -258,6 +275,7 @@ async fn main() {
     });
 
     let last: Arc<Mutex<Option<Blocking>>> = Arc::new(Mutex::new(None));
+    let soft_capable = Arc::new(std::sync::atomic::AtomicBool::new(false));
 
     // Retain only the newest heartbeat while disconnected; bound judge work separately.
     let (heartbeat_tx, heartbeat_rx) = watch::channel::<Option<Value>>(None);
@@ -268,6 +286,7 @@ async fn main() {
     {
         let out_tx = out_tx.clone();
         let last = last.clone();
+        let soft_capable = soft_capable.clone();
         tokio::spawn(async move {
             let mut stdin = tokio::io::stdin();
             loop {
@@ -280,8 +299,9 @@ async fn main() {
                             let _ = judge_tx.send(judge_request(&msg)).await;
                         }
                         _ => {
+                            soft_capable.store(msg.get("softBlockCapability").and_then(Value::as_u64) == Some(1), Ordering::SeqCst);
                             if let Some(b) = last.lock().await.clone() {
-                                let _ = out_tx.send(b.to_msg()).await; // `hello` → resend latest state
+                                let _ = out_tx.send(b.to_msg(soft_capable.load(Ordering::SeqCst))).await;
                             }
                         }
                     },
@@ -294,7 +314,7 @@ async fn main() {
 
     // Pipe loop: keep the service connection up and translate state/events into extension pushes.
     loop {
-        if let Err(_e) = pump_pipe(&out_tx, &last, heartbeat_rx.clone(), &mut judge_rx).await {
+        if let Err(_e) = pump_pipe(&out_tx, &last, &soft_capable, heartbeat_rx.clone(), &mut judge_rx).await {
             // Connection failed or dropped; back off and retry. The extension keeps its last rules.
         }
         tokio::time::sleep(Duration::from_secs(2)).await;
@@ -333,6 +353,7 @@ mod tests {
             default_action: default_action.to_string(),
             intent: Value::Null,
             enabled_premade_lists: Vec::new(),
+            soft_blocked_sites: Vec::new(),
             handshake_enabled: true,
             smart_filtering_enabled: false,
         }
@@ -340,7 +361,7 @@ mod tests {
 
     #[test]
     fn the_state_frame_carries_only_the_protocol_v4_policy_shape() {
-        let msg = blocking("allow", &["reddit.com"], &[]).to_msg();
+        let msg = blocking("allow", &["reddit.com"], &[]).to_msg(false);
 
         assert_eq!(msg["blockedDomains"][0], "reddit.com");
         assert_eq!(msg["defaultAction"], "allow");
@@ -352,7 +373,7 @@ mod tests {
     /// response has landed. It must still read as the open-by-default preset, not an empty string.
     #[test]
     fn an_unset_default_action_falls_back_to_allow() {
-        let msg = Blocking::default().to_msg();
+        let msg = Blocking::default().to_msg(false);
 
         assert_eq!(msg["defaultAction"], "allow");
     }
@@ -392,6 +413,7 @@ mod tests {
 async fn pump_pipe(
     out_tx: &mpsc::Sender<Value>,
     last: &Arc<Mutex<Option<Blocking>>>,
+    soft_capable: &Arc<std::sync::atomic::AtomicBool>,
     mut heartbeat_rx: watch::Receiver<Option<Value>>,
     judge_rx: &mut mpsc::Receiver<Value>,
 ) -> std::io::Result<()> {
@@ -505,7 +527,7 @@ async fn pump_pipe(
                         }
                     };
                     if push {
-                        let _ = out_tx.send(b.to_msg()).await;
+                        let _ = out_tx.send(b.to_msg(soft_capable.load(Ordering::SeqCst))).await;
                     }
                 }
             }

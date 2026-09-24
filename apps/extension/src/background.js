@@ -27,6 +27,7 @@ import { buildRules, hostnameMatchesAny, policyBlocksHostname } from './rules.js
 import { heartbeatDelayForState } from './heartbeat-timing.js';
 import { extractPageContent } from './content-extract.js';
 import { buildPremadeRulePlan } from './premade-rules.js';
+import { softRoute, softSiteForUrl, softNavigationAllowed } from './soft-block.js';
 
 // Prefer the callback-compatible `chrome` namespace where both aliases exist (notably Firefox).
 const browserApi = globalThis.chrome || globalThis.browser;
@@ -79,7 +80,9 @@ let currentPolicy = {
   defaultAction: 'allow',
   intent: null,
   enabledPremadeLists: [],
+  softBlockedSites: [],
 };
+const lastTabUrl = new Map();
 
 // Stable-ish identifiers for this worker session (best-effort; the service correlates by browser
 // PID, not these).
@@ -177,6 +180,7 @@ function applyState(state) {
         ? state.intent
         : null,
     enabledPremadeLists: Array.isArray(state.enabledPremadeLists) ? state.enabledPremadeLists : [],
+    softBlockedSites: Array.isArray(state.softBlockedSites) ? state.softBlockedSites : [],
   };
   policyGeneration += 1;
   invalidatePendingJudges();
@@ -196,6 +200,8 @@ function applyState(state) {
   // DNR only affects requests made from here on, so a tab already sitting on a now-blocked page
   // would stay put. Re-check what's open against the new policy.
   void enforceHardPolicyOnOpenTabs();
+  void enforceSoftPolicyOnOpenTabs();
+  void notifySoftContentScripts();
 }
 
 async function applyLatestRuleState() {
@@ -279,6 +285,16 @@ function currentPopupStatus() {
 }
 
 browserApi.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+  if (message?.type === 'talysman:soft-denied') {
+    if (_sender.tab?.id !== undefined && currentPolicy.active) {
+      void redirectIfStillOnUrl(_sender.tab.id, _sender.tab.url, 'Soft blocked: follow an external link or use search', policyGeneration);
+    }
+    return false;
+  }
+  if (message?.type === 'talysman:soft-policy') {
+    sendResponse({ active: currentPolicy.active, sites: currentPolicy.softBlockedSites });
+    return false;
+  }
   if (!message || message.type !== 'talysman:get-status') return undefined;
   sendResponse(currentPopupStatus());
   return false;
@@ -332,7 +348,7 @@ function connect() {
 
   // Ask the host for current state immediately.
   try {
-    port.postMessage({ type: 'hello' });
+    port.postMessage({ type: 'hello', softBlockCapability: 1 });
   } catch (e) {
     console.error('[talysman] hello failed', e);
   }
@@ -349,6 +365,7 @@ function heartbeatFrame() {
     browser: BROWSER,
     workerSessionId: PROFILE_ID,
     extensionVersion: EXTENSION_VERSION,
+    softBlockCapability: 1,
     lockedActive: blockingActive,
     health: currentHealth(),
   };
@@ -487,7 +504,8 @@ async function redirectIfStillOnUrl(tabId, expectedUrl, reason, generation = pol
       });
       return;
     }
-    await browserApi.tabs.update(tabId, { url: blockedPageUrl(reason) });
+    const softSite = reason.startsWith('Soft blocked:') ? softSiteForUrl(expectedUrl) : null;
+    await browserApi.tabs.update(tabId, { url: blockedPageUrl(reason, softSite) });
     console.info('[talysman][smart-filtering] redirected to blocked page', {
       tabId,
       expectedUrl,
@@ -502,9 +520,12 @@ async function redirectIfStillOnUrl(tabId, expectedUrl, reason, generation = pol
   }
 }
 
-function blockedPageUrl(reason) {
+function blockedPageUrl(reason, softSite = null) {
   const base = browserApi.runtime.getURL('blocked.html');
-  return reason ? `${base}?reason=${encodeURIComponent(reason)}` : base;
+  const query = new URLSearchParams();
+  if (reason) query.set('reason', reason);
+  if (softSite) query.set('softSite', softSite);
+  return query.size ? `${base}?${query}` : base;
 }
 
 /** Client-side backstop when defaultAction is the only signal we have (timeout or extraction failure). */
@@ -604,6 +625,7 @@ async function handleQualifyingNavigation(tabId, url) {
   const intent = currentPolicy.intent;
   const defaultAction = currentPolicy.defaultAction;
   if (!/^https?:\/\//i.test(url)) return; // browser-internal pages etc. are out of scope
+  if (currentPolicy.softBlockedSites.includes(softSiteForUrl(url))) return;
 
   let hostname;
   try {
@@ -728,26 +750,85 @@ async function enforceHardPolicyOnOpenTabs() {
   }
 }
 
+function enforceSoftPolicy(tabId, url, sourceUrl) {
+  if (!currentPolicy.active || typeof tabId !== 'number' || !url) return false;
+  const route = softRoute(url);
+  if (!route || !currentPolicy.softBlockedSites.includes(route.site)) return false;
+  if (route.kind === 'blocked' || (sourceUrl && softSiteForUrl(sourceUrl) === route.site
+      && !softNavigationAllowed(sourceUrl, url))) {
+    void redirectIfStillOnUrl(tabId, url, 'Soft blocked: open a specific post or use search', policyGeneration);
+    return true;
+  }
+  return false;
+}
+
+async function enforceSoftPolicyOnOpenTabs() {
+  if (!currentPolicy.active || currentPolicy.softBlockedSites.length === 0) return;
+  try {
+    for (const tab of await browserApi.tabs.query({})) {
+      if (typeof tab.id !== 'number') continue;
+      if (tab.url) lastTabUrl.set(tab.id, tab.url);
+      if (enforceSoftPolicy(tab.id, tab.url, null)) continue;
+      const site = softSiteForUrl(tab.url);
+      if (site && currentPolicy.softBlockedSites.includes(site)) {
+        try {
+          await browserApi.scripting.executeScript({ target: { tabId: tab.id }, files: ['soft-content.js'] });
+        } catch { /* The tab may close or navigate before injection. */ }
+      }
+    }
+  } catch (e) { console.warn('[talysman] soft-block tab sweep failed', e && e.message); }
+}
+
+async function notifySoftContentScripts() {
+  try {
+    for (const tab of await browserApi.tabs.query({})) {
+      if (typeof tab.id === 'number' && softSiteForUrl(tab.url)) {
+        Promise.resolve(browserApi.tabs.sendMessage(tab.id, {
+          type: 'talysman:soft-policy-updated', active: currentPolicy.active,
+          sites: currentPolicy.softBlockedSites,
+        })).catch(() => {});
+      }
+    }
+  } catch { /* A tab may close during the policy change. */ }
+}
+
+function handleSoftNavigation(details) {
+  const source = lastTabUrl.get(details.tabId);
+  const blocked = enforceSoftPolicy(details.tabId, details.url, source);
+  lastTabUrl.set(details.tabId, details.url);
+  return blocked;
+}
+
 if (browserApi.webNavigation) {
   // onCommitted fires before the document paints, including for service-worker-served and
   // bfcache-restored navigations that never touch the network.
   browserApi.webNavigation.onCommitted.addListener((details) => {
     if (details.frameId !== 0) return;
-    enforceHardPolicy(details.tabId, details.url);
+    if (enforceHardPolicy(details.tabId, details.url)) return;
+    handleSoftNavigation(details);
   });
 
   browserApi.webNavigation.onCompleted.addListener((details) => {
     if (details.frameId !== 0) return;
     if (enforceHardPolicy(details.tabId, details.url)) return;
+    if (enforceSoftPolicy(details.tabId, details.url, null)) return;
     handleQualifyingNavigation(details.tabId, details.url);
   });
 
   browserApi.webNavigation.onHistoryStateUpdated.addListener((details) => {
     if (details.frameId !== 0) return;
     if (enforceHardPolicy(details.tabId, details.url)) return;
+    if (handleSoftNavigation(details)) return;
     debounceSpaNavigation(details.tabId, details.url);
   });
 }
+browserApi.tabs.onRemoved.addListener((tabId) => lastTabUrl.delete(tabId));
+browserApi.tabs.onCreated.addListener((tab) => {
+  if (typeof tab.openerTabId === 'number' && typeof tab.id === 'number') {
+    const opener = lastTabUrl.get(tab.openerTabId);
+    if (opener) lastTabUrl.set(tab.id, opener);
+  }
+});
 
 // Register these listeners synchronously so Chrome wakes this worker when the profile starts or the
 // extension updates. Top-level connect also covers any other event that revives the worker.

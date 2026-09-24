@@ -25,6 +25,7 @@ export function Settings() {
   const setDevSubscriptionPlan = useFocusStore((s) => s.setDevSubscriptionPlan);
   const setLocalEntitlementEnabled = useFocusStore((s) => s.setLocalEntitlementEnabled);
   const handshakeEnabled = useFocusStore((s) => s.settings.browserHandshakeEnabled);
+  const softBlocksRequireHandshake = useFocusStore((s) => (s.policy.softBlockedSites?.length ?? 0) > 0);
   const keyPresent = useFocusStore((s) => s.keyPresent);
   const setBrowserHandshake = useFocusStore((s) => s.setBrowserHandshake);
   const trayIconEnabled = useFocusStore((s) => s.settings.trayIconEnabled);
@@ -226,17 +227,22 @@ export function Settings() {
             browser that can’t run the extension — while a locked focus session is active. Turning it
             off requires your paired USB key.
           </p>
+          {softBlocksRequireHandshake && (
+            <p className="text-slate-400">Browser handshake stays on while the active profile has soft blocks.</p>
+          )}
           <div className="flex items-center justify-between gap-3">
             <span className="font-medium text-slate-200">
               Strict mode:{' '}
-              <Badge tone={handshakeEnabled ? 'ok' : 'neutral'}>{handshakeEnabled ? 'On' : 'Off'}</Badge>
+              <Badge tone={handshakeEnabled || softBlocksRequireHandshake ? 'ok' : 'neutral'}>
+                {handshakeEnabled || softBlocksRequireHandshake ? 'On' : 'Off'}
+              </Badge>
             </span>
             <Button
               variant={handshakeEnabled ? 'ghost' : 'primary'}
-              disabled={handshakeBusy || (handshakeEnabled && !keyPresent)}
+              disabled={handshakeBusy || softBlocksRequireHandshake || (handshakeEnabled && !keyPresent)}
               onClick={() => toggleHandshake()}
             >
-              {handshakeEnabled ? 'Turn off' : 'Turn on'}
+              {softBlocksRequireHandshake ? 'Required' : handshakeEnabled ? 'Turn off' : 'Turn on'}
             </Button>
           </div>
           {handshakeEnabled && !keyPresent && (

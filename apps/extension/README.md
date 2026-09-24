@@ -38,6 +38,10 @@ service (named pipe)  ──►  talysman-natmsg.exe  ──►  extension backg
   each pushed state, and on host disconnect **keeps the last ruleset** while reconnecting (so killing
   the bridge can't unblock a locked session). DNR dynamic rules persist across service-worker
   restarts, so enforcement survives the MV3 worker sleeping.
+- Soft blocks for Reddit and Hacker News are profile policy entries. While focus is active, DNR
+  admits only specific post/discussion URLs (plus Reddit search and messages); a site content
+  script removes discovery links and stops navigation to other posts. The native host sends older
+  extensions a hard block for these sites until they advertise soft-block capability.
 - `resources/premade-lists/` — generated static DNR containers for built-in categories. Categories
   share five containers capped below AMO's 5MB per-file parser limit; the worker toggles individual
   rule IDs, so arbitrary category combinations do not consume one enabled ruleset per category.

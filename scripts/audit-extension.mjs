@@ -38,6 +38,7 @@ const expectedFiles = [
   "popup.html",
   "popup.js",
   "premade-lists",
+  "soft-content.js",
 ];
 
 function fail(message) {
@@ -227,6 +228,7 @@ for (const [store, directory] of Object.entries({
     "popup-view.js",
     "popup.html",
     "popup.css",
+    "soft-content.js",
   ]
     .map((file) => readFileSync(resolve(storeDir, file), "utf8"))
     .join("\n");
@@ -240,8 +242,11 @@ for (const [store, directory] of Object.entries({
     ["sendBeacon", /\bsendBeacon\b/],
     ["remote URL", /\bhttps?:\/\//],
   ];
+  // The blocked page's user-submitted Reddit search form is the sole reviewed navigation URL.
+  // Keep rejecting all other remote URLs and all programmatic network clients.
+  const auditedText = packagedText.replace('action="https://www.reddit.com/search/"', 'action="reviewed-reddit-search"');
   for (const [label, pattern] of prohibitedCode) {
-    if (pattern.test(packagedText)) fail(`${store}: unexpected ${label} in packaged code`);
+    if (pattern.test(auditedText)) fail(`${store}: unexpected ${label} in packaged code`);
   }
 
   const background = readFileSync(resolve(storeDir, "background.js"), "utf8");

@@ -24,7 +24,9 @@
 // survives any future tie-break change.
 export const DEFAULT_BLOCK_PRIORITY = 1;
 export const ALLOW_PRIORITY = 2;
-export const BLOCK_PRIORITY = 3;
+export const BLOCK_PRIORITY = 5;
+export const SOFT_BLOCK_PRIORITY = 3;
+export const SOFT_ALLOW_PRIORITY = 4;
 
 const MAIN_FRAME = ['main_frame'];
 const BLOCKED_PAGE = '/blocked.html';
@@ -38,19 +40,19 @@ function blockRule(id, condition, priority = BLOCK_PRIORITY) {
   };
 }
 
-function redirectMainFrameRule(id, condition, priority = BLOCK_PRIORITY) {
+function redirectMainFrameRule(id, condition, priority = BLOCK_PRIORITY, extensionPath = BLOCKED_PAGE) {
   return {
     id,
     priority,
-    action: { type: 'redirect', redirect: { extensionPath: BLOCKED_PAGE } },
+    action: { type: 'redirect', redirect: { extensionPath } },
     condition: { ...condition, resourceTypes: MAIN_FRAME },
   };
 }
 
-function allowRule(id, condition) {
+function allowRule(id, condition, priority = ALLOW_PRIORITY) {
   return {
     id,
-    priority: ALLOW_PRIORITY,
+    priority,
     action: { type: 'allow' },
     condition,
   };
@@ -123,6 +125,9 @@ export function hostnameMatchesAny(hostname, domains) {
 export function policyBlocksHostname(policy, hostname) {
   if (!policy || !policy.active) return false;
   if (hostnameMatchesAny(hostname, policy.blockedDomains)) return true;
+  if ((policy.softBlockedSites || []).some((site) =>
+    hostnameMatchesDomain(hostname, site === 'reddit' ? 'reddit.com' : site === 'hackernews' ? 'news.ycombinator.com' : '')))
+    return false;
   if (policy.defaultAction !== 'block') return false;
   return !hostnameMatchesAny(hostname, policy.allowedDomains);
 }
@@ -183,7 +188,7 @@ export function buildRules(state) {
   }
 
   // Allow rules also carve exceptions out of priority-1 static premade lists. Explicit user block
-  // rules remain priority 3, so normalization's "blocked wins" contract is preserved.
+  // rules remain at higher priority, so normalization's "blocked wins" contract is preserved.
   if (state.defaultAction === 'block' || (state.enabledPremadeLists?.length ?? 0) > 0) {
     for (const condition of allowedConditions) {
       rules.push(
@@ -191,6 +196,31 @@ export function buildRules(state) {
         allowRule(id++, { ...condition, resourceTypes: MAIN_FRAME }),
       );
     }
+  }
+
+  const soft = new Set(state.softBlockedSites || []);
+  if (soft.has('reddit') && !blocked.includes('reddit.com')) {
+    rules.push(allowRule(id++, { requestDomains: ['reddit.com'] }, SOFT_ALLOW_PRIORITY));
+    rules.push(allowRule(id++, { requestDomains: ['redditstatic.com', 'redditmedia.com', 'redd.it'] }, SOFT_ALLOW_PRIORITY));
+    rules.push(redirectMainFrameRule(id++, { requestDomains: ['reddit.com'] }, SOFT_BLOCK_PRIORITY, '/blocked.html?softSite=reddit'));
+    rules.push(redirectMainFrameRule(id++, { requestDomains: ['redd.it'] }, SOFT_BLOCK_PRIORITY, '/blocked.html?softSite=reddit'));
+    for (const regexFilter of [
+      '^https?://(?:[^/]+\\.)?reddit\\.com/(?:r/[^/]+/)?comments/[a-zA-Z0-9]+(?:[/?#]|$)',
+      '^https?://(?:[^/]+\\.)?reddit\\.com/gallery/[a-zA-Z0-9]+(?:[/?#]|$)',
+      '^https?://(?:[^/]+\\.)?reddit\\.com/r/[^/]+/s/[a-zA-Z0-9]+(?:[/?#]|$)',
+      '^https?://redd\\.it/[a-zA-Z0-9]+(?:[/?#]|$)',
+      '^https?://(?:[^/]+\\.)?reddit\\.com/(?:r/[^/]+/)?search/?\\?q=[^&#]+',
+      '^https?://(?:[^/]+\\.)?reddit\\.com/(?:message|chat)(?:[/?#]|$)',
+      '^https?://chat\\.reddit\\.com/',
+    ]) rules.push(allowRule(id++, { regexFilter, resourceTypes: MAIN_FRAME }, SOFT_ALLOW_PRIORITY));
+  }
+  if (soft.has('hackernews') && !blocked.includes('news.ycombinator.com')) {
+    rules.push(allowRule(id++, { requestDomains: ['news.ycombinator.com'] }, SOFT_ALLOW_PRIORITY));
+    rules.push(redirectMainFrameRule(id++, { requestDomains: ['news.ycombinator.com'] }, SOFT_BLOCK_PRIORITY));
+    rules.push(allowRule(id, {
+      regexFilter: '^https?://news\\.ycombinator\\.com/item\\?id=[0-9]+(?:[&#]|$)',
+      resourceTypes: MAIN_FRAME,
+    }, SOFT_ALLOW_PRIORITY));
   }
 
   return rules;

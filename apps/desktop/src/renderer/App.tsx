@@ -33,7 +33,8 @@ function policyModeLabel(policy: Policy): string {
   if (policy.defaultAction === 'block') {
     return SMART_FILTERING_ENABLED &&
       policy.blockedDomains.length === 0 &&
-      policy.allowedDomains.length === 0
+      policy.allowedDomains.length === 0 &&
+      (policy.softBlockedSites?.length ?? 0) === 0
       ? 'Block all'
       : 'Whitelist';
   }

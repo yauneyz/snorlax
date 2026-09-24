@@ -391,6 +391,7 @@ export function Blocklists({ onUpgrade }: { onUpgrade: () => void }) {
 
   const selected = resolveActiveProfile(profiles, selectedId ?? activeProfileId);
   const policy = selected?.policy ?? EMPTY_POLICY;
+  const softSupported = Array.isArray(selected?.policy.softBlockedSites);
   const isActive = selected?.id === activeProfileId;
   const accent = BLOCKLIST_SIGNAL;
   const profileLimit = maxProfiles(productLimits);
@@ -602,6 +603,28 @@ export function Blocklists({ onUpgrade }: { onUpgrade: () => void }) {
       enabledPremadeLists: enabled
         ? policy.enabledPremadeLists.filter((x) => x !== id)
         : [...policy.enabledPremadeLists, id],
+    });
+  };
+
+  const toggleSoftSite = (id: Policy['softBlockedSites'][number], domain: string) => {
+    if (!softSupported) return;
+    const enabled = (policy.softBlockedSites ?? []).includes(id);
+    if (enabled) {
+      void save({ ...policy, softBlockedSites: policy.softBlockedSites.filter((site) => site !== id) });
+      return;
+    }
+    const blocked = policy.blockedDomains.filter((entry) => {
+      const normalized = entry.toLowerCase().replace(/^\*\./, '');
+      return domain === normalized || domain.endsWith(`.${normalized}`);
+    });
+    if (blocked.some((entry) => entry.toLowerCase().replace(/^\*\./, '') !== domain)) {
+      setError(`Remove the broader hard block covering ${domain} before enabling its soft block.`);
+      return;
+    }
+    void save({
+      ...policy,
+      blockedDomains: policy.blockedDomains.filter((entry) => !blocked.includes(entry)),
+      softBlockedSites: [...(policy.softBlockedSites ?? []), id],
     });
   };
 
@@ -974,6 +997,41 @@ export function Blocklists({ onUpgrade }: { onUpgrade: () => void }) {
             limitReached={allowedLimitReached}
           />
         )}
+
+        <div className="mt-6">
+          <Kicker>Soft blocks</Kicker>
+          <p className="mt-1 text-[11px] leading-snug text-slate-400">
+            {softSupported
+              ? 'Open specific posts and discussions while feeds and links to other posts stay blocked. Changing a hard block to a soft block requires your key while focus is on.'
+              : 'Update the Talysman desktop service to enable soft blocks.'}
+          </p>
+          <div className="mt-2.5 flex flex-col gap-1.5">
+            {([
+              { id: 'reddit', label: 'Reddit', domain: 'reddit.com' },
+              { id: 'hackernews', label: 'Hacker News', domain: 'news.ycombinator.com' },
+            ] as const).map((site) => {
+              const enabled = (policy.softBlockedSites ?? []).includes(site.id);
+              return (
+                <button
+                  key={site.id}
+                  type="button"
+                  role="switch"
+                  aria-checked={enabled}
+                  onClick={() => toggleSoftSite(site.id, site.domain)}
+                  disabled={!softSupported}
+                  className={cx('flex items-center gap-3 rounded-[10px] border px-3 py-2.5 text-left transition',
+                    enabled ? 'border-seal/30 bg-seal/[0.09]' : 'border-white/[0.07] bg-white/[0.025] hover:border-white/[0.14]',
+                    !softSupported && 'opacity-50')}
+                >
+                  <span className="flex-1 text-[12.5px] font-semibold text-slate-250">{site.label}</span>
+                  <span className="text-[11px] text-slate-400">
+                    {enabled ? 'On' : 'Off'}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
 
         <div className="mt-4">
           {/* While the categories are open the header pins to the top of the page scroller, so

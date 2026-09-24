@@ -102,6 +102,7 @@ mod tests {
     fn premade_list_blocks_without_wildcarding_shared_infra() {
         let p = Policy {
             enabled_premade_lists: vec![talysman_common::policy::PremadeListId::Shopping],
+            soft_blocked_sites: Vec::new(),
             ..Policy::default()
         };
         assert!(is_host_blocked(&p, "amazon.com"));

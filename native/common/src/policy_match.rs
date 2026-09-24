@@ -38,6 +38,9 @@ pub fn is_host_blocked(policy: &Policy, host: &str) -> bool {
     if policy.allowed_domains.iter().any(|p| host_matches(host, p)) {
         return false;
     }
+    if policy.soft_blocked_sites.iter().any(|site| site.network_domains().iter().any(|domain| host_matches(host, domain))) {
+        return false;
+    }
     if premade_lists::is_blocked_by_premade(&policy.enabled_premade_lists, host) {
         return true;
     }
@@ -96,6 +99,9 @@ pub fn is_at_least_as_restrictive(prev: &Policy, next: &Policy) -> bool {
             hosts.push(base);
         }
     }
+    for site in prev.soft_blocked_sites.iter().chain(next.soft_blocked_sites.iter()) {
+        hosts.extend(site.network_domains().iter().map(|domain| domain.to_string()));
+    }
     hosts.push(NO_MATCH_SENTINEL.to_string());
 
     for host in &hosts {
@@ -109,6 +115,14 @@ pub fn is_at_least_as_restrictive(prev: &Policy, next: &Policy) -> bool {
         .iter()
         .all(|app| next.apps.iter().any(|candidate| same_app(candidate, app)))
     {
+        return false;
+    }
+
+    // Removing a soft block opens feeds even though both policies allow the hostname.
+    if !prev.soft_blocked_sites.iter().all(|site| {
+        next.soft_blocked_sites.contains(site)
+            || next.blocked_domains.iter().any(|domain| host_matches(site.domain(), domain))
+    }) {
         return false;
     }
 
@@ -135,6 +149,7 @@ pub fn effective_dns_sinkhole_domains(policy: &Policy) -> std::collections::BTre
             .allowed_domains
             .iter()
             .any(|p| host_matches(&domain, p))
+            || policy.soft_blocked_sites.iter().any(|site| site.network_domains().iter().any(|network| host_matches(&domain, network)))
         {
             continue;
         }
@@ -186,7 +201,19 @@ mod tests {
             intent: None,
             apps: Vec::new(),
             enabled_premade_lists: Vec::new(),
+            soft_blocked_sites: Vec::new(),
         }
+    }
+
+    #[test]
+    fn soft_block_is_a_key_gated_relaxation_of_a_hard_block() {
+        use crate::policy::SoftBlockedSite;
+        let hard = policy(&["reddit.com"], &[], DefaultAction::Allow);
+        let mut soft = policy(&[], &[], DefaultAction::Allow);
+        soft.soft_blocked_sites.push(SoftBlockedSite::Reddit);
+        assert!(!is_at_least_as_restrictive(&hard, &soft));
+        assert!(is_at_least_as_restrictive(&soft, &hard));
+        assert!(!is_at_least_as_restrictive(&soft, &policy(&[], &[], DefaultAction::Allow)));
     }
 
     use crate::policy::PremadeListId;

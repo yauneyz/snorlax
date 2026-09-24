@@ -249,6 +249,7 @@ mod profile_tests {
             intent: None,
             apps: Vec::new(),
             enabled_premade_lists: Vec::new(),
+            soft_blocked_sites: Vec::new(),
         }
     }
 

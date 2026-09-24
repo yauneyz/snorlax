@@ -170,6 +170,16 @@ export function normalizePolicy(policy: Policy): NormalizedPolicy {
     }
   }
 
+  const knownSoftSites = new Set(['reddit', 'hackernews']);
+  const softBlockedSites: Policy['softBlockedSites'] = [];
+  for (const id of policy.softBlockedSites ?? []) {
+    if (!knownSoftSites.has(id)) {
+      rejected.push({ value: id, reason: 'unknown soft block site' });
+    } else if (!softBlockedSites.includes(id)) {
+      softBlockedSites.push(id);
+    }
+  }
+
   return {
     blockedDomains,
     allowedDomains,
@@ -177,6 +187,7 @@ export function normalizePolicy(policy: Policy): NormalizedPolicy {
     intent,
     apps,
     enabledPremadeLists,
+    softBlockedSites,
     rejected,
   };
 }

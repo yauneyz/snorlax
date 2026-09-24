@@ -125,6 +125,7 @@ fn sinkhole_block(policy: &Policy) -> String {
             .allowed_domains
             .iter()
             .any(|p| crate::policy_match::host_matches(&domain, p))
+            || policy.soft_blocked_sites.iter().any(|site| site.network_domains().iter().any(|network| crate::policy_match::host_matches(&domain, network)))
         {
             continue;
         }

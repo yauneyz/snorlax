@@ -11,6 +11,7 @@ pub fn relay_heartbeat_params(frame: &Value, browser_pid: u32) -> Value {
         "sequence": optional_field(frame, "sequence"),
         "sentAt": optional_field(frame, "sentAt"),
         "extensionVersion": optional_field(frame, "extensionVersion"),
+        "softBlockCapability": optional_field(frame, "softBlockCapability"),
         "lockedActive": optional_field(frame, "lockedActive"),
         "health": frame.get("health").cloned().unwrap_or_else(|| json!({})),
     })
@@ -26,6 +27,7 @@ pub struct HeartbeatReport {
     pub browser: String,
     pub sequence: u64,
     pub extension_version: Option<String>,
+    pub soft_block_capable: bool,
     pub healthy: bool,
 }
 
@@ -57,6 +59,7 @@ pub fn parse_service_heartbeat(params: &Value) -> HeartbeatReport {
             .and_then(Value::as_str)
             .filter(|version| !version.is_empty())
             .map(str::to_owned),
+        soft_block_capable: params.get("softBlockCapability").and_then(Value::as_u64) == Some(1),
         healthy: can_block && permissions_ok,
     }
 }
@@ -73,6 +76,7 @@ mod tests {
             "sequence": 17,
             "sentAt": 1722470400000_u64,
             "extensionVersion": "0.5.0",
+            "softBlockCapability": 1,
             "lockedActive": true,
             "health": { "canBlock": true, "permissionsOk": true, "dnrRulesApplied": 3 }
         });
@@ -82,10 +86,12 @@ mod tests {
         assert_eq!(report.sequence, 17);
         assert_eq!(report.extension_version.as_deref(), Some("0.5.0"));
         assert!(report.healthy);
+        assert!(report.soft_block_capable);
     }
 
     #[test]
     fn incomplete_or_false_health_fails_closed() {
+        assert!(!parse_service_heartbeat(&json!({"health": {"canBlock": true, "permissionsOk": true}})).soft_block_capable);
         for health in [
             json!({}),
             json!({ "canBlock": true }),

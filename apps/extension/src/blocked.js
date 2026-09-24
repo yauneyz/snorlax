@@ -8,11 +8,13 @@
 (function () {
   var params = new URLSearchParams(window.location.search);
   var reason = params.get('reason');
-  if (!reason) return;
-
   var el = document.getElementById('reason-detail');
-  if (!el) return;
-
-  el.textContent = 'Reason: ' + reason;
-  el.hidden = false;
+  if (reason && el) {
+    el.textContent = 'Reason: ' + reason;
+    el.hidden = false;
+  }
+  if (params.get('softSite') === 'reddit') {
+    var form = document.getElementById('reddit-search');
+    if (form) form.hidden = false;
+  }
 })();

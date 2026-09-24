@@ -20,6 +20,13 @@
         <p>This website was blocked by Talysman.</p>
         <p class="detail">Blocking is controlled by your current setup in the Talysman desktop app.</p>
         <p class="detail" id="reason-detail" hidden></p>
+        <form id="reddit-search" class="soft-search" action="https://www.reddit.com/search/" method="get" hidden>
+          <label for="reddit-query">Search Reddit for a specific post</label>
+          <div class="soft-search-row">
+            <input id="reddit-query" name="q" type="search" required autocomplete="off" />
+            <button type="submit">Search</button>
+          </div>
+        </form>
       </section>
     </main>
     <script src="blocked.js"></script>

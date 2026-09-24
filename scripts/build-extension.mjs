@@ -58,6 +58,7 @@ const manifestIcons = {
   128: "icon.png",
 };
 const extensionFiles = [
+  "soft-content.js",
   "blocked.html",
   "blocked.css",
   "blocked.js",
@@ -128,11 +129,12 @@ function bundledBackground() {
     /^\s*import\s+\{[^}]*\}\s+from\s+['"]\.\/premade-rulesets\.js['"];?\s*$/gm,
     "",
   ).replace(/^export\s+/gm, "");
+  const softBlock = readFileSync(resolve(srcDir, "soft-block.js"), "utf8").replace(/^export\s+/gm, "");
   const background = readFileSync(
     resolve(srcDir, "background.js"),
     "utf8",
   ).replace(
-    /^\s*import\s+\{[^}]*\}\s+from\s+['"]\.\/(?:rules|heartbeat-timing|content-extract|premade-rules)\.js['"];?\s*$/gm,
+    /^\s*import\s+\{[^}]*\}\s+from\s+['"]\.\/(?:rules|heartbeat-timing|content-extract|premade-rules|soft-block)\.js['"];?\s*$/gm,
     "",
   );
   return (
@@ -146,6 +148,8 @@ function bundledBackground() {
     premadeRulesets +
     "\n" +
     premadeRules +
+    "\n" +
+    softBlock +
     "\n" +
     background
   );

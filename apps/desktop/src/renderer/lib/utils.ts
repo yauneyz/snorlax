@@ -17,12 +17,14 @@ export function formatTime(ms: number): string {
 /** One-line description of what a profile blocks — used on the seal and in the profile rail. */
 export function profileSummary(profile: Profile): string {
   const { blockedDomains, allowedDomains, defaultAction, intent, apps } = profile.policy;
+  const softCount = profile.policy.softBlockedSites?.length ?? 0;
   const hasSmartIntent = SMART_FILTERING_ENABLED && intent !== null;
   const isBlockAll =
     SMART_FILTERING_ENABLED &&
     defaultAction === 'block' &&
     blockedDomains.length === 0 &&
     allowedDomains.length === 0 &&
+    softCount === 0 &&
     !hasSmartIntent;
 
   let sites: string;
@@ -34,6 +36,14 @@ export function profileSummary(profile: Profile): string {
     sites = `${allowedDomains.length} allowed site${allowedDomains.length === 1 ? '' : 's'}`;
   } else {
     sites = `${blockedDomains.length} blocked site${blockedDomains.length === 1 ? '' : 's'}`;
+  }
+
+  if (softCount > 0) {
+    const softLabel = `${softCount} soft block${softCount === 1 ? '' : 's'}`;
+    const onlySoftSites = defaultAction === 'allow'
+      ? blockedDomains.length === 0
+      : allowedDomains.length === 0;
+    sites = onlySoftSites ? softLabel : `${sites} · ${softLabel}`;
   }
 
   return apps.length > 0 ? `${sites} · ${apps.length} app${apps.length === 1 ? '' : 's'}` : sites;

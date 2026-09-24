@@ -172,6 +172,7 @@ fn dnsmasq_config(policy: &Policy) -> String {
                 .to_ascii_lowercase();
             (!domain.is_empty()).then_some(domain)
         }));
+        exemptions.extend(policy.soft_blocked_sites.iter().flat_map(|site| site.network_domains().iter().map(|domain| domain.to_string())));
         exemptions.extend(
             talysman_common::premade_lists::expand_exemptions(&policy.enabled_premade_lists)
                 .map(str::to_owned),

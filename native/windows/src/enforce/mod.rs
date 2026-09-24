@@ -261,7 +261,8 @@ impl EnforceShared {
         let policy = self.policy_snapshot();
         if policy.blocked_domains.iter().any(|p| host_matches(host, p)) {
             ResolvedClass::Blocked
-        } else if policy.allowed_domains.iter().any(|p| host_matches(host, p)) {
+        } else if policy.allowed_domains.iter().any(|p| host_matches(host, p))
+            || policy.soft_blocked_sites.iter().any(|site| site.network_domains().iter().any(|domain| host_matches(host, domain))) {
             ResolvedClass::Allowed
         } else {
             ResolvedClass::Ignore
@@ -275,6 +276,7 @@ impl EnforceShared {
         let policy = self.policy_snapshot();
         let mut targets = policy.blocked_domains.clone();
         targets.extend(policy.allowed_domains.iter().cloned());
+        targets.extend(policy.soft_blocked_sites.iter().flat_map(|site| site.network_domains().iter().map(|domain| domain.to_string())));
         targets
     }
 

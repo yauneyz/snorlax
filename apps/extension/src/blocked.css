@@ -79,3 +79,9 @@ p {
   color: rgb(var(--color-foreground-muted));
   font-size: 14px;
 }
+
+.soft-search { margin-top: 26px; }
+.soft-search label { display: block; margin-bottom: 9px; color: rgb(var(--color-foreground-muted)); font-size: 14px; }
+.soft-search-row { display: flex; gap: 8px; }
+.soft-search input { min-width: 0; flex: 1; padding: 10px 12px; border: 1px solid rgb(var(--color-border)); border-radius: 8px; background: rgb(var(--color-background)); color: rgb(var(--color-foreground)); font: inherit; }
+.soft-search button { padding: 10px 16px; border: 0; border-radius: 8px; background: rgb(var(--color-foreground-strong)); color: rgb(var(--color-background)); font: inherit; cursor: pointer; }

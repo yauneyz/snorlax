@@ -52,6 +52,8 @@ export interface Policy {
   apps: AppRef[];
   /** Built-in bulk blocklist categories the user has toggled on (e.g. "nsfw", "shopping"). */
   enabledPremadeLists: PremadeListId[];
+  /** Supported sites whose feeds are closed while direct content and search remain available. */
+  softBlockedSites: ('reddit' | 'hackernews')[];
 }
 
 export const EMPTY_POLICY: Policy = {
@@ -61,4 +63,5 @@ export const EMPTY_POLICY: Policy = {
   intent: null,
   apps: [],
   enabledPremadeLists: [],
+  softBlockedSites: [],
 };

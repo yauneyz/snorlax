@@ -1,7 +1,7 @@
 // Shared Unix browser native-messaging host. Bridges the extension to the privileged service over
 // the Unix socket and exits with the browser-owned native-messaging port.
 
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -27,6 +27,7 @@ struct Blocking {
     allowed_domains: Vec<String>,
     default_action: String,
     enabled_premade_lists: Vec<String>,
+    soft_blocked_sites: Vec<String>,
     /// Raw JSON so a `null` intent round-trips as JSON `null` rather than `{}`. `Value::Null` by
     /// default, matching "no Smart filtering" for a freshly-constructed `Blocking`.
     intent: Value,
@@ -35,21 +36,33 @@ struct Blocking {
 }
 
 impl Blocking {
-    fn to_msg(&self) -> Value {
+    fn to_msg(&self, soft_capable: bool) -> Value {
         let default_action = if self.default_action.is_empty() {
             "allow"
         } else {
             self.default_action.as_str()
         };
+        let mut blocked_domains = self.blocked_domains.clone();
+        if !soft_capable {
+            for site in &self.soft_blocked_sites {
+                let domain = match site.as_str() {
+                    "reddit" => "reddit.com",
+                    "hackernews" => "news.ycombinator.com",
+                    _ => continue,
+                };
+                blocked_domains.push(domain.to_string());
+            }
+        }
         json!({
             "type": "state",
             "active": self.active,
-            "blockedDomains": self.blocked_domains,
+            "blockedDomains": blocked_domains,
             "allowedDomains": self.allowed_domains,
             "defaultAction": default_action,
             "intent": if self.smart_filtering_enabled { self.intent.clone() } else { Value::Null },
             "enabledPremadeLists": self.enabled_premade_lists,
-            "handshakeEnabled": self.handshake_enabled,
+            "softBlockedSites": if soft_capable { self.soft_blocked_sites.as_slice() } else { &[] },
+            "handshakeEnabled": self.handshake_enabled || !self.soft_blocked_sites.is_empty(),
         })
     }
 }
@@ -92,6 +105,10 @@ fn parse_policy(policy: &Value, b: &mut Blocking) {
                 .filter_map(|d| d.as_str().map(str::to_string))
                 .collect()
         })
+        .unwrap_or_default();
+    b.soft_blocked_sites = policy.get("softBlockedSites")
+        .and_then(Value::as_array)
+        .map(|sites| sites.iter().filter_map(Value::as_str).map(str::to_string).collect())
         .unwrap_or_default();
 }
 
@@ -178,6 +195,7 @@ async fn main() {
     });
 
     let last: Arc<Mutex<Option<Blocking>>> = Arc::new(Mutex::new(None));
+    let soft_capable = Arc::new(AtomicBool::new(false));
 
     // Heartbeats are state, not a work queue: retain only the latest while disconnected. Judge
     // requests remain bounded work so a broken service cannot grow this laptop process forever.
@@ -187,6 +205,7 @@ async fn main() {
     {
         let out_tx = out_tx.clone();
         let last = last.clone();
+        let soft_capable = soft_capable.clone();
         tokio::spawn(async move {
             let mut stdin = tokio::io::stdin();
             loop {
@@ -198,10 +217,11 @@ async fn main() {
                         Some("judge-request") => {
                             let _ = judge_tx.send(judge_request(&msg)).await;
                         }
-                        // `hello` (or anything else): resend the latest state to the browser.
+                        // Old extensions have no soft-block navigation gate: send them a hard block.
                         _ => {
+                            soft_capable.store(msg.get("softBlockCapability").and_then(Value::as_u64) == Some(1), Ordering::SeqCst);
                             if let Some(b) = last.lock().await.clone() {
-                                let _ = out_tx.send(b.to_msg()).await;
+                                let _ = out_tx.send(b.to_msg(soft_capable.load(Ordering::SeqCst))).await;
                             }
                         }
                     },
@@ -213,7 +233,7 @@ async fn main() {
     }
 
     loop {
-        let _ = pump_socket(&out_tx, &last, heartbeat_rx.clone(), &mut judge_rx).await;
+        let _ = pump_socket(&out_tx, &last, &soft_capable, heartbeat_rx.clone(), &mut judge_rx).await;
         tokio::time::sleep(Duration::from_secs(2)).await;
     }
 }
@@ -221,6 +241,7 @@ async fn main() {
 async fn pump_socket(
     out_tx: &mpsc::Sender<Value>,
     last: &Arc<Mutex<Option<Blocking>>>,
+    soft_capable: &Arc<AtomicBool>,
     mut heartbeat_rx: watch::Receiver<Option<Value>>,
     judge_rx: &mut mpsc::Receiver<Value>,
 ) -> std::io::Result<()> {
@@ -334,7 +355,7 @@ async fn pump_socket(
                         }
                     };
                     if push {
-                        let _ = out_tx.send(b.to_msg()).await;
+                        let _ = out_tx.send(b.to_msg(soft_capable.load(Ordering::SeqCst))).await;
                     }
                 }
             }
@@ -385,13 +406,29 @@ mod tests {
             ..Blocking::default()
         };
 
-        let classic = blocking.to_msg();
+        let classic = blocking.to_msg(false);
         assert_eq!(classic["blockedDomains"][0], "reddit.com");
         assert!(classic["intent"].is_null());
         assert!(classic.get("mode").is_none());
         assert!(classic.get("domains").is_none());
 
         blocking.smart_filtering_enabled = true;
-        assert_eq!(blocking.to_msg()["intent"]["positive"], "write a thesis");
+        assert_eq!(blocking.to_msg(false)["intent"]["positive"], "write a thesis");
+    }
+
+    #[test]
+    fn older_extension_receives_a_hard_block_for_soft_sites() {
+        let blocking = Blocking {
+            active: true,
+            soft_blocked_sites: vec!["reddit".into(), "hackernews".into()],
+            ..Blocking::default()
+        };
+        let old = blocking.to_msg(false);
+        assert_eq!(old["blockedDomains"], json!(["reddit.com", "news.ycombinator.com"]));
+        assert_eq!(old["softBlockedSites"], json!([]));
+        let current = blocking.to_msg(true);
+        assert_eq!(current["blockedDomains"], json!([]));
+        assert_eq!(current["softBlockedSites"], json!(["reddit", "hackernews"]));
+        assert_eq!(current["handshakeEnabled"], json!(true));
     }
 }
