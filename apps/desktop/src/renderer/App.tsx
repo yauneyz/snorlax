@@ -14,7 +14,7 @@ import { Plans } from './pages/Plans.js';
 import { FirstRun } from './components/FirstRun.js';
 import { TalysmanMark } from './components/TalysmanMark.js';
 import { ProfileDot } from './components/ui/index.js';
-import { cx } from './lib/utils.js';
+import { cx, effectiveAction } from './lib/utils.js';
 
 type Route = 'dashboard' | 'blocklists' | 'schedule' | 'keys' | 'account' | 'plans' | 'settings';
 
@@ -28,9 +28,10 @@ const NAV: { route: Route; label: string }[] = [
 ];
 
 /** A short label summarizing the sidebar's active policy — mirrors the presets in Blocklists.tsx. */
-function policyModeLabel(policy: Policy): string {
-  if (SMART_FILTERING_ENABLED && policy.defaultAction === 'judge') return 'Smart';
-  if (policy.defaultAction === 'block') {
+function policyModeLabel(policy: Policy, aiMode: boolean): string {
+  const defaultAction = effectiveAction(policy.defaultAction, policy, aiMode);
+  if (defaultAction === 'judge') return 'Smart';
+  if (defaultAction === 'block') {
     return SMART_FILTERING_ENABLED &&
       policy.blockedDomains.length === 0 &&
       policy.allowedDomains.length === 0 &&
@@ -54,6 +55,7 @@ export default function App() {
   const keyPresent = useFocusStore((s) => s.keyPresent);
   const focusActive = useFocusStore((s) => s.focusActive);
   const policy = useFocusStore((s) => s.policy);
+  const aiMode = useFocusStore((s) => s.aiMode);
   const watchdogWarning = useFocusStore((s) => s.watchdogWarning);
   const clearWatchdogWarning = useFocusStore((s) => s.clearWatchdogWarning);
   const passwordRecovery = useFocusStore((s) => s.passwordRecovery);
@@ -131,7 +133,7 @@ export default function App() {
           <div>
             <div className="font-mono text-[9.5px] tracking-[0.14em] text-slate-450">MODE</div>
             <div className="mt-0.5 text-[12.5px] font-medium text-slate-200">
-              {focusActive ? policyModeLabel(policy) : 'Off'}
+              {focusActive ? policyModeLabel(policy, aiMode) : 'Off'}
             </div>
           </div>
         </div>

@@ -235,6 +235,22 @@ mod tests {
     }
 
     #[test]
+    fn tasks_without_judge_rules_enforce_exactly_like_ai_filtering_off() {
+        let mut policy = Policy::default();
+        policy.blocked_domains = vec!["example.com".into()];
+        policy.judge = Some(judge());
+        policy.sites.insert("reddit".into(), SiteRule::default());
+        let on = Blocking { active: true, policy, handshake_enabled: false, smart_filtering_enabled: true };
+        let off = Blocking { smart_filtering_enabled: false, ..on.clone() };
+        let caps = caps(&["reddit"]);
+        let (mut on_frame, mut off_frame) = (state_frame(&on, &caps), state_frame(&off, &caps));
+        // The task list rides along for a future judge rule, but nothing in the frame acts on it.
+        on_frame.as_object_mut().unwrap().remove("judge");
+        off_frame.as_object_mut().unwrap().remove("judge");
+        assert_eq!(on_frame, off_frame);
+    }
+
+    #[test]
     fn relays_judge_requests_and_results() {
         let params = judge_request_params(&json!({
             "type": "judge-request", "requestId": "r1", "url": "https://a.test/", "title": "A",

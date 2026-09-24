@@ -85,6 +85,9 @@ export const onboardingStatus = () => window.api.onboardingStatus();
 export const completeOnboarding = () => window.api.completeOnboarding();
 export const resetOnboarding = () => window.api.resetOnboarding();
 
+export const aiModeStatus = () => window.api.aiModeStatus();
+export const setAiMode = (enabled: boolean) => window.api.setAiMode(enabled);
+
 export type {
   AppUpdateCheckResult,
   CheckoutPrice,

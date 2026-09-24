@@ -2,7 +2,7 @@ import { useState } from 'react';
 import type { Policy, RuleAction, SiteDefinition } from '@talysman/shared';
 import { SITE_DEFINITIONS, effectiveSiteFeatures } from '@talysman/shared';
 import { Kicker } from './ui/index.js';
-import { cx } from '../lib/utils.js';
+import { cx, effectiveAction } from '../lib/utils.js';
 
 const ACTION_LABELS: Record<RuleAction, string> = { allow: 'Allow', judge: 'AI', block: 'Hide' };
 
@@ -21,6 +21,7 @@ function coversHost(entry: string, host: string): boolean {
 export function SiteRules({
   policy,
   supported,
+  aiMode,
   smartAllowed,
   limitReached,
   onSave,
@@ -30,6 +31,8 @@ export function SiteRules({
   policy: Policy;
   /** False against a daemon that predates site rules. */
   supported: boolean;
+  /** AI mode is on. Off ⇒ no AI option anywhere, and judged features show as their fallback. */
+  aiMode: boolean;
   /** AI filtering is available (flag + plan). */
   smartAllowed: boolean;
   /** The plan's blocked-website allowance is used up. */
@@ -102,7 +105,12 @@ export function SiteRules({
           const rule = sites[site.id];
           const enabled = Boolean(rule);
           const open = enabled && expanded === site.id;
-          const features = effectiveSiteFeatures(site.id, rule);
+          const features = Object.fromEntries(
+            Object.entries(effectiveSiteFeatures(site.id, rule)).map(([id, action]) => [
+              id,
+              effectiveAction(action, policy, aiMode),
+            ]),
+          );
           const configurable = site.features.filter((feature) => !feature.locked);
           const blockedCount = configurable.filter((feature) => features[feature.id] === 'block').length;
           const judgedCount = configurable.filter((feature) => features[feature.id] === 'judge').length;
@@ -153,7 +161,8 @@ export function SiteRules({
                         )}
                       </span>
                       <ActionPicker
-                        value={features[feature.id] ?? feature.default}
+                        value={features[feature.id] ?? effectiveAction(feature.default, policy, aiMode)}
+                        aiMode={aiMode}
                         smartAllowed={smartAllowed}
                         onChange={(action) => setFeature(site, feature.id, action)}
                       />
@@ -171,14 +180,16 @@ export function SiteRules({
 
 function ActionPicker({
   value,
+  aiMode,
   smartAllowed,
   onChange,
 }: {
   value: RuleAction;
+  aiMode: boolean;
   smartAllowed: boolean;
   onChange: (action: RuleAction) => void;
 }) {
-  const actions: RuleAction[] = ['allow', 'judge', 'block'];
+  const actions: RuleAction[] = aiMode ? ['allow', 'judge', 'block'] : ['allow', 'block'];
   return (
     <span role="radiogroup" className="flex shrink-0 overflow-hidden rounded-full border border-white/[0.10]">
       {actions.map((action) => {

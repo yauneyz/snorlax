@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { productFeaturesForEnvironment } from '@talysman/product';
 import { useFocusStore } from '../store/useFocusStore.js';
 import {
   checkForUpdates,
@@ -10,6 +11,10 @@ import {
 } from '../lib/bridge.js';
 import { Badge, Button, Card, CardTitle } from '../components/ui/index.js';
 import { cx } from '../lib/utils.js';
+
+const SMART_FILTERING_ENABLED = productFeaturesForEnvironment(
+  __APP_CONFIG__.APP_ENV,
+).smartFiltering;
 
 export function Settings() {
   const appEnv = useFocusStore((s) => s.appEnv);
@@ -30,6 +35,8 @@ export function Settings() {
   const setBrowserHandshake = useFocusStore((s) => s.setBrowserHandshake);
   const trayIconEnabled = useFocusStore((s) => s.settings.trayIconEnabled);
   const setTrayIconEnabled = useFocusStore((s) => s.setTrayIconEnabled);
+  const aiMode = useFocusStore((s) => s.aiMode);
+  const setAiMode = useFocusStore((s) => s.setAiMode);
   const replayOnboarding = useFocusStore((s) => s.replayOnboarding);
   const platform = useFocusStore((s) => s.platform);
   const [firstRunError, setFirstRunError] = useState<string | null>(null);
@@ -45,6 +52,8 @@ export function Settings() {
   const [handshakeError, setHandshakeError] = useState<string | null>(null);
   const [trayBusy, setTrayBusy] = useState(false);
   const [trayError, setTrayError] = useState<string | null>(null);
+  const [aiModeBusy, setAiModeBusy] = useState(false);
+  const [aiModeError, setAiModeError] = useState<string | null>(null);
   const [updateBusy, setUpdateBusy] = useState(false);
   const [updateStatus, setUpdateStatus] = useState<{
     message: string;
@@ -110,6 +119,18 @@ export function Settings() {
       setTrayError((e as Error).message);
     } finally {
       setTrayBusy(false);
+    }
+  }
+
+  async function toggleAiMode() {
+    setAiModeBusy(true);
+    setAiModeError(null);
+    try {
+      await setAiMode(!aiMode);
+    } catch (e) {
+      setAiModeError((e as Error).message);
+    } finally {
+      setAiModeBusy(false);
     }
   }
 
@@ -272,6 +293,34 @@ export function Settings() {
           {trayError && <p className="text-[12.5px] text-warn">{trayError}</p>}
         </div>
       </Card>
+
+      {SMART_FILTERING_ENABLED && (
+        <Card>
+          <CardTitle hint="Optional. Everything else in Talysman works the same with it off.">
+            AI mode
+          </CardTitle>
+          <div className="flex flex-col gap-3 text-sm text-slate-300">
+            <p className="text-slate-400">
+              Adds AI filtering to your blocklists: pages or site features you set to “AI” are
+              checked against what you’re working on. While it’s off, AI rules are hidden and
+              nothing is sent for checking.
+            </p>
+            <div className="flex items-center justify-between gap-3">
+              <span className="font-medium text-slate-200">
+                Status: <Badge tone={aiMode ? 'ok' : 'neutral'}>{aiMode ? 'On' : 'Off'}</Badge>
+              </span>
+              <Button
+                variant={aiMode ? 'ghost' : 'primary'}
+                disabled={aiModeBusy}
+                onClick={() => toggleAiMode()}
+              >
+                {aiMode ? 'Turn off' : 'Turn on'}
+              </Button>
+            </div>
+            {aiModeError && <p className="text-[12.5px] text-warn">{aiModeError}</p>}
+          </div>
+        </Card>
+      )}
 
       {platform === 'darwin' && (
         <Card>

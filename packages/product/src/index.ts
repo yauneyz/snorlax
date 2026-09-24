@@ -247,6 +247,15 @@ export function policyUsesJudge(policy: Policy): boolean {
     || Object.entries(policy.sites ?? {}).some(([id, rule]) => siteRuleUsesJudge(id, rule));
 }
 
+/**
+ * Whether any rule actually sends pages to the AI judge — a judged default or a judged site
+ * feature. Tasks alone are inert. TS mirror of the daemon's `Policy::uses_judge`.
+ */
+export function policyHasJudgeRule(policy: Policy): boolean {
+  return policy.defaultAction === 'judge'
+    || Object.entries(policy.sites ?? {}).some(([id, rule]) => siteRuleUsesJudge(id, rule));
+}
+
 export function validatePolicyForLimits(
   policy: Policy,
   limits: ProductLimits | null,

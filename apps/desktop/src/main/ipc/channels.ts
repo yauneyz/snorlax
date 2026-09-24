@@ -59,6 +59,10 @@ export const Channels = {
   completeOnboarding: 'app:completeOnboarding',
   /** invoke: dev-only — forget the first run so the walkthrough replays. */
   resetOnboarding: 'app:resetOnboarding',
+  /** invoke: returns { enabled } — whether the user has turned on AI mode. */
+  aiModeStatus: 'app:aiModeStatus',
+  /** invoke: { enabled } → persist AI mode and push the capability flag to the daemon. */
+  setAiMode: 'app:setAiMode',
   /** invoke: { message, stack? } → report an uncaught renderer error/rejection for tracking. */
   reportRendererError: 'app:reportRendererError',
   /** main→renderer push: { event } where event is 'authChanged' | 'entitlementChanged'. */

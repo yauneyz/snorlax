@@ -19,6 +19,7 @@ import { config } from './config.js';
 import { logger } from './logging.js';
 import { getAccessToken } from './auth/supabase.js';
 import type { ServiceConnection } from './service/connection.js';
+import { aiModeEnabledSync } from './aiMode.js';
 
 // Leave time for the daemon to receive the result before its 8-second authoritative fallback.
 const JUDGE_FETCH_TIMEOUT_MS = 6_000;
@@ -79,6 +80,12 @@ export function initSmartFiltering(service: ServiceConnection): void {
 }
 
 async function handleJudgeRequested(service: ServiceConnection, request: JudgeRequested): Promise<void> {
+  // With AI mode off the daemon never asks (its capability flag is off), but another client
+  // sharing the daemon could turn it on. Never send page content to the judge while opted out.
+  if (!aiModeEnabledSync()) {
+    logger.info(`[judge] skipping judgeRequested ${request.requestId}: AI mode is off`);
+    return;
+  }
   const token = await getAccessToken();
   if (!token) {
     logger.warn(`[judge] skipping judgeRequested ${request.requestId}: no auth session`);

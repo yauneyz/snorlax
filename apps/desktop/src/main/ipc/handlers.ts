@@ -54,6 +54,7 @@ import {
   type SubscriptionPlan,
 } from '../../shared/productLimits.js';
 import { completeOnboarding, getOnboardingStatus, resetOnboarding } from '../onboarding.js';
+import { getAiModeEnabled, setAiModeEnabled } from '../aiMode.js';
 import { Channels } from './channels.js';
 
 /** Events pushed to renderers so the UI re-pulls auth/entitlement after a change. */
@@ -477,6 +478,13 @@ export async function registerIpcHandlers(ctx: HandlerContext): Promise<void> {
       return { ok: false, message: 'Only available in development builds.' };
     }
     return { ok: true, status: await resetOnboarding() };
+  });
+
+  // --- AI mode ---
+  ipcHandle(Channels.aiModeStatus, async () => ({ enabled: await getAiModeEnabled(service) }));
+  ipcHandle(Channels.setAiMode, async (_e, args: { enabled: boolean }) => {
+    await setAiModeEnabled(service, args?.enabled === true);
+    return { enabled: await getAiModeEnabled(service) };
   });
 
   ipcHandle(Channels.reportRendererError, (_e, args: { message: string; stack?: string }) => {

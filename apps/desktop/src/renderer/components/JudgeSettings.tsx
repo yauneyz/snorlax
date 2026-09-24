@@ -11,7 +11,8 @@ function newTaskId(): string {
 /**
  * The AI filter: what you're working on (tasks) and what to steer clear of (avoid). Every rule set
  * to "AI" — the default for unlisted pages when "Judge everything else" is on, or a site feature
- * like Reddit posts — is checked against these. Edits save on blur/Enter, not per keystroke, so a
+ * like Reddit posts — is checked against these. Tasks on their own are inert: with no rule set to
+ * AI, blocking behaves exactly as if AI mode were off. Edits save on blur/Enter, not per keystroke, so a
  * half-typed task never reaches the judge.
  */
 export function JudgeSettings({
@@ -47,11 +48,10 @@ export function JudgeSettings({
     const title = taskDraft.trim();
     if (!title) return;
     const task: JudgeTask = { id: newTaskId(), title };
-    // The first task switches an open default to judging unlisted pages — that's what "Smart"
-    // means. A block-by-default policy stays closed; judging would loosen it.
-    const defaultAction = policy.judge || policy.defaultAction === 'block' ? policy.defaultAction : 'judge';
     if (!allowed) return onUpgrade();
-    onSave({ ...policy, defaultAction, judge: { ...judge, tasks: [...judge.tasks, task] } });
+    // Tasks alone change nothing: only rules set to AI (the "Smart" preset / the checkbox below,
+    // or a site feature) send pages to the judge. So adding one never touches `defaultAction`.
+    onSave({ ...policy, judge: { ...judge, tasks: [...judge.tasks, task] } });
     setTaskDraft('');
   }
 
@@ -189,8 +189,9 @@ export function JudgeSettings({
           </button>
         ) : (
           <p className="text-[11px] leading-relaxed text-slate-450">
-            Pages set to “AI” load, then get checked against your tasks — usually within a few
-            seconds. Site rules can use it too: set a feature like Reddit posts to “AI”.
+            Your tasks only apply where a rule is set to AI: tick the box above (or pick Smart) to
+            judge every unlisted page, or set a site feature like Reddit posts to “AI”. Judged
+            pages load, then get checked — usually within a few seconds.
           </p>
         )}
       </div>

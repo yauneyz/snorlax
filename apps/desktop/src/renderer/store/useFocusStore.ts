@@ -14,7 +14,9 @@ import {
   EMPTY_SCHEDULE,
   resolveActiveProfile,
 } from '@talysman/shared';
+import { productFeaturesForEnvironment } from '@talysman/product';
 import {
+  aiModeStatus,
   appInfo,
   authStatus,
   completeOnboarding,
@@ -25,6 +27,7 @@ import {
   onboardingStatus,
   request,
   resetOnboarding,
+  setAiMode as setAiModeRequest,
   setLocalEntitlementEnabled,
   subscriptionDetail,
   type SubscriptionDetailInfo,
@@ -32,6 +35,10 @@ import {
 } from '../lib/bridge.js';
 import { limitsForPlan, type ProductLimits } from '../../shared/productLimits.js';
 import { initSessionReplay } from '../lib/posthog.js';
+
+const SMART_FILTERING_ENABLED = productFeaturesForEnvironment(
+  __APP_CONFIG__.APP_ENV,
+).smartFiltering;
 
 interface FocusStore {
   ready: boolean;
@@ -92,6 +99,13 @@ interface FocusStore {
   /** Dev-only: forget the first run and show the walkthrough again immediately. */
   replayOnboarding: () => Promise<void>;
 
+  /**
+   * Effective AI mode: the build ships AI filtering AND the user turned it on in Settings. When
+   * false, every AI control is hidden and judged rules are shown as their fallback.
+   */
+  aiMode: boolean;
+  setAiMode: (enabled: boolean) => Promise<void>;
+
   init: () => Promise<void>;
   refresh: () => Promise<void>;
   refreshAuth: () => Promise<void>;
@@ -138,6 +152,7 @@ export const useFocusStore = create<FocusStore>((set, get) => ({
   settings: DEFAULT_SETTINGS,
   pairedKeys: [],
   serviceVersion: 'unknown',
+  aiMode: false,
 
   applySnapshot: (s) =>
     set({
@@ -236,6 +251,11 @@ export const useFocusStore = create<FocusStore>((set, get) => ({
     set((s) => ({ settings: { ...s.settings, browserHandshakeEnabled: enabled } }));
   },
 
+  setAiMode: async (enabled) => {
+    const res = await setAiModeRequest(enabled);
+    set({ aiMode: SMART_FILTERING_ENABLED && res.enabled });
+  },
+
   setTrayIconEnabled: async (enabled) => {
     await request('setTrayIconEnabled', { enabled });
     set((s) => ({ settings: { ...s.settings, trayIconEnabled: enabled } }));
@@ -249,9 +269,10 @@ export const useFocusStore = create<FocusStore>((set, get) => ({
   init: async () => {
     if (initialization) return initialization;
     initialization = (async () => {
-      const [info, onboarding] = await Promise.all([
+      const [info, onboarding, aiMode] = await Promise.all([
         appInfo(),
         onboardingStatus(),
+        aiModeStatus(),
         get().refreshAuth(),
         get().refreshEntitlement(),
       ]);
@@ -263,6 +284,7 @@ export const useFocusStore = create<FocusStore>((set, get) => ({
         localEntitlementEnabled: info.localEntitlementEnabled,
         platform: info.platform,
         onboardingComplete: onboarding.complete,
+        aiMode: SMART_FILTERING_ENABLED && aiMode.enabled,
       });
       void get().refreshSubscriptionDetail();
       initSessionReplay({

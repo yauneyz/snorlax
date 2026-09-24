@@ -52,18 +52,23 @@ const CLASSIC_PRESETS: Preset[] = [
   { value: 'whitelist', label: 'Whitelist', hint: 'Block everything except your list.' },
 ];
 
-const PRESETS: Preset[] = SMART_FILTERING_ENABLED
-  ? [
-      { value: 'blacklist', label: 'Simple blocklist', hint: 'Block only the sites you list.' },
-      { value: 'whitelist', label: 'Strict allowlist', hint: 'Block everything except your list.' },
-      { value: 'block-all', label: 'Block everything', hint: 'No internet at all.' },
-      {
-        value: 'smart',
-        label: 'Smart',
-        hint: 'AI judges anything else against what you’re working on.',
-      },
-    ]
-  : CLASSIC_PRESETS;
+const GENERAL_PRESETS: Preset[] = [
+  { value: 'blacklist', label: 'Simple blocklist', hint: 'Block only the sites you list.' },
+  { value: 'whitelist', label: 'Strict allowlist', hint: 'Block everything except your list.' },
+  { value: 'block-all', label: 'Block everything', hint: 'No internet at all.' },
+];
+
+const SMART_PRESET: Preset = {
+  value: 'smart',
+  label: 'Smart',
+  hint: 'AI judges anything else against what you’re working on.',
+};
+
+/** "Smart" only exists while AI mode is on; otherwise there's no hint AI filtering exists. */
+function presetsFor(aiMode: boolean): Preset[] {
+  if (!SMART_FILTERING_ENABLED) return CLASSIC_PRESETS;
+  return aiMode ? [...GENERAL_PRESETS, SMART_PRESET] : GENERAL_PRESETS;
+}
 
 function appKey(app: AppRef): string {
   return [
@@ -373,6 +378,7 @@ export function Blocklists({ onUpgrade }: { onUpgrade: () => void }) {
   const activeProfileId = useFocusStore((s) => s.activeProfileId);
   const keyPresent = useFocusStore((s) => s.keyPresent);
   const productLimits = useFocusStore((s) => s.productLimits);
+  const aiMode = useFocusStore((s) => s.aiMode);
   const refresh = useFocusStore((s) => s.refresh);
   // Which profile the editor is pointed at. `null` keeps it tracking whatever focus is
   // enforcing, so a scheduled profile switch carries the editor with it.
@@ -402,7 +408,7 @@ export function Blocklists({ onUpgrade }: { onUpgrade: () => void }) {
   const maxBlocked = maxBlockedDomains(productLimits);
   const maxAllowed = maxAllowedDomains(productLimits);
   const maxApps = maxPolicyApps(productLimits);
-  const smartAllowed = SMART_FILTERING_ENABLED && smartFilteringAllowed(productLimits);
+  const smartAllowed = aiMode && smartFilteringAllowed(productLimits);
   const classicMode = policy.defaultAction === 'allow' ? 'blacklist' : 'whitelist';
   const classicDomains =
     classicMode === 'blacklist' ? policy.blockedDomains : policy.allowedDomains;
@@ -686,7 +692,7 @@ export function Blocklists({ onUpgrade }: { onUpgrade: () => void }) {
                 {selected?.name ?? 'No profile'}
               </span>
               <span className="font-mono text-[10.5px] uppercase tracking-[0.08em] text-slate-500">
-                {selected ? profileSummary(selected) : '—'}
+                {selected ? profileSummary(selected, aiMode) : '—'}
               </span>
             </span>
             <span className="flex flex-col items-start gap-[3px] border-l border-white/[0.10] pl-[7px] pt-px">
@@ -742,7 +748,7 @@ export function Blocklists({ onUpgrade }: { onUpgrade: () => void }) {
                           {p.name}
                         </span>
                         <span className="mt-0.5 block truncate font-mono text-[10.5px] text-slate-450">
-                          {profileSummary(p)}
+                          {profileSummary(p, aiMode)}
                         </span>
                       </span>
                       {p.id === activeProfileId ? (
@@ -831,7 +837,7 @@ export function Blocklists({ onUpgrade }: { onUpgrade: () => void }) {
       </div>
 
       <section className="flex min-h-0 min-w-0 flex-1 flex-col">
-        {SMART_FILTERING_ENABLED && (
+        {aiMode && (
           <JudgeSettings
             key={selected?.id}
             policy={policy}
@@ -843,7 +849,7 @@ export function Blocklists({ onUpgrade }: { onUpgrade: () => void }) {
 
         {/* One-click starting points — each just prefills the fields below. */}
         <div className="mt-3 flex gap-2">
-          {PRESETS.map((p) => {
+          {presetsFor(aiMode).map((p) => {
             const locked = p.value === 'smart' && !smartAllowed;
             const active = SMART_FILTERING_ENABLED
               ? p.value === 'smart' && policy.defaultAction === 'judge'
@@ -892,7 +898,11 @@ export function Blocklists({ onUpgrade }: { onUpgrade: () => void }) {
           <DomainListEditor
             kicker={SMART_FILTERING_ENABLED ? 'Always allow' : 'Allow list'}
             hint={
-              SMART_FILTERING_ENABLED ? 'never blocked, never judged' : 'everything else is blocked'
+              !SMART_FILTERING_ENABLED
+                ? 'everything else is blocked'
+                : aiMode
+                  ? 'never blocked, never judged'
+                  : 'never blocked'
             }
             placeholder="mail.google.com"
             accent={accent}
@@ -910,6 +920,7 @@ export function Blocklists({ onUpgrade }: { onUpgrade: () => void }) {
         <SiteRules
           policy={policy}
           supported={sitesSupported}
+          aiMode={aiMode}
           smartAllowed={smartAllowed}
           limitReached={blockedLimitReached}
           onSave={(next) => void save(next)}

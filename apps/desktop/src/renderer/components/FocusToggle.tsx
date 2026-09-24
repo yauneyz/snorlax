@@ -21,6 +21,7 @@ export function FocusToggle() {
   const scheduleLocked = useFocusStore((s) => s.scheduleLocked);
   const profiles = useFocusStore((s) => s.profiles);
   const activeProfileId = useFocusStore((s) => s.activeProfileId);
+  const aiMode = useFocusStore((s) => s.aiMode);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -112,7 +113,7 @@ export function FocusToggle() {
           </button>
 
           <div className="text-[12px] text-slate-400">
-            {focusActive && activeProfile ? profileSummary(activeProfile) : 'nothing is being blocked'}
+            {focusActive && activeProfile ? profileSummary(activeProfile, aiMode) : 'nothing is being blocked'}
           </div>
         </div>
       </div>

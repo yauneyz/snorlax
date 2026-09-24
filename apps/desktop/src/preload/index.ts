@@ -41,6 +41,8 @@ const Channels = {
   onboardingStatus: 'app:onboardingStatus',
   completeOnboarding: 'app:completeOnboarding',
   resetOnboarding: 'app:resetOnboarding',
+  aiModeStatus: 'app:aiModeStatus',
+  setAiMode: 'app:setAiMode',
   reportRendererError: 'app:reportRendererError',
   appEvent: 'app:event',
 } as const;
@@ -216,6 +218,13 @@ const api = {
   resetOnboarding: (): Promise<
     ActionResult & { status?: OnboardingStatusInfo }
   > => ipcRenderer.invoke(Channels.resetOnboarding),
+
+  // --- AI mode ---
+  /** Whether the user has turned on AI mode (off by default). */
+  aiModeStatus: (): Promise<{ enabled: boolean }> => ipcRenderer.invoke(Channels.aiModeStatus),
+  /** Turn AI mode on/off; resolves with the persisted value. */
+  setAiMode: (enabled: boolean): Promise<{ enabled: boolean }> =>
+    ipcRenderer.invoke(Channels.setAiMode, { enabled }),
 
   /** Report an uncaught renderer error/rejection so it's tracked and pushed like a main-process one. */
   reportRendererError: (message: string, stack?: string): Promise<void> =>

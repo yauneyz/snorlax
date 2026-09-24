@@ -1,4 +1,4 @@
-import type { Profile } from '@talysman/shared';
+import type { Policy, Profile, RuleAction } from '@talysman/shared';
 import { productFeaturesForEnvironment } from '@talysman/product';
 
 const SMART_FILTERING_ENABLED = productFeaturesForEnvironment(
@@ -14,11 +14,21 @@ export function formatTime(ms: number): string {
   return new Date(ms).toLocaleString();
 }
 
+/**
+ * What a rule action actually does given AI mode. With AI mode off, `judge` is enforced as the
+ * judge's fallback (mirrors natmsg `Blocking::resolve`), so that's what the UI shows too.
+ */
+export function effectiveAction(action: RuleAction, policy: Policy, aiMode: boolean): RuleAction {
+  if (action !== 'judge' || aiMode) return action;
+  return policy.judge?.fallback ?? 'allow';
+}
+
 /** One-line description of what a profile blocks — used on the seal and in the profile rail. */
-export function profileSummary(profile: Profile): string {
-  const { blockedDomains, allowedDomains, defaultAction, apps } = profile.policy;
+export function profileSummary(profile: Profile, aiMode: boolean): string {
+  const { blockedDomains, allowedDomains, apps } = profile.policy;
+  const defaultAction = effectiveAction(profile.policy.defaultAction, profile.policy, aiMode);
   const softCount = Object.keys(profile.policy.sites ?? {}).length;
-  const hasSmartIntent = SMART_FILTERING_ENABLED && defaultAction === 'judge';
+  const hasSmartIntent = defaultAction === 'judge';
   const isBlockAll =
     SMART_FILTERING_ENABLED &&
     defaultAction === 'block' &&

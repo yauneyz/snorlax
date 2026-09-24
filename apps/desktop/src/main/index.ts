@@ -27,6 +27,7 @@ import type { ServiceConnection } from './service/connection.js';
 import { ensureServiceCurrent, ensureServiceInstalled } from './service/installer.js';
 import { initUpdater } from './updater.js';
 import { initSmartFiltering } from './smartFiltering.js';
+import { applyAiMode } from './aiMode.js';
 import { createTray } from './tray.js';
 import { createWindow, handleDeepLink, showMainWindow } from './window.js';
 
@@ -111,7 +112,7 @@ async function ensureProtocolCompatible(service: ServiceConnection, mock: MockSe
       );
     }
   }
-  await service.request('setSmartFilteringEnabled', { enabled: features.smartFiltering });
+  await applyAiMode(service);
 }
 
 /**

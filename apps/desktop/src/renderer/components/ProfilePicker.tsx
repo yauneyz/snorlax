@@ -24,6 +24,7 @@ export function ProfilePicker({
   onClose: () => void;
 }) {
   const refresh = useFocusStore((s) => s.refresh);
+  const aiMode = useFocusStore((s) => s.aiMode);
   const [error, setError] = React.useState<string | null>(null);
 
   async function activate(profileId: string) {
@@ -87,7 +88,7 @@ export function ProfilePicker({
                 {p.name}
               </span>
               <span className="max-w-full px-3 font-mono text-[9px] leading-tight text-slate-450">
-                {profileSummary(p)}
+                {profileSummary(p, aiMode)}
               </span>
             </button>
           );
