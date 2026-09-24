@@ -78,8 +78,7 @@ export const SITE_CATALOG = {
       {
         "feature": "content",
         "host": "redd.it",
-        "path": "^/([a-z0-9]+)$",
-        "item": 1
+        "path": "^/([a-z0-9]+)$"
       },
       {
         "feature": "messages",
@@ -88,20 +87,17 @@ export const SITE_CATALOG = {
       {
         "feature": "content",
         "path": "^/(?:r/[^/]+/)?comments/([a-z0-9]+)(?:/.*)?$",
-        "item": 1,
         "judge": {
           "contentSelector": "shreddit-post"
         }
       },
       {
         "feature": "content",
-        "path": "^/gallery/([a-z0-9]+)$",
-        "item": 1
+        "path": "^/gallery/([a-z0-9]+)$"
       },
       {
         "feature": "content",
-        "path": "^/r/[^/]+/s/([a-z0-9]+)$",
-        "item": 1
+        "path": "^/r/[^/]+/s/([a-z0-9]+)$"
       },
       {
         "feature": "search",
@@ -132,48 +128,70 @@ export const SITE_CATALOG = {
       }
     ],
     "fallbackFeature": "feed",
-    "hops": {
-      "feature": "recommendations"
-    },
     "elements": [
       {
         "feature": "feed",
-        "selector": "reddit-sidebar-nav"
-      },
-      {
-        "feature": "feed",
-        "selector": "shreddit-feed",
+        "selector": "shreddit-feed, shreddit-gallery-carousel, #siteTable",
         "on": [
-          "content"
+          "feed"
         ]
       },
       {
         "feature": "recommendations",
-        "selector": "[data-testid*=\"recommend\"], [data-testid*=\"related\"], [data-testid*=\"trending\"]"
+        "selector": "[data-testid*=\"recommend\"], [data-testid*=\"related\"], [data-testid*=\"trending\"], #right-sidebar-container, .trending-subreddits"
       },
       {
         "feature": "recommendations",
-        "selector": "aside",
+        "selector": "aside, shreddit-feed",
         "on": [
           "content"
         ]
       },
       {
         "feature": "comments",
-        "selector": "shreddit-comment-tree, #comment-tree"
-      }
-    ],
-    "entryPoints": [
+        "selector": "shreddit-comment-tree, #comment-tree, .commentarea"
+      },
+      {
+        "feature": "content",
+        "selector": "main, .content[role=\"main\"]",
+        "on": [
+          "content"
+        ]
+      },
       {
         "feature": "search",
-        "label": "Search Reddit",
-        "url": "https://www.reddit.com/search/",
-        "param": "q"
+        "selector": "main, .content[role=\"main\"]",
+        "on": [
+          "search"
+        ]
       },
       {
         "feature": "messages",
-        "label": "Messages",
-        "url": "https://www.reddit.com/message/inbox"
+        "selector": "main, .content[role=\"main\"]",
+        "on": [
+          "messages"
+        ]
+      },
+      {
+        "feature": "notifications",
+        "selector": "main, .content[role=\"main\"]",
+        "on": [
+          "notifications"
+        ]
+      },
+      {
+        "feature": "compose",
+        "selector": "main, .content[role=\"main\"]",
+        "on": [
+          "compose"
+        ]
+      },
+      {
+        "feature": "profiles",
+        "selector": "main, .content[role=\"main\"]",
+        "on": [
+          "profiles"
+        ]
       }
     ]
   },
@@ -222,7 +240,6 @@ export const SITE_CATALOG = {
         "query": {
           "id": "^[0-9]+$"
         },
-        "item": "id",
         "judge": {
           "contentSelector": ".fatitem"
         }
@@ -241,16 +258,36 @@ export const SITE_CATALOG = {
       }
     ],
     "fallbackFeature": "feed",
-    "hops": {
-      "feature": "feed"
-    },
     "elements": [
       {
         "feature": "feed",
-        "selector": "#hnmain > tbody > tr:first-child, .pagetop, .morelink"
+        "selector": "#bigbox",
+        "on": [
+          "feed"
+        ]
+      },
+      {
+        "feature": "content",
+        "selector": "#bigbox",
+        "on": [
+          "content"
+        ]
+      },
+      {
+        "feature": "compose",
+        "selector": "#bigbox",
+        "on": [
+          "compose"
+        ]
+      },
+      {
+        "feature": "profiles",
+        "selector": "#bigbox",
+        "on": [
+          "profiles"
+        ]
       }
-    ],
-    "entryPoints": []
+    ]
   },
   "x": {
     "id": "x",
@@ -322,7 +359,6 @@ export const SITE_CATALOG = {
       {
         "feature": "content",
         "path": "^/(?:i/)?(?:[^/]+/)?status/([0-9]+)(?:/.*)?$",
-        "item": 1,
         "judge": {
           "contentSelector": "article[data-testid=\"tweet\"]"
         }
@@ -360,50 +396,71 @@ export const SITE_CATALOG = {
       }
     ],
     "fallbackFeature": "feed",
-    "hops": {
-      "feature": "recommendations"
-    },
     "elements": [
       {
-        "feature": "recommendations",
-        "selector": "[data-testid=\"sidebarColumn\"], [data-testid=\"trend\"]"
+        "feature": "feed",
+        "selector": "[data-testid=\"primaryColumn\"] section[role=\"region\"]",
+        "on": [
+          "feed",
+          "compose"
+        ]
       },
       {
         "feature": "recommendations",
-        "selector": "[data-testid=\"UserCell\"]",
+        "selector": "[data-testid=\"sidebarColumn\"] :is(section, aside), [data-testid=\"trend\"]"
+      },
+      {
+        "feature": "recommendations",
+        "selector": "[data-testid=\"UserCell\"], [data-testid=\"cellInnerDiv\"]:has(h2), [data-testid=\"cellInnerDiv\"]:has(h2) ~ [data-testid=\"cellInnerDiv\"]",
         "on": [
           "content"
         ]
       },
       {
-        "feature": "feed",
-        "selector": "[data-testid=\"primaryColumn\"] article",
+        "feature": "content",
+        "selector": "[data-testid=\"primaryColumn\"] section[role=\"region\"]",
         "on": [
-          "compose"
+          "content"
         ]
-      }
-    ],
-    "entryPoints": [
-      {
-        "feature": "search",
-        "label": "Search X",
-        "url": "https://x.com/search",
-        "param": "q"
       },
       {
-        "feature": "compose",
-        "label": "Post",
-        "url": "https://x.com/compose/post"
+        "feature": "search",
+        "selector": "[data-testid=\"primaryColumn\"] section[role=\"region\"]",
+        "on": [
+          "search"
+        ]
+      },
+      {
+        "feature": "profiles",
+        "selector": "[data-testid=\"primaryColumn\"] section[role=\"region\"]",
+        "on": [
+          "profiles"
+        ]
       },
       {
         "feature": "notifications",
-        "label": "Notifications",
-        "url": "https://x.com/notifications"
+        "selector": "[data-testid=\"primaryColumn\"]",
+        "on": [
+          "notifications"
+        ]
       },
       {
         "feature": "messages",
-        "label": "Messages",
-        "url": "https://x.com/messages"
+        "selector": "main[role=\"main\"]",
+        "on": [
+          "messages"
+        ]
+      },
+      {
+        "feature": "compose",
+        "selector": "[data-testid=\"SideNav_NewTweet_Button\"], [data-testid=\"tweetButtonInline\"]"
+      },
+      {
+        "feature": "compose",
+        "selector": "[role=\"dialog\"]",
+        "on": [
+          "compose"
+        ]
       }
     ]
   },
@@ -478,7 +535,6 @@ export const SITE_CATALOG = {
       {
         "feature": "content",
         "path": "^/feed/update/urn:li:(?:activity|share|ugcpost):([0-9]+)(?:/.*)?$",
-        "item": 1,
         "judge": {
           "contentSelector": ".feed-shared-update-v2"
         }
@@ -486,7 +542,6 @@ export const SITE_CATALOG = {
       {
         "feature": "content",
         "path": "^/(?:posts|pulse)/([^/]+)$",
-        "item": 1,
         "judge": {
           "contentSelector": "article, main"
         }
@@ -512,8 +567,11 @@ export const SITE_CATALOG = {
       },
       {
         "feature": "feed",
-        "path": "^/feed$",
-        "shell": true
+        "path": "^/feed$"
+      },
+      {
+        "feature": "recommendations",
+        "path": "^/mynetwork(?:/.*)?$"
       },
       {
         "feature": "profiles",
@@ -529,43 +587,81 @@ export const SITE_CATALOG = {
       }
     ],
     "fallbackFeature": "feed",
-    "hops": {
-      "feature": "recommendations"
-    },
     "elements": [
       {
-        "feature": "recommendations",
-        "selector": ".scaffold-layout__aside, .right-rail"
-      },
-      {
         "feature": "feed",
-        "selector": ".feed-shared-update-v2, [data-urn^=\"urn:li:activity:\"], [data-urn^=\"urn:li:share:\"]",
+        "selector": ".feed-shared-update-v2, [data-urn^=\"urn:li:activity:\"], [data-urn^=\"urn:li:share:\"], .scaffold-finite-scroll",
         "on": [
           "feed"
         ]
-      }
-    ],
-    "entryPoints": [
-      {
-        "feature": "search",
-        "label": "Search LinkedIn posts",
-        "url": "https://www.linkedin.com/search/results/content/",
-        "param": "keywords"
       },
       {
-        "feature": "compose",
-        "label": "Post",
-        "url": "https://www.linkedin.com/feed/"
+        "feature": "recommendations",
+        "selector": ".scaffold-layout__aside, .right-rail, #feed-news-module"
       },
       {
-        "feature": "notifications",
-        "label": "Notifications",
-        "url": "https://www.linkedin.com/notifications/"
+        "feature": "recommendations",
+        "selector": "main",
+        "on": [
+          "recommendations"
+        ]
       },
       {
         "feature": "messages",
-        "label": "Messages",
-        "url": "https://www.linkedin.com/messaging/"
+        "selector": "#msg-overlay, .msg-overlay-container"
+      },
+      {
+        "feature": "compose",
+        "selector": ".share-box-feed-entry__closed-share-box"
+      },
+      {
+        "feature": "content",
+        "selector": "main",
+        "on": [
+          "content"
+        ]
+      },
+      {
+        "feature": "search",
+        "selector": "main",
+        "on": [
+          "search"
+        ]
+      },
+      {
+        "feature": "messages",
+        "selector": "main",
+        "on": [
+          "messages"
+        ]
+      },
+      {
+        "feature": "notifications",
+        "selector": "main",
+        "on": [
+          "notifications"
+        ]
+      },
+      {
+        "feature": "compose",
+        "selector": "main",
+        "on": [
+          "compose"
+        ]
+      },
+      {
+        "feature": "profiles",
+        "selector": "main",
+        "on": [
+          "profiles"
+        ]
+      },
+      {
+        "feature": "jobs",
+        "selector": "main",
+        "on": [
+          "jobs"
+        ]
       }
     ]
   },
@@ -621,7 +717,7 @@ export const SITE_CATALOG = {
       },
       {
         "id": "recommendations",
-        "label": "Suggestions & swiping",
+        "label": "Suggestions",
         "default": "block"
       },
       {
@@ -640,7 +736,6 @@ export const SITE_CATALOG = {
       {
         "feature": "content",
         "path": "^/(?:[^/]+/)?(?:p|reel|reels|tv)/([-_a-z0-9]+)$",
-        "item": 1,
         "judge": {
           "contentSelector": "article, main"
         }
@@ -662,8 +757,7 @@ export const SITE_CATALOG = {
       },
       {
         "feature": "feed",
-        "path": "^/$",
-        "shell": true
+        "path": "^/$"
       },
       {
         "feature": "explore",
@@ -683,9 +777,6 @@ export const SITE_CATALOG = {
       }
     ],
     "fallbackFeature": "feed",
-    "hops": {
-      "feature": "recommendations"
-    },
     "elements": [
       {
         "feature": "feed",
@@ -693,24 +784,70 @@ export const SITE_CATALOG = {
         "on": [
           "feed"
         ]
-      }
-    ],
-    "entryPoints": [
-      {
-        "feature": "search",
-        "label": "Search Instagram",
-        "url": "https://www.instagram.com/explore/search/",
-        "param": "q"
       },
       {
-        "feature": "compose",
-        "label": "Create or notifications",
-        "url": "https://www.instagram.com/"
+        "feature": "explore",
+        "selector": "main",
+        "on": [
+          "explore"
+        ]
+      },
+      {
+        "feature": "stories",
+        "selector": "main, section",
+        "on": [
+          "stories"
+        ]
+      },
+      {
+        "feature": "stories",
+        "selector": "main [role=\"menu\"]:has(canvas)"
+      },
+      {
+        "feature": "recommendations",
+        "selector": "main div:has(> a[href^=\"/explore/people\"])"
+      },
+      {
+        "feature": "recommendations",
+        "selector": "main article ~ div",
+        "on": [
+          "content"
+        ]
+      },
+      {
+        "feature": "content",
+        "selector": "main, article",
+        "on": [
+          "content"
+        ]
+      },
+      {
+        "feature": "search",
+        "selector": "main",
+        "on": [
+          "search"
+        ]
       },
       {
         "feature": "messages",
-        "label": "Messages",
-        "url": "https://www.instagram.com/direct/inbox/"
+        "selector": "main, [role=\"main\"]",
+        "on": [
+          "messages"
+        ]
+      },
+      {
+        "feature": "compose",
+        "selector": "[role=\"dialog\"]",
+        "on": [
+          "compose"
+        ]
+      },
+      {
+        "feature": "profiles",
+        "selector": "main",
+        "on": [
+          "profiles"
+        ]
       }
     ]
   },
@@ -794,8 +931,7 @@ export const SITE_CATALOG = {
       {
         "feature": "content",
         "host": "youtu.be",
-        "path": "^/([-_a-z0-9]{11})$",
-        "item": 1
+        "path": "^/([-_a-z0-9]{11})$"
       },
       {
         "feature": "content",
@@ -803,20 +939,17 @@ export const SITE_CATALOG = {
         "query": {
           "v": "^[-_a-zA-Z0-9]{11}$"
         },
-        "item": "v",
         "judge": {
           "contentSelector": "ytd-watch-metadata, #above-the-fold"
         }
       },
       {
         "feature": "content",
-        "path": "^/live/([-_a-z0-9]{11})$",
-        "item": 1
+        "path": "^/live/([-_a-z0-9]{11})$"
       },
       {
         "feature": "shorts",
-        "path": "^/shorts/([-_a-z0-9]{11})$",
-        "item": 1
+        "path": "^/shorts/([-_a-z0-9]{11})$"
       },
       {
         "feature": "search",
@@ -843,34 +976,82 @@ export const SITE_CATALOG = {
       }
     ],
     "fallbackFeature": "feed",
-    "hops": {
-      "feature": "recommendations"
-    },
     "elements": [
       {
+        "feature": "feed",
+        "selector": "ytd-browse, ytm-browse",
+        "on": [
+          "feed"
+        ]
+      },
+      {
         "feature": "recommendations",
-        "selector": "#secondary, #related, ytd-watch-next-secondary-results-renderer, .ytp-endscreen-content, .ytp-ce-element, ytd-compact-video-renderer, ytd-reel-shelf-renderer, ytd-rich-shelf-renderer",
+        "selector": "#secondary, #related, ytd-watch-next-secondary-results-renderer, .ytp-endscreen-content, .ytp-ce-element, .ytp-autonav-endscreen-countdown-overlay, ytd-compact-video-renderer, ytd-reel-shelf-renderer, ytd-rich-shelf-renderer, #navigation-button-up, #navigation-button-down",
         "on": [
           "content",
           "shorts"
         ]
       },
       {
+        "feature": "recommendations",
+        "selector": "ytd-search ytd-shelf-renderer, ytd-search ytd-reel-shelf-renderer, ytd-search ytd-horizontal-card-list-renderer",
+        "on": [
+          "search"
+        ]
+      },
+      {
         "feature": "comments",
-        "selector": "ytd-comments#comments"
-      }
-    ],
-    "entryPoints": [
+        "selector": "ytd-comments#comments, ytm-comment-section-renderer"
+      },
+      {
+        "feature": "content",
+        "selector": "ytd-watch-flexy, ytm-watch",
+        "on": [
+          "content"
+        ]
+      },
+      {
+        "feature": "shorts",
+        "selector": "ytd-shorts",
+        "on": [
+          "shorts"
+        ]
+      },
+      {
+        "feature": "shorts",
+        "selector": "ytd-reel-shelf-renderer, ytd-rich-shelf-renderer[is-shorts], ytd-guide-entry-renderer:has(a[title=\"Shorts\"]), ytd-mini-guide-entry-renderer[aria-label=\"Shorts\"]"
+      },
       {
         "feature": "search",
-        "label": "Search YouTube",
-        "url": "https://www.youtube.com/results",
-        "param": "search_query"
+        "selector": "ytd-search, ytm-search",
+        "on": [
+          "search"
+        ]
+      },
+      {
+        "feature": "notifications",
+        "selector": "ytd-notification-topbar-button-renderer"
+      },
+      {
+        "feature": "notifications",
+        "selector": "ytd-browse, ytm-browse",
+        "on": [
+          "notifications"
+        ]
       },
       {
         "feature": "studio",
-        "label": "Studio",
-        "url": "https://studio.youtube.com/"
+        "selector": "ytcp-app, ytd-browse",
+        "on": [
+          "studio"
+        ]
+      },
+      {
+        "feature": "channels",
+        "selector": "ytd-browse, ytm-browse",
+        "on": [
+          "channels"
+        ]
       }
     ]
   }

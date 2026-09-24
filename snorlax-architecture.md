@@ -500,17 +500,20 @@ Classic presets are just shapes of this:
 
 **Site rules** (soft blocks) come from the site catalog, `packages/shared/src/sites` (see its
 README). Each supported site is one declarative module with its own feature schema, route table,
-element selectors, and blocked-page entry points. The user sets each feature to allow, AI, or
-block. Catalog defaults reproduce the classic "soft block": direct content, search, and messaging
-are allowed; feeds and recommendations are blocked. Enforcement splits by layer:
+and element selectors. The user sets each feature to allow, AI, or hide (`block`). A site rule
+never blocks a page — every page stays reachable, so notifications, messages, and posting are
+always a click away — it hides content on the page, Unhook-style. Catalog defaults: direct
+content, search, and messaging are shown; feeds and recommendations are hidden wherever they
+appear. Enforcement splits by layer:
 - The daemon lets a site's hosts and asset domains through the network layer.
-- The extension enforces the features:
-  - DNR route bands for navigations;
-  - the webNavigation backstop for hops between items and for SPA navigations;
-  - a generic content script for page elements and links.
+- The extension's DNR rules let the site's pages and sub-resources through, whatever the default
+  action or premade lists say.
+- A generic content script hides the elements of hidden features (routes only decide which
+  page-scoped elements apply), and pauses media inside hidden regions.
 
 **The AI judge** resolves every `judge` action, whether a judged default or a judged site feature
 (for example: Reddit posts are reachable, but each one is checked against the user's tasks).
+A rejected site page isn't blocked either: the content script hides that page's feature.
 1. The page loads.
 2. The extension extracts its text and sends `judge-request` through natmsg to the daemon.
 3. The daemon attaches `judge` and broadcasts `judgeRequested`.

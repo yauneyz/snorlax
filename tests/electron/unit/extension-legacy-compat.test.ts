@@ -20,7 +20,7 @@ describe('extension ⇄ v4 native host', () => {
     expect(frame.defaultAction).toBe('judge');
     expect(frame).not.toHaveProperty('softBlockedSites');
     expect(frame).not.toHaveProperty('intent');
-    expect(decide(frame, 'https://www.reddit.com/').action).toBe('block');
+    expect(decide(frame, 'https://www.reddit.com/')).toMatchObject({ action: 'allow', hidden: true });
     expect(decide(frame, 'https://docs.rs/').action).toBe('judge');
   });
 

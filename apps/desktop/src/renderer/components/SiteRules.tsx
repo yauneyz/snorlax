@@ -4,7 +4,7 @@ import { SITE_DEFINITIONS, effectiveSiteFeatures } from '@talysman/shared';
 import { Kicker } from './ui/index.js';
 import { cx } from '../lib/utils.js';
 
-const ACTION_LABELS: Record<RuleAction, string> = { allow: 'Allow', judge: 'AI', block: 'Block' };
+const ACTION_LABELS: Record<RuleAction, string> = { allow: 'Allow', judge: 'AI', block: 'Hide' };
 
 function coversHost(entry: string, host: string): boolean {
   const base = entry.toLowerCase().replace(/^\*\./, '');
@@ -12,9 +12,10 @@ function coversHost(entry: string, host: string): boolean {
 }
 
 /**
- * Site rules ("soft blocks"): one row per catalog site. Turning a site on applies its catalog
- * defaults — typically feeds and recommendations blocked, direct content, search, and messaging
- * allowed — and each feature can then be set to Allow, AI (judged against your tasks), or Block.
+ * Site rules ("soft blocks"): one row per catalog site. The site itself always stays reachable;
+ * turning it on applies its catalog defaults — typically feeds and recommendations hidden, direct
+ * content, search, and messaging shown — and each feature can then be set to Allow, AI (hidden
+ * page by page when it doesn't fit your tasks), or Hide.
  * Everything here is rendered from the site catalog; there is no per-site UI code.
  */
 export function SiteRules({
@@ -93,7 +94,7 @@ export function SiteRules({
       </div>
       <p className="mt-1 text-[11px] leading-snug text-slate-400">
         {supported
-          ? 'Keep the useful parts of a site — search, messages, posting, a specific post — while its feeds and recommendations stay blocked. Loosening a rule needs your key while focus is on.'
+          ? 'Keep using a site — search, messages, notifications, posting, a specific post — with its feeds and recommendations hidden. Loosening a rule needs your key while focus is on.'
           : 'Update the Talysman desktop service to use site rules.'}
       </p>
       <div className="mt-2.5 flex flex-col gap-1.5">
@@ -125,7 +126,7 @@ export function SiteRules({
                   <span className="text-[12.5px] font-semibold text-slate-250">{site.label}</span>
                   {enabled && (
                     <span className="truncate text-[11px] text-slate-450">
-                      {blockedCount} blocked{judgedCount > 0 ? ` · ${judgedCount} AI` : ''} · {open ? 'hide' : 'customize'}
+                      {blockedCount} hidden{judgedCount > 0 ? ` · ${judgedCount} AI` : ''} · {open ? 'hide' : 'customize'}
                     </span>
                   )}
                 </button>
@@ -188,7 +189,7 @@ function ActionPicker({
             type="button"
             role="radio"
             aria-checked={value === action}
-            title={action === 'judge' ? 'Let the AI decide based on your tasks' : undefined}
+            title={action === 'judge' ? 'Let the AI decide based on your tasks' : action === 'block' ? 'Hide this wherever it appears on the site' : undefined}
             onClick={() => value !== action && onChange(action)}
             className={cx(
               'px-2.5 py-1 text-[10.5px] font-semibold transition',

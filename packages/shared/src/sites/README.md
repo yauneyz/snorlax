@@ -1,10 +1,12 @@
 # Site catalog
 
-Site rules let a user keep the useful parts of a site (search, messages, posting, one specific
-post) while its feeds and recommendations stay blocked. Each supported site is a single
-declarative module in `sites/<id>.ts`. Nothing else in the codebase names a site: the extension
-engine, the DNR compiler, the content script, the blocked page, the daemon, and the desktop UI all
-read this catalog.
+Site rules let a user keep the useful parts of a site (search, messages, notifications, posting,
+one specific post) while its feeds and recommendations are hidden. A site rule **never blocks a
+page**: every page of the site stays reachable, and hidden features are removed from the page
+in-place (like Unhook for YouTube). `reddit.com/r/popular` loads — it just has no posts on it.
+Each supported site is a single declarative module in `sites/<id>.ts`. Nothing else in the
+codebase names a site: the extension engine, the DNR compiler, the content script, the daemon,
+and the desktop UI all read this catalog.
 
 ## How a site is described
 
@@ -12,39 +14,33 @@ A site breaks itself into **features**. These are its own vocabulary of things a
 on or off, such as `feed`, `recommendations`, `messages`, `shorts` or `jobs`. Each feature has a
 default action:
 
-- `allow`
-- `block`
-- `judge`: the AI decides against the user's tasks
+- `allow`: shown
+- `block`: hidden wherever it appears (shown as "Hide" in the UI)
+- `judge`: the AI decides page by page against the user's tasks; a rejected page has that
+  feature hidden
 
 Users override features one at a time. Features marked `locked` (for example sign-in flows) can't
 be overridden and are hidden from the UI.
 
-Everything on the site then maps onto a feature through four mechanisms.
+Everything on the site then maps onto a feature through three mechanisms.
 
 **`routes`** are ordered and first match wins. Each route is an RE2-safe regex over the
 lowercased, trailing-slash-trimmed path, plus at most one required query parameter. A URL that no
 route matches belongs to `fallbackFeature`. Subdomains that aren't in `appHosts` also belong to
-`fallbackFeature`.
-- `item` marks a route that addresses one specific thing, such as a post or a video. Its value is
-  a capture group or a query parameter.
-- `hops.feature` names the feature that governs jumping from one item to a *different* item: post
-  to post, autoplay to the next video, swiping Reels. While that feature is blocked, those jumps
-  are blocked.
-- `shell: true` keeps a route reachable even when its feature is blocked. The feature's `elements`
-  are hidden instead. Use it for app shells that host allowed tools around a feed, such as the
-  LinkedIn composer on `/feed`.
+`fallbackFeature`. Routes only decide which feature a page belongs to — that is, which
+page-scoped `elements` apply and what the AI judge is judging.
 - `judge.contentSelector` tells the AI judge which part of the page is the actual content.
 
 **`elements`** are CSS selectors hidden while their feature is blocked. `on` optionally scopes
-them to pages of certain route features. Some features are element-only, like YouTube `comments`.
-
-**`entryPoints`** are shortcuts shown on the blocked page, such as a search form or a Messages
-link, while their feature is allowed. Their `https` URLs are the only remote URLs the packaged
-extension may contain.
+them to pages of certain route features. Hide the algorithmic part, not the page: on X's home the
+timeline goes but the composer and tabs stay. Some features are element-only, like YouTube
+`comments`. Validation requires every configurable feature to hide something, and every feature
+that owns pages to hide something *on its own pages* — otherwise hiding it would change nothing
+there.
 
 **`examples`** are `[url, feature]` fixtures that form the site's regression suite. The catalog
-test checks every example against the engine. It also checks that the compiled DNR rules agree
-with the engine when every feature is set to its default, to allow, to block, and to judge.
+test checks every example against the engine, and checks that no configuration (every feature
+at its default, allowed, hidden, or judged — even over a default-deny policy) blocks any of them.
 
 ## Adding a site
 

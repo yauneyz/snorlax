@@ -12,13 +12,13 @@ export default defineSite({
     { id: 'messages', label: 'Messages', default: 'allow' },
     { id: 'notifications', label: 'Notifications', default: 'allow' },
     { id: 'compose', label: 'Posting', default: 'allow' },
-    { id: 'feed', label: 'Home timeline & Explore', default: 'block' },
-    { id: 'recommendations', label: 'Trends & who to follow', description: 'The sidebar, suggested accounts, and jumping from one post to another.', default: 'block' },
+    { id: 'feed', label: 'Home timeline & Explore', description: 'The timelines themselves. Home and Explore stay usable for posting and search.', default: 'block' },
+    { id: 'recommendations', label: 'Trends & who to follow', description: 'Trends, suggested accounts, and "Discover more" under a post.', default: 'block' },
     { id: 'profiles', label: 'Profiles', default: 'block' },
     { id: 'essentials', label: 'Sign-in & settings', default: 'allow', locked: true },
   ],
   routes: [
-    { feature: 'content', path: '^/(?:i/)?(?:[^/]+/)?status/([0-9]+)(?:/.*)?$', item: 1, judge: { contentSelector: 'article[data-testid="tweet"]' } },
+    { feature: 'content', path: '^/(?:i/)?(?:[^/]+/)?status/([0-9]+)(?:/.*)?$', judge: { contentSelector: 'article[data-testid="tweet"]' } },
     { feature: 'search', path: '^/search$', query: { q: '^[^&#]+$' } },
     { feature: 'messages', path: '^/(?:messages|i/chat)(?:/.*)?$' },
     { feature: 'notifications', path: '^/(?:i/)?notifications(?:/.*)?$' },
@@ -28,17 +28,21 @@ export default defineSite({
     { feature: 'profiles', path: '^/[a-z0-9_]{1,15}(?:/(?:with_replies|media|likes|highlights|articles|followers|following))?$' },
   ],
   fallbackFeature: 'feed',
-  hops: { feature: 'recommendations' },
   elements: [
-    { feature: 'recommendations', selector: '[data-testid="sidebarColumn"], [data-testid="trend"]' },
-    { feature: 'recommendations', selector: '[data-testid="UserCell"]', on: ['content'] },
-    { feature: 'feed', selector: '[data-testid="primaryColumn"] article', on: ['compose'] },
-  ],
-  entryPoints: [
-    { feature: 'search', label: 'Search X', url: 'https://x.com/search', param: 'q' },
-    { feature: 'compose', label: 'Post', url: 'https://x.com/compose/post' },
-    { feature: 'notifications', label: 'Notifications', url: 'https://x.com/notifications' },
-    { feature: 'messages', label: 'Messages', url: 'https://x.com/messages' },
+    // A timeline is a `section[role=region]` in the primary column; the composer, tab bar, and
+    // search box sit outside it.
+    { feature: 'feed', selector: '[data-testid="primaryColumn"] section[role="region"]', on: ['feed', 'compose'] },
+    // The sidebar's search box isn't in a section/aside, so it stays.
+    { feature: 'recommendations', selector: '[data-testid="sidebarColumn"] :is(section, aside), [data-testid="trend"]' },
+    // Suggested accounts, and the "Discover more" block (a heading cell and everything after it).
+    { feature: 'recommendations', selector: '[data-testid="UserCell"], [data-testid="cellInnerDiv"]:has(h2), [data-testid="cellInnerDiv"]:has(h2) ~ [data-testid="cellInnerDiv"]', on: ['content'] },
+    { feature: 'content', selector: '[data-testid="primaryColumn"] section[role="region"]', on: ['content'] },
+    { feature: 'search', selector: '[data-testid="primaryColumn"] section[role="region"]', on: ['search'] },
+    { feature: 'profiles', selector: '[data-testid="primaryColumn"] section[role="region"]', on: ['profiles'] },
+    { feature: 'notifications', selector: '[data-testid="primaryColumn"]', on: ['notifications'] },
+    { feature: 'messages', selector: 'main[role="main"]', on: ['messages'] },
+    { feature: 'compose', selector: '[data-testid="SideNav_NewTweet_Button"], [data-testid="tweetButtonInline"]' },
+    { feature: 'compose', selector: '[role="dialog"]', on: ['compose'] },
   ],
   examples: [
     ['https://x.com/home', 'feed'],

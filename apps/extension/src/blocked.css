@@ -80,11 +80,3 @@ p {
   font-size: 14px;
 }
 
-.soft-search { margin-top: 26px; }
-.soft-search label { display: block; margin-bottom: 9px; color: rgb(var(--color-foreground-muted)); font-size: 14px; }
-.soft-search-row { display: flex; gap: 8px; }
-.soft-search input { min-width: 0; flex: 1; padding: 10px 12px; border: 1px solid rgb(var(--color-border)); border-radius: 8px; background: rgb(var(--color-background)); color: rgb(var(--color-foreground)); font: inherit; }
-.soft-search button { padding: 10px 16px; border: 0; border-radius: 8px; background: rgb(var(--color-foreground-strong)); color: rgb(var(--color-background)); font: inherit; cursor: pointer; }
-.soft-tools { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 20px; }
-.soft-tools[hidden] { display: none; }
-.soft-tools a { color: rgb(var(--color-foreground-strong)); font-size: 14px; }

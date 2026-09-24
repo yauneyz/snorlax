@@ -8,7 +8,9 @@
 //
 // Layers, in order (mirrored host-level by the daemon's `is_host_blocked`):
 //   1. blockedDomains             → block
-//   2. site rules (SITE_CATALOG)  → the action of the feature the URL belongs to
+//   2. site rules (SITE_CATALOG)  → allow, or judge when the page's feature is judged. Site rules
+//                                   never block a page: a blocked feature is hidden in-page by
+//                                   site-content.js (`hidden` marks a page whose own feature is).
 //   3. allowedDomains             → allow (never judged)
 //   4. premade lists              → block (static DNR rulesets; not visible to this engine)
 //   5. defaultAction              → allow | judge | block
@@ -35,8 +37,6 @@ import { SITE_CATALOG } from './site-catalog.js';
  *   site: string,
  *   feature: string,
  *   route: number,
- *   item: string|null,
- *   shell: boolean,
  *   judge: {contentSelector?: string}|null,
  * }} Classification
  * @typedef {{
@@ -44,8 +44,7 @@ import { SITE_CATALOG } from './site-catalog.js';
  *   layer: 'inactive'|'blocklist'|'site'|'allowlist'|'default',
  *   site?: string,
  *   feature?: string,
- *   hop?: boolean,
- *   shellHidden?: boolean,
+ *   hidden?: boolean,
  *   contentSelector?: string,
  * }} Decision
  */
@@ -100,15 +99,14 @@ export function classifyUrl(value) {
   const host = url.hostname.toLowerCase();
   const site = siteForHostname(host);
   if (!site) return null;
-  const fallback = { site: site.id, feature: site.fallbackFeature, route: -1, item: null, shell: false, judge: null };
+  const fallback = { site: site.id, feature: site.fallbackFeature, route: -1, judge: null };
   if (!site.appHosts.includes(host)) return fallback;
   const path = url.pathname.toLowerCase().replace(/\/+$/, '') || '/';
   const query = rawQuery(url.search);
   for (let index = 0; index < site.routes.length; index += 1) {
     const route = site.routes[index];
     if (route.host && route.host !== host) continue;
-    const match = route.path ? re(route.path).exec(path) : [path];
-    if (!match) continue;
+    if (route.path && !re(route.path).test(path)) continue;
     let queryOk = true;
     for (const [key, pattern] of Object.entries(route.query || {})) {
       if (!query.has(key) || !re(pattern).test(query.get(key))) {
@@ -117,17 +115,7 @@ export function classifyUrl(value) {
       }
     }
     if (!queryOk) continue;
-    let item = null;
-    if (typeof route.item === 'number') item = match[route.item] ?? null;
-    else if (typeof route.item === 'string') item = query.get(route.item) ?? null;
-    return {
-      site: site.id,
-      feature: route.feature,
-      route: index,
-      item,
-      shell: !!route.shell,
-      judge: route.judge || null,
-    };
+    return { site: site.id, feature: route.feature, route: index, judge: route.judge || null };
   }
   return fallback;
 }
@@ -154,30 +142,21 @@ export function effectiveFeatures(siteId, rule) {
 }
 
 /**
- * Site-rule layer only. Null when `url` isn't on a site the state has rules for.
+ * Site-rule layer only. Null when `url` isn't on a site the state has rules for. Never `block`:
+ * a page whose feature is blocked loads with that feature hidden (`hidden: true`).
  * @param {EngineState} state
  * @param {string} url
- * @param {string|null|undefined} sourceUrl the tab's previous URL, for the hop rule
  * @returns {Decision|null}
  */
-export function siteDecision(state, url, sourceUrl) {
+export function siteDecision(state, url) {
   const target = classifyUrl(url);
   if (!target) return null;
   const rule = state.sites && state.sites[target.site];
   if (!rule) return null;
-  const site = SITE_CATALOG[target.site];
   const features = effectiveFeatures(target.site, rule);
   const base = { layer: 'site', site: target.site, feature: target.feature };
   const action = features[target.feature] || 'block';
-  if (action === 'block') {
-    return target.shell ? { ...base, action: 'allow', shellHidden: true } : { ...base, action: 'block' };
-  }
-  if (site.hops && features[site.hops.feature] === 'block' && target.item !== null && sourceUrl) {
-    const source = classifyUrl(sourceUrl);
-    if (source && source.site === target.site && source.item !== null && source.item !== target.item) {
-      return { ...base, feature: site.hops.feature, action: 'block', hop: true };
-    }
-  }
+  if (action === 'block') return { ...base, action: 'allow', hidden: true };
   const decision = { ...base, action };
   if (action === 'judge' && target.judge && target.judge.contentSelector) {
     decision.contentSelector = target.judge.contentSelector;
@@ -206,10 +185,9 @@ function hostnameInList(hostname, domains) {
  * filtering isn't available, so an unresolved `judge` without a policy is a no-op).
  * @param {EngineState} state
  * @param {string} url
- * @param {string|null} [sourceUrl]
  * @returns {Decision}
  */
-export function decide(state, url, sourceUrl = null) {
+export function decide(state, url) {
   if (!state || !state.active) return { action: 'allow', layer: 'inactive' };
   let hostname;
   try {
@@ -220,7 +198,7 @@ export function decide(state, url, sourceUrl = null) {
     return { action: 'allow', layer: 'inactive' };
   }
   if (hostnameInList(hostname, state.blockedDomains)) return { action: 'block', layer: 'blocklist' };
-  const site = siteDecision(state, url, sourceUrl);
+  const site = siteDecision(state, url);
   if (site) return withJudgeResolved(state, site);
   if (hostnameInList(hostname, state.allowedDomains)) return { action: 'allow', layer: 'allowlist' };
   const action = state.defaultAction === 'block' || state.defaultAction === 'judge' ? state.defaultAction : 'allow';

@@ -4,7 +4,6 @@ import { readFileSync, readdirSync, statSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
 import { PREMADE_RULESETS } from "../apps/extension/src/premade-rulesets.js";
-import { SITE_CATALOG } from "../apps/extension/src/site-catalog.js";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const extensionDir = resolve(root, "apps/extension");
@@ -39,7 +38,6 @@ const expectedFiles = [
   "popup.html",
   "popup.js",
   "premade-lists",
-  "site-catalog.js",
   "site-content.js",
 ];
 
@@ -230,7 +228,6 @@ for (const [store, directory] of Object.entries({
     "popup-view.js",
     "popup.html",
     "popup.css",
-    "site-catalog.js",
     "site-content.js",
   ]
     .map((file) => readFileSync(resolve(storeDir, file), "utf8"))
@@ -245,18 +242,9 @@ for (const [store, directory] of Object.entries({
     ["sendBeacon", /\bsendBeacon\b/],
     ["remote URL", /\bhttps?:\/\//],
   ];
-  // The site catalog's entry points are the blocked page's fixed search/shortcut destinations
-  // (validated as plain https URLs by scripts/lib/site-catalog.ts). Reject any other remote URL in
-  // packaged code, as well as every programmatic network client above.
-  const reviewedNavigationUrls = Object.values(SITE_CATALOG).flatMap((site) =>
-    site.entryPoints.map((entry) => entry.url),
-  );
-  let auditedText = packagedText;
-  for (const url of reviewedNavigationUrls) {
-    auditedText = auditedText.replaceAll(JSON.stringify(url), '"reviewed-navigation"');
-  }
+  // Packaged code contains no remote URL and no programmatic network client.
   for (const [label, pattern] of prohibitedCode) {
-    if (pattern.test(auditedText)) fail(`${store}: unexpected ${label} in packaged code`);
+    if (pattern.test(packagedText)) fail(`${store}: unexpected ${label} in packaged code`);
   }
 
   // The bundles concatenate source modules into one scope (scripts/build-extension.mjs). A

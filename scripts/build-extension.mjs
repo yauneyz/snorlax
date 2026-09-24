@@ -175,8 +175,6 @@ function stageStore(name, manifest, background) {
   );
   writeFileSync(resolve(outputDir, "background.js"), background);
   writeFileSync(resolve(outputDir, "site-content.js"), bundledSiteContent());
-  // Loaded by blocked.html as a classic script.
-  writeFileSync(resolve(outputDir, "site-catalog.js"), concatModules(["site-catalog.js"]));
   for (const [name, source] of Object.entries(iconFiles)) {
     copyFileSync(source, resolve(outputDir, name));
   }
@@ -355,7 +353,7 @@ apps/extension/dist/talysman-${browser}-${version}.zip
 
 The build script removes the ES module \`export\` and \`import\` statements from the extension's
 source modules, then concatenates them into unminified, unobfuscated \`background.js\` and
-\`site-content.js\` bundles (plus a classic-script copy of the generated \`site-catalog.js\`). It generates the browser-specific
+\`site-content.js\` bundles. It generates the browser-specific
 \`manifest.json\`, copies the remaining JavaScript, HTML, CSS, SVG, and PNG files without code
 transformation, and writes a standard compressed ZIP.
 `;

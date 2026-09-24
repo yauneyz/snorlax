@@ -10,21 +10,17 @@
 // page; all other matching requests are blocked without entering the extension process.
 
 import { SITE_CATALOG } from './site-catalog.js';
-import { effectiveFeatures } from './site-engine.js';
 
 /** @typedef {import('./site-engine.js').EngineState} State */
 
 // Priorities. Higher wins; the hard block always wins.
-//   1        defaultAction: 'block' catch-all (static premade rules are also priority 1)
-//   2        allowedDomains
-//   100–899  site rules: each enabled site gets a band whose floor (100) catches every URL on its
-//            hosts, with one rule per catalog route stacked above it so that the earliest route
-//            wins — exactly the engine's first-match semantics
-//   1000     blockedDomains
+//   1     defaultAction: 'block' catch-all (static premade rules are also priority 1)
+//   2     allowedDomains
+//   100   site rules: an enabled site's hosts and asset domains are always let through
+//   1000  blockedDomains
 export const DEFAULT_BLOCK_PRIORITY = 1;
 export const ALLOW_PRIORITY = 2;
-export const SITE_BAND_BASE = 100;
-export const SITE_BAND_MAX = 899;
+export const SITE_PRIORITY = 100;
 export const BLOCK_PRIORITY = 1000;
 
 const MAIN_FRAME = ['main_frame'];
@@ -179,72 +175,26 @@ export function buildRules(state) {
     }
   }
 
-  for (const [siteId, rule] of Object.entries(state.sites || {})) {
+  for (const siteId of Object.keys(state.sites || {})) {
     const site = SITE_CATALOG[siteId];
     if (!site) continue;
-    // A hard block on the site outranks every site rule; skip the band entirely.
+    // A hard block on the site outranks its site rule; skip it entirely.
     if (site.hosts.some((host) => blocked.some((domain) => hostnameMatchesDomain(host, domain)))) continue;
-    for (const siteRule of siteRules(site, rule)) rules.push({ ...siteRule, id: id++ });
+    for (const siteRule of siteRules(site)) rules.push({ ...siteRule, id: id++ });
   }
 
   return rules;
 }
 
-function escapeRegex(value) {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
-
-/** Strip the author's `^`/`$` anchors from a catalog regex so it can be embedded. */
-function unanchored(pattern) {
-  return pattern.replace(/^\^/, '').replace(/\$$/, '');
-}
-
 /**
- * The DNR `regexFilter` for one catalog route: its hosts, its path (trailing slashes tolerated,
- * like the engine's normalization), and at most one required query parameter.
- * @returns {string}
+ * Compile one enabled site into DNR rules (ids assigned by the caller). Site rules never block a
+ * page — blocked features are hidden in-page by site-content.js, and judged pages must load
+ * before the AI judge can read them — so a site is simply let through: its pages and its own
+ * sub-resources and CDNs, whatever the default action or premade lists say.
  */
-export function routeRegexFilter(site, route) {
-  const hosts = (route.host ? [route.host] : site.appHosts).map(escapeRegex).join('|');
-  const prefix = `^https?://(?:${hosts})`;
-  const path = route.path ? `${unanchored(route.path)}/*` : '(?:/[^?#]*)?';
-  const query = Object.entries(route.query || {});
-  if (query.length === 0) return `${prefix}${path}(?:[?#]|$)`;
-  const [[key, value]] = query;
-  return `${prefix}${path}\\?(?:[^#]*&)?${escapeRegex(key)}=${unanchored(value)}(?:[&#]|$)`;
-}
-
-function blockedPagePath(siteId, featureId) {
-  return `${BLOCKED_PAGE}?site=${encodeURIComponent(siteId)}&feature=${encodeURIComponent(featureId)}`;
-}
-
-/**
- * Compile one enabled site into DNR rules (ids assigned by the caller). `judge` compiles to allow:
- * the page must load before the AI judge can read it.
- */
-function siteRules(site, rule) {
-  const features = effectiveFeatures(site.id, rule);
-  const out = [];
-  const mainFrame = (priority, feature, shell, condition) => {
-    const blocked = features[feature] === 'block' && !shell;
-    return blocked
-      ? { priority, action: { type: 'redirect', redirect: { extensionPath: blockedPagePath(site.id, feature) } }, condition: { ...condition, resourceTypes: MAIN_FRAME } }
-      : { priority, action: { type: 'allow' }, condition: { ...condition, resourceTypes: MAIN_FRAME } };
-  };
-  // The site's pages need their own sub-resources and CDNs whatever the default action or
-  // premade lists say.
-  out.push({
-    priority: SITE_BAND_BASE,
-    action: { type: 'allow' },
-    condition: { requestDomains: [...site.hosts, ...site.networkDomains] },
-  });
-  out.push(mainFrame(SITE_BAND_BASE, site.fallbackFeature, false, { requestDomains: site.hosts }));
-  site.routes.forEach((route, index) => {
-    const priority = SITE_BAND_BASE + site.routes.length - index;
-    out.push(mainFrame(priority, route.feature, !!route.shell, {
-      regexFilter: routeRegexFilter(site, route),
-      isUrlFilterCaseSensitive: false,
-    }));
-  });
-  return out;
+function siteRules(site) {
+  return [
+    { priority: SITE_PRIORITY, action: { type: 'allow' }, condition: { requestDomains: [...site.hosts, ...site.networkDomains] } },
+    { priority: SITE_PRIORITY, action: { type: 'allow' }, condition: { requestDomains: site.hosts, resourceTypes: MAIN_FRAME } },
+  ];
 }

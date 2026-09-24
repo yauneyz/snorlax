@@ -28,34 +28,36 @@ service (named pipe)  ──►  talysman-natmsg.exe  ──►  extension backg
 ```
 
 - `src/site-engine.js` — **pure** decision engine shared by the worker, the content script, and the
-  tests. `decide(state, url, sourceUrl)` walks the policy layers (hard block → site rules → hard
-  allow → default) and returns `allow`, `block`, or `judge`, plus which layer/site/feature decided.
+  tests. `decide(state, url)` walks the policy layers (hard block → site rules → hard allow →
+  default) and returns `allow`, `block`, or `judge`, plus which layer/site/feature decided. The
+  site layer never returns `block`; it marks a page whose own feature is hidden with `hidden`.
 - `src/rules.js` — **pure** `policy → DNR rule` translation (unit-tested in
   `tests/electron/unit/extension-rules.test.ts` and `site-catalog.test.ts`, no `chrome.*`).
   Blacklist blocks the listed domains (+ subdomains); whitelist default-denies and allows the listed
   domains at higher priority; block-all blocks everything; focus-off emits no rules. Each enabled
-  site compiles into a priority band — one rule per catalog route, earlier routes higher — so DNR's
-  highest-priority-wins resolution reproduces the engine's first-match routing exactly. Matching
-  top-level HTTP(S) navigations redirect to the packaged `blocked.html`, while matching
-  subresources are terminated silently.
+  site compiles into allow rules for its hosts and asset domains, above the default and premade
+  lists. Matching top-level HTTP(S) navigations of hard blocks redirect to the packaged
+  `blocked.html`, while matching subresources are terminated silently.
 - `src/blocked.html` / `blocked.css` / `blocked.js` — the fixed local page shown for a blocked
-  navigation. It receives no attempted URL or domain — only which layer, site, and feature decided
-  (and the AI judge's reason) — and offers the site's catalog entry points (search, messages, …)
-  that are still allowed. It uses the Talysman brand mark packaged from `assets/brand/`.
+  navigation. It receives no attempted URL or domain — only which layer decided (and the AI
+  judge's reason). Site rules never lead there. It uses the Talysman brand mark packaged from
+  `assets/brand/`.
 - `src/background.js` — connects to the native-messaging host `com.talysman.host`, applies rules on
   each pushed state, and on host disconnect **keeps the last ruleset** while reconnecting (so killing
   the bridge can't unblock a locked session). DNR dynamic rules persist across service-worker
   restarts, so enforcement survives the MV3 worker sleeping.
 - **Site rules** (soft blocks) come from the site catalog in `packages/shared/src/sites` — one
   declarative module per site, decomposed into features (feed, recommendations, messages, …) that
-  the user sets to Allow, AI, or Block. `src/site-catalog.js` is generated from it
-  (`pnpm generate:sites`); no extension code names a site. The generic `src/site-content.js`
-  (bundled with the catalog and engine) hides the elements of blocked features, hides links whose
-  navigation would be blocked, and stops in-page navigation to them. The worker's webNavigation
-  backstop enforces what DNR can't express: hops between items (post → post, autoplay) and `judge`.
+  the user sets to Allow, AI, or Hide. `src/site-catalog.js` is generated from it
+  (`pnpm generate:sites`); no extension code names a site. Site rules **never block a page**: the
+  generic `src/site-content.js` (bundled with the catalog and engine) hides the elements of hidden
+  features wherever they appear — so `x.com/home` or `reddit.com/r/popular` loads with no feed,
+  and notifications/messages stay one click away — and pauses media inside hidden regions.
 - **AI judge** — any `judge` decision lets the page load, extracts its text (focused on the
   route's content selector when the catalog has one), and asks the daemon (`judge-request`), which
-  attaches the user's tasks/"help me avoid" list and answers via Electron and the web judge.
+  attaches the user's tasks/"help me avoid" list and answers via Electron and the web judge. A
+  rejected site page stays open with its feature hidden (`talysman:site-judged`); any other
+  rejected page goes to the blocked page.
 - **Capabilities** — `hello` advertises `siteCapability` and the catalog `siteIds`; the native host
   hard-blocks any enabled site this build doesn't know and pre-resolves `judge` to the judge's
   fallback when AI filtering is unavailable. `src/legacy-compat.js` (`LEGACY-COMPAT(v5)`) keeps
@@ -152,7 +154,7 @@ The `HOST_NAME` (`com.talysman.host`) must match between `background.js` and
 3. **Store release prep:** `pnpm release:extension`, then inspect
    `apps/extension/release/store/` and `apps/extension/release/store-submission.json`.
 4. **End-to-end:** run the service (`talysman-svc --console`), enable focus with `reddit.com`
-   blocked, and load reddit in **Firefox** — it should show the local Talysman blocked page even with
+   hard-blocked, and load reddit in **Firefox** — it should show the local Talysman blocked page even with
    ECH on and over a reused connection. Toggle focus off → the site loads within the push latency.
 5. **VPN:** repeat step 4 with a VPN active — the extension blocks identically (it never touched the
    network path).

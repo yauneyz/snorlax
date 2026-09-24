@@ -46,7 +46,6 @@ export function validateSite(site: SiteDefinition): void {
     if (!features.has(feature)) throw new Error(`${at}: ${where} references unknown feature ${feature}`);
   };
   known(site.fallbackFeature, 'fallbackFeature');
-  if (site.hops) known(site.hops.feature, 'hops');
   site.routes.forEach((route, index) => {
     const where = `${at} route ${index}`;
     known(route.feature, where);
@@ -59,19 +58,21 @@ export function validateSite(site: SiteDefinition): void {
       if (!/^[a-z_]+$/i.test(key)) throw new Error(`${where}: invalid query key ${key}`);
       checkRegex(pattern, `${where} query ${key}`);
     }
-    if (typeof route.item === 'number' && !route.path) throw new Error(`${where}: capture-group item needs a path`);
-    if (typeof route.item === 'string' && !(route.item in (route.query ?? {}))) {
-      throw new Error(`${where}: item parameter must be a required query parameter`);
-    }
   });
-  if (site.routes.length > 400) throw new Error(`${at}: too many routes for one DNR priority band`);
   for (const element of site.elements) {
     known(element.feature, 'element');
     for (const feature of element.on ?? []) known(feature, 'element.on');
   }
-  for (const entry of site.entryPoints) {
-    known(entry.feature, 'entry point');
-    if (!/^https:\/\/[^'"\s\\]+$/.test(entry.url)) throw new Error(`${at}: entry point URL must be a plain https URL`);
+  // Site rules never block a page, so hiding a feature must hide something — and on the
+  // feature's own pages, something there (otherwise its page would show it unchanged).
+  const pageFeatures = new Set([site.fallbackFeature, ...site.routes.map((route) => route.feature)]);
+  for (const feature of site.features) {
+    if (feature.locked) continue;
+    const own = site.elements.filter((element) => element.feature === feature.id);
+    if (own.length === 0) throw new Error(`${at}: feature ${feature.id} hides no elements`);
+    if (pageFeatures.has(feature.id) && !own.some((element) => !element.on || element.on.includes(feature.id))) {
+      throw new Error(`${at}: feature ${feature.id} owns pages but hides nothing on them`);
+    }
   }
   if (site.examples.length === 0) throw new Error(`${at}: add examples`);
   for (const [, feature] of site.examples) known(feature, 'example');
@@ -103,9 +104,7 @@ function runtimeSite(site: SiteDefinition) {
     features: site.features.map(({ id, label, default: action, locked }) => ({ id, label, default: action, ...(locked ? { locked } : {}) })),
     routes: site.routes,
     fallbackFeature: site.fallbackFeature,
-    ...(site.hops ? { hops: site.hops } : {}),
     elements: site.elements,
-    entryPoints: site.entryPoints,
   };
 }
 
@@ -131,11 +130,6 @@ export function nativeCatalogJson(sites: readonly SiteDefinition[] = SITE_DEFINI
 
 export function contentScriptMatches(sites: readonly SiteDefinition[] = SITE_DEFINITIONS): string[] {
   return sites.flatMap((site) => site.hosts.flatMap((host) => [`*://${host}/*`, `*://*.${host}/*`]));
-}
-
-/** Every remote URL the packaged extension may contain (the blocked page's entry points). */
-export function reviewedNavigationUrls(sites: readonly SiteDefinition[] = SITE_DEFINITIONS): string[] {
-  return sites.flatMap((site) => site.entryPoints.map((entry) => entry.url));
 }
 
 export function manifestWithContentScripts(manifest: Record<string, unknown>, sites: readonly SiteDefinition[] = SITE_DEFINITIONS) {

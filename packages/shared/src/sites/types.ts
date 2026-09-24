@@ -5,13 +5,18 @@
  * piece of page chrome onto one of those features. Enforcement code never special-cases a site:
  * the extension, the daemon, and the desktop UI are all driven from this data.
  *
+ * Site rules never block a page. Every page of a ruled site stays reachable; a feature whose
+ * action is `block` is *hidden* — its `elements` are removed from whatever page they appear on.
+ *
  * `scripts/generate-site-catalog.ts` validates the catalog and emits the runtime artifacts
  * (extension data module, native JSON subset, content-script match patterns).
  */
 
 /**
- * What a rule decides for a page. `judge` hands the decision to the AI judge (the user's tasks
- * and "help me avoid" list); it resolves to `JudgePolicy.fallback` when the judge is unavailable.
+ * What a rule decides for a feature. On a site rule, `block` hides the feature's elements (the
+ * page itself always loads). `judge` hands the decision to the AI judge (the user's tasks and
+ * "help me avoid" list) page by page — a `block` verdict hides the page's feature as if it were
+ * blocked; it resolves to `JudgePolicy.fallback` when the judge is unavailable.
  */
 export type RuleAction = 'allow' | 'judge' | 'block';
 
@@ -41,38 +46,20 @@ export interface SiteRoute {
   path?: string;
   /** Required query parameters, each an RE2-compatible regex over the raw (decoded) value. */
   query?: Record<string, string>;
-  /**
-   * Where this route's item id comes from: a 1-based capture group index in `path`, or a query
-   * parameter name. Present ⇒ the route addresses one specific item (a post, a video), which is
-   * what the hop rule compares.
-   */
-  item?: number | string;
-  /**
-   * Keep the page reachable even when `feature` is blocked; the feature's `elements` are hidden
-   * instead. For app shells that host allowed tools (a composer, notifications) around a feed.
-   */
-  shell?: boolean;
   /** Hints for the AI judge when this page is judged. */
   judge?: { contentSelector?: string };
 }
 
 export interface SiteElement {
-  /** Hidden while this feature's action is `block`. */
+  /**
+   * Hidden while this feature's action is `block`, and on a page of this feature that the AI
+   * judge rejected.
+   */
   feature: string;
   /** CSS selector list. */
   selector: string;
   /** Only hide on pages whose route belongs to one of these features. Omitted ⇒ every page. */
   on?: string[];
-}
-
-export interface SiteEntryPoint {
-  /** Shown on the blocked page only while this feature isn't blocked. */
-  feature: string;
-  label: string;
-  /** Fixed https URL. These are the only remote URLs the packaged extension may contain. */
-  url: string;
-  /** Present ⇒ rendered as a search form submitting `param=<query>` to `url`. */
-  param?: string;
 }
 
 export interface SiteDefinition {
@@ -95,12 +82,10 @@ export interface SiteDefinition {
   /** Feature for URLs no route matches (typically the feed / discovery surface). */
   fallbackFeature: string;
   /**
-   * Moving from one item to a *different* item (post → post, video → autoplayed video) is denied
-   * while this feature is blocked. Omitted ⇒ hopping is never restricted.
+   * What hiding each feature removes. Every configurable feature that owns pages must hide
+   * something on its own pages, so visiting one with the feature hidden never shows it.
    */
-  hops?: { feature: string };
   elements: SiteElement[];
-  entryPoints: SiteEntryPoint[];
   /**
    * `[url, expectedFeature]` fixtures. The catalog test checks every one against the engine and
    * against the compiled DNR rules, so they double as the site's regression suite.

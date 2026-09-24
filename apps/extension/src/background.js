@@ -21,8 +21,10 @@
 // walks the policy layers (hard block → site rules → hard allow → default) and yields allow,
 // block, or judge. DNR enforces the same decisions ahead of the network (see rules.js); the
 // webNavigation listeners below are the backstop for what DNR can't see, and the only enforcer
-// of what DNR can't express — hops between items on a site, and `judge`, which extracts the page
-// and asks the AI judge via the daemon (`judge-request`/`judge-result`).
+// of what DNR can't express — `judge`, which extracts the page and asks the AI judge via the
+// daemon (`judge-request`/`judge-result`). Site rules never block a page: blocked site features
+// are hidden in-page by site-content.js, and a judge rejection on a site page hides that page's
+// feature there rather than leaving the page.
 
 import { buildRules } from './rules.js';
 import { heartbeatDelayForState } from './heartbeat-timing.js';
@@ -96,7 +98,6 @@ let currentPolicy = {
   sites: {},
   judge: null,
 };
-const lastTabUrl = new Map();
 
 // Stable-ish identifiers for this worker session (best-effort; the service correlates by browser
 // PID, not these).
@@ -321,17 +322,7 @@ function sitePolicyMessage() {
   return { active: currentPolicy.active, sites: currentPolicy.sites };
 }
 
-browserApi.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  if (message?.type === 'talysman:site-denied') {
-    // The content script stopped an in-page navigation; re-derive the decision here rather than
-    // trusting the page, then show the blocked page for it.
-    const tab = sender.tab;
-    if (tab?.id !== undefined && currentPolicy.active && typeof message.url === 'string') {
-      const decision = decide(currentPolicy, message.url, tab.url);
-      if (decision.action === 'block') void redirectIfStillOnUrl(tab.id, tab.url, decision, policyGeneration);
-    }
-    return false;
-  }
+browserApi.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   if (message?.type === 'talysman:site-policy') {
     sendResponse(sitePolicyMessage());
     return false;
@@ -536,15 +527,12 @@ function urlsRoughlyMatch(a, b) {
 /**
  * The local blocked page for a decision. The page renders the layer-specific explanation and the
  * site's entry points from these parameters.
- * @param {{ layer?: string, site?: string, feature?: string, hop?: boolean, reason?: string }} block
+ * @param {{ layer?: string, reason?: string }} block
  */
 function blockedPageUrl(block) {
   const base = browserApi.runtime.getURL('blocked.html');
   const query = new URLSearchParams();
   if (block.layer) query.set('layer', block.layer);
-  if (block.site) query.set('site', block.site);
-  if (block.feature) query.set('feature', block.feature);
-  if (block.hop) query.set('hop', '1');
   if (block.reason) query.set('reason', block.reason);
   return query.size ? `${base}?${query}` : base;
 }
@@ -563,17 +551,30 @@ async function redirectIfStillOnUrl(tabId, expectedUrl, block, generation = poli
       return;
     }
     await browserApi.tabs.update(tabId, { url: blockedPageUrl(block) });
-    console.info('[talysman] redirected to blocked page', { tabId, expectedUrl, layer: block.layer, site: block.site, feature: block.feature });
+    console.info('[talysman] redirected to blocked page', { tabId, expectedUrl, layer: block.layer });
   } catch (e) {
     console.warn('[talysman] redirect failed', { tabId, expectedUrl, error: e && e.message });
   }
 }
 
+/**
+ * Act on a judge rejection. A site page stays open with its judged feature hidden (site rules
+ * never block a page); anything else goes to the blocked page.
+ */
+function rejectJudgedPage(tabId, url, decision, generation, reason) {
+  if (generation !== policyGeneration || !currentPolicy.active) return;
+  if (decision.layer === 'site') {
+    Promise.resolve(browserApi.tabs.sendMessage(tabId, { type: 'talysman:site-judged', url, verdict: 'block' })).catch(() => {});
+    console.info('[talysman][judge] hid judged site page', { tabId, url, site: decision.site, feature: decision.feature });
+    return;
+  }
+  void redirectIfStillOnUrl(tabId, url, { layer: 'judge', reason }, generation);
+}
+
 /** Apply the judge's fallback when no verdict could be obtained (timeout, extraction failure). */
 function applyJudgeFallback(tabId, url, generation, decision, judge, reason) {
-  if (generation !== policyGeneration || !currentPolicy.active) return;
   if (judge.fallback !== 'block') return; // fail-open: leave the tab alone
-  void redirectIfStillOnUrl(tabId, url, { ...decision, layer: 'judge', reason }, generation);
+  rejectJudgedPage(tabId, url, decision, generation, reason);
 }
 
 function clearPendingJudgeRequest(requestId) {
@@ -599,9 +600,7 @@ function handleJudgeResult(msg) {
   console.info('[talysman][judge] verdict received', { requestId, url, verdict });
 
   setCachedVerdict(url, pending.judgeKey, verdict, reason);
-  if (verdict === 'block') {
-    void redirectIfStillOnUrl(pending.tabId, pending.url, { ...pending.decision, layer: 'judge', reason }, pending.generation);
-  }
+  if (verdict === 'block') rejectJudgedPage(pending.tabId, pending.url, pending.decision, pending.generation, reason);
 }
 
 function sendJudgeRequest(tabId, url, page, decision, generation, judge) {
@@ -650,9 +649,7 @@ async function judgePage(tabId, url, decision) {
 
   const cached = getCachedVerdict(url, key);
   if (cached) {
-    if (cached.verdict === 'block') {
-      void redirectIfStillOnUrl(tabId, url, { ...decision, layer: 'judge', reason: cached.reason }, generation);
-    }
+    if (cached.verdict === 'block') rejectJudgedPage(tabId, url, decision, generation, cached.reason);
     return;
   }
 
@@ -694,8 +691,8 @@ async function judgePage(tabId, url, decision) {
 // the service worker, which is why the DNR redirect appeared to work there and not in Chrome.
 //
 // So every top-level navigation is re-decided here with the same engine the DNR rules were
-// compiled from. This is also the only place hop rules (item → different item) and `judge`
-// decisions are enforced, since both depend on more than the target URL.
+// compiled from. This is also the only place `judge` decisions are enforced, since they depend on
+// the page's content.
 // ---------------------------------------------------------------------------------------------
 
 /**
@@ -703,10 +700,10 @@ async function judgePage(tabId, url, decision) {
  * @param {'commit'|'complete'|'spa'} phase
  * @returns {boolean} true when the navigation was blocked (caller should stop here).
  */
-function evaluateNavigation(tabId, url, sourceUrl, phase) {
+function evaluateNavigation(tabId, url, phase) {
   if (!currentPolicy.active || typeof tabId !== 'number' || tabId < 0) return false;
   if (!url || !/^https?:\/\//i.test(url)) return false; // extension/browser-internal pages
-  const decision = decide(currentPolicy, url, sourceUrl);
+  const decision = decide(currentPolicy, url);
   if (decision.action === 'block') {
     void redirectIfStillOnUrl(tabId, url, decision, policyGeneration);
     return true;
@@ -740,10 +737,9 @@ async function enforcePolicyOnOpenTabs() {
   try {
     for (const tab of (await browserApi.tabs.query({})) || []) {
       if (typeof tab?.id !== 'number' || !tab.url) continue;
-      lastTabUrl.set(tab.id, tab.url);
       // 'commit' re-checks blocks without judging: a policy push must not send every open tab
       // to the AI judge. Pages are judged as they're navigated to.
-      if (evaluateNavigation(tab.id, tab.url, null, 'commit')) continue;
+      if (evaluateNavigation(tab.id, tab.url, 'commit')) continue;
       const site = siteForUrl(tab.url);
       if (site && currentPolicy.sites[site.id]) {
         try {
@@ -775,40 +771,25 @@ async function notifySiteContentScripts() {
   } catch { /* A tab may close during the policy change. */ }
 }
 
-/** Decide against the tab's previous URL (for hop rules), then remember the new one. */
-function evaluateTabNavigation(details, phase) {
-  const source = lastTabUrl.get(details.tabId) ?? null;
-  lastTabUrl.set(details.tabId, details.url);
-  return evaluateNavigation(details.tabId, details.url, source, phase);
-}
-
 if (browserApi.webNavigation) {
   // onCommitted fires before the document paints, including for service-worker-served and
   // bfcache-restored navigations that never touch the network.
   browserApi.webNavigation.onCommitted.addListener((details) => {
     if (details.frameId !== 0) return;
-    evaluateTabNavigation(details, 'commit');
+    evaluateNavigation(details.tabId, details.url, 'commit');
   });
 
-  // The page is readable now; judge it if needed. The hop was already checked at commit.
+  // The page is readable now; judge it if needed.
   browserApi.webNavigation.onCompleted.addListener((details) => {
     if (details.frameId !== 0) return;
-    evaluateNavigation(details.tabId, details.url, null, 'complete');
+    evaluateNavigation(details.tabId, details.url, 'complete');
   });
 
   browserApi.webNavigation.onHistoryStateUpdated.addListener((details) => {
     if (details.frameId !== 0) return;
-    evaluateTabNavigation(details, 'spa');
+    evaluateNavigation(details.tabId, details.url, 'spa');
   });
 }
-browserApi.tabs.onRemoved.addListener((tabId) => lastTabUrl.delete(tabId));
-browserApi.tabs.onCreated.addListener((tab) => {
-  // A tab opened from a post inherits it as its source, so "open in new tab" can't dodge hops.
-  if (typeof tab.openerTabId === 'number' && typeof tab.id === 'number') {
-    const opener = lastTabUrl.get(tab.openerTabId);
-    if (opener) lastTabUrl.set(tab.id, opener);
-  }
-});
 
 // Register these listeners synchronously so Chrome wakes this worker when the profile starts or the
 // extension updates. Top-level connect also covers any other event that revives the worker.
