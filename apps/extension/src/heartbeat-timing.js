@@ -7,7 +7,7 @@ export const IDLE_HEARTBEAT_MS = 60000;
  * A missing handshake flag is treated as enabled while focus is active; only an explicit `false`
  * may select the slower active cadence.
  */
-export function heartbeatDelayForState({ browser, blockingActive, handshakeEnabled }) {
+export function heartbeatDelayForState({ blockingActive, handshakeEnabled }) {
   if (blockingActive && handshakeEnabled !== false) return STRICT_HEARTBEAT_MS;
   return blockingActive ? ACTIVE_HEARTBEAT_MS : IDLE_HEARTBEAT_MS;
 }

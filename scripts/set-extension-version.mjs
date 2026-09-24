@@ -18,7 +18,7 @@ const usage =
 
 // manifest.json is authoritative: build-extension.mjs and release-extension.mjs both read it.
 const manifests = ["apps/extension/manifest.json", "apps/extension/package.json"];
-const versionPattern = /^(  "version": )"([^"]+)"/m;
+const versionPattern = /^( {2}"version": )"([^"]+)"/m;
 
 function readVersion(relative) {
   const match = versionPattern.exec(readFileSync(resolve(root, relative), "utf8"));

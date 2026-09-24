@@ -3,10 +3,7 @@
 import { execFileSync, spawnSync } from "node:child_process";
 import { existsSync, mkdtempSync, readdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
-
-const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+import { join, resolve } from "node:path";
 
 function signingIdentity(appPath) {
   const result = spawnSync("codesign", ["-dvvv", appPath], {

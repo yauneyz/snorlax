@@ -1,11 +1,18 @@
-- write essay
+- got my first user post
+
 - improve soft blocking
+  - build the entire stack, as much as possible
 - improve soft blocker ui, blocklist UI in general
+- include a phone app for max power (should have the foqos idea)
 - landing/pricing copy for soft blocking
-- add soft blocklist to marketing copy, pricing page (pro feature)
+- add soft blocklist to marketing copy, pricing page
 - improve pricing page copy in general
-- ship new builds, extension, etc
+- ship new builds, extension, etc, ship model
+
 - send to instagram guy
+
+- post on X, reddit, linkedin, etc
+
 
 - read "learn creator outreach" materials
 - Message 15 people
@@ -15,8 +22,8 @@
 - put the product on all the directories
 - reach out to media outlets to be covered
 - reach out to lists to get in them
-- got my first user post
 
+- stats layer
 
 
 - drive more traffic - post on X, linkedIn, Reddit

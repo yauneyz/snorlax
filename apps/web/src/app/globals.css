@@ -1546,18 +1546,18 @@ input:-webkit-autofill:focus {
   font-weight: 600;
   font-size: 0.95rem;
   border-radius: var(--r-pill);
-  background: #5865f2;
-  color: #fff;
-  border: 1px solid #5865f2;
+  background: rgb(var(--color-discord));
+  color: rgb(var(--color-white));
+  border: 1px solid rgb(var(--color-discord));
   transition:
     background var(--t-base) var(--ease),
     border-color var(--t-base) var(--ease);
 }
 
 .discord-cta:hover {
-  background: #4752c4;
-  border-color: #4752c4;
-  color: #fff;
+  background: rgb(var(--color-discord-hover));
+  border-color: rgb(var(--color-discord-hover));
+  color: rgb(var(--color-white));
 }
 
 /* Free-vs-Pro split on the landing page. Two plain columns: this is a disclosure,

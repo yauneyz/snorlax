@@ -1,16 +1,16 @@
-import { hexToRgbChannels, paletteVariableName, type PaletteColorName } from '@talysman/shared';
+import { hexToRgbChannels, paletteColor, paletteVariableName, type PaletteColorName } from '@talysman/shared';
 
 /**
- * The desktop app's action-signal colors, distinct from the landing page's lime. This is the
- * one place to change them — both the CSS custom properties (for Tailwind's `signal`/`seal`
- * utilities) and the raw hex values (for call sites that need a literal, like inline SVG fills
- * or `<canvas>`) come from here, so nothing can drift out of sync with the other.
+ * The desktop app's action-signal colors, distinct from the landing page's lime. The values live
+ * in palette.json (`desktop*`); this maps them onto the shared names so both the CSS custom
+ * properties (for Tailwind's `signal`/`seal` utilities) and the raw hex values (for call sites
+ * that need a literal, like inline SVG fills or `<canvas>`) come from one place.
  */
 const DESKTOP_SIGNAL_OVERRIDES = {
-  signal: '#2dd9ee',
-  signalHigh: '#8ff0fa',
-  signalInk: '#031316',
-  background: '#050506',
+  signal: paletteColor('desktopSignal'),
+  signalHigh: paletteColor('desktopSignalHigh'),
+  signalInk: paletteColor('desktopSignalInk'),
+  background: paletteColor('desktopBackground'),
 } satisfies Partial<Record<PaletteColorName, string>>;
 
 export function desktopPaletteColor(name: keyof typeof DESKTOP_SIGNAL_OVERRIDES): string {

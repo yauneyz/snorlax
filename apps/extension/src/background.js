@@ -421,7 +421,6 @@ function heartbeatFrame() {
 
 function heartbeatDelay() {
   return heartbeatDelayForState({
-    browser: BROWSER,
     blockingActive,
     handshakeEnabled,
   });

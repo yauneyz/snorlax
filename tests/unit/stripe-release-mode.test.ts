@@ -20,6 +20,7 @@ const liveCredentials = {
   webhook_secret_live: 'whsec_live_example',
   price_id_monthly_live: 'price_monthly_live',
   price_id_yearly_live: 'price_yearly_live',
+  price_id_lifetime_live: 'price_lifetime_live',
 };
 
 describe('stripe key mode', () => {

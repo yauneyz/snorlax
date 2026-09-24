@@ -60,9 +60,10 @@ describe("landing page media", () => {
   it("leads with the physical-key mechanism without invented social proof", async () => {
     const html = await renderLanding("production");
 
-    expect(html).toContain("A distraction blocker you need a");
-    expect(html).toContain("physical key");
-    expect(html).toContain("Start a locked session — free");
+    // The headline is split across spans and line breaks for layout; compare its text.
+    const text = html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ");
+    expect(text).toContain("A distraction blocker you need a physical key to turn off.");
+    expect(html).toContain("Start focusing in under 5 minutes - free");
     expect(html).not.toContain("From people who kept using it");
     expect(html).not.toContain("Placeholder — replace with a real customer");
   });

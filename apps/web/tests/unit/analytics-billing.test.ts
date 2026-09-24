@@ -191,12 +191,19 @@ describe("charge.refunded", () => {
   });
 });
 
+describe("trial reminders", () => {
+  it("emits trial_ending_soon when Stripe warns that a trial is about to end", () => {
+    const signals = billingSignalsFor(event("customer.subscription.trial_will_end", subscription()));
+    expect(signals.map((s) => s.event)).toEqual(["trial_ending_soon"]);
+    expect(signals[0].props.subscription_id).toBe("sub_123");
+  });
+});
+
 describe("events that must emit nothing", () => {
   it.each([
     "checkout.session.completed",
     "customer.subscription.paused",
     "customer.subscription.resumed",
-    "customer.subscription.trial_will_end",
   ])("%s", (type) => {
     // checkout.session.completed is excluded on purpose: customer.subscription.created fires
     // for the same conversion with better data, so emitting both would double count.
