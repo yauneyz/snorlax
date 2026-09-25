@@ -20,6 +20,25 @@
         <p id="blocked-summary">This website was blocked by Talysman.</p>
         <p class="detail">Blocking is controlled by your current setup in the Talysman desktop app.</p>
         <p class="detail" id="reason-detail" hidden></p>
+
+        <!-- Unlock popup (spec §3.10), filled in from the service's popup info. -->
+        <div id="unlock" hidden>
+          <p class="blocked-by" id="blocked-by" hidden></p>
+          <p class="streak" id="streak" hidden></p>
+          <div class="pool" id="pool" hidden>
+            <p class="pool-title" id="pool-title"></p>
+            <p class="detail" id="pool-detail"></p>
+          </div>
+          <div class="pause" id="pause" hidden>
+            <div class="pause-ring" id="pause-ring"></div>
+            <p class="detail" id="pause-text"></p>
+          </div>
+          <div class="actions">
+            <button type="button" class="primary" id="unlock-button" hidden></button>
+            <a class="secondary" id="other-options" href="talysman://override">Other options</a>
+          </div>
+          <p class="detail error" id="unlock-error" hidden></p>
+        </div>
       </section>
     </main>
     <script src="blocked.js"></script>

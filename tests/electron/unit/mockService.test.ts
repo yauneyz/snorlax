@@ -191,7 +191,7 @@ describe('MockServiceConnection — blocking profiles (engine-backed)', () => {
     const svc = new MockServiceConnection();
     const named = (name: string): Command => ({
       type: 'upsertProfile',
-      profile: { id: 'evening', name, color: '#000', config: eveningConfig() },
+      profile: { id: 'evening', name, color: 'test-color', config: eveningConfig() },
     });
     await expect(apply(svc, named('   '))).rejects.toMatchObject({ code: ErrorCode.BAD_REQUEST });
     await expect(apply(svc, named('x'.repeat(41)))).rejects.toMatchObject({ code: ErrorCode.BAD_REQUEST });
@@ -208,7 +208,7 @@ describe('MockServiceConnection — pools, overrides, emergency', () => {
     config.pools = [
       { id: 'social', name: 'Social', items: [{ kind: 'domain', domain: 'reddit.com' }], unlocksPerDay: 2, unlockMinutes: 10, friction },
     ];
-    await apply(svc, { type: 'upsertProfile', profile: { id: 'p', name: 'P', color: '#000', config } });
+    await apply(svc, { type: 'upsertProfile', profile: { id: 'p', name: 'P', color: 'test-color', config } });
     await apply(svc, { type: 'setLatch', profileId: 'p', on: true });
     return { svc, advance: (ms: number) => (now += ms) };
   }

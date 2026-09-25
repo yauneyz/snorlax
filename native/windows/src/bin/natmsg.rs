@@ -172,6 +172,8 @@ async fn main() {
     // Retain only the newest heartbeat while disconnected; bound judge work separately.
     let (heartbeat_tx, heartbeat_rx) = watch::channel::<Option<Value>>(None);
     let (judge_tx, mut judge_rx) = mpsc::channel::<Value>(64);
+    // Relayed extension requests awaiting their RPC response: RPC id → extension request id.
+    let relays: Relays = Arc::new(Mutex::new(HashMap::new()));
 
     // stdin reader: heartbeats relay to the service; any other frame (the extension's `hello`)
     // requests a state resend.
@@ -179,6 +181,7 @@ async fn main() {
         let out_tx = out_tx.clone();
         let last = last.clone();
         let caps = caps.clone();
+        let relays = relays.clone();
         tokio::spawn(async move {
             let mut stdin = tokio::io::stdin();
             loop {
@@ -190,6 +193,18 @@ async fn main() {
                         Some("judge-request") => {
                             let _ = judge_tx.send(judge_request(&msg)).await;
                         }
+                        // The blocked page's unlock popup (allowlisted; see `relay_request`).
+                        Some("service-request") => match natmsg_frames::relay_request(&msg) {
+                            Some((request_id, method, params)) => {
+                                let id = NEXT_ID.fetch_add(1, Ordering::Relaxed);
+                                relays.lock().await.insert(id, request_id);
+                                let rpc = json!({ "kind": "request", "id": id, "method": method, "params": params });
+                                let _ = judge_tx.send(rpc).await;
+                            }
+                            None => {
+                                let _ = out_tx.send(natmsg_frames::relay_refused_frame(&msg)).await;
+                            }
+                        },
                         // The extension's `hello`: record what it can enforce, then resend state.
                         _ => {
                             let hello_caps = ExtensionCaps::from_hello(&msg);
@@ -208,8 +223,14 @@ async fn main() {
 
     // Pipe loop: keep the service connection up and translate state/events into extension pushes.
     loop {
-        if let Err(_e) = pump_pipe(&out_tx, &last, &caps, heartbeat_rx.clone(), &mut judge_rx).await {
+        if let Err(_e) = pump_pipe(&out_tx, &last, &caps, &relays, heartbeat_rx.clone(), &mut judge_rx).await {
             // Connection failed or dropped; back off and retry. The extension keeps its last rules.
+        }
+        // Requests in flight on a dropped pipe will never be answered.
+        for (_, request_id) in relays.lock().await.drain() {
+            let _ = out_tx
+                .send(natmsg_frames::relay_response_frame(&request_id, &json!({ "ok": false, "code": "INTERNAL", "message": "Talysman service disconnected" })))
+                .await;
         }
         tokio::time::sleep(Duration::from_secs(2)).await;
     }
@@ -256,11 +277,14 @@ mod tests {
     }
 }
 
+type Relays = Arc<Mutex<HashMap<u64, Value>>>;
+
 /// Connect to the service (prod pipe, then dev) and stream state until the pipe drops.
 async fn pump_pipe(
     out_tx: &mpsc::Sender<Value>,
     last: &Arc<Mutex<Option<Blocking>>>,
     caps: &Arc<Mutex<ExtensionCaps>>,
+    relays: &Relays,
     mut heartbeat_rx: watch::Receiver<Option<Value>>,
     judge_rx: &mut mpsc::Receiver<Value>,
 ) -> std::io::Result<()> {
@@ -322,6 +346,14 @@ async fn pump_pipe(
                                 b.smart_filtering_enabled = enabled;
                             }
                             changed = true;
+                        }
+                    }
+                    Some("response")
+                        if relays.lock().await.contains_key(&v.get("id").and_then(Value::as_u64).unwrap_or(0)) =>
+                    {
+                        let id = v.get("id").and_then(Value::as_u64).unwrap_or(0);
+                        if let Some(request_id) = relays.lock().await.remove(&id) {
+                            let _ = out_tx.send(natmsg_frames::relay_response_frame(&request_id, &v)).await;
                         }
                     }
                     Some("response")

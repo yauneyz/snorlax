@@ -433,7 +433,7 @@ mod tests {
         Profile {
             id: id.into(),
             name: id.into(),
-            color: "#000".into(),
+            color: "test-color".into(),
             created_at_ms: 0,
             config: ProfileConfig { policy, ..Default::default() },
             latch: Latch::On { since_ms: 0, source: LatchSource::User },

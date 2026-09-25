@@ -16,7 +16,7 @@ fn at(h: i64, m: i64) -> Ctx {
 }
 
 fn input(id: &str, config: ProfileConfig) -> ProfileInput {
-    ProfileInput { id: id.into(), name: id.into(), color: "#112233".into(), config }
+    ProfileInput { id: id.into(), name: id.into(), color: "test-color".into(), config }
 }
 
 fn blocks(domains: &[&str]) -> ProfileConfig {
@@ -65,7 +65,7 @@ fn creating_duplicating_and_turning_on_are_free() {
     let ctx = at(10, 0);
     let mut e = engine_with(vec![("a", blocks(&["reddit.com"]))], &ctx);
     on(&mut e, "a", &ctx);
-    e.apply(Command::DuplicateProfile { profile_id: "a".into(), new_id: "b".into(), color: Some("#fff".into()) }, Auth::None, &ctx).unwrap();
+    e.apply(Command::DuplicateProfile { profile_id: "a".into(), new_id: "b".into(), color: Some("test-color-b".into()) }, Auth::None, &ctx).unwrap();
     let b = e.state.profile("b").unwrap();
     assert_eq!(b.name, "a copy");
     assert!(!b.latch.is_on());

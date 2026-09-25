@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import type { UpcomingEvent } from '@talysman/shared';
+import { palette } from '@talysman/shared';
 import { useFocusStore } from '../store/useFocusStore.js';
 import { FocusToggle } from '../components/FocusToggle.js';
 import { Kicker, ProfileDot } from '../components/ui/index.js';
@@ -68,7 +69,7 @@ export function Dashboard() {
               <ul className="mt-2 flex flex-col gap-1.5">
                 {unlocked.map((pool) => (
                   <li key={`${pool.profileId}:${pool.poolId}`} className="flex items-center gap-2 text-[12.5px] text-slate-200">
-                    <ProfileDot color={nameOf(pool.profileId)?.color ?? '#888'} size={7} />
+                    <ProfileDot color={nameOf(pool.profileId)?.color ?? palette.colors.foregroundFaint} size={7} />
                     <span className="truncate">{pool.name}</span>
                     <span className="ml-auto font-mono text-[11px] text-slate-400">
                       {formatDuration((pool.activeUntilMs ?? now) - now)} left
@@ -86,7 +87,7 @@ export function Dashboard() {
                   const profile = nameOf(event.profileId);
                   return (
                     <li key={`${event.profileId}:${event.atMs}:${event.kind}`} className="flex items-center gap-2 text-[12.5px] text-slate-200">
-                      <ProfileDot color={profile?.color ?? '#888'} size={7} />
+                      <ProfileDot color={profile?.color ?? palette.colors.foregroundFaint} size={7} />
                       <span className="truncate">
                         {profile?.name ?? 'Profile'} {EVENT_VERB[event.kind]}
                       </span>

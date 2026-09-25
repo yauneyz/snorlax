@@ -5,7 +5,7 @@
  * any number of profiles can be switched on. The service re-checks every gate itself.
  */
 import React, { useState } from 'react';
-import { ErrorCode } from '@talysman/shared';
+import { ErrorCode, palette } from '@talysman/shared';
 import { useFocusStore } from '../store/useFocusStore.js';
 import { formatClock, runCommand } from '../lib/engine.js';
 import { cx, profileSummary } from '../lib/utils.js';
@@ -88,7 +88,7 @@ export function FocusToggle() {
             className="flex items-center gap-2 rounded-full border border-white/[0.12] bg-white/[0.05] px-3 py-1 transition hover:bg-white/[0.09]"
           >
             {active.length === 0 ? (
-              <ProfileDot color="rgb(148 163 184)" size={7} />
+              <ProfileDot color={palette.colors.foregroundFaint} size={7} />
             ) : (
               active.slice(0, 4).map((p) => <ProfileDot key={p.profile.id} color={p.profile.color} size={7} />)
             )}

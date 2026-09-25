@@ -156,6 +156,11 @@ export async function handleDeepLink(url: string): Promise<void> {
     } else if (parsed.path === DESKTOP_BILLING_SUCCESS_PATH) {
       await applyPlanLimitsNow();
       broadcastAppEvent('entitlementChanged');
+    } else if (parsed.path === 'override') {
+      // "Other options" on the extension's blocked page: the key-gated overrides live here.
+      showMainWindow();
+      broadcastAppEvent('openOverrides');
+      return;
     }
   } catch (e) {
     logger.error('[deeplink] failed to handle', (e as Error).message);

@@ -142,9 +142,9 @@ mod tests {
             "focusActive": focus,
             "focusSource": source,
             "profiles": [
-                { "id": "profile-default", "name": "Default", "color": "#123456",
+                { "id": "profile-default", "name": "Default", "color": "test-color-a",
                   "policy": { "blockedDomains": ["reddit.com"], "allowedDomains": [], "defaultAction": "allow", "apps": [] } },
-                { "id": "deep", "name": "Deep Work", "color": "#654321",
+                { "id": "deep", "name": "Deep Work", "color": "test-color-b",
                   "policy": { "mode": "whitelist", "domains": ["docs.rs"], "apps": [] } }
             ],
             "activeProfileId": "profile-default",
@@ -159,7 +159,7 @@ mod tests {
 
     #[test]
     fn windows_move_onto_their_profiles_and_user_focus_becomes_a_latch() {
-        let state = from_v5(&v5(true, "user"), "dev", "#000", true, &monday(8));
+        let state = from_v5(&v5(true, "user"), "dev", "test-color", true, &monday(8));
         assert_eq!(state.profiles.len(), 2);
         let default = state.profile("profile-default").unwrap();
         assert!(default.latch.is_on());
@@ -177,7 +177,7 @@ mod tests {
 
     #[test]
     fn schedule_started_focus_stays_window_driven() {
-        let state = from_v5(&v5(true, "schedule"), "dev", "#000", false, &monday(10));
+        let state = from_v5(&v5(true, "schedule"), "dev", "test-color", false, &monday(10));
         assert!(state.profiles.iter().all(|p| !p.latch.is_on()));
         assert_eq!(activation::active_ids(&state, &monday(10)), vec!["deep".to_string()]);
         assert!(activation::active_ids(&state, &monday(18)).is_empty());
@@ -185,7 +185,7 @@ mod tests {
 
     #[test]
     fn an_empty_document_yields_one_default_profile() {
-        let state = from_v5(&serde_json::json!({}), "dev", "#000", false, &monday(10));
+        let state = from_v5(&serde_json::json!({}), "dev", "test-color", false, &monday(10));
         assert_eq!(state.profiles.len(), 1);
         assert!(state.first_enabled_local_date.is_none());
     }

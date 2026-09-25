@@ -12,7 +12,7 @@ function config(blocked: string[]): ProfileConfig {
 
 const upsert = (id: string, c: ProfileConfig): Command => ({
   type: 'upsertProfile',
-  profile: { id, name: id, color: '#123456', config: c },
+  profile: { id, name: id, color: 'test-color', config: c },
 });
 
 describe('engine-wasm', () => {

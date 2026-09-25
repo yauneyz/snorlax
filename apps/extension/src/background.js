@@ -322,10 +322,64 @@ function sitePolicyMessage() {
   return { active: currentPolicy.active, sites: currentPolicy.sites };
 }
 
-browserApi.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+// ---------------------------------------------------------------------------------------------
+// Blocked-page unlock popup. The page asks for the URL its tab was blocked on and relays two kinds
+// of service calls through the native host: popup info, and the keyless pool-unlock commands. The
+// host enforces that allowlist too (natmsg_frames::relay_request).
+// ---------------------------------------------------------------------------------------------
+
+/** Last http(s) URL each tab tried to load at top level — what a blocked page was blocking. */
+const attemptedUrlByTab = new Map();
+const pendingServiceRequests = new Map();
+let nextServiceRequestId = 1;
+const SERVICE_REQUEST_TIMEOUT_MS = 8000;
+
+function serviceRequest(method, params) {
+  return new Promise((resolve) => {
+    if (!port) {
+      resolve({ ok: false, code: 'INTERNAL', message: 'The Talysman app isn’t connected.' });
+      return;
+    }
+    const requestId = nextServiceRequestId++;
+    const timer = setTimeout(() => {
+      pendingServiceRequests.delete(requestId);
+      resolve({ ok: false, code: 'INTERNAL', message: 'The Talysman app didn’t answer.' });
+    }, SERVICE_REQUEST_TIMEOUT_MS);
+    pendingServiceRequests.set(requestId, (response) => {
+      clearTimeout(timer);
+      resolve(response);
+    });
+    try {
+      port.postMessage({ type: 'service-request', requestId, method, params });
+    } catch (e) {
+      pendingServiceRequests.delete(requestId);
+      clearTimeout(timer);
+      resolve({ ok: false, code: 'INTERNAL', message: String(e && e.message) });
+    }
+  });
+}
+
+function handleServiceResponse(msg) {
+  const resolve = pendingServiceRequests.get(msg.requestId);
+  if (!resolve) return;
+  pendingServiceRequests.delete(msg.requestId);
+  resolve(msg);
+}
+
+browserApi.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message?.type === 'talysman:site-policy') {
     sendResponse(sitePolicyMessage());
     return false;
+  }
+  if (message?.type === 'talysman:blocked-context') {
+    const tabId = sender && sender.tab ? sender.tab.id : undefined;
+    const url = tabId === undefined ? null : attemptedUrlByTab.get(tabId) ?? null;
+    sendResponse({ url, decision: url ? decide(currentPolicy, url) : null });
+    return false;
+  }
+  if (message?.type === 'talysman:service') {
+    void serviceRequest(message.method, message.params).then(sendResponse);
+    return true;
   }
   if (!message || message.type !== 'talysman:get-status') return undefined;
   sendResponse(currentPopupStatus());
@@ -364,6 +418,10 @@ function connect() {
       lastHeartbeatAckAt = Date.now();
       lastHeartbeatAckSequence = msg.sequence ?? null;
       reconnectMs = RECONNECT_MIN_MS;
+      return;
+    }
+    if (msg && msg.type === 'service-response') {
+      handleServiceResponse(msg);
       return;
     }
     if (msg && msg.type === 'judge-result') {
@@ -772,6 +830,15 @@ async function notifySiteContentScripts() {
 }
 
 if (browserApi.webNavigation) {
+  // Remember where each tab was headed, so its blocked page can offer to unlock exactly that.
+  browserApi.webNavigation.onBeforeNavigate.addListener((details) => {
+    if (details.frameId !== 0 || !/^https?:/i.test(details.url)) return;
+    attemptedUrlByTab.set(details.tabId, details.url);
+  });
+  if (browserApi.tabs && browserApi.tabs.onRemoved) {
+    browserApi.tabs.onRemoved.addListener((tabId) => attemptedUrlByTab.delete(tabId));
+  }
+
   // onCommitted fires before the document paints, including for service-worker-served and
   // bfcache-restored navigations that never touch the network.
   browserApi.webNavigation.onCommitted.addListener((details) => {

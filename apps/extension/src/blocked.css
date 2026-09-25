@@ -80,3 +80,116 @@ p {
   font-size: 14px;
 }
 
+
+/* Unlock popup. */
+#unlock {
+  margin-top: 24px;
+}
+
+.blocked-by {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  font-size: 14px;
+}
+
+.profile-chip {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+  color: rgb(var(--color-foreground-strong));
+}
+
+.profile-chip i {
+  width: 9px;
+  height: 9px;
+  border-radius: 2px;
+}
+
+.streak {
+  display: inline-block;
+  padding: 4px 12px;
+  border: 1px solid rgb(var(--color-warning)/30%);
+  border-radius: 999px;
+  background: rgb(var(--color-warning)/8%);
+  color: rgb(var(--color-warning));
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.pool {
+  margin-top: 16px;
+  padding: 14px 16px;
+  border: 1px solid rgb(var(--color-border));
+  border-radius: 12px;
+}
+
+.pool-title {
+  margin: 0;
+  color: rgb(var(--color-foreground-strong));
+  font-weight: 600;
+}
+
+.pause {
+  display: grid;
+  place-items: center;
+  margin-top: 18px;
+}
+
+.pause-ring {
+  display: grid;
+  place-items: center;
+  width: 96px;
+  height: 96px;
+  border: 1px solid rgb(var(--color-signal)/40%);
+  border-radius: 50%;
+  background: rgb(var(--color-signal)/8%);
+  font: 600 22px ui-monospace, monospace;
+}
+
+.pause-ring.breathing {
+  animation: breathe 8s ease-in-out infinite;
+}
+
+@keyframes breathe {
+  0%,
+  100% {
+    transform: scale(0.82);
+  }
+  50% {
+    transform: scale(1.12);
+  }
+}
+
+.actions {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  margin-top: 20px;
+}
+
+.actions .primary {
+  padding: 10px 20px;
+  border: 1px solid rgb(var(--color-signal));
+  border-radius: 999px;
+  background: rgb(var(--color-signal));
+  color: rgb(var(--color-signal-ink, var(--color-background)));
+  font: inherit;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.actions .primary:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.actions .secondary {
+  color: rgb(var(--color-foreground-muted, var(--color-foreground)));
+  font-size: 13px;
+}
+
+.error {
+  color: rgb(var(--color-danger));
+}

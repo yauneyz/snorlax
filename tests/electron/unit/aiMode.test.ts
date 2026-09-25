@@ -11,7 +11,7 @@ function profile(policy: Partial<Policy>): Profile {
   return {
     id: 'p',
     name: 'P',
-    color: '#000',
+    color: 'test-color',
     createdAtMs: 0,
     config: { ...emptyProfileConfig(), policy: { ...EMPTY_POLICY, ...policy } },
     latch: { state: 'off' },

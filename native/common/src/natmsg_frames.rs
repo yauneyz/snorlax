@@ -176,6 +176,58 @@ pub fn judge_result_frame(payload: &Value, caps: &ExtensionCaps) -> Value {
     frame
 }
 
+/// Service calls the extension may make through the host, for the blocked page's unlock popup:
+/// read-only popup info and the *keyless* pool-unlock commands. Everything else (overrides,
+/// config edits, emergency unlocks) stays in the desktop app, so a compromised page can at most
+/// spend the user's own daily pool budget.
+const RELAYED_COMMANDS: &[&str] = &["requestPoolUnlock", "confirmPoolUnlock", "cancelPoolUnlock"];
+
+/// Validate an extension `service-request` frame (`{requestId, method, params}`) against the
+/// allowlist. Returns the extension's request id and the RPC `(method, params)` to send.
+pub fn relay_request(frame: &Value) -> Option<(Value, String, Value)> {
+    let request_id = frame.get("requestId").filter(|id| id.is_string() || id.is_number())?.clone();
+    let method = frame.get("method")?.as_str()?;
+    let params = frame.get("params").cloned().unwrap_or(Value::Null);
+    let allowed = match method {
+        "getPopupInfo" => params.pointer("/target/kind").and_then(Value::as_str) == Some("url"),
+        "applyCommand" => {
+            params.get("dryRun").is_none()
+                && params
+                    .pointer("/command/type")
+                    .and_then(Value::as_str)
+                    .is_some_and(|t| RELAYED_COMMANDS.contains(&t))
+        }
+        _ => false,
+    };
+    allowed.then(|| (request_id, method.to_string(), params))
+}
+
+/// The `service-response` frame answering a relayed request.
+pub fn relay_response_frame(request_id: &Value, response: &Value) -> Value {
+    if response.get("ok").and_then(Value::as_bool) == Some(true) {
+        json!({ "type": "service-response", "requestId": request_id, "ok": true, "result": response.get("result").cloned().unwrap_or(Value::Null) })
+    } else {
+        json!({
+            "type": "service-response",
+            "requestId": request_id,
+            "ok": false,
+            "code": response.get("code").cloned().unwrap_or_else(|| json!("INTERNAL")),
+            "message": response.get("message").cloned().unwrap_or_else(|| json!("Request failed")),
+        })
+    }
+}
+
+/// A `service-response` refusing a request the host won't relay.
+pub fn relay_refused_frame(frame: &Value) -> Value {
+    json!({
+        "type": "service-response",
+        "requestId": frame.get("requestId").cloned().unwrap_or(Value::Null),
+        "ok": false,
+        "code": "BAD_REQUEST",
+        "message": "The extension may not make that request.",
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -270,5 +322,21 @@ mod tests {
         let mut b = blocking();
         b.apply_policy_json(&json!({ "defaultAction": "sideways" }));
         assert_eq!(b.policy.default_action, RuleAction::Judge);
+    }
+
+    #[test]
+    fn only_popup_info_and_keyless_pool_commands_are_relayed() {
+        let ok = |frame: Value| relay_request(&frame).is_some();
+        assert!(ok(json!({ "requestId": 1, "method": "getPopupInfo", "params": { "target": { "kind": "url", "url": "https://x.com" } } })));
+        assert!(ok(json!({ "requestId": "a", "method": "applyCommand", "params": { "command": { "type": "requestPoolUnlock", "pools": [] } } })));
+        assert!(!ok(json!({ "requestId": 1, "method": "applyCommand", "params": { "command": { "type": "emergencyUnlock" } } })));
+        assert!(!ok(json!({ "requestId": 1, "method": "applyCommand", "params": { "command": { "type": "startOverrideAll" } } })));
+        assert!(!ok(json!({ "requestId": 1, "method": "applyCommand", "params": { "command": { "type": "confirmPoolUnlock" }, "dryRun": true } })));
+        assert!(!ok(json!({ "requestId": 1, "method": "getPopupInfo", "params": { "target": { "kind": "app", "app": {} } } })));
+        assert!(!ok(json!({ "requestId": 1, "method": "pairKey", "params": {} })));
+        assert!(!ok(json!({ "method": "getPopupInfo", "params": { "target": { "kind": "url", "url": "x" } } })));
+        let refused = relay_response_frame(&json!(7), &json!({ "ok": false, "code": "POOL_EXHAUSTED", "message": "none left" }));
+        assert_eq!(refused["code"], "POOL_EXHAUSTED");
+        assert_eq!(relay_response_frame(&json!(7), &json!({ "ok": true, "result": { "a": 1 } }))["result"]["a"], 1);
     }
 }

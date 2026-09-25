@@ -862,7 +862,7 @@ mod test_support {
         engine.profiles.push(EngineProfile {
             id: "p".into(),
             name: "P".into(),
-            color: "#000".into(),
+            color: "test-color".into(),
             created_at_ms: 0,
             config: ProfileConfig { policy, ..Default::default() },
             latch: if active { Latch::On { since_ms: 0, source: LatchSource::User } } else { Latch::Off },
@@ -879,7 +879,7 @@ mod test_support {
     }
 
     pub fn input(id: &str, policy: Policy) -> ProfileInput {
-        ProfileInput { id: id.into(), name: id.into(), color: "#000".into(), config: ProfileConfig { policy, ..Default::default() } }
+        ProfileInput { id: id.into(), name: id.into(), color: "test-color".into(), config: ProfileConfig { policy, ..Default::default() } }
     }
 }
 
