@@ -37,6 +37,14 @@
         </dl>
       </section>
 
+      <!-- Firefox for Android: connect to the Talysman app instead of the desktop. -->
+      <form class="pairing" id="pairing" hidden>
+        <label for="pairing-code">Talysman app pairing code</label>
+        <p class="explanation">Find it in the Talysman app under Settings → Firefox soft blocks.</p>
+        <input id="pairing-code" autocomplete="off" autocapitalize="characters" spellcheck="false" maxlength="16" />
+        <button type="submit">Connect</button>
+      </form>
+
       <p class="explanation">
         Website rules are configured in the Talysman desktop app. This companion applies them
         locally without reading or recording your browsing history.

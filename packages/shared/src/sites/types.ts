@@ -147,6 +147,44 @@ export function defineSite(site: SiteDefinition): SiteDefinition {
   return site;
 }
 
+/**
+ * A catalog entry that only exists as an Android app (no website to filter), e.g. Snapchat. Its
+ * `SiteRule` lives in `Policy.sites` like any other entry's; the desktop simply has nothing to
+ * enforce for it.
+ */
+export interface AppOnlyDefinition {
+  id: string;
+  label: string;
+  features: SiteFeature[];
+  android: AndroidAppDefinition;
+}
+
+export function defineApp(app: AppOnlyDefinition): AppOnlyDefinition {
+  return app;
+}
+
+/** A browser the Android accessibility service can read the address of. */
+export interface AndroidBrowser {
+  package: string;
+  label: string;
+  /** View ids of the address bar, first match wins. */
+  urlBarIds: string[];
+  /** Runs the Talysman extension (Firefox), so soft rules are left to it when it's connected. */
+  extensionCapable?: boolean;
+}
+
+/**
+ * A screen that could switch Talysman off (its app info page, its accessibility toggle, the
+ * uninstall dialog…). While blocking is on, the accessibility service backs out of it.
+ */
+export interface AndroidGuard {
+  id: string;
+  label: string;
+  packages: string[];
+  /** All-of: every match must be present in the window. */
+  match: AndroidNodeMatch[];
+}
+
 const ACTION_RANK: Record<RuleAction, number> = { allow: 0, judge: 1, block: 2 };
 
 /** allow < judge < block. */

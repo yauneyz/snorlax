@@ -462,6 +462,12 @@ rather than every local interactive user.
 
 ---
 
+> **Profiles, schedules, overrides, pools and the streak (protocol 6):** all of it now lives in
+> the platform-free Rust engine `native/engine` (`talysman_engine`), shared by the daemons,
+> Talysman for Android (uniffi) and TypeScript (wasm + generated types). The daemon core is a thin
+> shell around it. See `android-and-overrides-spec.md` (§4 architecture, §12 implementation notes).
+> Where §7–§9 below describe a single active profile and a global schedule, that's the v5 model.
+
 ## 7. Blocking model
 
 Defined in `packages/shared/src/policy.ts` (TS) and `native/common/src/policy.rs` (Rust),

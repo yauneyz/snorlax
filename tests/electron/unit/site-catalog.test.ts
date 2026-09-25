@@ -6,6 +6,7 @@ import type { RuleAction } from '@talysman/shared';
 import {
   contentScriptMatches,
   extensionCatalogModule,
+  androidCatalogJson,
   nativeCatalogJson,
   validateCatalog,
 } from '../../../scripts/lib/site-catalog.js';
@@ -45,6 +46,7 @@ describe('site catalog', () => {
   it('checked-in generated artifacts are fresh (run `pnpm generate:sites`)', () => {
     expect(readFileSync(resolve(root, 'apps/extension/src/site-catalog.js'), 'utf8')).toBe(extensionCatalogModule());
     expect(readFileSync(resolve(root, 'native/engine/resources/site-catalog.json'), 'utf8')).toBe(nativeCatalogJson());
+    expect(readFileSync(resolve(root, 'apps/android/blocker/catalog/android-catalog.json'), 'utf8')).toBe(androidCatalogJson());
     const manifest = JSON.parse(readFileSync(resolve(root, 'apps/extension/manifest.json'), 'utf8'));
     expect(manifest.content_scripts).toEqual([{ matches: contentScriptMatches(), js: ['site-content.js'], run_at: 'document_start' }]);
   });

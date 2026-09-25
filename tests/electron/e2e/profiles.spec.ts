@@ -13,12 +13,6 @@ function switcher(win: Page) {
   return win.locator('button[aria-expanded]').filter({ hasText: 'to switch between' });
 }
 
-/** An open switcher menu sits above a dismiss layer that closes it when clicked. */
-async function closeMenu(win: Page) {
-  await win.locator('div.fixed.inset-0.z-40').click({ position: { x: 5, y: 5 } });
-  await expect(switcher(win)).toHaveAttribute('aria-expanded', 'false');
-}
-
 test('Pro gets unlimited blocking profiles that run side by side, Free gets one', async () => {
   const app = await launchApp();
   try {

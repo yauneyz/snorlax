@@ -1,0 +1,733 @@
+{
+  "apps": [
+    {
+      "id": "reddit",
+      "label": "Reddit",
+      "features": [
+        {
+          "id": "content",
+          "label": "Posts you open directly",
+          "default": "allow"
+        },
+        {
+          "id": "comments",
+          "label": "Comments",
+          "default": "allow"
+        },
+        {
+          "id": "search",
+          "label": "Search",
+          "default": "allow"
+        },
+        {
+          "id": "messages",
+          "label": "Messages & chat",
+          "default": "allow"
+        },
+        {
+          "id": "notifications",
+          "label": "Notifications",
+          "default": "allow"
+        },
+        {
+          "id": "compose",
+          "label": "Posting",
+          "default": "allow"
+        },
+        {
+          "id": "feed",
+          "label": "Feeds & subreddit listings",
+          "default": "block"
+        },
+        {
+          "id": "recommendations",
+          "label": "Recommendations & related posts",
+          "default": "block"
+        },
+        {
+          "id": "profiles",
+          "label": "User profiles",
+          "default": "block"
+        }
+      ],
+      "packages": [
+        "com.reddit.frontpage"
+      ],
+      "screens": [
+        {
+          "feature": "feed",
+          "match": [
+            {
+              "contentDesc": "^Home$",
+              "selected": true
+            }
+          ],
+          "action": "overlay",
+          "maxTested": "2025.x"
+        }
+      ]
+    },
+    {
+      "id": "x",
+      "label": "X",
+      "features": [
+        {
+          "id": "content",
+          "label": "Posts you open directly",
+          "default": "allow"
+        },
+        {
+          "id": "search",
+          "label": "Search",
+          "default": "allow"
+        },
+        {
+          "id": "messages",
+          "label": "Messages",
+          "default": "allow"
+        },
+        {
+          "id": "notifications",
+          "label": "Notifications",
+          "default": "allow"
+        },
+        {
+          "id": "compose",
+          "label": "Posting",
+          "default": "allow"
+        },
+        {
+          "id": "feed",
+          "label": "Home timeline & Explore",
+          "default": "block"
+        },
+        {
+          "id": "recommendations",
+          "label": "Trends & who to follow",
+          "default": "block"
+        },
+        {
+          "id": "profiles",
+          "label": "Profiles",
+          "default": "block"
+        }
+      ],
+      "packages": [
+        "com.twitter.android"
+      ],
+      "screens": []
+    },
+    {
+      "id": "linkedin",
+      "label": "LinkedIn",
+      "features": [
+        {
+          "id": "content",
+          "label": "Posts & articles you open directly",
+          "default": "allow"
+        },
+        {
+          "id": "search",
+          "label": "Search",
+          "default": "allow"
+        },
+        {
+          "id": "messages",
+          "label": "Messaging",
+          "default": "allow"
+        },
+        {
+          "id": "notifications",
+          "label": "Notifications",
+          "default": "allow"
+        },
+        {
+          "id": "compose",
+          "label": "Posting",
+          "default": "allow"
+        },
+        {
+          "id": "feed",
+          "label": "Feed",
+          "default": "block"
+        },
+        {
+          "id": "recommendations",
+          "label": "Recommendations",
+          "default": "block"
+        },
+        {
+          "id": "profiles",
+          "label": "Profiles",
+          "default": "block"
+        },
+        {
+          "id": "jobs",
+          "label": "Jobs",
+          "default": "block"
+        }
+      ],
+      "packages": [
+        "com.linkedin.android"
+      ],
+      "screens": []
+    },
+    {
+      "id": "instagram",
+      "label": "Instagram",
+      "features": [
+        {
+          "id": "content",
+          "label": "Posts & reels you open directly",
+          "default": "allow"
+        },
+        {
+          "id": "search",
+          "label": "Search",
+          "default": "allow"
+        },
+        {
+          "id": "messages",
+          "label": "Direct messages",
+          "default": "allow"
+        },
+        {
+          "id": "compose",
+          "label": "Posting",
+          "default": "allow"
+        },
+        {
+          "id": "feed",
+          "label": "Home feed",
+          "default": "block"
+        },
+        {
+          "id": "explore",
+          "label": "Explore & Reels tab",
+          "default": "block"
+        },
+        {
+          "id": "stories",
+          "label": "Stories",
+          "default": "block"
+        },
+        {
+          "id": "recommendations",
+          "label": "Suggestions",
+          "default": "block"
+        },
+        {
+          "id": "profiles",
+          "label": "Profiles",
+          "default": "block"
+        }
+      ],
+      "packages": [
+        "com.instagram.android"
+      ],
+      "screens": [
+        {
+          "feature": "explore",
+          "match": [
+            {
+              "viewId": "com.instagram.android:id/clips_viewer_view_pager"
+            }
+          ],
+          "action": "back",
+          "maxTested": "350.x"
+        },
+        {
+          "feature": "explore",
+          "match": [
+            {
+              "contentDesc": "^(Reels|Search and explore)$",
+              "selected": true
+            }
+          ],
+          "action": "clickAlternative",
+          "alternative": {
+            "contentDesc": "^Home$"
+          },
+          "maxTested": "350.x"
+        },
+        {
+          "feature": "feed",
+          "match": [
+            {
+              "contentDesc": "^Home$",
+              "selected": true
+            },
+            {
+              "viewId": "com.instagram.android:id/refreshable_container"
+            }
+          ],
+          "action": "overlay",
+          "hideNodes": [
+            {
+              "viewId": "com.instagram.android:id/refreshable_container"
+            }
+          ],
+          "maxTested": "350.x"
+        }
+      ]
+    },
+    {
+      "id": "youtube",
+      "label": "YouTube",
+      "features": [
+        {
+          "id": "content",
+          "label": "Videos you open directly",
+          "default": "allow"
+        },
+        {
+          "id": "shorts",
+          "label": "Shorts you open directly",
+          "default": "allow"
+        },
+        {
+          "id": "comments",
+          "label": "Comments",
+          "default": "allow"
+        },
+        {
+          "id": "search",
+          "label": "Search",
+          "default": "allow"
+        },
+        {
+          "id": "notifications",
+          "label": "Notifications",
+          "default": "allow"
+        },
+        {
+          "id": "studio",
+          "label": "YouTube Studio & uploads",
+          "default": "allow"
+        },
+        {
+          "id": "feed",
+          "label": "Home, subscriptions & trending",
+          "default": "block"
+        },
+        {
+          "id": "recommendations",
+          "label": "Recommended & up next",
+          "default": "block"
+        },
+        {
+          "id": "channels",
+          "label": "Channel pages",
+          "default": "block"
+        }
+      ],
+      "packages": [
+        "com.google.android.youtube"
+      ],
+      "screens": [
+        {
+          "feature": "shorts",
+          "match": [
+            {
+              "viewId": "com.google.android.youtube:id/reel_recycler"
+            }
+          ],
+          "action": "back",
+          "maxTested": "19.x"
+        },
+        {
+          "feature": "shorts",
+          "match": [
+            {
+              "viewId": "com.google.android.youtube:id/reel_shelf_header"
+            }
+          ],
+          "action": "overlay",
+          "hideNodes": [
+            {
+              "viewId": "com.google.android.youtube:id/reel_shelf_header"
+            }
+          ],
+          "maxTested": "19.x"
+        },
+        {
+          "feature": "feed",
+          "match": [
+            {
+              "contentDesc": "^(Home|Subscriptions)$",
+              "selected": true
+            }
+          ],
+          "action": "overlay",
+          "maxTested": "19.x"
+        }
+      ]
+    },
+    {
+      "id": "substack",
+      "label": "Substack",
+      "features": [
+        {
+          "id": "content",
+          "label": "Posts & notes you open directly",
+          "default": "allow"
+        },
+        {
+          "id": "publications",
+          "label": "Newsletter sites",
+          "default": "allow"
+        },
+        {
+          "id": "inbox",
+          "label": "Subscriptions inbox",
+          "default": "allow"
+        },
+        {
+          "id": "messages",
+          "label": "Chat & messages",
+          "default": "allow"
+        },
+        {
+          "id": "notifications",
+          "label": "Activity",
+          "default": "allow"
+        },
+        {
+          "id": "search",
+          "label": "Search",
+          "default": "allow"
+        },
+        {
+          "id": "feed",
+          "label": "Home, Notes & Explore",
+          "default": "block"
+        },
+        {
+          "id": "recommendations",
+          "label": "Recommendations",
+          "default": "block"
+        },
+        {
+          "id": "profiles",
+          "label": "Profiles",
+          "default": "block"
+        }
+      ],
+      "packages": [
+        "com.substack.app"
+      ],
+      "screens": []
+    },
+    {
+      "id": "facebook",
+      "label": "Facebook",
+      "features": [
+        {
+          "id": "messages",
+          "label": "Messages",
+          "default": "allow"
+        },
+        {
+          "id": "groups",
+          "label": "Groups",
+          "default": "allow"
+        },
+        {
+          "id": "marketplace",
+          "label": "Marketplace",
+          "default": "allow"
+        },
+        {
+          "id": "feed",
+          "label": "News feed",
+          "default": "block"
+        },
+        {
+          "id": "reels",
+          "label": "Reels & video",
+          "default": "block"
+        }
+      ],
+      "packages": [
+        "com.facebook.katana"
+      ],
+      "screens": [
+        {
+          "feature": "reels",
+          "match": [
+            {
+              "contentDesc": "^(Reels|Video)(, tab \\d+ of \\d+)?$",
+              "selected": true
+            }
+          ],
+          "action": "clickAlternative",
+          "alternative": {
+            "contentDesc": "^(Groups|Marketplace)(, tab \\d+ of \\d+)?$"
+          },
+          "maxTested": "480.x"
+        },
+        {
+          "feature": "feed",
+          "match": [
+            {
+              "contentDesc": "^Home(, tab \\d+ of \\d+)?$",
+              "selected": true
+            }
+          ],
+          "action": "overlay",
+          "maxTested": "480.x"
+        }
+      ]
+    },
+    {
+      "id": "snapchat",
+      "label": "Snapchat",
+      "features": [
+        {
+          "id": "chat",
+          "label": "Chat",
+          "default": "allow"
+        },
+        {
+          "id": "camera",
+          "label": "Camera",
+          "default": "allow"
+        },
+        {
+          "id": "stories",
+          "label": "Friends’ stories",
+          "default": "allow"
+        },
+        {
+          "id": "spotlight",
+          "label": "Spotlight",
+          "default": "block"
+        },
+        {
+          "id": "discover",
+          "label": "Discover",
+          "default": "block"
+        }
+      ],
+      "packages": [
+        "com.snapchat.android"
+      ],
+      "screens": [
+        {
+          "feature": "spotlight",
+          "match": [
+            {
+              "contentDesc": "^Spotlight$",
+              "selected": true
+            }
+          ],
+          "action": "clickAlternative",
+          "alternative": {
+            "contentDesc": "^Chat$"
+          },
+          "maxTested": "13.x"
+        },
+        {
+          "feature": "discover",
+          "match": [
+            {
+              "contentDesc": "^(Stories|Discover)$",
+              "selected": true
+            },
+            {
+              "text": "^Discover$"
+            }
+          ],
+          "action": "overlay",
+          "hideNodes": [
+            {
+              "text": "^Discover$"
+            }
+          ],
+          "maxTested": "13.x"
+        }
+      ]
+    }
+  ],
+  "browsers": [
+    {
+      "package": "com.android.chrome",
+      "label": "Chrome",
+      "urlBarIds": [
+        "com.android.chrome:id/url_bar"
+      ]
+    },
+    {
+      "package": "com.chrome.beta",
+      "label": "Chrome Beta",
+      "urlBarIds": [
+        "com.chrome.beta:id/url_bar"
+      ]
+    },
+    {
+      "package": "com.chrome.dev",
+      "label": "Chrome Dev",
+      "urlBarIds": [
+        "com.chrome.dev:id/url_bar"
+      ]
+    },
+    {
+      "package": "com.chrome.canary",
+      "label": "Chrome Canary",
+      "urlBarIds": [
+        "com.chrome.canary:id/url_bar"
+      ]
+    },
+    {
+      "package": "com.microsoft.emmx",
+      "label": "Edge",
+      "urlBarIds": [
+        "com.microsoft.emmx:id/url_bar"
+      ]
+    },
+    {
+      "package": "com.brave.browser",
+      "label": "Brave",
+      "urlBarIds": [
+        "com.brave.browser:id/url_bar"
+      ]
+    },
+    {
+      "package": "com.vivaldi.browser",
+      "label": "Vivaldi",
+      "urlBarIds": [
+        "com.vivaldi.browser:id/url_bar"
+      ]
+    },
+    {
+      "package": "com.kiwibrowser.browser",
+      "label": "Kiwi",
+      "urlBarIds": [
+        "com.kiwibrowser.browser:id/url_bar"
+      ]
+    },
+    {
+      "package": "com.sec.android.app.sbrowser",
+      "label": "Samsung Internet",
+      "urlBarIds": [
+        "com.sec.android.app.sbrowser:id/location_bar_edit_text",
+        "com.sec.android.app.sbrowser:id/custom_tab_toolbar_url_bar_text"
+      ]
+    },
+    {
+      "package": "com.opera.browser",
+      "label": "Opera",
+      "urlBarIds": [
+        "com.opera.browser:id/url_field"
+      ]
+    },
+    {
+      "package": "com.duckduckgo.mobile.android",
+      "label": "DuckDuckGo",
+      "urlBarIds": [
+        "com.duckduckgo.mobile.android:id/omnibarTextInput"
+      ]
+    },
+    {
+      "package": "org.mozilla.firefox",
+      "label": "Firefox",
+      "urlBarIds": [
+        "org.mozilla.firefox:id/mozac_browser_toolbar_url_view"
+      ],
+      "extensionCapable": true
+    },
+    {
+      "package": "org.mozilla.firefox_beta",
+      "label": "Firefox Beta",
+      "urlBarIds": [
+        "org.mozilla.firefox_beta:id/mozac_browser_toolbar_url_view"
+      ],
+      "extensionCapable": true
+    },
+    {
+      "package": "org.mozilla.fenix",
+      "label": "Firefox Nightly",
+      "urlBarIds": [
+        "org.mozilla.fenix:id/mozac_browser_toolbar_url_view"
+      ],
+      "extensionCapable": true
+    }
+  ],
+  "guards": [
+    {
+      "id": "app-info",
+      "label": "Talysman’s app info",
+      "packages": [
+        "com.android.settings",
+        "com.samsung.android.settings",
+        "com.google.android.permissioncontroller"
+      ],
+      "match": [
+        {
+          "text": "^Talysman$"
+        },
+        {
+          "text": "(?i)^(force stop|uninstall|clear storage|clear data)$"
+        }
+      ]
+    },
+    {
+      "id": "accessibility",
+      "label": "Talysman’s accessibility switch",
+      "packages": [
+        "com.android.settings",
+        "com.samsung.android.settings",
+        "com.google.android.permissioncontroller"
+      ],
+      "match": [
+        {
+          "text": "(?i)^(use talysman|talysman shortcut)$"
+        }
+      ]
+    },
+    {
+      "id": "device-admin",
+      "label": "Talysman’s device admin",
+      "packages": [
+        "com.android.settings",
+        "com.samsung.android.settings",
+        "com.google.android.permissioncontroller"
+      ],
+      "match": [
+        {
+          "text": "(?i)deactivate this device admin"
+        },
+        {
+          "text": "Talysman"
+        }
+      ]
+    },
+    {
+      "id": "uninstall",
+      "label": "Uninstalling Talysman",
+      "packages": [
+        "com.google.android.packageinstaller",
+        "com.android.packageinstaller"
+      ],
+      "match": [
+        {
+          "text": "Talysman"
+        }
+      ]
+    },
+    {
+      "id": "date-time",
+      "label": "Date & time",
+      "packages": [
+        "com.android.settings",
+        "com.samsung.android.settings",
+        "com.google.android.permissioncontroller"
+      ],
+      "match": [
+        {
+          "text": "(?i)^(set time automatically|automatic date (and|&) time|use network-provided time)$"
+        }
+      ]
+    }
+  ]
+}

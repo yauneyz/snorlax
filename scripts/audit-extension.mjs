@@ -15,6 +15,8 @@ const expectedPermissions = [
   "declarativeNetRequest",
   "nativeMessaging",
   "scripting",
+  // Firefox for Android: the pairing code for the Talysman app's loopback bridge.
+  "storage",
   "tabs",
   "webNavigation",
 ];
@@ -242,10 +244,22 @@ for (const [store, directory] of Object.entries({
     ["sendBeacon", /\bsendBeacon\b/],
     ["remote URL", /\bhttps?:\/\//],
   ];
-  // Packaged code contains no remote URL and no programmatic network client.
-  for (const [label, pattern] of prohibitedCode) {
-    if (pattern.test(packagedText)) fail(`${store}: unexpected ${label} in packaged code`);
+  // Packaged code contains no remote URL and no programmatic network client. The one exception is
+  // Firefox's loopback socket to the Talysman Android app on the same phone (Firefox for Android
+  // has no native messaging): exactly this URL, opened in exactly one place.
+  let auditedText = packagedText;
+  if (store === "firefox") {
+    const loopbackUrl = "const LOOPBACK_URL = 'ws://127.0.0.1:47623';";
+    const loopbackOpen = "new WebSocket(LOOPBACK_URL)";
+    if (!packagedText.includes(loopbackUrl) || packagedText.split(loopbackOpen).length !== 2) {
+      fail("firefox: the Android loopback socket must be the single `new WebSocket(LOOPBACK_URL)` to 127.0.0.1");
+    }
+    auditedText = packagedText.replace(loopbackUrl, "").replace(loopbackOpen, "");
   }
+  for (const [label, pattern] of prohibitedCode) {
+    if (pattern.test(auditedText)) fail(`${store}: unexpected ${label} in packaged code`);
+  }
+  if (/\bwss?:\/\//.test(auditedText)) fail(`${store}: unexpected WebSocket URL in packaged code`);
 
   // The bundles concatenate source modules into one scope (scripts/build-extension.mjs). A
   // repeated top-level function silently replaces the earlier one, so reject any collision.

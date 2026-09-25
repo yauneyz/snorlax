@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.Talysman" parent="android:Theme.Material.NoActionBar">
+        <item name="android:statusBarColor">@color/talysman_panel</item>
+        <item name="android:windowBackground">@color/talysman_background</item>
+    </style>
+    <!-- The block screen sits over the blocked app without a launch animation flash. -->
+    <style name="Theme.Talysman.Block" parent="Theme.Talysman">
+        <item name="android:windowAnimationStyle">@null</item>
+    </style>
+</resources>

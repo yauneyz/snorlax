@@ -57,5 +57,29 @@ export default defineSite({
     ['https://www.instagram.com/accounts/login/', 'essentials'],
     ['https://www.instagram.com/ada/', 'profiles'],
   ],
-  android: { packages: ['com.instagram.android'] },
+  android: {
+    packages: ['com.instagram.android'],
+    screens: [
+      {
+        feature: 'explore',
+        match: [{ viewId: 'com.instagram.android:id/clips_viewer_view_pager' }],
+        action: 'back',
+        maxTested: '350.x',
+      },
+      {
+        feature: 'explore',
+        match: [{ contentDesc: '^(Reels|Search and explore)$', selected: true }],
+        action: 'clickAlternative',
+        alternative: { contentDesc: '^Home$' },
+        maxTested: '350.x',
+      },
+      {
+        feature: 'feed',
+        match: [{ contentDesc: '^Home$', selected: true }, { viewId: 'com.instagram.android:id/refreshable_container' }],
+        action: 'overlay',
+        hideNodes: [{ viewId: 'com.instagram.android:id/refreshable_container' }],
+        maxTested: '350.x',
+      },
+    ],
+  },
 });

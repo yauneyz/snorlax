@@ -8,6 +8,7 @@
     "declarativeNetRequest",
     "nativeMessaging",
     "scripting",
+    "storage",
     "tabs",
     "webNavigation"
   ],

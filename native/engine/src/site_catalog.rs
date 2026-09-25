@@ -284,7 +284,8 @@ mod tests {
     /// The same fixtures the extension's catalog test runs through `classifyUrl`.
     #[test]
     fn every_catalog_example_classifies_like_the_extension() {
-        for site in sites() {
+        // App-only entries (no website) have nothing to classify.
+        for site in sites().iter().filter(|site| !site.hosts.is_empty()) {
             assert!(!site.examples.is_empty(), "{} has no examples", site.id);
             for (url, feature) in &site.examples {
                 let got = classify_url(url).unwrap_or_else(|| panic!("{url} is not classified"));
@@ -304,6 +305,7 @@ mod tests {
         assert!(parse_url("chrome://settings").is_none());
         assert!(parse_url("about:blank").is_none());
         assert_eq!(site_for_package("com.google.android.youtube").map(|s| s.id.as_str()), Some("youtube"));
+        assert_eq!(site_for_package("com.snapchat.android").map(|s| s.id.as_str()), Some("snapchat"));
     }
 
     #[test]

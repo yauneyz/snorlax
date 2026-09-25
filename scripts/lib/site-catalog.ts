@@ -2,8 +2,9 @@
 // scripts/generate-site-catalog.ts, which writes the artifacts, and the catalog unit test, which
 // fails when the checked-in artifacts are stale.
 
-import { SITE_DEFINITIONS } from '../../packages/shared/src/sites/catalog.js';
-import type { SiteDefinition } from '../../packages/shared/src/sites/types.js';
+import { APP_DEFINITIONS, SITE_DEFINITIONS } from '../../packages/shared/src/sites/catalog.js';
+import { ANDROID_BROWSERS, ANDROID_GUARDS } from '../../packages/shared/src/sites/android.js';
+import type { AndroidAppDefinition, AndroidNodeMatch, AppOnlyDefinition, SiteDefinition, SiteFeature } from '../../packages/shared/src/sites/types.js';
 
 const ACTIONS = new Set(['allow', 'judge', 'block']);
 const ID = /^[a-z][a-z0-9_]*$/;
@@ -78,6 +79,28 @@ export function validateSite(site: SiteDefinition): void {
   for (const [, feature] of site.examples) known(feature, 'example');
 }
 
+function checkNodeMatch(match: AndroidNodeMatch, where: string): void {
+  if (!Object.values(match).some((v) => v !== undefined)) throw new Error(`${where}: empty node match`);
+  for (const key of ['text', 'contentDesc'] as const) {
+    const pattern = match[key];
+    if (pattern !== undefined) new RegExp(pattern.replace(/^\(\?i\)/, ''));
+  }
+}
+
+/** Screens must name the entry's own features and use compilable patterns. */
+export function validateAndroid(id: string, features: readonly SiteFeature[], android: AndroidAppDefinition): void {
+  const known = new Set(features.map((f) => f.id));
+  android.screens?.forEach((screen, index) => {
+    const where = `${id} android screen ${index}`;
+    if (!known.has(screen.feature)) throw new Error(`${where}: unknown feature ${screen.feature}`);
+    if (screen.match.length === 0) throw new Error(`${where}: needs at least one match`);
+    screen.match.forEach((m) => checkNodeMatch(m, where));
+    if (screen.action === 'clickAlternative' && !screen.alternative) throw new Error(`${where}: clickAlternative needs an alternative`);
+    if (screen.alternative) checkNodeMatch(screen.alternative, where);
+    screen.hideNodes?.forEach((m) => checkNodeMatch(m, where));
+  });
+}
+
 export function validateCatalog(sites: readonly SiteDefinition[] = SITE_DEFINITIONS): void {
   const ids = new Set<string>();
   const hosts = new Map<string, string>();
@@ -97,6 +120,18 @@ export function validateCatalog(sites: readonly SiteDefinition[] = SITE_DEFINITI
       hosts.set(host, site.id);
     }
     validateSite(site);
+    if (site.android) validateAndroid(site.id, site.features, site.android);
+  }
+  for (const app of APP_DEFINITIONS) {
+    if (ids.has(app.id)) throw new Error(`duplicate catalog entry ${app.id}`);
+    ids.add(app.id);
+    if (!ID.test(app.id)) throw new Error(`app ${app.id}: invalid id`);
+    for (const pkg of app.android.packages) {
+      const owner = packages.get(pkg);
+      if (owner) throw new Error(`Android package ${pkg} belongs to both ${owner} and ${app.id}`);
+      packages.set(pkg, app.id);
+    }
+    validateAndroid(app.id, app.features, app.android);
   }
 }
 
@@ -141,8 +176,54 @@ export function extensionCatalogModule(sites: readonly SiteDefinition[] = SITE_D
     + `export const SITE_CATALOG = ${JSON.stringify(catalog, null, 2)};\n`;
 }
 
-export function nativeCatalogJson(sites: readonly SiteDefinition[] = SITE_DEFINITIONS): string {
-  return JSON.stringify({ sites: sites.map(nativeSite) }, null, 2) + '\n';
+/** App-only entries in the engine's shape: no hosts or routes, just features and packages. */
+function nativeApp(app: AppOnlyDefinition) {
+  return {
+    id: app.id,
+    label: app.label,
+    hosts: [],
+    appHosts: [],
+    networkDomains: [],
+    features: app.features.map(({ id, label, default: action, locked }) => ({ id, label, default: action, locked: !!locked })),
+    routes: [],
+    fallbackFeature: app.features[0]?.id ?? '',
+    androidPackages: app.android.packages,
+    examples: [],
+  };
+}
+
+export function nativeCatalogJson(
+  sites: readonly SiteDefinition[] = SITE_DEFINITIONS,
+  apps: readonly AppOnlyDefinition[] = APP_DEFINITIONS,
+): string {
+  return JSON.stringify({ sites: [...sites.map(nativeSite), ...apps.map(nativeApp)] }, null, 2) + '\n';
+}
+
+/**
+ * What Talysman for Android's accessibility service reads: every entry with an Android app (its
+ * packages, feature labels and screen matchers), the browsers it reads addresses from, and the
+ * system screens it guards.
+ */
+export function androidCatalogJson(): string {
+  const entries = [
+    ...SITE_DEFINITIONS.filter((site) => site.android).map((site) => ({ id: site.id, label: site.label, features: site.features, android: site.android })),
+    ...APP_DEFINITIONS.map((app) => ({ id: app.id, label: app.label, features: app.features, android: app.android })),
+  ];
+  return JSON.stringify(
+    {
+      apps: entries.map(({ id, label, features, android }) => ({
+        id,
+        label,
+        features: features.filter((f) => !f.locked).map(({ id: featureId, label: featureLabel, default: action }) => ({ id: featureId, label: featureLabel, default: action })),
+        packages: android.packages,
+        screens: android.screens ?? [],
+      })),
+      browsers: ANDROID_BROWSERS,
+      guards: ANDROID_GUARDS,
+    },
+    null,
+    2,
+  ) + '\n';
 }
 
 export function contentScriptMatches(sites: readonly SiteDefinition[] = SITE_DEFINITIONS): string[] {

@@ -35,3 +35,18 @@ function refresh() {
 
 refresh();
 setInterval(refresh, 1000);
+
+// Firefox for Android talks to the Talysman app over a paired loopback connection.
+const pairing = document.querySelector('#pairing');
+const pairingInput = document.querySelector('#pairing-code');
+if (/Android/i.test(navigator.userAgent) && browserApi.storage && browserApi.storage.local) {
+  pairing.hidden = false;
+  browserApi.storage.local.get('androidPairingCode', (items) => {
+    pairingInput.value = (items && items.androidPairingCode) || '';
+  });
+  pairing.addEventListener('submit', (event) => {
+    event.preventDefault();
+    const code = pairingInput.value.trim().toUpperCase();
+    browserApi.storage.local.set({ androidPairingCode: code || null });
+  });
+}

@@ -67,5 +67,31 @@ export default defineSite({
     ['https://www.youtube.com/@somechannel/videos', 'channels'],
     ['https://music.youtube.com/results?search_query=music', 'feed'],
   ],
-  android: { packages: ['com.google.android.youtube'] },
+  android: {
+    packages: ['com.google.android.youtube'],
+    screens: [
+      // The Shorts player: back out of it.
+      {
+        feature: 'shorts',
+        match: [{ viewId: 'com.google.android.youtube:id/reel_recycler' }],
+        action: 'back',
+        maxTested: '19.x',
+      },
+      // Shorts shelves in the home feed and search results.
+      {
+        feature: 'shorts',
+        match: [{ viewId: 'com.google.android.youtube:id/reel_shelf_header' }],
+        action: 'overlay',
+        hideNodes: [{ viewId: 'com.google.android.youtube:id/reel_shelf_header' }],
+        maxTested: '19.x',
+      },
+      // The home / subscriptions video grids; search and videos you open stay usable.
+      {
+        feature: 'feed',
+        match: [{ contentDesc: '^(Home|Subscriptions)$', selected: true }],
+        action: 'overlay',
+        maxTested: '19.x',
+      },
+    ],
+  },
 });

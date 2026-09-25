@@ -65,48 +65,11 @@ val stageNotificationSound by tasks.registering(Copy::class) {
     rename { "conversion_unlocked.mp3" }
 }
 
-// Generate Android-native palette constants/resources from the repo's single color source.
-val paletteFile = rootProject.file("../../packages/shared/src/palette.json")
-val generatedPaletteDir = layout.buildDirectory.dir("generated/palette")
-val generatePalette by tasks.registering {
-    inputs.file(paletteFile)
-    outputs.dir(generatedPaletteDir)
-    doLast {
-        @Suppress("UNCHECKED_CAST")
-        val document = JsonSlurper().parse(paletteFile) as Map<String, Any?>
-        val colors = document["colors"] as Map<String, String>
-        fun pascal(name: String) = name.replaceFirstChar { it.uppercase() }
-        fun snake(name: String) = name.replace(Regex("([a-z0-9])([A-Z])"), "$1_$2").lowercase()
-        fun argb(value: String) = "FF" + value.removePrefix("#").uppercase()
-
-        val kotlinDir = generatedPaletteDir.get().dir("kotlin/app/talysman/insights/ui").asFile
-        kotlinDir.mkdirs()
-        kotlinDir.resolve("TalysmanPalette.kt").writeText(buildString {
-            appendLine("// Generated from packages/shared/src/palette.json. Do not edit.")
-            appendLine("package app.talysman.insights.ui")
-            appendLine()
-            appendLine("import androidx.compose.ui.graphics.Color")
-            appendLine()
-            appendLine("object TalysmanPalette {")
-            colors.forEach { (name, value) ->
-                appendLine("    val ${pascal(name)} = Color(0x${argb(value)})")
-            }
-            appendLine("}")
-        })
-
-        val valuesDir = generatedPaletteDir.get().dir("res/values").asFile
-        valuesDir.mkdirs()
-        valuesDir.resolve("talysman_palette.xml").writeText(buildString {
-            appendLine("<?xml version=\"1.0\" encoding=\"utf-8\"?>")
-            appendLine("<!-- Generated from packages/shared/src/palette.json. Do not edit. -->")
-            appendLine("<resources>")
-            colors.forEach { (name, value) ->
-                appendLine("    <color name=\"talysman_${snake(name)}\">$value</color>")
-            }
-            appendLine("</resources>")
-        })
-    }
-}
+// Android palette constants/resources from packages/shared/src/palette.json.
+extra["palettePackage"] = "app.talysman.insights.ui"
+apply(from = rootProject.file("gradle/palette.gradle.kts"))
+@Suppress("UNCHECKED_CAST")
+val generatedPaletteDir = extra["generatedPaletteDir"] as Provider<Directory>
 
 android {
     namespace = "app.talysman.insights"
@@ -171,7 +134,7 @@ android {
 }
 
 tasks.named("preBuild").configure {
-    dependsOn(stageNotificationSound, generatePalette)
+    dependsOn(stageNotificationSound)
 }
 
 dependencies {

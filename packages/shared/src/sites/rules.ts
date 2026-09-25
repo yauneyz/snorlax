@@ -3,12 +3,12 @@
  * restrictiveness checks). The extension engine (apps/extension/src/site-engine.js) implements the
  * same `effectiveFeatures` semantics in plain JS; the catalog test keeps them honest.
  */
-import { siteDefinition } from './catalog.js';
+import { catalogEntry } from './catalog.js';
 import { actionRank, type RuleAction, type SiteRule } from './types.js';
 
 /** The action for every feature of `siteId`: overrides over catalog defaults, locked features fixed. */
 export function effectiveSiteFeatures(siteId: string, rule: SiteRule | undefined): Record<string, RuleAction> {
-  const site = siteDefinition(siteId);
+  const site = catalogEntry(siteId);
   const out: Record<string, RuleAction> = {};
   if (!site) return out;
   for (const feature of site.features) {

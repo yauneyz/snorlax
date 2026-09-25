@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Talysman</string>
+    <string name="a11y_description">Talysman blocks the apps and websites your profiles block, hides Shorts, Reels and feeds you\'ve turned off, and protects its own settings while blocking is on. It reads only which app is open, browser addresses, and the screen of apps you\'ve set soft blocks for. Nothing leaves your phone.</string>
+    <string name="admin_description">Stops Talysman being uninstalled while blocking is on.</string>
+    <string name="channel_enforcement">Blocking status</string>
+</resources>

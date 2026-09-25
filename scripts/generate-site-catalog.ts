@@ -3,6 +3,7 @@
 //   - apps/extension/src/site-catalog.js          (runtime catalog for the engine and blocked page)
 //   - native/engine/resources/site-catalog.json   (daemon subset: hosts, network domains, features)
 //   - apps/extension/manifest.json                (content_scripts matches)
+//   - apps/android/blocker/catalog/android-catalog.json (Android apps, browsers, guards)
 // Run with `pnpm generate:sites` after editing a site module.
 
 import { readFileSync, writeFileSync } from 'node:fs';
@@ -11,6 +12,7 @@ import { fileURLToPath } from 'node:url';
 import {
   extensionCatalogModule,
   manifestWithContentScripts,
+  androidCatalogJson,
   nativeCatalogJson,
   validateCatalog,
 } from './lib/site-catalog.js';
@@ -22,6 +24,7 @@ validateCatalog();
 const outputs: [string, string][] = [
   ['apps/extension/src/site-catalog.js', extensionCatalogModule()],
   ['native/engine/resources/site-catalog.json', nativeCatalogJson()],
+  ['apps/android/blocker/catalog/android-catalog.json', androidCatalogJson()],
 ];
 const manifestPath = path.join(root, 'apps/extension/manifest.json');
 const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'));

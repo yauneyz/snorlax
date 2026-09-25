@@ -590,3 +590,62 @@ App updates break view ids. Add a debug-only "Dump screen" action (writes the no
 - Android: `apps/android/{settings.gradle.kts,build.gradle.kts,build-logic/**,designsystem/**,engine/**,blocker/**}`, `apps/android/README.md`
 - Tests: `tests/fixtures/engine/`, `tests/electron/unit/*`, `tests/electron/e2e/*`, `tests/helpers/mockService.ts`
 - Docs: `snorlax-architecture.md` (new §: engine, profiles, overrides), `android-and-overrides-spec.md`
+
+---
+
+## 12. Implementation notes (where the build differs from this spec)
+
+Written after implementing phases 1–4 on the `android-and-overrides` branch.
+
+**Engine and data model**
+- `ProfileConfig` is `{ policy, appMode, allowedApps, pools, schedule, oneShots }`. `policy` is the
+  existing `Policy` (web rules, blacklisted `apps`, catalog `sites` soft rules), not separate
+  `web`/`apps`/`soft` structs. The existing editors, restrictiveness rules and extension all keep
+  working unchanged.
+- Suppressed window occurrences live in `Overrides.suppressed`, not inside `AllOff`/`Exempt`.
+  Turning one profile off with its switch (`setLatch off`) is key-gated and breaks the streak, but
+  "Re-enable all" doesn't restore it. Turning profiles off through override (2) is restorable.
+- A pool with no friction unlocks as soon as it's requested; with friction, request then confirm.
+- The journal records breaking events, emergency unlocks, pool unlocks, latch flips, key
+  pairing and the migration marker. Tightening edits and window starts aren't journaled.
+- No Cargo workspace: every crate keeps its own `Cargo.lock`, because the NixOS daemon package
+  builds `native/linux` against its own lockfile. `native/engine` is a path dependency.
+- `regex-lite` instead of `regex` (smaller wasm and Android libraries). The catalog's route
+  patterns are all plain ASCII.
+- Premade blocklists are behind the engine's `premade` feature. The daemons enable it; wasm and
+  Android leave it off.
+
+**Desktop**
+- Enforcement backends aren't layer-aware. The engine flattens the active profiles into one
+  network policy with `effective::flatten_network`. With one profile active it returns that
+  profile's policy unchanged, so enforcement is identical to v5. With several, a host is blocked
+  if any profile blocks it; in rare cases where one allow pattern can't express the combination,
+  it fails closed. The extension therefore still receives one flat state frame, and
+  `SITE_CAPABILITY` stays 3.
+- Multi-judge (DEFAULT 12) is simplified: the flat policy carries the first active profile's
+  judge that has a judged rule.
+- The v5 RPCs are removed apart from `enableFocus`/`disableFocus`/`toggleFocus`, which the tray
+  and CLIs use. The desktop app refuses a daemon with any other protocol version anyway.
+- One-shot events are free on every plan. Recurring schedule rules keep the existing Pro gate.
+- The extension's blocked page relays only `getPopupInfo` and the keyless pool-unlock commands.
+  The native hosts enforce that allowlist (`natmsg_frames::relay_request`). "Other options"
+  opens `talysman://override`.
+
+**Android**
+- QR codes use ZXing core for both generation and scanning, not zxing-cpp.
+- Paired keys are salted hashes in an app-private file (`KeyRepository`), not a Keystore-wrapped
+  file. The hashes can't be reversed into a secret.
+- Firefox bridge: fixed port 47623, and the user types an 8-character pairing code from Settings
+  into the extension popup. There is no `talysman://ext-pair` deep link. Only the Firefox build of
+  the extension contains the loopback socket, and the extension audit allows exactly that one.
+- Facebook and Snapchat are app-only catalog entries (`defineApp`). Every Android screen matcher
+  carries a `maxTested` app version and **needs checking on a real device**.
+
+**Not done yet**
+- Optional VPN DNS mode.
+- Play-flavor account sign-in and entitlement fetch. The Play build applies Free limits.
+- Release signing and APK upload.
+- A developer-options guard.
+- Instrumented and on-device tests. The test emulator on the development machine wouldn't boot,
+  so nothing Android-side has run on a device yet. JVM tests cover the Kotlin↔engine boundary
+  against a host build.

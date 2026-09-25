@@ -1,4 +1,63 @@
-# Talysman Insights Android app
+# Android apps
+
+This Gradle project holds two apps and one library:
+
+| Module | Package | What |
+|---|---|---|
+| `:blocker` | `app.talysman.android` | **Talysman for Android** — the blocker (spec: `android-and-overrides-spec.md` §6–7) |
+| `:engine` | `app.talysman.engine` | The Rust engine (`native/engine`) built with cargo-ndk + uniffi Kotlin bindings |
+| `:app` | `app.talysman.insights` | Talysman Insights, the internal analytics companion (below) |
+
+## Talysman for Android
+
+Every blocking decision comes from the Rust engine — the same code the desktop daemons run —
+through `:engine`. Kotlin only supplies the clock, persistence, keys (NFC/QR), and enforcement
+(accessibility service, block screen, alarms). App-specific data (browsers' address bars, in-app
+screen matchers for Shorts/Reels/feeds, guarded settings screens) is generated from the site
+catalog into `blocker/catalog/android-catalog.json` by `pnpm generate:sites`.
+
+### Building
+
+`:engine` runs `scripts/build-android-engine.mjs` before every build (Gradle skips it when
+`native/engine*` hasn't changed). It needs:
+
+- a Rust toolchain with the `aarch64-linux-android`, `armv7-linux-androideabi` and
+  `x86_64-linux-android` targets (`rustup target add …`),
+- `cargo-ndk` (`cargo install cargo-ndk`),
+- the Android NDK r27+ (`sdkmanager "ndk;27.2.12479018"`).
+
+If those aren't on `PATH`, point Gradle at them in `local.properties`:
+
+```properties
+talysman.cargoBin=/home/you/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin:/home/you/.cargo/bin
+talysman.ndkHome=/path/to/Android/Sdk/ndk/27.2.12479018
+```
+
+Then:
+
+```bash
+./gradlew :blocker:assembleSideloadDebug      # sideloaded build: Pro without an account
+./gradlew :blocker:assemblePlayDebug          # Play build: Free limits until account sign-in lands
+./gradlew :blocker:testSideloadDebugUnitTest  # JVM tests against a host build of native/engine-ffi
+```
+
+The JVM tests load `native/engine-ffi/target/debug/libtalysman_engine_ffi.so`
+(`cargo build` in `native/engine-ffi`) and are skipped when it's missing.
+
+### Flavors
+
+- `sideload` — `ENTITLEMENT_SOURCE = "sideload"`: always Pro, uninstall protection through
+  Device Admin.
+- `play` — plan from the account (Free: one profile), no Device Admin.
+
+### Firefox
+
+Firefox for Android has no native messaging, so the Talysman extension connects to the app's
+loopback bridge (`bridge/BridgeServer.kt`, `ws://127.0.0.1:47623`) after the user types the
+pairing code from Settings into the extension's popup. While it's connected, soft blocks in
+Firefox are done in-page by the extension; other browsers get route-level blocking.
+
+# Talysman Insights
 
 Copy `local.properties.example` to `local.properties` and retain your Android SDK and insights API
 values. Put the Firebase Android client downloaded from Firebase Console at

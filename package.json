@@ -37,6 +37,7 @@
     "generate:sites": "tsx scripts/generate-site-catalog.ts",
     "gen:types": "node scripts/generate-engine-types.mjs",
     "build:engine-wasm": "node scripts/build-engine-wasm.mjs",
+    "build:android-engine": "node scripts/build-android-engine.mjs",
     "audit:extension": "node scripts/audit-extension.mjs",
     "palette:check": "node scripts/check-palette.mjs",
     "release:local": "node scripts/release-local.mjs",

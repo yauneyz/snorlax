@@ -11,7 +11,7 @@ name = "talysman_common"
 path = "src/lib.rs"
 
 [dependencies]
-talysman_engine = { path = "../engine" }
+talysman_engine = { path = "../engine", default-features = false }
 hex = "0.4"
 rand = "0.8"
 serde = { version = "1", features = ["derive"] }

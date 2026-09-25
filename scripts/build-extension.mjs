@@ -119,7 +119,11 @@ function concatModules(files) {
     .join("\n");
 }
 
-function bundledBackground() {
+/**
+ * `firefox`: Firefox for Android reaches the Talysman Android app over a loopback WebSocket
+ * (loopback-port.js). Chromium builds get loopback-stub.js and carry no network client.
+ */
+function bundledBackground(firefox = false) {
   return (
     "// Built by scripts/build-extension.mjs — policy helpers + generated catalogs + background.js bundled.\n\n" +
     concatModules([
@@ -131,6 +135,7 @@ function bundledBackground() {
       "premade-rulesets.js",
       "premade-rules.js",
       "legacy-compat.js",
+      firefox ? "loopback-port.js" : "loopback-stub.js",
       "background.js",
     ])
   );
@@ -438,7 +443,7 @@ const edgeDevDir = stageStore("edge-dev", chromeManifest, background);
 
 const artifacts = [];
 for (const store of stores) {
-  const unpackedDir = stageStore(store.name, store.manifest, background);
+  const unpackedDir = stageStore(store.name, store.manifest, store.name === "firefox" ? bundledBackground(true) : background);
   const zipPath = resolve(distDir, `talysman-${store.name}-${version}.zip`);
   zipDirectory(unpackedDir, zipPath);
   const sourceZipPath = buildSourceArchive(store.name, version);

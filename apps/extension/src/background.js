@@ -31,6 +31,7 @@ import { heartbeatDelayForState } from './heartbeat-timing.js';
 import { extractPageContent } from './content-extract.js';
 import { buildPremadeRulePlan } from './premade-rules.js';
 import { SITE_CATALOG } from './site-catalog.js';
+import { isAndroidBrowser, loopbackPort } from './loopback-port.js';
 import { decide, effectiveFeatures, siteForHostname } from './site-engine.js';
 import {
   LEGACY_HELLO_FIELDS,
@@ -389,9 +390,16 @@ browserApi.runtime.onMessage.addListener((message, sender, sendResponse) => {
 function connect() {
   if (port) return;
 
-  console.info('[talysman] opening native port', { workerSessionId: PROFILE_ID });
+  // Firefox for Android: the Talysman app's loopback bridge, once the user entered its code.
+  const android = isAndroidBrowser() || typeof browserApi.runtime.connectNative !== 'function';
+  if (android && !androidPairingCode) {
+    scheduleReconnect();
+    return;
+  }
+
+  console.info('[talysman] opening native port', { workerSessionId: PROFILE_ID, android });
   try {
-    port = browserApi.runtime.connectNative(HOST_NAME);
+    port = android ? loopbackPort(androidPairingCode) : browserApi.runtime.connectNative(HOST_NAME);
   } catch (e) {
     console.error('[talysman] connectNative threw', e);
     scheduleReconnect();
@@ -855,6 +863,22 @@ if (browserApi.webNavigation) {
   browserApi.webNavigation.onHistoryStateUpdated.addListener((details) => {
     if (details.frameId !== 0) return;
     evaluateNavigation(details.tabId, details.url, 'spa');
+  });
+}
+
+// Firefox for Android: the pairing code for the Talysman app, entered in the popup.
+let androidPairingCode = null;
+if (browserApi.storage && browserApi.storage.local) {
+  browserApi.storage.local.get('androidPairingCode', (items) => {
+    androidPairingCode = (items && items.androidPairingCode) || null;
+    if (androidPairingCode && !port) connect();
+  });
+  browserApi.storage.onChanged.addListener((changes, area) => {
+    if (area !== 'local' || !changes.androidPairingCode) return;
+    androidPairingCode = changes.androidPairingCode.newValue || null;
+    if (port) port.disconnect();
+    port = null;
+    connect();
   });
 }
 

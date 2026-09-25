@@ -1501,6 +1501,96 @@
           "publications"
         ]
       ]
+    },
+    {
+      "id": "facebook",
+      "label": "Facebook",
+      "hosts": [],
+      "appHosts": [],
+      "networkDomains": [],
+      "features": [
+        {
+          "id": "messages",
+          "label": "Messages",
+          "default": "allow",
+          "locked": false
+        },
+        {
+          "id": "groups",
+          "label": "Groups",
+          "default": "allow",
+          "locked": false
+        },
+        {
+          "id": "marketplace",
+          "label": "Marketplace",
+          "default": "allow",
+          "locked": false
+        },
+        {
+          "id": "feed",
+          "label": "News feed",
+          "default": "block",
+          "locked": false
+        },
+        {
+          "id": "reels",
+          "label": "Reels & video",
+          "default": "block",
+          "locked": false
+        }
+      ],
+      "routes": [],
+      "fallbackFeature": "messages",
+      "androidPackages": [
+        "com.facebook.katana"
+      ],
+      "examples": []
+    },
+    {
+      "id": "snapchat",
+      "label": "Snapchat",
+      "hosts": [],
+      "appHosts": [],
+      "networkDomains": [],
+      "features": [
+        {
+          "id": "chat",
+          "label": "Chat",
+          "default": "allow",
+          "locked": false
+        },
+        {
+          "id": "camera",
+          "label": "Camera",
+          "default": "allow",
+          "locked": false
+        },
+        {
+          "id": "stories",
+          "label": "Friends’ stories",
+          "default": "allow",
+          "locked": false
+        },
+        {
+          "id": "spotlight",
+          "label": "Spotlight",
+          "default": "block",
+          "locked": false
+        },
+        {
+          "id": "discover",
+          "label": "Discover",
+          "default": "block",
+          "locked": false
+        }
+      ],
+      "routes": [],
+      "fallbackFeature": "chat",
+      "androidPackages": [
+        "com.snapchat.android"
+      ],
+      "examples": []
     }
   ]
 }
