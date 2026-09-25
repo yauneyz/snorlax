@@ -18,6 +18,8 @@ export default [
       "**/.pnpm/**",
       "**/.pnpm-store/**",
       "native/**/target/**",
+      "packages/engine-wasm/pkg/**",
+      "packages/shared/src/generated/**",
       "apps/web/**",
       "apps/extension/dist/**",
       "apps/desktop/resources/**",

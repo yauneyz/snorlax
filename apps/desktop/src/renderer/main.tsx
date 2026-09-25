@@ -2,6 +2,7 @@ import React from 'react';
 import { createRoot } from 'react-dom/client';
 import { applyPaletteVariables } from '@talysman/shared';
 import App from './App.js';
+import { UnlockPopup } from './components/UnlockPopup.js';
 import { ErrorBoundary } from './components/ErrorBoundary.js';
 import { applyDesktopPaletteOverrides } from './lib/desktopPalette.js';
 import './styles/globals.css';
@@ -23,10 +24,15 @@ window.addEventListener('unhandledrejection', (event) => {
 
 const container = document.getElementById('root');
 if (!container) throw new Error('#root not found');
+
+// The app-blocked popup window loads this same bundle with ?popup=app&app=<AppRef JSON>.
+const query = new URLSearchParams(window.location.search);
+const popupApp = query.get('popup') === 'app' ? query.get('app') : null;
+
 createRoot(container).render(
   <React.StrictMode>
     <ErrorBoundary>
-      <App />
+      {popupApp ? <UnlockPopup target={{ kind: 'app', app: JSON.parse(popupApp) }} /> : <App />}
     </ErrorBoundary>
   </React.StrictMode>,
 );

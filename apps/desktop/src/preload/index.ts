@@ -7,7 +7,7 @@
  */
 
 import { contextBridge, ipcRenderer } from 'electron';
-import type { TransitionKind, UsageTransition } from '@talysman/shared';
+import type { AppRef, TransitionKind, UsageTransition } from '@talysman/shared';
 import type { CheckoutPrice, SubscriptionPlan } from '../shared/productLimits.js';
 import type { AppPickerItem } from '../shared/appPicker.js';
 
@@ -44,6 +44,9 @@ const Channels = {
   aiModeStatus: 'app:aiModeStatus',
   setAiMode: 'app:setAiMode',
   reportRendererError: 'app:reportRendererError',
+  closePopup: 'app:closePopup',
+  openOverrides: 'app:openOverrides',
+  devSimulateAppBlocked: 'app:devSimulateAppBlocked',
   appEvent: 'app:event',
 } as const;
 
@@ -78,7 +81,7 @@ export interface SubscriptionDetailInfo {
   canceledAt?: string | null;
 }
 
-export type AppEventName = 'authChanged' | 'entitlementChanged';
+export type AppEventName = 'authChanged' | 'entitlementChanged' | 'openOverrides';
 
 export interface ActionResult {
   ok: boolean;
@@ -148,6 +151,13 @@ const api = {
   /** Dev-only: emit one fake extension heartbeat from the mock service. */
   devSimulateExtension: (): Promise<ActionResult> =>
     ipcRenderer.invoke(Channels.devSimulateExtension),
+  /** Dev-only: pretend the mock service just closed a blocked app (shows the unlock popup). */
+  devSimulateAppBlocked: (app: AppRef): Promise<ActionResult> =>
+    ipcRenderer.invoke(Channels.devSimulateAppBlocked, app),
+  /** Close the app-blocked unlock popup window. */
+  closePopup: (): Promise<ActionResult> => ipcRenderer.invoke(Channels.closePopup),
+  /** Close the popup and open the key-gated override options in the main window. */
+  openOverrides: (): Promise<ActionResult> => ipcRenderer.invoke(Channels.openOverrides),
 
   /** Dev-only: push one fake exact-usage transition into the mock service's usage log. */
   devPushUsageTransition: (

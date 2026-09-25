@@ -8,7 +8,7 @@
 import { test, expect, type Page } from '@playwright/test';
 import { launchApp } from './launch.js';
 
-/** The Blocklists heading doubles as the profile switcher; it names the profile being edited. */
+/** The Profiles page heading doubles as the profile switcher; it names the profile being edited. */
 function switcher(win: Page) {
   return win.locator('button[aria-expanded]').filter({ hasText: 'to switch between' });
 }
@@ -19,7 +19,7 @@ async function closeMenu(win: Page) {
   await expect(switcher(win)).toHaveAttribute('aria-expanded', 'false');
 }
 
-test('Pro gets unlimited blocking profiles, Free gets one', async () => {
+test('Pro gets unlimited blocking profiles that run side by side, Free gets one', async () => {
   const app = await launchApp();
   try {
     const win = await app.firstWindow();
@@ -32,19 +32,21 @@ test('Pro gets unlimited blocking profiles, Free gets one', async () => {
     await win.getByRole('button', { name: 'Settings' }).click();
     await devPlan.getByText('Pro').click();
 
-    await win.getByRole('button', { name: 'Blocklists' }).click();
+    // Turning a profile on needs a paired key.
+    await win.getByRole('button', { name: 'Keys' }).click();
+    await win.getByRole('button', { name: 'Pair this drive' }).click();
 
-    // One profile out of the box, and it is the one focus enforces.
+    await win.getByRole('button', { name: 'Profiles' }).click();
+
+    // One profile out of the box, switched off.
     await expect(switcher(win)).toContainText('Default');
-    await expect(win.getByText('ENFORCING NOW')).toBeVisible();
+    await expect(win.getByRole('switch', { name: 'Default off' })).toBeVisible();
 
-    // Pro can add profiles. The new one is selected for editing but does not take over
-    // enforcement until it is explicitly activated.
+    // Pro can add profiles; a new one starts off.
     await switcher(win).click();
     await expect(win.getByText('SWITCH PROFILE · 1', { exact: true })).toBeVisible();
     await win.getByRole('button', { name: 'New profile' }).click();
     await expect(switcher(win)).toContainText('Profile 2');
-    await expect(win.getByRole('button', { name: 'Activate now' })).toBeVisible();
 
     // Renaming writes through to the switcher.
     await switcher(win).click();
@@ -52,20 +54,20 @@ test('Pro gets unlimited blocking profiles, Free gets one', async () => {
     await nameField.fill('Evening');
     await nameField.press('Enter');
     await expect(switcher(win)).toContainText('Evening');
-    await closeMenu(win);
+    // Make it the profile "Turn on focus" uses.
+    await win.getByRole('button', { name: 'Use Evening for “Turn on focus”' }).click();
 
-    // Activating it moves enforcement with it.
-    await win.getByRole('button', { name: 'Activate now' }).click();
-    await expect(win.getByText('ENFORCING NOW')).toBeVisible();
+    // Switching it on is free and leaves other profiles alone.
+    await win.getByRole('switch', { name: 'Evening off' }).click();
+    await expect(win.getByRole('switch', { name: 'Evening on' })).toBeVisible();
 
-    // Drop to Free: the allowance shows up and "New profile" becomes an upgrade prompt.
+    // Drop to Free: the default profile is kept and the idle one is trimmed.
     await win.getByRole('button', { name: 'Settings' }).click();
     await devPlan.getByText('Free').click();
 
-    await win.getByRole('button', { name: 'Blocklists' }).click();
+    await win.getByRole('button', { name: 'Profiles' }).click();
     await expect(switcher(win)).toContainText('Evening');
     await switcher(win).click();
-    // Trimming to the Free allowance keeps whatever was being enforced, not merely the first.
     await expect(win.getByText('SWITCH PROFILE · 1/1', { exact: true })).toBeVisible();
     await expect(win.getByRole('button', { name: /^Default/ })).toBeHidden();
 

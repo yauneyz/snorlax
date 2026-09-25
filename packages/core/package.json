@@ -7,8 +7,7 @@
   "types": "./src/index.ts",
   "exports": {
     ".": "./src/index.ts",
-    "./browser": "./src/browser.ts",
-    "./schedule": "./src/scheduleEngine.ts"
+    "./browser": "./src/browser.ts"
   },
   "dependencies": {
     "@talysman/shared": "workspace:*"

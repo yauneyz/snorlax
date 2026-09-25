@@ -1,23 +1,60 @@
 {
-  "$comment": "Language-neutral mirror of packages/shared/src/protocol.ts + events.ts. NDJSON carries one envelope per line.",
-  "protocolVersion": 5,
+  "$comment": "Language-neutral summary of packages/shared/src/protocol.ts + events.ts. NDJSON carries one envelope per line. Engine types (Command, Gate, EngineSnapshot, PopupTarget, PopupInfo, Profile, …) are generated from native/engine by ts-rs into packages/shared/src/generated — that directory is their schema.",
+  "protocolVersion": 6,
   "transport": {
     "windows": "named pipe \\\\.\\pipe\\talysman (dev: talysman-dev)",
     "linux": "Unix socket /run/talysman/talysman.sock",
     "macos": "Unix socket /var/run/talysman/talysman.sock"
   },
   "envelopes": {
-    "request": { "kind": "request", "id": "number", "method": "string", "params": "object" },
-    "responseOk": { "kind": "response", "id": "number", "ok": true, "result": "object" },
-    "responseErr": { "kind": "response", "id": "number", "ok": false, "code": "string", "message": "string" },
-    "event": { "kind": "event", "event": "string", "payload": "object" }
+    "request": {
+      "kind": "request",
+      "id": "number",
+      "method": "string",
+      "params": "object"
+    },
+    "responseOk": {
+      "kind": "response",
+      "id": "number",
+      "ok": true,
+      "result": "object"
+    },
+    "responseErr": {
+      "kind": "response",
+      "id": "number",
+      "ok": false,
+      "code": "string",
+      "message": "string"
+    },
+    "event": {
+      "kind": "event",
+      "event": "string",
+      "payload": "object"
+    }
   },
   "types": {
-    "AppRef": { "windowsImageName": "string?", "linuxProcessName": "string?", "macBundleId": "string?", "label": "string" },
+    "AppRef": {
+      "windowsImageName": "string?",
+      "linuxProcessName": "string?",
+      "macBundleId": "string?",
+      "androidPackage": "string?",
+      "label": "string"
+    },
     "RuleAction": "allow|judge|block",
-    "JudgeTask": { "id": "string", "title": "string", "notes": "string?" },
-    "JudgePolicy": { "tasks": "JudgeTask[]", "avoid": "string[]", "fallback": "allow|block" },
-    "SiteRule": { "features": "Record<featureId, RuleAction>", "$comment": "Feature ids come from the site catalog (packages/shared/src/sites); omitted features use the catalog default." },
+    "JudgeTask": {
+      "id": "string",
+      "title": "string",
+      "notes": "string?"
+    },
+    "JudgePolicy": {
+      "tasks": "JudgeTask[]",
+      "avoid": "string[]",
+      "fallback": "allow|block"
+    },
+    "SiteRule": {
+      "features": "Record<featureId, RuleAction>",
+      "$comment": "Feature ids come from the site catalog (packages/shared/src/sites); omitted features use the catalog default."
+    },
     "Policy": {
       "blockedDomains": "string[]",
       "allowedDomains": "string[]",
@@ -28,71 +65,301 @@
       "sites": "Record<siteId, SiteRule>",
       "$comment": "The sole current policy shape. Legacy mode/domains (pre-profiles) and softBlockedSites/intent (protocol 4) are accepted only while reading old persisted state or old clients."
     },
-    "JudgeContext": { "site": "string", "feature": "string" },
-    "JudgePage": { "url": "string", "title": "string", "content": "string", "context": "JudgeContext?" },
-    "Profile": { "id": "string", "name": "string", "color": "string", "policy": "Policy" },
-    "ScheduleWindow": { "id": "string", "days": "string[]", "start": "HH:MM", "end": "HH:MM", "profileId": "string?", "locked": "boolean" },
-    "Schedule": { "windows": "ScheduleWindow[]" },
-    "Settings": { "browserHandshakeEnabled": "boolean", "trayIconEnabled": "boolean", "smartFilteringEnabled": "boolean" },
-    "BrowserHealth": { "canBlock": "boolean", "permissionsOk": "boolean", "dnrRulesApplied": "number?" },
+    "JudgeContext": {
+      "site": "string",
+      "feature": "string"
+    },
+    "JudgePage": {
+      "url": "string",
+      "title": "string",
+      "content": "string",
+      "context": "JudgeContext?"
+    },
+    "Settings": {
+      "browserHandshakeEnabled": "boolean",
+      "trayIconEnabled": "boolean",
+      "smartFilteringEnabled": "boolean"
+    },
+    "BrowserHealth": {
+      "canBlock": "boolean",
+      "permissionsOk": "boolean",
+      "dnrRulesApplied": "number?"
+    },
     "FocusSource": "user|schedule|boot",
     "TransitionKind": "focusOn|focusOff|scheduleFired|keyPresent|keyAbsent",
-    "UsageTransition": { "seq": "number", "at": "number", "kind": "TransitionKind", "source": "FocusSource" },
+    "UsageTransition": {
+      "seq": "number",
+      "at": "number",
+      "kind": "TransitionKind",
+      "source": "FocusSource"
+    },
     "ServiceState": {
       "protocolVersion": "number",
       "serviceVersion": "string",
       "focusActive": "boolean",
       "focusSource": "FocusSource",
-      "profiles": "Profile[]",
-      "activeProfileId": "string",
       "policy": "Policy",
-      "schedule": "Schedule",
+      "engine": "EngineSnapshot (generated)",
       "settings": "Settings",
       "pairedKeys": "PairedKey[]",
       "keyPresent": "boolean",
       "presentKeyId": "string?",
-      "scheduleLocked": "boolean"
+      "scheduleLocked": "boolean",
+      "$comment": "focusActive/policy keep their v5 meaning for natmsg, tray and CLIs: whether anything is enforced, and the flat merged policy."
     }
   },
   "methods": {
-    "getState": { "params": null, "result": "ServiceState" },
-    "ping": { "params": null, "result": { "version": "string", "protocolVersion": "number" } },
-    "getKeyPresence": { "params": null, "result": { "present": "boolean", "keyId": "string?" } },
-    "setPolicy": { "params": { "policy": "Policy" }, "result": { "ok": true }, "errors": ["KEY_REQUIRED"] },
-    "setProfile": { "params": { "profile": "Profile" }, "result": { "ok": true }, "errors": ["KEY_REQUIRED", "BAD_REQUEST"] },
-    "deleteProfile": { "params": { "profileId": "string" }, "result": { "ok": true }, "errors": ["KEY_REQUIRED", "LOCKED", "LAST_PROFILE", "BAD_REQUEST"] },
-    "setActiveProfile": { "params": { "profileId": "string" }, "result": { "ok": true }, "errors": ["KEY_REQUIRED", "LOCKED", "BAD_REQUEST"] },
-    "setSchedule": { "params": { "schedule": "Schedule" }, "result": { "ok": true } },
-    "setBrowserHandshake": { "params": { "enabled": "boolean" }, "result": { "ok": true }, "errors": ["KEY_REQUIRED", "LOCKED"] },
-    "setTrayIconEnabled": { "params": { "enabled": "boolean" }, "result": { "ok": true } },
-    "setSmartFilteringEnabled": { "params": { "enabled": "boolean" }, "result": { "ok": true } },
-    "extHeartbeat": {
-      "params": { "browserPid": "number", "browser": "string", "workerSessionId": "string?", "sequence": "number?", "sentAt": "number?", "extensionVersion": "string?", "siteCapability": "number?", "lockedActive": "boolean?", "health": "BrowserHealth" },
-      "result": { "heartbeat": { "sequence": "number", "browserPid": "number", "healthy": "boolean" } }
+    "getState": {
+      "params": null,
+      "result": "ServiceState"
     },
-    "enableFocus": { "params": { "reason": "string?" }, "result": { "ok": true }, "errors": ["NO_PAIRED_KEY"] },
-    "disableFocus": { "params": {}, "result": { "ok": true }, "errors": ["KEY_REQUIRED", "LOCKED"] },
-    "toggleFocus": { "params": {}, "result": { "ok": true, "active": "boolean" }, "errors": ["NO_PAIRED_KEY", "KEY_REQUIRED", "LOCKED"] },
-    "drainUsage": { "params": { "afterSeq": "number" }, "result": { "transitions": "UsageTransition[]", "latestSeq": "number" } },
-    "listRemovableDrives": { "params": null, "result": { "drives": "Drive[]" } },
-    "pairKey": { "params": { "driveId": "string", "label": "string" }, "result": { "key": "PairedKey" } },
-    "unpairKey": { "params": { "keyId": "string" }, "result": { "ok": true }, "errors": ["KEY_REQUIRED", "LAST_PAIRED_KEY"] },
-    "judgeRequest": { "params": "JudgePage & { requestId: string }", "result": { "ok": true }, "errors": ["BAD_REQUEST"] },
-    "submitJudgeVerdict": { "params": { "requestId": "string", "verdict": "allow|block", "reason": "string" }, "result": { "ok": true } }
+    "ping": {
+      "params": null,
+      "result": {
+        "version": "string",
+        "protocolVersion": "number"
+      }
+    },
+    "getKeyPresence": {
+      "params": null,
+      "result": {
+        "present": "boolean",
+        "keyId": "string?"
+      }
+    },
+    "applyCommand": {
+      "params": {
+        "command": "Command (generated)",
+        "dryRun": "boolean?"
+      },
+      "result": {
+        "gate": "Gate?",
+        "ok": "true?",
+        "journal": "JournalEntry[]?"
+      },
+      "errors": [
+        "KEY_REQUIRED",
+        "LOCKED",
+        "NO_PAIRED_KEY",
+        "LAST_PROFILE",
+        "BAD_REQUEST",
+        "NO_EMERGENCY_LEFT",
+        "POOL_EXHAUSTED",
+        "FRICTION_PENDING",
+        "POOL_ITEM_CONFLICT",
+        "LIMIT_EXCEEDED",
+        "NOT_BLOCKED"
+      ]
+    },
+    "getPopupInfo": {
+      "params": {
+        "target": "PopupTarget (generated)"
+      },
+      "result": "PopupInfo (generated)"
+    },
+    "setBrowserHandshake": {
+      "params": {
+        "enabled": "boolean"
+      },
+      "result": {
+        "ok": true
+      },
+      "errors": [
+        "KEY_REQUIRED",
+        "LOCKED"
+      ]
+    },
+    "setTrayIconEnabled": {
+      "params": {
+        "enabled": "boolean"
+      },
+      "result": {
+        "ok": true
+      }
+    },
+    "setSmartFilteringEnabled": {
+      "params": {
+        "enabled": "boolean"
+      },
+      "result": {
+        "ok": true
+      }
+    },
+    "extHeartbeat": {
+      "params": {
+        "browserPid": "number",
+        "browser": "string",
+        "workerSessionId": "string?",
+        "sequence": "number?",
+        "sentAt": "number?",
+        "extensionVersion": "string?",
+        "siteCapability": "number?",
+        "lockedActive": "boolean?",
+        "health": "BrowserHealth"
+      },
+      "result": {
+        "heartbeat": {
+          "sequence": "number",
+          "browserPid": "number",
+          "healthy": "boolean"
+        }
+      }
+    },
+    "enableFocus": {
+      "params": {
+        "reason": "string?"
+      },
+      "result": {
+        "ok": true
+      },
+      "errors": [
+        "NO_PAIRED_KEY"
+      ],
+      "$comment": "Tray/CLI shorthand: latch the default profile on."
+    },
+    "disableFocus": {
+      "params": {},
+      "result": {
+        "ok": true
+      },
+      "errors": [
+        "KEY_REQUIRED",
+        "LOCKED"
+      ],
+      "$comment": "Tray/CLI shorthand: override (1), everything off until re-enabled."
+    },
+    "toggleFocus": {
+      "params": {},
+      "result": {
+        "ok": true,
+        "active": "boolean"
+      },
+      "errors": [
+        "NO_PAIRED_KEY",
+        "KEY_REQUIRED",
+        "LOCKED"
+      ]
+    },
+    "drainUsage": {
+      "params": {
+        "afterSeq": "number"
+      },
+      "result": {
+        "transitions": "UsageTransition[]",
+        "latestSeq": "number"
+      }
+    },
+    "listRemovableDrives": {
+      "params": null,
+      "result": {
+        "drives": "Drive[]"
+      }
+    },
+    "pairKey": {
+      "params": {
+        "driveId": "string",
+        "label": "string"
+      },
+      "result": {
+        "key": "PairedKey"
+      },
+      "errors": [
+        "KEY_REQUIRED",
+        "BAD_REQUEST"
+      ]
+    },
+    "unpairKey": {
+      "params": {
+        "keyId": "string"
+      },
+      "result": {
+        "ok": true
+      },
+      "errors": [
+        "KEY_REQUIRED",
+        "LAST_PAIRED_KEY"
+      ]
+    },
+    "judgeRequest": {
+      "params": "JudgePage & { requestId: string }",
+      "result": {
+        "ok": true
+      },
+      "errors": [
+        "BAD_REQUEST"
+      ]
+    },
+    "submitJudgeVerdict": {
+      "params": {
+        "requestId": "string",
+        "verdict": "allow|block",
+        "reason": "string"
+      },
+      "result": {
+        "ok": true
+      }
+    }
   },
   "events": {
-    "stateChanged": { "state": "ServiceState" },
-    "keyPresenceChanged": { "present": "boolean", "keyId": "string?" },
-    "focusChanged": { "active": "boolean", "source": "FocusSource" },
-    "policyChanged": { "policy": "Policy" },
-    "profilesChanged": { "profiles": "Profile[]", "activeProfileId": "string" },
-    "scheduleFired": { "windowId": "string", "active": "boolean" },
-    "settingsChanged": { "settings": "Settings" },
-    "browserWatchdogWarning": { "browser": "string", "pid": "number" },
-    "browserWatchdogKilled": { "browser": "string", "pid": "number" },
-    "extensionHeartbeat": { "browser": "string", "pid": "number", "extensionVersion": "string?", "healthy": "boolean" },
+    "stateChanged": {
+      "state": "ServiceState"
+    },
+    "keyPresenceChanged": {
+      "present": "boolean",
+      "keyId": "string?"
+    },
+    "focusChanged": {
+      "active": "boolean",
+      "source": "FocusSource"
+    },
+    "policyChanged": {
+      "policy": "Policy"
+    },
+    "scheduleFired": {
+      "profileId": "string",
+      "action": "on|off"
+    },
+    "settingsChanged": {
+      "settings": "Settings"
+    },
+    "browserWatchdogWarning": {
+      "browser": "string",
+      "pid": "number"
+    },
+    "browserWatchdogKilled": {
+      "browser": "string",
+      "pid": "number"
+    },
+    "extensionHeartbeat": {
+      "browser": "string",
+      "pid": "number",
+      "extensionVersion": "string?",
+      "healthy": "boolean"
+    },
     "judgeRequested": "JudgePage & { requestId: string, judge: JudgePolicy }",
-    "judgeResult": { "requestId": "string", "url": "string", "verdict": "allow|block", "reason": "string" }
+    "judgeResult": {
+      "requestId": "string",
+      "url": "string",
+      "verdict": "allow|block",
+      "reason": "string"
+    },
+    "appBlocked": {
+      "app": "AppRef"
+    }
   },
-  "errorCodes": ["KEY_REQUIRED", "NO_PAIRED_KEY", "LAST_PAIRED_KEY", "LAST_PROFILE", "LOCKED", "BAD_REQUEST", "INTERNAL"]
+  "errorCodes": [
+    "KEY_REQUIRED",
+    "NO_PAIRED_KEY",
+    "LAST_PAIRED_KEY",
+    "LAST_PROFILE",
+    "LOCKED",
+    "BAD_REQUEST",
+    "INTERNAL",
+    "NO_EMERGENCY_LEFT",
+    "POOL_EXHAUSTED",
+    "FRICTION_PENDING",
+    "POOL_ITEM_CONFLICT",
+    "LIMIT_EXCEEDED",
+    "NOT_BLOCKED"
+  ]
 }

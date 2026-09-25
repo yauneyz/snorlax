@@ -12,7 +12,7 @@
 use std::collections::BTreeMap;
 use std::sync::OnceLock;
 
-use regex::Regex;
+use regex_lite::Regex;
 use serde::Deserialize;
 
 use crate::policy::{RuleAction, SiteRule};

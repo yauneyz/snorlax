@@ -1,7 +1,7 @@
 /**
  * Pure exact-usage rollup (architecture §7/Phase 7): turn a device's raw focus transition log
  * into per-local-date usage rows. This is the canonical implementation — the Rust service only
- * ever records raw transitions; all bucketing logic lives here, mirroring `scheduleEngine.ts`'s
+ * ever records raw transitions; all bucketing logic lives here, mirroring the Rust engine's
  * style (clock passed in explicitly, no Electron/native imports) so it is unit-testable without
  * a running app.
  */

@@ -57,8 +57,8 @@ export async function getAiModeEnabled(service: ServiceConnection): Promise<bool
     cache = stored;
     return cache;
   }
-  const { profiles } = await service.request('getState', undefined);
-  cache = resolveAiModeEnabled(undefined, profiles);
+  const { engine } = await service.request('getState', undefined);
+  cache = resolveAiModeEnabled(undefined, engine.profiles.map((status) => status.profile));
   // Pin the default so it doesn't flip later when the user's rules change.
   await persist(cache);
   return cache;

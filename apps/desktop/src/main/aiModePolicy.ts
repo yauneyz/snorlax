@@ -13,7 +13,7 @@ import { policyHasJudgeRule } from '@talysman/product';
  */
 export function resolveAiModeEnabled(stored: boolean | undefined, profiles: readonly Profile[]): boolean {
   if (stored !== undefined) return stored;
-  return profiles.some((profile) => policyHasJudgeRule(profile.policy));
+  return profiles.some((profile) => policyHasJudgeRule(profile.config.policy));
 }
 
 /** What the daemon's `smartFilteringEnabled` capability flag should be: build flag AND user choice. */

@@ -8,9 +8,8 @@
  */
 
 import type { Policy } from './policy.js';
-import type { Profile } from './profile.js';
-import type { Schedule } from './schedule.js';
 import type { Settings, BrowserHealth } from './settings.js';
+import type { Command, EngineSnapshot, Gate, JournalEntry, PopupInfo, PopupTarget } from './generated/index.js';
 import type { ErrorCode } from './constants.js';
 import type { JudgePage, JudgeVerdict } from './judge.js';
 
@@ -57,24 +56,25 @@ export interface UsageTransition {
   source: FocusSource;
 }
 
-/** Full authoritative snapshot returned by `getState` and broadcast on changes. */
+/**
+ * Full authoritative snapshot returned by `getState` and broadcast on changes (protocol 6).
+ * `focusActive`/`policy` keep their v5 meaning for the native-messaging hosts, tray, and CLIs:
+ * whether anything is enforced, and the one flat policy enforcement applies (every active
+ * profile merged, most restrictive wins). Profiles, schedules, overrides, pools, the streak and
+ * emergency unlocks are all in `engine`.
+ */
 export interface ServiceState {
   protocolVersion: number;
   serviceVersion: string;
   focusActive: boolean;
   focusSource: FocusSource;
-  /** Every blocking profile the user has defined; never empty. */
-  profiles: Profile[];
-  /** Which profile focus enforces right now. */
-  activeProfileId: string;
-  /** Derived: the active profile's policy. This is what enforcement actually applies. */
   policy: Policy;
-  schedule: Schedule;
+  engine: EngineSnapshot;
   settings: Settings;
   pairedKeys: PairedKey[];
   keyPresent: boolean;
   presentKeyId?: string;
-  /** True when a `locked` schedule window is currently active (disable is blocked). */
+  /** Some active profile is held by a locked schedule window. */
   scheduleLocked: boolean;
 }
 
@@ -85,27 +85,17 @@ export interface ServiceState {
 export interface RequestMap {
   getState: { params: void; result: ServiceState };
   /**
-   * Edit the **active** profile's policy. Kept as the flat shorthand the blocklist editor uses;
-   * gated exactly like `setProfile` on the active profile.
+   * Run one engine command (spec §4.3): profile edits, turning profiles on/off, pool unlocks,
+   * overrides, emergency unlocks. The service asks for the USB key itself when the engine's gate
+   * says so (KEY_REQUIRED / LOCKED otherwise). With `dryRun` nothing changes and the gate is
+   * returned instead, so the UI can show the key prompt (and what's being loosened) up front.
    */
-  setPolicy: { params: { policy: Policy }; result: Ok };
-  /**
-   * Create or replace one profile. Relaxing a profile's policy is key-gated — a profile that is
-   * not active today may be switched in by a locked schedule window tomorrow, so pre-loosening
-   * it must cost the same as loosening the live one.
-   */
-  setProfile: { params: { profile: Profile }; result: Ok };
-  /**
-   * Remove a profile. Key-gated when the profile is active or referenced by a schedule window;
-   * may fail LAST_PROFILE when it is the only one left.
-   */
-  deleteProfile: { params: { profileId: string }; result: Ok };
-  /**
-   * Switch which profile focus enforces. Free while focus is off; key-gated while focus is
-   * active (any switch can relax what is currently blocked) and refused during a locked window.
-   */
-  setActiveProfile: { params: { profileId: string }; result: Ok };
-  setSchedule: { params: { schedule: Schedule }; result: Ok };
+  applyCommand: {
+    params: { command: Command; dryRun?: boolean };
+    result: { gate?: Gate; ok?: true; journal?: JournalEntry[] };
+  };
+  /** What the block/unlock popup shows for a URL or app. */
+  getPopupInfo: { params: { target: PopupTarget }; result: PopupInfo };
   /**
    * Toggle the browser handshake strict mode. Enabling is free; **disabling** is gated
    * exactly like `disableFocus` (the service re-checks USB presence) and may fail KEY_REQUIRED /
@@ -144,13 +134,13 @@ export interface RequestMap {
     };
     result: { heartbeat: { sequence: number; browserPid: number; healthy: boolean } };
   };
-  /** Requires at least one paired key; may fail NO_PAIRED_KEY. */
+  /** Tray/CLI shorthand: turn the default profile on. May fail NO_PAIRED_KEY. */
   enableFocus: { params: { reason?: string }; result: Ok };
-  /** Service re-checks USB presence itself; may fail KEY_REQUIRED / LOCKED. */
+  /** Tray/CLI shorthand: override (1), everything off until re-enabled. KEY_REQUIRED / LOCKED. */
   disableFocus: { params: Record<string, never>; result: Ok };
-  /** Turning on is free; turning off uses the same key and schedule gates as `disableFocus`. */
   toggleFocus: { params: Record<string, never>; result: Ok & { active: boolean } };
   listRemovableDrives: { params: void; result: { drives: Drive[] } };
+  /** Free with nothing active; otherwise an already-paired key must be present (KEY_REQUIRED). */
   pairKey: { params: { driveId: string; label: string }; result: { key: PairedKey } };
   /** Removing a key is itself key-gated and may not remove the final paired key. */
   unpairKey: { params: { keyId: string }; result: Ok };

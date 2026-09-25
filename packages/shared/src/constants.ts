@@ -4,7 +4,7 @@
  */
 
 /** Protocol version negotiated on connect; bump on breaking RPC changes. */
-export const PROTOCOL_VERSION = 5;
+export const PROTOCOL_VERSION = 6;
 
 /** Deep-link scheme used for the billing return (Phase 3) and tray re-focus. */
 export const DEEP_LINK_SCHEME = 'talysman';
@@ -36,7 +36,7 @@ export const PIPE_BASE_DEV = 'talysman-dev';
 
 /** Standard error codes returned by the service across the IPC boundary. */
 export const ErrorCode = {
-  /** Disable refused: no paired USB key physically present right now. */
+  /** Refused: this needs a paired USB key physically present right now. */
   KEY_REQUIRED: 'KEY_REQUIRED',
   /** Enable refused: no USB key has been paired yet. */
   NO_PAIRED_KEY: 'NO_PAIRED_KEY',
@@ -44,12 +44,24 @@ export const ErrorCode = {
   LAST_PAIRED_KEY: 'LAST_PAIRED_KEY',
   /** Profile delete refused: the requested profile is the only one left. */
   LAST_PROFILE: 'LAST_PROFILE',
-  /** Disable refused: a `locked` schedule window is currently active. */
+  /** Refused: a `locked` schedule window holds the affected profile (only an emergency unlock gets past it). */
   LOCKED: 'LOCKED',
   /** Generic bad request / validation failure. */
   BAD_REQUEST: 'BAD_REQUEST',
   /** Service-internal failure. */
   INTERNAL: 'INTERNAL',
+  /** Emergency unlock refused: all lifetime emergency unlocks are used. */
+  NO_EMERGENCY_LEFT: 'NO_EMERGENCY_LEFT',
+  /** Pool unlock refused: no unlocks left in the pool today. */
+  POOL_EXHAUSTED: 'POOL_EXHAUSTED',
+  /** Pool unlock confirm refused: the pause (friction) hasn't elapsed. */
+  FRICTION_PENDING: 'FRICTION_PENDING',
+  /** Profile save refused: an item may belong to only one pool per profile. */
+  POOL_ITEM_CONFLICT: 'POOL_ITEM_CONFLICT',
+  /** A plan limit (e.g. profile count) would be exceeded. */
+  LIMIT_EXCEEDED: 'LIMIT_EXCEEDED',
+  /** Nothing to unlock: the item isn't blocked. */
+  NOT_BLOCKED: 'NOT_BLOCKED',
 } as const;
 
 export type ErrorCode = (typeof ErrorCode)[keyof typeof ErrorCode];

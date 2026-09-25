@@ -4,6 +4,7 @@
  */
 
 import type {
+  AppRef,
   EventMap,
   EventName,
   Method,
@@ -59,6 +60,9 @@ export const devToggleKey = () => window.api.devToggleKey();
 export const devSimulateExtension = () => window.api.devSimulateExtension();
 export const devPushUsageTransition = (kind: TransitionKind) =>
   window.api.devPushUsageTransition(kind);
+export const devSimulateAppBlocked = (app: AppRef) => window.api.devSimulateAppBlocked(app);
+export const closePopup = () => window.api.closePopup();
+export const openOverrides = () => window.api.openOverrides();
 export const entitlement = () => window.api.entitlement();
 export const devSetEntitlementPlan = (plan: SubscriptionPlan) =>
   window.api.devSetEntitlementPlan(plan);

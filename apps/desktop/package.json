@@ -15,6 +15,7 @@
     "@supabase/supabase-js": "^2.47.10",
     "@talysman/auth-contracts": "workspace:*",
     "@talysman/core": "workspace:*",
+    "@talysman/engine-wasm": "workspace:*",
     "@talysman/product": "workspace:*",
     "@talysman/shared": "workspace:*",
     "electron-log": "^5.2.0",

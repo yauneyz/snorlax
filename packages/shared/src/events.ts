@@ -1,7 +1,7 @@
 /** Server-pushed event types (architecture §6). The service pushes these unsolicited. */
 
-import type { Policy } from './policy.js';
-import type { Profile } from './profile.js';
+import type { AppRef, Policy } from './policy.js';
+import type { OnOff } from './schedule.js';
 import type { Settings } from './settings.js';
 import type { FocusSource, ServiceState } from './protocol.js';
 import type { JudgePolicy } from './policy.js';
@@ -12,11 +12,15 @@ export interface EventMap {
   stateChanged: { state: ServiceState };
   keyPresenceChanged: { present: boolean; keyId?: string };
   focusChanged: { active: boolean; source: FocusSource };
-  /** The enforced (active profile's) policy changed, for whatever reason. */
+  /** The enforced (merged, flat) policy changed, for whatever reason. */
   policyChanged: { policy: Policy };
-  /** The profile set or the active profile changed. */
-  profilesChanged: { profiles: Profile[]; activeProfileId: string };
-  scheduleFired: { windowId: string; active: boolean };
+  /** An "on at"/"off at" rule or one-shot event flipped a profile. */
+  scheduleFired: { profileId: string; action: OnOff };
+  /**
+   * The service closed a blocked desktop app. Electron fetches `getPopupInfo` for it and shows
+   * the unlock popup (streak, pools, other options).
+   */
+  appBlocked: { app: AppRef };
   settingsChanged: { settings: Settings };
   /**
    * The browser handshake watchdog is about to close a browser whose extension stopped responding

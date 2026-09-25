@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import type { Profile } from '@talysman/shared';
-import { DEFAULT_PROFILE_ID, EMPTY_POLICY, ErrorCode, palette } from '@talysman/shared';
+import type { Command, ProfileConfig } from '@talysman/shared';
+import {
+  DEFAULT_PROFILE_ID,
+  EMERGENCY_LIFETIME_LIMIT,
+  EMPTY_POLICY,
+  ErrorCode,
+  emptyProfileConfig,
+  palette,
+} from '@talysman/shared';
 import { MockServiceConnection } from '../../helpers/mockService.js';
 
 async function pairMockKey(svc: MockServiceConnection, driveId = 'mock-drive-1') {
@@ -94,141 +101,169 @@ describe('MockServiceConnection — focus and key gates', () => {
   });
 });
 
-const evening: Profile = {
-  id: 'evening',
-  name: 'Evening',
-  color: palette.colors.profileCoral,
-  policy: { ...EMPTY_POLICY, defaultAction: 'block' },
-};
-
-async function addEvening(svc: MockServiceConnection) {
-  await svc.request('setProfile', { profile: evening });
+function eveningConfig(): ProfileConfig {
+  return { ...emptyProfileConfig(), policy: { ...EMPTY_POLICY, defaultAction: 'block' } };
 }
 
-describe('MockServiceConnection — blocking profiles', () => {
-  it('starts with one profile and reports its policy as the enforced one', async () => {
+const evening = (config: ProfileConfig = eveningConfig()): Command => ({
+  type: 'upsertProfile',
+  profile: { id: 'evening', name: 'Evening', color: palette.colors.profileCoral, config },
+});
+
+const apply = (svc: MockServiceConnection, command: Command) => svc.request('applyCommand', { command });
+
+describe('MockServiceConnection — blocking profiles (engine-backed)', () => {
+  it('starts with one idle default profile', async () => {
     const svc = new MockServiceConnection();
     const state = await svc.request('getState', undefined);
 
-    expect(state.profiles).toHaveLength(1);
-    expect(state.activeProfileId).toBe(DEFAULT_PROFILE_ID);
-    expect(state.policy).toEqual(state.profiles[0]!.policy);
+    expect(state.engine.profiles).toHaveLength(1);
+    expect(state.engine.defaultProfileId).toBe(DEFAULT_PROFILE_ID);
+    expect(state.focusActive).toBe(false);
+    expect(state.engine.emergencyLeft).toBe(EMERGENCY_LIFETIME_LIMIT);
   });
 
-  it('edits the active profile when setPolicy is used', async () => {
+  it('runs several profiles at once and enforces their union', async () => {
     const svc = new MockServiceConnection();
-    await svc.request('setPolicy', {
-      policy: { ...EMPTY_POLICY, blockedDomains: ['news.example.com'] },
-    });
-
-    const state = await svc.request('getState', undefined);
-    expect(state.profiles[0]!.policy.blockedDomains).toEqual(['news.example.com']);
-    expect(state.policy.blockedDomains).toEqual(['news.example.com']);
-  });
-
-  it('adds a profile without disturbing which one is enforced', async () => {
-    const svc = new MockServiceConnection();
-    await addEvening(svc);
-
-    const state = await svc.request('getState', undefined);
-    expect(state.profiles.map((p) => p.id)).toEqual([DEFAULT_PROFILE_ID, 'evening']);
-    expect(state.activeProfileId).toBe(DEFAULT_PROFILE_ID);
-    expect(state.policy.defaultAction).toBe('allow');
-  });
-
-  it('switches the enforced policy when the active profile changes', async () => {
-    const svc = new MockServiceConnection();
-    await addEvening(svc);
-    const seen: string[] = [];
-    svc.on('policyChanged', ({ policy }) => seen.push(policy.defaultAction));
-
-    await svc.request('setActiveProfile', { profileId: 'evening' });
-
-    const state = await svc.request('getState', undefined);
-    expect(state.activeProfileId).toBe('evening');
-    expect(state.policy.defaultAction).toBe('block');
-    expect(seen).toEqual(['block']);
-  });
-
-  it('requires the key to switch profiles while focus is on', async () => {
-    const svc = new MockServiceConnection();
-    await addEvening(svc);
     await pairMockKey(svc);
-    await svc.request('enableFocus', { reason: 'test' });
+    await apply(svc, evening());
+    await apply(svc, { type: 'setLatch', profileId: DEFAULT_PROFILE_ID, on: true });
+    await apply(svc, { type: 'setLatch', profileId: 'evening', on: true });
 
-    await expect(svc.request('setActiveProfile', { profileId: 'evening' })).rejects.toMatchObject({
-      code: ErrorCode.KEY_REQUIRED,
-    });
+    const state = await svc.request('getState', undefined);
+    expect(state.engine.profiles.every((p) => p.activation.active)).toBe(true);
+    expect(state.policy.defaultAction).toBe('block');
+    expect(state.policy.blockedDomains).toEqual(['youtube.com', '*.reddit.com']);
+  });
+
+  it('dry-runs a loosening edit to show the key prompt, then gates it', async () => {
+    const svc = new MockServiceConnection();
+    await pairMockKey(svc);
+    await apply(svc, { type: 'setLatch', profileId: DEFAULT_PROFILE_ID, on: true });
+    const state = await svc.request('getState', undefined);
+    const current = state.engine.profiles[0]!.profile;
+    const loosened: Command = {
+      type: 'upsertProfile',
+      profile: { ...current, config: { ...current.config, policy: { ...current.config.policy, blockedDomains: [] } } },
+    };
+
+    const dry = await svc.request('applyCommand', { command: loosened, dryRun: true });
+    expect(dry.gate).toMatchObject({ kind: 'needsKey' });
+    await expect(apply(svc, loosened)).rejects.toMatchObject({ code: ErrorCode.KEY_REQUIRED });
 
     svc.devToggleKey(); // plug in
-    await svc.request('setActiveProfile', { profileId: 'evening' });
-    expect((await svc.request('getState', undefined)).activeProfileId).toBe('evening');
+    await apply(svc, loosened);
+    expect((await svc.request('getState', undefined)).policy.blockedDomains).toEqual([]);
   });
 
   it('refuses to delete the last profile', async () => {
     const svc = new MockServiceConnection();
-    await expect(
-      svc.request('deleteProfile', { profileId: DEFAULT_PROFILE_ID }),
-    ).rejects.toMatchObject({ code: ErrorCode.LAST_PROFILE });
+    await expect(apply(svc, { type: 'deleteProfile', profileId: DEFAULT_PROFILE_ID })).rejects.toMatchObject({
+      code: ErrorCode.LAST_PROFILE,
+    });
   });
 
-  it('deletes an idle profile freely but key-gates deleting the active one', async () => {
+  it('deletes an idle profile freely but key-gates deleting one that is on or scheduled', async () => {
     const svc = new MockServiceConnection();
-    await addEvening(svc);
+    await apply(svc, evening());
+    await apply(svc, { type: 'deleteProfile', profileId: 'evening' });
+    expect((await svc.request('getState', undefined)).engine.profiles).toHaveLength(1);
 
-    // "evening" is neither active nor scheduled, so it goes without the key.
-    await svc.request('deleteProfile', { profileId: 'evening' });
-    expect((await svc.request('getState', undefined)).profiles).toHaveLength(1);
-
-    await addEvening(svc);
-    await svc.request('setActiveProfile', { profileId: 'evening' });
+    const scheduled = eveningConfig();
+    scheduled.schedule = [{ kind: 'window', id: 'w1', days: ['mon'], start: '19:00', end: '22:00', locked: false }];
+    await apply(svc, evening(scheduled));
     await pairMockKey(svc);
-    await expect(svc.request('deleteProfile', { profileId: 'evening' })).rejects.toMatchObject({
+    await expect(apply(svc, { type: 'deleteProfile', profileId: 'evening' })).rejects.toMatchObject({
       code: ErrorCode.KEY_REQUIRED,
     });
   });
 
-  it('falls the schedule back to the active profile when a scheduled profile is deleted', async () => {
+  it('duplicates a profile with its whole config, switched off', async () => {
     const svc = new MockServiceConnection();
-    await addEvening(svc);
-    await svc.request('setSchedule', {
-      schedule: {
-        windows: [
-          { id: 'w1', days: ['mon'], start: '19:00', end: '22:00', locked: false, profileId: 'evening' },
-        ],
-      },
-    });
-    await pairMockKey(svc);
-    svc.devToggleKey(); // deleting a scheduled profile is key-gated
-
-    await svc.request('deleteProfile', { profileId: 'evening' });
-
-    const state = await svc.request('getState', undefined);
-    expect(state.schedule.windows[0]!.profileId).toBeUndefined();
-    expect(state.profiles).toHaveLength(1);
-  });
-
-  it('rejects a schedule window pointing at an unknown profile', async () => {
-    const svc = new MockServiceConnection();
-    await expect(
-      svc.request('setSchedule', {
-        schedule: {
-          windows: [
-            { id: 'w1', days: ['mon'], start: '09:00', end: '17:00', locked: false, profileId: 'nope' },
-          ],
-        },
-      }),
-    ).rejects.toMatchObject({ code: ErrorCode.BAD_REQUEST });
+    await apply(svc, { type: 'duplicateProfile', profileId: DEFAULT_PROFILE_ID, newId: 'copy' });
+    const copy = (await svc.request('getState', undefined)).engine.profiles.find((p) => p.profile.id === 'copy')!;
+    expect(copy.profile.name).toBe('Default copy');
+    expect(copy.profile.config.policy.blockedDomains).toEqual(['youtube.com', '*.reddit.com']);
+    expect(copy.activation.active).toBe(false);
   });
 
   it('rejects a blank or over-long profile name', async () => {
     const svc = new MockServiceConnection();
-    await expect(
-      svc.request('setProfile', { profile: { ...evening, name: '   ' } }),
-    ).rejects.toMatchObject({ code: ErrorCode.BAD_REQUEST });
-    await expect(
-      svc.request('setProfile', { profile: { ...evening, name: 'x'.repeat(41) } }),
-    ).rejects.toMatchObject({ code: ErrorCode.BAD_REQUEST });
+    const named = (name: string): Command => ({
+      type: 'upsertProfile',
+      profile: { id: 'evening', name, color: '#000', config: eveningConfig() },
+    });
+    await expect(apply(svc, named('   '))).rejects.toMatchObject({ code: ErrorCode.BAD_REQUEST });
+    await expect(apply(svc, named('x'.repeat(41)))).rejects.toMatchObject({ code: ErrorCode.BAD_REQUEST });
+  });
+});
+
+describe('MockServiceConnection — pools, overrides, emergency', () => {
+  async function pooledSetup(friction: ProfileConfig['pools'][number]['friction']) {
+    let now = Date.UTC(2026, 8, 21, 10);
+    const svc = new MockServiceConnection(() => now);
+    await pairMockKey(svc);
+    const config = emptyProfileConfig();
+    config.policy = { ...EMPTY_POLICY, blockedDomains: ['reddit.com'] };
+    config.pools = [
+      { id: 'social', name: 'Social', items: [{ kind: 'domain', domain: 'reddit.com' }], unlocksPerDay: 2, unlockMinutes: 10, friction },
+    ];
+    await apply(svc, { type: 'upsertProfile', profile: { id: 'p', name: 'P', color: '#000', config } });
+    await apply(svc, { type: 'setLatch', profileId: 'p', on: true });
+    return { svc, advance: (ms: number) => (now += ms) };
+  }
+
+  it('unlocks a pool after its pause, keylessly, and re-blocks when it expires', async () => {
+    const { svc, advance } = await pooledSetup({ kind: 'countdown', secs: 10 });
+    const target = { kind: 'url' as const, url: 'https://reddit.com/' };
+    const popup = await svc.request('getPopupInfo', { target });
+    expect(popup.unlockAvailable).toBe(true);
+    expect(popup.pools[0]).toMatchObject({ leftToday: 2, unlockMinutes: 10 });
+
+    const pools = [{ profileId: 'p', poolId: 'social' }];
+    await apply(svc, { type: 'requestPoolUnlock', pools });
+    await expect(apply(svc, { type: 'confirmPoolUnlock', pools })).rejects.toMatchObject({
+      code: ErrorCode.FRICTION_PENDING,
+    });
+    advance(10_000);
+    await apply(svc, { type: 'confirmPoolUnlock', pools });
+    expect((await svc.request('getState', undefined)).policy.blockedDomains).toEqual([]);
+
+    advance(10 * 60_000);
+    svc.tick();
+    expect((await svc.request('getState', undefined)).policy.blockedDomains).toEqual(['reddit.com']);
+    expect((await svc.request('getPopupInfo', { target })).pools[0]!.leftToday).toBe(1);
+  });
+
+  it('pauses with the key and resumes on its own', async () => {
+    const { svc, advance } = await pooledSetup({ kind: 'none' });
+    await expect(apply(svc, { type: 'startOverrideTimed', minutes: 15 })).rejects.toMatchObject({
+      code: ErrorCode.KEY_REQUIRED,
+    });
+    svc.devToggleKey();
+    await apply(svc, { type: 'startOverrideTimed', minutes: 15 });
+    expect((await svc.request('getState', undefined)).focusActive).toBe(false);
+    advance(15 * 60_000);
+    svc.tick();
+    const state = await svc.request('getState', undefined);
+    expect(state.focusActive).toBe(true);
+    expect(state.engine.streak.currentDays).toBe(0);
+  });
+
+  it('spends an emergency unlock without a key', async () => {
+    const { svc } = await pooledSetup({ kind: 'none' });
+    await apply(svc, { type: 'emergencyUnlock' });
+    const state = await svc.request('getState', undefined);
+    expect(state.focusActive).toBe(false);
+    expect(state.engine.emergencyLeft).toBe(EMERGENCY_LIFETIME_LIMIT - 1);
+    expect(state.engine.overridden).toBe(true);
+  });
+
+  it('needs an existing key to pair another while blocking is on', async () => {
+    const { svc } = await pooledSetup({ kind: 'none' });
+    await expect(pairMockKey(svc, 'mock-drive-2')).rejects.toMatchObject({ code: ErrorCode.KEY_REQUIRED });
+    svc.devToggleKey();
+    await pairMockKey(svc, 'mock-drive-2');
   });
 });
 

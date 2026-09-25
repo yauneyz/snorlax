@@ -77,6 +77,9 @@ importers:
       '@talysman/core':
         specifier: workspace:*
         version: link:../../packages/core
+      '@talysman/engine-wasm':
+        specifier: workspace:*
+        version: link:../../packages/engine-wasm
       '@talysman/product':
         specifier: workspace:*
         version: link:../../packages/product
@@ -307,6 +310,12 @@ importers:
       '@types/node':
         specifier: ^20.14.0
         version: 20.19.43
+
+  packages/engine-wasm:
+    dependencies:
+      '@talysman/shared':
+        specifier: workspace:*
+        version: link:../shared
 
   packages/product:
     dependencies:

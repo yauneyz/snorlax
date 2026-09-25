@@ -14,13 +14,14 @@ import { Plans } from './pages/Plans.js';
 import { FirstRun } from './components/FirstRun.js';
 import { TalysmanMark } from './components/TalysmanMark.js';
 import { ProfileDot } from './components/ui/index.js';
+import { OverrideDialog } from './components/OverrideDialog.js';
 import { cx, effectiveAction } from './lib/utils.js';
 
 type Route = 'dashboard' | 'blocklists' | 'schedule' | 'keys' | 'account' | 'plans' | 'settings';
 
 const NAV: { route: Route; label: string }[] = [
   { route: 'dashboard', label: 'Dashboard' },
-  { route: 'blocklists', label: 'Blocklists' },
+  { route: 'blocklists', label: 'Profiles' },
   { route: 'schedule', label: 'Schedule' },
   { route: 'keys', label: 'Keys' },
   { route: 'account', label: 'Account' },
@@ -60,6 +61,8 @@ export default function App() {
   const clearWatchdogWarning = useFocusStore((s) => s.clearWatchdogWarning);
   const passwordRecovery = useFocusStore((s) => s.passwordRecovery);
   const onboardingComplete = useFocusStore((s) => s.onboardingComplete);
+  const overridesOpen = useFocusStore((s) => s.overridesOpen);
+  const setOverridesOpen = useFocusStore((s) => s.setOverridesOpen);
   const [route, setRoute] = useState<Route>('dashboard');
 
   useEffect(() => {
@@ -92,6 +95,7 @@ export default function App() {
       )}
     >
       {showFirstRun && <FirstRun onDone={() => setRoute('dashboard')} />}
+      {ready && overridesOpen && <OverrideDialog onClose={() => setOverridesOpen(false)} />}
 
       {/* Nav rail. */}
       <aside className="desktop-sidebar relative flex w-44 shrink-0 flex-col border-r border-white/[0.07] backdrop-blur-xl">

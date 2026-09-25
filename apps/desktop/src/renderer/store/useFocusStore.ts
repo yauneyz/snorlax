@@ -5,15 +5,8 @@
  */
 
 import { create } from 'zustand';
-import type { Policy, Profile, Schedule, ServiceState, Settings } from '@talysman/shared';
-import {
-  DEFAULT_PROFILE,
-  DEFAULT_PROFILE_ID,
-  DEFAULT_SETTINGS,
-  EMPTY_POLICY,
-  EMPTY_SCHEDULE,
-  resolveActiveProfile,
-} from '@talysman/shared';
+import type { EngineSnapshot, Policy, Profile, ServiceState, Settings } from '@talysman/shared';
+import { DEFAULT_PROFILE_ID, DEFAULT_SETTINGS, EMPTY_POLICY } from '@talysman/shared';
 import { productFeaturesForEnvironment } from '@talysman/product';
 import {
   aiModeStatus,
@@ -62,19 +55,26 @@ interface FocusStore {
   /** Display-only subscription snapshot from the web API; undefined when signed out/offline. */
   subscriptionDetail?: SubscriptionDetailInfo;
 
+  /** Anything is being enforced right now (some profile is active). */
   focusActive: boolean;
   keyPresent: boolean;
+  /** An active profile is held by a locked schedule window. */
   scheduleLocked: boolean;
-  /** Every blocking profile the user has defined. */
+  /** Everything the engine reports: profiles and why they're active, overrides, pools, streak. */
+  engine: EngineSnapshot;
+  /** Every blocking profile the user has defined (from `engine`). */
   profiles: Profile[];
-  /** The profile focus enforces; also what the blocklist editor edits. */
-  activeProfileId: string;
-  /** Derived by the service: the active profile's policy. */
+  /** The profile "Turn on focus" (and the tray) latches on. */
+  defaultProfileId: string;
+  /** The merged policy enforcement applies right now. */
   policy: Policy;
-  schedule: Schedule;
   settings: Settings;
   pairedKeys: ServiceState['pairedKeys'];
   serviceVersion: string;
+
+  /** The override sheet (turn everything off / some things off / pause) is open. */
+  overridesOpen: boolean;
+  setOverridesOpen: (open: boolean) => void;
 
   /** Last error surfaced from a request, for transient UI messaging. */
   lastError?: { code: string; message: string };
@@ -122,6 +122,21 @@ interface FocusStore {
 
 let initialization: Promise<void> | undefined;
 
+const EMPTY_SNAPSHOT: EngineSnapshot = {
+  nowMs: 0,
+  generation: 0,
+  profiles: [],
+  defaultProfileId: null,
+  anyActive: false,
+  overrides: { allOff: null, exempt: null, timed: null, suppressed: [], lockedBypass: [] },
+  overridden: false,
+  pools: [],
+  pendingUnlocks: [],
+  streak: { currentDays: 0, bestDays: 0, lastBreakLocalDate: null },
+  emergencyLeft: 5,
+  nextEvents: [],
+};
+
 export const useFocusStore = create<FocusStore>((set, get) => ({
   ready: false,
   usingMock: false,
@@ -145,10 +160,10 @@ export const useFocusStore = create<FocusStore>((set, get) => ({
   focusActive: false,
   keyPresent: false,
   scheduleLocked: false,
-  profiles: [DEFAULT_PROFILE],
-  activeProfileId: DEFAULT_PROFILE_ID,
+  engine: EMPTY_SNAPSHOT,
+  profiles: [],
+  defaultProfileId: DEFAULT_PROFILE_ID,
   policy: EMPTY_POLICY,
-  schedule: EMPTY_SCHEDULE,
   settings: DEFAULT_SETTINGS,
   pairedKeys: [],
   serviceVersion: 'unknown',
@@ -159,14 +174,17 @@ export const useFocusStore = create<FocusStore>((set, get) => ({
       focusActive: s.focusActive,
       keyPresent: s.keyPresent,
       scheduleLocked: s.scheduleLocked,
-      profiles: s.profiles,
-      activeProfileId: s.activeProfileId,
+      engine: s.engine,
+      profiles: s.engine.profiles.map((status) => status.profile),
+      defaultProfileId: s.engine.defaultProfileId ?? s.engine.profiles[0]?.profile.id ?? DEFAULT_PROFILE_ID,
       policy: s.policy,
-      schedule: s.schedule,
       settings: s.settings,
       pairedKeys: s.pairedKeys,
       serviceVersion: s.serviceVersion,
     }),
+
+  overridesOpen: false,
+  setOverridesOpen: (overridesOpen) => set({ overridesOpen }),
 
   clearWatchdogWarning: () => set({ watchdogWarning: undefined }),
 
@@ -301,13 +319,6 @@ export const useFocusStore = create<FocusStore>((set, get) => ({
       onEvent('keyPresenceChanged', ({ present }) => set({ keyPresent: present }));
       onEvent('focusChanged', ({ active }) => set({ focusActive: active }));
       onEvent('policyChanged', ({ policy }) => set({ policy }));
-      onEvent('profilesChanged', ({ profiles, activeProfileId }) =>
-        set({
-          profiles,
-          activeProfileId,
-          policy: resolveActiveProfile(profiles, activeProfileId)?.policy ?? EMPTY_POLICY,
-        }),
-      );
       onEvent('settingsChanged', ({ settings }) => set({ settings }));
       onEvent('browserWatchdogWarning', ({ browser, pid }) =>
         set({ watchdogWarning: { browser, pid } }),
@@ -320,8 +331,13 @@ export const useFocusStore = create<FocusStore>((set, get) => ({
         void get().refresh();
       });
 
-      // Main pushes these after sign-in/out and billing deep-link returns.
-      onAppEvent(() => {
+      // Main pushes these after sign-in/out and billing deep-link returns, and when the
+      // app-blocked popup asks for the override options.
+      onAppEvent((event) => {
+        if (event === 'openOverrides') {
+          set({ overridesOpen: true });
+          return;
+        }
         void get()
           .refreshAuth()
           .then(() => get().refreshSubscriptionDetail());

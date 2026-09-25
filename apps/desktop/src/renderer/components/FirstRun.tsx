@@ -9,10 +9,11 @@
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import type { Drive, Policy } from '@talysman/shared';
-import { palette, resolveActiveProfile } from '@talysman/shared';
+import { palette } from '@talysman/shared';
 import { productFeaturesForEnvironment } from '@talysman/product';
 import { devSimulateExtension, openExternal, request } from '../lib/bridge.js';
 import { useFocusStore } from '../store/useFocusStore.js';
+import { saveProfile } from '../lib/engine.js';
 import { cx } from '../lib/utils.js';
 import { TalysmanMark } from './TalysmanMark.js';
 
@@ -104,7 +105,7 @@ const MODE_LABELS: Record<ModePreset, string> = {
 
 export function FirstRun({ onDone }: { onDone: () => void }) {
   const profiles = useFocusStore((s) => s.profiles);
-  const activeProfileId = useFocusStore((s) => s.activeProfileId);
+  const defaultProfileId = useFocusStore((s) => s.defaultProfileId);
   const pairedKeys = useFocusStore((s) => s.pairedKeys);
   const usingMock = useFocusStore((s) => s.usingMock);
   const appEnv = useFocusStore((s) => s.appEnv);
@@ -112,7 +113,7 @@ export function FirstRun({ onDone }: { onDone: () => void }) {
   const refresh = useFocusStore((s) => s.refresh);
   const finishOnboarding = useFocusStore((s) => s.finishOnboarding);
 
-  const profile = resolveActiveProfile(profiles, activeProfileId);
+  const profile = profiles.find((p) => p.id === defaultProfileId) ?? profiles[0];
   const [step, setStep] = useState(0);
   // First-run profiles start empty, so there's nothing meaningful to derive the preset from yet.
   const [mode, setMode] = useState<ModePreset>('blacklist');
@@ -159,8 +160,8 @@ export function FirstRun({ onDone }: { onDone: () => void }) {
   const hasKey = pairedKeys.length > 0;
   const hasList =
     mode === 'whitelist'
-      ? (profile?.policy.allowedDomains.length ?? 0) > 0
-      : (profile?.policy.blockedDomains.length ?? 0) > 0;
+      ? (profile?.config.policy.allowedDomains.length ?? 0) > 0
+      : (profile?.config.policy.blockedDomains.length ?? 0) > 0;
   // Raising the shield on an empty whitelist would cut the network with no way back but the key,
   // and an empty blacklist blocks nothing at all. Neither is a good way to end setup.
   const canRaise = hasKey && (mode === 'block-all' || hasList);
@@ -178,11 +179,10 @@ export function FirstRun({ onDone }: { onDone: () => void }) {
     }
   }
 
-  /** Write the chosen preset onto the active profile before moving off the profile step. */
+  /** Write the chosen preset onto the default profile before moving off the profile step. */
   async function applyMode() {
     if (!profile) return;
-    await request('setPolicy', { policy: applyPresetToPolicy(profile.policy, mode) });
-    await refresh();
+    await saveProfile({ ...profile, config: { ...profile.config, policy: applyPresetToPolicy(profile.config.policy, mode) } });
   }
 
   async function pairSelectedDrive() {

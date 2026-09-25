@@ -25,9 +25,10 @@ export function effectiveAction(action: RuleAction, policy: Policy, aiMode: bool
 
 /** One-line description of what a profile blocks — used on the seal and in the profile rail. */
 export function profileSummary(profile: Profile, aiMode: boolean): string {
-  const { blockedDomains, allowedDomains, apps } = profile.policy;
-  const defaultAction = effectiveAction(profile.policy.defaultAction, profile.policy, aiMode);
-  const softCount = Object.keys(profile.policy.sites ?? {}).length;
+  const policy = profile.config.policy;
+  const { blockedDomains, allowedDomains, apps } = policy;
+  const defaultAction = effectiveAction(policy.defaultAction, policy, aiMode);
+  const softCount = Object.keys(policy.sites ?? {}).length;
   const hasSmartIntent = defaultAction === 'judge';
   const isBlockAll =
     SMART_FILTERING_ENABLED &&

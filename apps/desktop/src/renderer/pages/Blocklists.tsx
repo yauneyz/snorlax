@@ -5,11 +5,15 @@ import { productFeaturesForEnvironment } from '@talysman/product';
 import {
   EMPTY_POLICY,
   MAX_PROFILE_NAME_LENGTH,
+  emptyProfileConfig,
+  newProfileId,
   nextProfileColor,
-  resolveActiveProfile,
 } from '@talysman/shared';
 import { siblingsFor } from '@talysman/core/browser';
-import { listInstalledApps, request } from '../lib/bridge.js';
+import { listInstalledApps } from '../lib/bridge.js';
+import { runCommand, saveProfile as saveProfileCommand } from '../lib/engine.js';
+import { PoolEditor } from '../components/PoolEditor.js';
+import { ProfileSwitch } from '../components/ProfileList.js';
 import { desktopPaletteColor } from '../lib/desktopPalette.js';
 import { useFocusStore } from '../store/useFocusStore.js';
 import { Badge, Button, Input, Kicker, ProfileDot, Textarea } from '../components/ui/index.js';
@@ -375,13 +379,14 @@ function DomainListEditor({
 
 export function Blocklists({ onUpgrade }: { onUpgrade: () => void }) {
   const profiles = useFocusStore((s) => s.profiles);
-  const activeProfileId = useFocusStore((s) => s.activeProfileId);
+  const engine = useFocusStore((s) => s.engine);
+  const defaultProfileId = useFocusStore((s) => s.defaultProfileId);
+  const pairedKeys = useFocusStore((s) => s.pairedKeys);
+  const setOverridesOpen = useFocusStore((s) => s.setOverridesOpen);
   const keyPresent = useFocusStore((s) => s.keyPresent);
   const productLimits = useFocusStore((s) => s.productLimits);
   const aiMode = useFocusStore((s) => s.aiMode);
-  const refresh = useFocusStore((s) => s.refresh);
-  // Which profile the editor is pointed at. `null` keeps it tracking whatever focus is
-  // enforcing, so a scheduled profile switch carries the editor with it.
+  // Which profile the editor is pointed at. `null` shows the default profile.
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const [blockedInput, setBlockedInput] = useState('');
@@ -396,11 +401,13 @@ export function Blocklists({ onUpgrade }: { onUpgrade: () => void }) {
   const [selectedApps, setSelectedApps] = useState<Set<string>>(() => new Set());
   const [error, setError] = useState<string | null>(null);
 
-  const selected = resolveActiveProfile(profiles, selectedId ?? activeProfileId);
-  const policy = selected?.policy ?? EMPTY_POLICY;
-  // A daemon older than protocol 5 reports no `sites` on its policies.
-  const sitesSupported = selected?.policy.sites !== undefined;
-  const isActive = selected?.id === activeProfileId;
+  const selected =
+    profiles.find((p) => p.id === selectedId) ?? profiles.find((p) => p.id === defaultProfileId) ?? profiles[0];
+  const policy = selected?.config.policy ?? EMPTY_POLICY;
+  const sitesSupported = true;
+  const isOn = (id: string | undefined) =>
+    engine.profiles.some((p) => p.profile.id === id && (p.activation.active || p.activation.paused));
+  const isActive = isOn(selected?.id);
   const accent = BLOCKLIST_SIGNAL;
   const profileLimit = maxProfiles(productLimits);
   const profileLimitReached = profileLimit !== null && profiles.length >= profileLimit;
@@ -450,12 +457,11 @@ export function Blocklists({ onUpgrade }: { onUpgrade: () => void }) {
     });
   }, [pickerItems, pickerQuery]);
 
-  /** Every edit on this page writes one whole profile; the service derives the rest. */
+  /** Every edit on this page writes one whole profile; the service gates any loosening. */
   async function saveProfile(next: Profile): Promise<boolean> {
     setError(null);
     try {
-      await request('setProfile', { profile: next });
-      await refresh();
+      await saveProfileCommand(next);
       return true;
     } catch (e) {
       setError((e as Error).message);
@@ -465,35 +471,41 @@ export function Blocklists({ onUpgrade }: { onUpgrade: () => void }) {
 
   async function save(next: Policy) {
     if (!selected) return;
-    await saveProfile({ ...selected, policy: next });
+    await saveProfile({ ...selected, config: { ...selected.config, policy: next } });
+  }
+
+  async function savePools(pools: Profile['config']['pools']) {
+    if (!selected) return;
+    await saveProfile({ ...selected, config: { ...selected.config, pools } });
   }
 
   async function addProfile() {
     if (profileLimitReached) return onUpgrade();
-    const profile: Profile = {
-      id: `profile-${Date.now().toString(36)}`,
+    const id = newProfileId();
+    const ok = await saveProfile({
+      id,
       name: `Profile ${profiles.length + 1}`,
       color: nextProfileColor(profiles),
-      policy: EMPTY_POLICY,
-    };
-    if (await saveProfile(profile)) setSelectedId(profile.id);
+      createdAtMs: Date.now(),
+      config: emptyProfileConfig(),
+      latch: { state: 'off' },
+    });
+    if (ok) setSelectedId(id);
   }
 
-  /** Copy the selected profile's whole policy under a new id — the fastest way to a variant. */
+  /** Copy the selected profile's whole config (pools and schedule too) under a new id. */
   async function duplicateProfile() {
     if (!selected) return;
     if (profileLimitReached) return onUpgrade();
-    const profile: Profile = {
-      ...selected,
-      id: `profile-${Date.now().toString(36)}`,
-      name: `${selected.name} copy`.slice(0, MAX_PROFILE_NAME_LENGTH),
-      color: nextProfileColor(profiles),
-    };
-    if (await saveProfile(profile)) setSelectedId(profile.id);
+    const newId = newProfileId();
+    await runProfileRequest(async () => {
+      await runCommand({ type: 'duplicateProfile', profileId: selected.id, newId, color: nextProfileColor(profiles) });
+      setSelectedId(newId);
+    });
   }
 
   async function renameProfile(name: string) {
-    const trimmed = name.trim();
+    const trimmed = name.trim().slice(0, MAX_PROFILE_NAME_LENGTH);
     if (!selected || !trimmed || trimmed === selected.name) return;
     await saveProfile({ ...selected, name: trimmed });
   }
@@ -502,7 +514,6 @@ export function Blocklists({ onUpgrade }: { onUpgrade: () => void }) {
     setError(null);
     try {
       await run();
-      await refresh();
     } catch (e) {
       setError((e as Error).message);
     }
@@ -510,12 +521,14 @@ export function Blocklists({ onUpgrade }: { onUpgrade: () => void }) {
 
   const deleteProfile = (profileId: string) =>
     runProfileRequest(async () => {
-      await request('deleteProfile', { profileId });
+      await runCommand({ type: 'deleteProfile', profileId });
       if (selectedId === profileId) setSelectedId(null);
     });
 
-  const activateProfile = (profileId: string) =>
-    runProfileRequest(() => request('setActiveProfile', { profileId }));
+  const turnOn = (profileId: string) => runProfileRequest(() => runCommand({ type: 'setLatch', profileId, on: true }));
+
+  const makeDefault = (profileId: string) =>
+    runProfileRequest(() => runCommand({ type: 'setDefaultProfile', profileId }));
 
   function applyPreset(preset: 'blacklist' | 'whitelist' | 'block-all' | 'smart') {
     if (preset === 'smart') {
@@ -751,7 +764,7 @@ export function Blocklists({ onUpgrade }: { onUpgrade: () => void }) {
                           {profileSummary(p, aiMode)}
                         </span>
                       </span>
-                      {p.id === activeProfileId ? (
+                      {isOn(p.id) ? (
                         <Badge tone="ok">ON</Badge>
                       ) : (
                         p.id === selected?.id && (
@@ -784,6 +797,18 @@ export function Blocklists({ onUpgrade }: { onUpgrade: () => void }) {
                     <span className="font-mono text-[13px] text-slate-500">⧉</span>
                     Duplicate {selected?.name}
                   </button>
+                  {selected && selected.id !== defaultProfileId && (
+                    <button
+                      onClick={() => {
+                        setMenuOpen(false);
+                        void makeDefault(selected.id);
+                      }}
+                      className="flex items-center gap-2.5 rounded-[9px] px-2.5 py-2 text-left text-[12px] font-medium text-slate-400 transition hover:bg-white/[0.05] hover:text-slate-200"
+                    >
+                      <span className="font-mono text-[13px] text-slate-500">★</span>
+                      Use {selected.name} for “Turn on focus”
+                    </button>
+                  )}
                 </div>
 
                 <div className="mt-1.5 border-t border-white/[0.07] px-1.5 pb-1 pt-2">
@@ -823,16 +848,18 @@ export function Blocklists({ onUpgrade }: { onUpgrade: () => void }) {
           )}
         </div>
 
-        {isActive ? (
-          <Badge tone="ok">ENFORCING NOW</Badge>
-        ) : (
-          <Button
-            variant="ghost"
-            onClick={() => selected && void activateProfile(selected.id)}
-            className="ml-auto"
-          >
-            Activate now
-          </Button>
+        {selected && (
+          <div className="ml-auto flex items-center gap-2">
+            <span className={cx('font-mono text-[10px] tracking-[0.12em]', isActive ? 'text-okInk' : 'text-slate-450')}>
+              {isActive ? 'ON' : 'OFF'}
+            </span>
+            <ProfileSwitch
+              label={`${selected.name} ${isActive ? 'on' : 'off'}`}
+              on={isActive}
+              disabled={!isActive && pairedKeys.length === 0}
+              onChange={() => (isActive ? setOverridesOpen(true) : void turnOn(selected.id))}
+            />
+          </div>
         )}
       </div>
 
@@ -1096,6 +1123,10 @@ export function Blocklists({ onUpgrade }: { onUpgrade: () => void }) {
             </p>
           )}
         </div>
+
+        {selected && (
+          <PoolEditor pools={selected.config.pools} policy={policy} onSave={(pools) => void savePools(pools)} />
+        )}
 
         {error && <p className="mt-3 text-[12.5px] text-dangerInk">{error}</p>}
       </section>

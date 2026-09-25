@@ -139,3 +139,43 @@ export function Input(props: React.InputHTMLAttributes<HTMLInputElement>) {
 export function Textarea(props: React.TextareaHTMLAttributes<HTMLTextAreaElement>) {
   return <textarea {...props} className={cx(FIELD, 'resize-none', props.className)} />;
 }
+
+/** Centered dialog over a dimmed backdrop. Closing is left to the caller (Esc / backdrop). */
+export function Modal({
+  title,
+  onClose,
+  children,
+  width = 460,
+}: {
+  title: string;
+  onClose: () => void;
+  children: React.ReactNode;
+  width?: number;
+}) {
+  React.useEffect(() => {
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onClose]);
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-label={title}>
+      <button
+        aria-label="Close"
+        onClick={onClose}
+        className="absolute inset-0 bg-[rgb(var(--color-background)/0.82)] backdrop-blur-md"
+      />
+      <div
+        className="relative max-h-full overflow-y-auto rounded-[16px] border border-white/[0.10] bg-[rgb(var(--color-panel)/0.97)] p-5 shadow-[0_24px_60px_rgb(var(--color-black)/0.6)]"
+        style={{ width }}
+      >
+        <div className="mb-3 flex items-center">
+          <h2 className="text-[15px] font-semibold text-slate-100">{title}</h2>
+          <button onClick={onClose} className="ml-auto rounded px-2 py-0.5 text-[12px] text-slate-400 hover:text-slate-200">
+            Close
+          </button>
+        </div>
+        {children}
+      </div>
+    </div>
+  );
+}

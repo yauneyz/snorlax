@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import type { Policy, Profile, Schedule } from '@talysman/shared';
-import { EMPTY_POLICY, palette } from '@talysman/shared';
+import type { Policy, Profile, ProfileConfig } from '@talysman/shared';
+import { EMPTY_POLICY, emptyProfileConfig, palette } from '@talysman/shared';
 import {
+  constrainConfigToLimits,
   constrainPolicyToLimits,
   constrainProfilesToLimits,
-  constrainScheduleToLimits,
   FREE_BLOCKED_SITE_LIMIT,
   FREE_PROFILE_LIMIT,
   limitsForPlan,
@@ -25,18 +25,19 @@ const policy: Policy = {
   enabledPremadeLists: [],
 };
 
-const schedule: Schedule = {
-  windows: [{ id: 'w1', days: ['mon'], start: '09:00', end: '17:00', locked: false }],
+const schedule: ProfileConfig = {
+  ...emptyProfileConfig(),
+  schedule: [{ kind: 'window', id: 'w1', days: ['mon'], start: '09:00', end: '17:00', locked: false }],
+  oneShots: [{ id: 'o1', atMs: 1, action: 'on', firedAtMs: null }],
 };
 
+function profile(id: string, name: string, color: string, policy: Policy): Profile {
+  return { id, name, color, createdAtMs: 0, config: { ...emptyProfileConfig(), policy }, latch: { state: 'off' } };
+}
+
 const profiles: Profile[] = [
-  { id: 'deep', name: 'Deep Work', color: palette.colors.profileAqua, policy: EMPTY_POLICY },
-  {
-    id: 'evening',
-    name: 'Evening',
-    color: palette.colors.profileCoral,
-    policy: { ...EMPTY_POLICY, defaultAction: 'block' },
-  },
+  profile('deep', 'Deep Work', palette.colors.profileAqua, EMPTY_POLICY),
+  profile('evening', 'Evening', palette.colors.profileCoral, { ...EMPTY_POLICY, defaultAction: 'block' }),
 ];
 
 describe('product limits', () => {
@@ -56,7 +57,7 @@ describe('product limits', () => {
     expect(validatePolicyForLimits(policy, limits)).toEqual([]);
     expect(validateScheduleForLimits(schedule, limits)).toEqual([]);
     expect(constrainPolicyToLimits(policy, limits)).toBe(policy);
-    expect(constrainScheduleToLimits(schedule, limits)).toBe(schedule);
+    expect(constrainConfigToLimits(schedule, limits)).toEqual(schedule);
   });
 
   it('gives Free unlimited allow-list websites while keeping apps and schedules gated', () => {
@@ -69,7 +70,8 @@ describe('product limits', () => {
       ...policy,
       apps: [],
     });
-    expect(constrainScheduleToLimits(schedule, limits)).toEqual({ windows: [] });
+    // Recurring rules are Pro; one-shot events stay (they add no limits).
+    expect(constrainConfigToLimits(schedule, limits)).toEqual({ ...schedule, schedule: [] });
   });
 
   it('gates premade blocklists behind Pro', () => {

@@ -5,7 +5,18 @@
  */
 
 import { app, BrowserWindow, dialog, ipcMain, Notification, shell } from 'electron';
-import { ErrorCode, type EventName, type Method, type Params, type TransitionKind } from '@talysman/shared';
+import {
+  ErrorCode,
+  profileInput,
+  type AppRef,
+  type Command,
+  type EventName,
+  type Method,
+  type Params,
+  type Policy,
+  type ServiceState,
+  type TransitionKind,
+} from '@talysman/shared';
 import { policyUsesJudge, productFeaturesForEnvironment } from '@talysman/product';
 import { config } from '../config.js';
 import { logger } from '../logging.js';
@@ -43,22 +54,21 @@ import {
 } from '../auth/billing.js';
 import {
   type CheckoutPrice,
-  constrainPolicyToLimits,
+  constrainConfigToLimits,
   constrainProfilesToLimits,
-  constrainScheduleToLimits,
   limitsForPlan,
   maxProfiles,
-  validatePolicyForLimits,
+  validateConfigForLimits,
   validateProfilesForLimits,
-  validateScheduleForLimits,
   type SubscriptionPlan,
 } from '../../shared/productLimits.js';
 import { completeOnboarding, getOnboardingStatus, resetOnboarding } from '../onboarding.js';
 import { getAiModeEnabled, setAiModeEnabled } from '../aiMode.js';
 import { Channels } from './channels.js';
+import { closeUnlockPopup, showUnlockPopup } from '../popupWindow.js';
 
 /** Events pushed to renderers so the UI re-pulls auth/entitlement after a change. */
-export type AppEvent = 'authChanged' | 'entitlementChanged';
+export type AppEvent = 'authChanged' | 'entitlementChanged' | 'openOverrides';
 
 let activeService: ServiceConnection | undefined;
 const features = productFeaturesForEnvironment(config.appEnv);
@@ -81,7 +91,6 @@ const FORWARDED_EVENTS: EventName[] = [
   'keyPresenceChanged',
   'focusChanged',
   'policyChanged',
-  'profilesChanged',
   'scheduleFired',
   'settingsChanged',
   'browserWatchdogWarning',
@@ -188,7 +197,7 @@ function limitError(message: string) {
   return { ok: false, code: ErrorCode.BAD_REQUEST, message };
 }
 
-function productionPolicyError(policy: Params<'setPolicy'>['policy']): string | undefined {
+function productionPolicyError(policy: Policy): string | undefined {
   if (features.smartFiltering) return undefined;
   if (policyUsesJudge(policy)) return 'AI filtering is not available in this build.';
   if (policy.defaultAction === 'allow' && policy.allowedDomains.length > 0) {
@@ -200,47 +209,39 @@ function productionPolicyError(policy: Params<'setPolicy'>['policy']): string | 
   return undefined;
 }
 
+/**
+ * Trim the daemon's profiles to the current plan (after sign-in, a downgrade, a billing return).
+ * Free keeps one profile (the default one), caps each profile's lists, and drops recurring
+ * schedule rules. Trimming can loosen a committed profile, which the service gates behind the
+ * USB key — so a refused step leaves the stricter state until the user unlocks. That's the
+ * intended fail-safe, so gate errors are logged instead of failing the whole sync.
+ */
 async function applyCurrentPlanLimits(service: ServiceConnection): Promise<void> {
   const limits = limitsForPlan((await getEntitlement()).plan);
   if (!limits) return;
 
   const state = await service.request('getState', undefined);
-  const schedule = constrainScheduleToLimits(state.schedule, limits);
-  const profiles = constrainProfilesToLimits(state.profiles, state.activeProfileId, limits);
-  const policy = constrainPolicyToLimits(state.policy, limits);
-
-  // Trimming policy/profiles/schedule to plan limits can relax them (free clears all schedule
-  // windows, keeps one profile, and caps the blocklist). The service gates any loosening behind
-  // the USB key, so these may be refused — in which case the stricter state stays until the user
-  // unlocks. That's the intended fail-safe, so swallow the gate errors instead of failing the
-  // whole sync.
-  //
-  // Order matters: the schedule goes first because a window pointing at a profile makes deleting
-  // that profile key-gated, and on Free those windows are being dropped anyway.
-  await applyConstrainedState(service, 'setSchedule', { schedule }, 'schedule');
-  for (const dropped of state.profiles) {
-    if (profiles.some((kept) => kept.id === dropped.id)) continue;
-    await applyConstrainedState(
+  const profiles = state.engine.profiles.map((status) => status.profile);
+  const kept = constrainProfilesToLimits(profiles, state.engine.defaultProfileId, limits);
+  for (const dropped of profiles) {
+    if (kept.some((profile) => profile.id === dropped.id)) continue;
+    await applyConstrainedCommand(service, { type: 'deleteProfile', profileId: dropped.id }, `profile "${dropped.name}"`);
+  }
+  for (const profile of kept) {
+    const config = constrainConfigToLimits(profile.config, limits);
+    if (JSON.stringify(config) === JSON.stringify(profile.config)) continue;
+    await applyConstrainedCommand(
       service,
-      'deleteProfile',
-      { profileId: dropped.id },
-      `profile "${dropped.name}"`,
+      { type: 'upsertProfile', profile: profileInput({ ...profile, config }) },
+      `profile "${profile.name}"`,
     );
   }
-  await applyConstrainedState(service, 'setPolicy', { policy }, 'policy');
 }
 
-type ConstrainedMethod = 'setPolicy' | 'setSchedule' | 'deleteProfile';
-
-/** Apply a plan-limit-constrained update, tolerating the service's key gate on any relaxation. */
-async function applyConstrainedState<M extends ConstrainedMethod>(
-  service: ServiceConnection,
-  method: M,
-  params: Params<M>,
-  label: string,
-): Promise<void> {
+/** Apply a plan-limit-constrained command, tolerating the service's key gate on any relaxation. */
+async function applyConstrainedCommand(service: ServiceConnection, command: Command, label: string): Promise<void> {
   try {
-    await service.request(method, params);
+    await service.request('applyCommand', { command });
   } catch (e) {
     if (isServiceError(e) && (e.code === 'KEY_REQUIRED' || e.code === 'LOCKED')) {
       logger.info(`[plan-limits] ${label} kept stricter than plan limits until unlocked`);
@@ -248,6 +249,35 @@ async function applyConstrainedState<M extends ConstrainedMethod>(
       throw e;
     }
   }
+}
+
+/**
+ * Plan and build checks on a UI command before it reaches the service: the daemon doesn't know
+ * the user's plan. Returns an error message, or undefined to let it through.
+ */
+async function commandLimitError(
+  service: ServiceConnection,
+  command: Command,
+  limits: ReturnType<typeof limitsForPlan>,
+  state: () => Promise<ServiceState>,
+): Promise<string | undefined> {
+  if (command.type === 'upsertProfile') {
+    const featureError = productionPolicyError(command.profile.config.policy);
+    if (featureError) return featureError;
+    const violations = validateConfigForLimits(command.profile.config, limits);
+    if (violations[0]) return violations[0].message;
+  }
+  const creates =
+    command.type === 'duplicateProfile'
+    || (command.type === 'upsertProfile'
+      && !(await state()).engine.profiles.some((p) => p.profile.id === command.profile.id));
+  if (creates && maxProfiles(limits) !== null) {
+    const profiles = (await state()).engine.profiles;
+    const violations = validateProfilesForLimits([...profiles, null], limits);
+    if (violations[0]) return violations[0].message;
+  }
+  void service;
+  return undefined;
 }
 
 export async function registerIpcHandlers(ctx: HandlerContext): Promise<void> {
@@ -276,56 +306,40 @@ export async function registerIpcHandlers(ctx: HandlerContext): Promise<void> {
     notifyBrowserWatchdogKilled(browser);
   });
 
+  // A blocked desktop app was just closed: offer the unlock popup.
+  service.on('appBlocked', ({ app }) => showUnlockPopup(app));
+
   ipcHandle(Channels.serviceRequest, async (_e, arg: { method: Method; params: unknown }) => {
     try {
       const limits = limitsForPlan((await getEntitlement()).plan);
+      let before: ServiceState | undefined;
+      const state = async () => (before ??= await service.request('getState', undefined));
 
-      if (arg.method === 'setPolicy') {
-        const params = arg.params as Params<'setPolicy'>;
-        const featureError = productionPolicyError(params.policy);
-        if (featureError) return limitError(featureError);
-        const violations = validatePolicyForLimits(params.policy, limits);
-        if (violations[0]) return limitError(violations[0].message);
+      if (arg.method === 'applyCommand') {
+        const params = arg.params as Params<'applyCommand'>;
+        if (!params.dryRun) {
+          const limitError_ = await commandLimitError(service, params.command, limits, state);
+          if (limitError_) return limitError(limitError_);
+        }
       }
 
-      if (arg.method === 'setProfile') {
-        const params = arg.params as Params<'setProfile'>;
-        const featureError = productionPolicyError(params.profile.policy);
-        if (featureError) return limitError(featureError);
-        const policyViolations = validatePolicyForLimits(params.profile.policy, limits);
-        if (policyViolations[0]) return limitError(policyViolations[0].message);
-
-        // Only a *new* profile can push the user over the plan's profile allowance.
-        if (maxProfiles(limits) !== null) {
-          const state = await service.request('getState', undefined);
-          if (!state.profiles.some((p) => p.id === params.profile.id)) {
-            const violations = validateProfilesForLimits(
-              [...state.profiles, params.profile],
-              limits,
-            );
-            if (violations[0]) return limitError(violations[0].message);
+      // `schedule_created` (first recurring rule on a profile) vs `schedule_edited` (a return
+      // visit changing an existing setup) is read from state *before* the call.
+      let scheduleEvent: 'schedule_created' | 'schedule_edited' | undefined;
+      if (arg.method === 'applyCommand') {
+        const { command, dryRun } = arg.params as Params<'applyCommand'>;
+        if (!dryRun && command.type === 'upsertProfile') {
+          const previous = (await state()).engine.profiles.find((p) => p.profile.id === command.profile.id)?.profile;
+          const prevSchedule = JSON.stringify(previous?.config.schedule ?? []);
+          if (prevSchedule !== JSON.stringify(command.profile.config.schedule)) {
+            scheduleEvent = (previous?.config.schedule.length ?? 0) > 0 ? 'schedule_edited' : 'schedule_created';
           }
         }
       }
 
-      // 'setSchedule' is a single upsert of the device's one schedule (there is no per-id
-      // schedule list — `ServiceState.schedule` is singular), so whether this is a create or
-      // an edit has to be read from state *before* the call — same pattern as the setProfile
-      // allowance check above. A device with existing windows configured is being edited, not
-      // set up for the first time. `schedule_edited` (a return visit changing an existing
-      // setup) is a stickiness signal distinct from the one-time schedule_created milestone.
-      let isScheduleEdit = false;
-      if (arg.method === 'setSchedule') {
-        const params = arg.params as Params<'setSchedule'>;
-        const violations = validateScheduleForLimits(params.schedule, limits);
-        if (violations[0]) return limitError(violations[0].message);
-        const state = await service.request('getState', undefined);
-        isScheduleEdit = state.schedule.windows.length > 0;
-      }
-
       const result = await service.request(arg.method, arg.params as Params<Method>);
       if (arg.method === 'pairKey') track('usb_key_paired');
-      if (arg.method === 'setSchedule') track(isScheduleEdit ? 'schedule_edited' : 'schedule_created');
+      if (scheduleEvent) track(scheduleEvent);
       return { ok: true, result };
     } catch (e) {
       if (arg.method === 'pairKey') {
@@ -335,6 +349,25 @@ export async function registerIpcHandlers(ctx: HandlerContext): Promise<void> {
       logger.error('[ipc] unexpected service error', e);
       return { ok: false, code: 'INTERNAL', message: (e as Error).message };
     }
+  });
+
+  ipcHandle(Channels.closePopup, () => {
+    closeUnlockPopup();
+    return { ok: true };
+  });
+
+  ipcHandle(Channels.openOverrides, async () => {
+    closeUnlockPopup();
+    const { showMainWindow } = await import('../window.js');
+    const win = showMainWindow();
+    win?.webContents.send(Channels.appEvent, { event: 'openOverrides' });
+    return { ok: true };
+  });
+
+  ipcHandle(Channels.devSimulateAppBlocked, (_e, app: AppRef) => {
+    if (!mock) return { ok: false, message: 'Only available against the mock service.' };
+    mock.devSimulateAppBlocked(app);
+    return { ok: true };
   });
 
   ipcHandle(Channels.appInfo, async () => {

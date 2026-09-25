@@ -1,6 +1,6 @@
 import { z } from 'zod';
-import type { Policy, Profile, Schedule } from '@talysman/shared';
-import { resolveActiveProfile, siteRuleUsesJudge } from '@talysman/shared';
+import type { Policy, Profile, ProfileConfig } from '@talysman/shared';
+import { siteRuleUsesJudge } from '@talysman/shared';
 
 export const SUBSCRIPTION_PLANS = ['free', 'pro'] as const;
 export const CHECKOUT_PRICES = ['monthly', 'yearly', 'lifetime'] as const;
@@ -94,6 +94,8 @@ export const entitlementSourceSchema = z.enum([
   'server',
   'cache',
   'offline',
+  // Sideloaded Talysman for Android: Pro without an account.
+  'sideload',
 ]);
 
 export type EntitlementSource = z.infer<typeof entitlementSourceSchema>;
@@ -307,7 +309,7 @@ export function validatePolicyForLimits(
 }
 
 export function validateProfilesForLimits(
-  profiles: readonly Profile[],
+  profiles: readonly unknown[],
   limits: ProductLimits | null,
 ): LimitViolation[] {
   const max = maxProfiles(limits);
@@ -323,12 +325,21 @@ export function validateProfilesForLimits(
   ];
 }
 
+/**
+ * Recurring schedule rules (windows, "on at"/"off at") are Pro. One-shot events, pools,
+ * overrides, streaks and emergency unlocks add no limits (spec §3.11).
+ */
 export function validateScheduleForLimits(
-  schedule: Schedule,
+  config: Pick<ProfileConfig, 'schedule'>,
   limits: ProductLimits | null,
 ): LimitViolation[] {
-  if (isScheduleEnabled(limits) || schedule.windows.length === 0) return [];
+  if (isScheduleEnabled(limits) || config.schedule.length === 0) return [];
   return [{ field: 'schedule', message: 'Free does not include scheduling.' }];
+}
+
+/** Every plan-limit violation of one profile's config. */
+export function validateConfigForLimits(config: ProfileConfig, limits: ProductLimits | null): LimitViolation[] {
+  return [...validatePolicyForLimits(config.policy, limits), ...validateScheduleForLimits(config, limits)];
 }
 
 export function constrainPolicyToLimits(policy: Policy, limits: ProductLimits | null): Policy {
@@ -370,28 +381,30 @@ export function constrainPolicyToLimits(policy: Policy, limits: ProductLimits | 
   };
 }
 
-/**
- * Trim the profile set to the plan's allowance. The *active* profile is always the one kept —
- * a downgrade must never silently swap out what is being enforced right now. The returned
- * profiles are otherwise order-stable.
- */
-export function constrainProfilesToLimits(
-  profiles: readonly Profile[],
-  activeProfileId: string,
-  limits: ProductLimits | null,
-): Profile[] {
-  const max = maxProfiles(limits);
-  if (max === null || profiles.length <= max) return profiles as Profile[];
-  if (max <= 0) return profiles.slice(0, 1);
-
-  const active = resolveActiveProfile(profiles, activeProfileId);
-  const kept = profiles.filter((p) => p.id !== active?.id).slice(0, Math.max(0, max - 1));
-  return profiles.filter((p) => p.id === active?.id || kept.includes(p));
+/** One profile's config trimmed to the plan: capped policy, no recurring schedule on Free. */
+export function constrainConfigToLimits(config: ProfileConfig, limits: ProductLimits | null): ProfileConfig {
+  return {
+    ...config,
+    policy: constrainPolicyToLimits(config.policy, limits),
+    schedule: isScheduleEnabled(limits) ? config.schedule : [],
+  };
 }
 
-export function constrainScheduleToLimits(
-  schedule: Schedule,
+/**
+ * Trim the profile set to the plan's allowance. `keepId` (the default profile, or whichever is
+ * enforcing) is always kept — a downgrade must never silently swap out what is being enforced
+ * right now. The returned profiles are otherwise order-stable.
+ */
+export function constrainProfilesToLimits<P extends Pick<Profile, 'id'>>(
+  profiles: readonly P[],
+  keepId: string | null | undefined,
   limits: ProductLimits | null,
-): Schedule {
-  return isScheduleEnabled(limits) ? schedule : { windows: [] };
+): P[] {
+  const max = maxProfiles(limits);
+  if (max === null || profiles.length <= max) return profiles as P[];
+  if (max <= 0) return profiles.slice(0, 1);
+
+  const keep = profiles.find((p) => p.id === keepId) ?? profiles[0];
+  const kept = profiles.filter((p) => p.id !== keep?.id).slice(0, Math.max(0, max - 1));
+  return profiles.filter((p) => p.id === keep?.id || kept.includes(p));
 }

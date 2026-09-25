@@ -1,27 +1,28 @@
-/** Schedule data model (architecture §8). Evaluated by the pure @core/scheduleEngine. */
+/**
+ * Schedule data model (spec §3.9), generated from the Rust engine which alone evaluates it. Each
+ * profile owns its rules: `window` (active during a weekly time range, optionally `locked`),
+ * `at` (recurring "on at"/"off at" latch flips), plus one-shot events.
+ */
 
-export type Weekday = 'sun' | 'mon' | 'tue' | 'wed' | 'thu' | 'fri' | 'sat';
+import type { Weekday } from './generated/index.js';
+
+export type { OneShotEvent, OnOff, ScheduleRule, UpcomingEvent, UpcomingKind, Weekday, WindowOccurrence } from './generated/index.js';
 
 export const WEEKDAYS: Weekday[] = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
 
-export interface ScheduleWindow {
-  id: string;
-  days: Weekday[];
-  /** "HH:MM" 24h local time, inclusive start. */
-  start: string;
-  /** "HH:MM" 24h local time, exclusive end. */
-  end: string;
-  /**
-   * Blocking profile to switch to for the duration of this window. When omitted the window
-   * enforces whatever profile is already active.
-   */
-  profileId?: string;
-  /** If true, a present USB key cannot disable focus during this window ("no escape"). */
-  locked: boolean;
+/** "HH:MM" → minutes after midnight, or null. */
+export function parseHm(hm: string): number | null {
+  const match = /^(\d{2}):(\d{2})$/.exec(hm);
+  if (!match) return null;
+  const h = Number(match[1]);
+  const m = Number(match[2]);
+  return h <= 23 && m <= 59 ? h * 60 + m : null;
 }
 
-export interface Schedule {
-  windows: ScheduleWindow[];
+/** Window length in minutes; windows ending at or before their start run past midnight. */
+export function windowMinutes(start: string, end: string): number {
+  const s = parseHm(start);
+  const e = parseHm(end);
+  if (s === null || e === null || s === e) return 0;
+  return e > s ? e - s : 24 * 60 - s + e;
 }
-
-export const EMPTY_SCHEDULE: Schedule = { windows: [] };

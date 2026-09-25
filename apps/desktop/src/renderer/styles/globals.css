@@ -258,3 +258,14 @@ input[type='time']::-webkit-calendar-picker-indicator {
   }
 }
 
+
+/* Pool-unlock breathing pause: in for 4 s, out for 4 s. */
+@keyframes breathe {
+  0%,
+  100% {
+    transform: scale(0.82);
+  }
+  50% {
+    transform: scale(1.12);
+  }
+}

@@ -65,6 +65,12 @@ export const Channels = {
   setAiMode: 'app:setAiMode',
   /** invoke: { message, stack? } → report an uncaught renderer error/rejection for tracking. */
   reportRendererError: 'app:reportRendererError',
-  /** main→renderer push: { event } where event is 'authChanged' | 'entitlementChanged'. */
+  /** invoke: close the app-blocked unlock popup window. */
+  closePopup: 'app:closePopup',
+  /** invoke: close the popup and bring up the main window's override options. */
+  openOverrides: 'app:openOverrides',
+  /** invoke: dev-only — pretend the mock service just closed a blocked app. */
+  devSimulateAppBlocked: 'app:devSimulateAppBlocked',
+  /** main→renderer push: { event } — 'authChanged' | 'entitlementChanged' | 'openOverrides'. */
   appEvent: 'app:event',
 } as const;

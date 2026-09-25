@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Policy, Profile, RuleAction } from '@talysman/shared';
-import { DEFAULT_PROFILE, EMPTY_POLICY, SITE_DEFINITIONS } from '@talysman/shared';
+import { EMPTY_POLICY, SITE_DEFINITIONS, emptyProfileConfig } from '@talysman/shared';
 import { policyHasJudgeRule } from '@talysman/product';
 import { effectiveSmartFiltering, resolveAiModeEnabled } from '../../../apps/desktop/src/main/aiModePolicy.js';
 import { decide } from '../../../apps/extension/src/site-engine.js';
@@ -8,7 +8,14 @@ import { decide } from '../../../apps/extension/src/site-engine.js';
 const JUDGE: Policy['judge'] = { tasks: [{ id: 't1', title: 'Write the thesis' }], avoid: ['sports'], fallback: 'block' };
 
 function profile(policy: Partial<Policy>): Profile {
-  return { ...DEFAULT_PROFILE, policy: { ...EMPTY_POLICY, ...policy } };
+  return {
+    id: 'p',
+    name: 'P',
+    color: '#000',
+    createdAtMs: 0,
+    config: { ...emptyProfileConfig(), policy: { ...EMPTY_POLICY, ...policy } },
+    latch: { state: 'off' },
+  };
 }
 
 describe('policyHasJudgeRule', () => {

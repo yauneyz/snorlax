@@ -6,6 +6,7 @@
     { "path": "./packages/auth-contracts" },
     { "path": "./packages/billing-server" },
     { "path": "./packages/core" },
+    { "path": "./packages/engine-wasm" },
     { "path": "./config" }
   ]
 }
