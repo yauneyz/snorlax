@@ -35,6 +35,10 @@ native/windows/target/
 native/linux/target/
 native/macos/target/
 native/common/target/
+native/engine/target/
+native/engine-ffi/target/
+native/engine-wasm/target/
+native/engine-wasm/pkg/
 
 # Env (machine-local secrets/overrides)
 .credentials

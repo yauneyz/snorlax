@@ -17,8 +17,12 @@
  * page itself always loads). `judge` hands the decision to the AI judge (the user's tasks and
  * "help me avoid" list) page by page — a `block` verdict hides the page's feature as if it were
  * blocked; it resolves to `JudgePolicy.fallback` when the judge is unavailable.
+ *
+ * `RuleAction` and `SiteRule` (a user's configuration for one catalog site; omitted features use
+ * the catalog default) are generated from the Rust engine.
  */
-export type RuleAction = 'allow' | 'judge' | 'block';
+export type { RuleAction, SiteRule } from '../generated/index.js';
+import type { RuleAction } from '../generated/index.js';
 
 export interface SiteFeature {
   /** Stable id, unique within the site. Persisted in user policies — never rename. */
@@ -91,11 +95,52 @@ export interface SiteDefinition {
    * against the compiled DNR rules, so they double as the site's regression suite.
    */
   examples: [url: string, feature: string][];
+  /** The site's Android app(s), driven by the same features (see `AndroidAppDefinition`). */
+  android?: AndroidAppDefinition;
 }
 
-/** A user's configuration for one catalog site. Omitted features use the catalog default. */
-export interface SiteRule {
-  features: Partial<Record<string, RuleAction>>;
+/**
+ * A catalog entry's Android app. The same `SiteRule` drives the website (extension) and the app
+ * (the Talysman for Android accessibility service): each screen matcher maps a region of the app
+ * onto one of the entry's feature ids. No Kotlin code names a specific app — this data is all
+ * Android enforcement knows about one.
+ */
+export interface AndroidAppDefinition {
+  /** Application ids, e.g. `com.google.android.youtube`. Unique across the catalog. */
+  packages: string[];
+  /** Screens/regions mapped to this entry's features. Evaluated only for blocked features. */
+  screens?: AndroidScreenMatcher[];
+}
+
+/** One accessibility-node predicate; every given field must match. */
+export interface AndroidNodeMatch {
+  /** Fully-qualified view id, e.g. `com.google.android.youtube:id/reel_recycler`. */
+  viewId?: string;
+  /** Regex over the node's text. */
+  text?: string;
+  /** Regex over the node's content description. */
+  contentDesc?: string;
+  className?: string;
+  /** Foreground activity class name (matched against the window, not the node). */
+  activity?: string;
+  selected?: boolean;
+}
+
+export interface AndroidScreenMatcher {
+  feature: string;
+  /** All-of: every match must be present in the active window. */
+  match: AndroidNodeMatch[];
+  /**
+   * back — press Back; home — go to the launcher; overlay — cover the screen (or `hideNodes`)
+   * with a "hidden by Talysman" card; clickAlternative — click `alternative` (e.g. switch to the
+   * Subscriptions tab).
+   */
+  action: 'back' | 'home' | 'overlay' | 'clickAlternative';
+  alternative?: AndroidNodeMatch;
+  /** Only cover these nodes' bounds instead of the whole screen. */
+  hideNodes?: AndroidNodeMatch[];
+  /** App version the matcher was last verified against (shown when blocking may be degraded). */
+  maxTested?: string;
 }
 
 export function defineSite(site: SiteDefinition): SiteDefinition {

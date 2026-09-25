@@ -67,4 +67,5 @@ export default defineSite({
     ['https://www.youtube.com/@somechannel/videos', 'channels'],
     ['https://music.youtube.com/results?search_query=music', 'feed'],
   ],
+  android: { packages: ['com.google.android.youtube'] },
 });

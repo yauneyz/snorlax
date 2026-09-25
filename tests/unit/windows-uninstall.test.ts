@@ -47,7 +47,7 @@ describe('Windows uninstall safety', () => {
     expect(uninstall).toBeDefined();
     expect(uninstall).toContain('stop_if_running(service)');
     expect(uninstall).toContain('talysman::enforce::teardown_network()');
-    expect(uninstall).toContain('state.focus_active = false');
+    expect(uninstall).toContain('state.latch_all_off()');
     expect(uninstall!.indexOf('stop_if_running(service)')).toBeLessThan(
       uninstall!.indexOf('service.delete()'),
     );

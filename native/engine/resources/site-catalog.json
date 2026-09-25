@@ -1,0 +1,1506 @@
+{
+  "sites": [
+    {
+      "id": "reddit",
+      "label": "Reddit",
+      "hosts": [
+        "reddit.com",
+        "redd.it"
+      ],
+      "appHosts": [
+        "reddit.com",
+        "www.reddit.com",
+        "old.reddit.com",
+        "new.reddit.com",
+        "np.reddit.com",
+        "sh.reddit.com",
+        "chat.reddit.com",
+        "redd.it"
+      ],
+      "networkDomains": [
+        "redditstatic.com",
+        "redditmedia.com"
+      ],
+      "features": [
+        {
+          "id": "content",
+          "label": "Posts you open directly",
+          "default": "allow",
+          "locked": false
+        },
+        {
+          "id": "comments",
+          "label": "Comments",
+          "default": "allow",
+          "locked": false
+        },
+        {
+          "id": "search",
+          "label": "Search",
+          "default": "allow",
+          "locked": false
+        },
+        {
+          "id": "messages",
+          "label": "Messages & chat",
+          "default": "allow",
+          "locked": false
+        },
+        {
+          "id": "notifications",
+          "label": "Notifications",
+          "default": "allow",
+          "locked": false
+        },
+        {
+          "id": "compose",
+          "label": "Posting",
+          "default": "allow",
+          "locked": false
+        },
+        {
+          "id": "feed",
+          "label": "Feeds & subreddit listings",
+          "default": "block",
+          "locked": false
+        },
+        {
+          "id": "recommendations",
+          "label": "Recommendations & related posts",
+          "default": "block",
+          "locked": false
+        },
+        {
+          "id": "profiles",
+          "label": "User profiles",
+          "default": "block",
+          "locked": false
+        },
+        {
+          "id": "essentials",
+          "label": "Sign-in & settings",
+          "default": "allow",
+          "locked": true
+        }
+      ],
+      "routes": [
+        {
+          "feature": "content",
+          "host": "redd.it",
+          "path": "^/([a-z0-9]+)$"
+        },
+        {
+          "feature": "messages",
+          "host": "chat.reddit.com"
+        },
+        {
+          "feature": "content",
+          "path": "^/(?:r/[^/]+/)?comments/([a-z0-9]+)(?:/.*)?$"
+        },
+        {
+          "feature": "content",
+          "path": "^/gallery/([a-z0-9]+)$"
+        },
+        {
+          "feature": "content",
+          "path": "^/r/[^/]+/s/([a-z0-9]+)$"
+        },
+        {
+          "feature": "search",
+          "path": "^/(?:r/[^/]+/)?search$",
+          "query": {
+            "q": "^[^&#]+$"
+          }
+        },
+        {
+          "feature": "messages",
+          "path": "^/(?:message|chat)(?:/.*)?$"
+        },
+        {
+          "feature": "notifications",
+          "path": "^/notifications$"
+        },
+        {
+          "feature": "compose",
+          "path": "^/(?:r/[^/]+/)?submit$"
+        },
+        {
+          "feature": "profiles",
+          "path": "^/(?:u|user)/[^/]+(?:/.*)?$"
+        },
+        {
+          "feature": "essentials",
+          "path": "^/(?:login|register|password|account|settings|prefs)(?:/.*)?$"
+        }
+      ],
+      "fallbackFeature": "feed",
+      "androidPackages": [
+        "com.reddit.frontpage"
+      ],
+      "examples": [
+        [
+          "https://www.reddit.com/",
+          "feed"
+        ],
+        [
+          "https://www.reddit.com/r/rust/",
+          "feed"
+        ],
+        [
+          "https://www.reddit.com/r/popular",
+          "feed"
+        ],
+        [
+          "https://www.reddit.com/r/rust/comments/abc123/some_title/",
+          "content"
+        ],
+        [
+          "https://old.reddit.com/comments/abc123",
+          "content"
+        ],
+        [
+          "https://www.reddit.com/gallery/abc123",
+          "content"
+        ],
+        [
+          "https://www.reddit.com/r/rust/s/abc123",
+          "content"
+        ],
+        [
+          "https://redd.it/abc123",
+          "content"
+        ],
+        [
+          "https://redd.it/",
+          "feed"
+        ],
+        [
+          "https://www.reddit.com/search/?q=rust",
+          "search"
+        ],
+        [
+          "https://www.reddit.com/r/rust/search?q=async",
+          "search"
+        ],
+        [
+          "https://www.reddit.com/search/",
+          "feed"
+        ],
+        [
+          "https://www.reddit.com/message/inbox",
+          "messages"
+        ],
+        [
+          "https://chat.reddit.com/room/abc",
+          "messages"
+        ],
+        [
+          "https://www.reddit.com/notifications",
+          "notifications"
+        ],
+        [
+          "https://www.reddit.com/r/rust/submit",
+          "compose"
+        ],
+        [
+          "https://www.reddit.com/user/spez/",
+          "profiles"
+        ],
+        [
+          "https://www.reddit.com/login/",
+          "essentials"
+        ],
+        [
+          "https://ads.reddit.com/comments/abc123",
+          "feed"
+        ]
+      ]
+    },
+    {
+      "id": "hackernews",
+      "label": "Hacker News",
+      "hosts": [
+        "news.ycombinator.com"
+      ],
+      "appHosts": [
+        "news.ycombinator.com"
+      ],
+      "networkDomains": [],
+      "features": [
+        {
+          "id": "content",
+          "label": "Stories you open directly",
+          "default": "allow",
+          "locked": false
+        },
+        {
+          "id": "compose",
+          "label": "Submitting & replying",
+          "default": "allow",
+          "locked": false
+        },
+        {
+          "id": "feed",
+          "label": "Front page & listings",
+          "default": "block",
+          "locked": false
+        },
+        {
+          "id": "profiles",
+          "label": "User profiles",
+          "default": "block",
+          "locked": false
+        },
+        {
+          "id": "essentials",
+          "label": "Sign-in & voting",
+          "default": "allow",
+          "locked": true
+        }
+      ],
+      "routes": [
+        {
+          "feature": "content",
+          "path": "^/item$",
+          "query": {
+            "id": "^[0-9]+$"
+          }
+        },
+        {
+          "feature": "compose",
+          "path": "^/(?:submit|reply|comment|edit)$"
+        },
+        {
+          "feature": "profiles",
+          "path": "^/(?:user|submitted|threads|favorites)$"
+        },
+        {
+          "feature": "essentials",
+          "path": "^/(?:login|logout|vote|changepw|forgot|x)$"
+        }
+      ],
+      "fallbackFeature": "feed",
+      "androidPackages": [],
+      "examples": [
+        [
+          "https://news.ycombinator.com/",
+          "feed"
+        ],
+        [
+          "https://news.ycombinator.com/news",
+          "feed"
+        ],
+        [
+          "https://news.ycombinator.com/newest",
+          "feed"
+        ],
+        [
+          "https://news.ycombinator.com/item?id=123",
+          "content"
+        ],
+        [
+          "https://news.ycombinator.com/item?id=abc",
+          "feed"
+        ],
+        [
+          "https://news.ycombinator.com/submit",
+          "compose"
+        ],
+        [
+          "https://news.ycombinator.com/user?id=pg",
+          "profiles"
+        ],
+        [
+          "https://news.ycombinator.com/login",
+          "essentials"
+        ]
+      ]
+    },
+    {
+      "id": "x",
+      "label": "X",
+      "hosts": [
+        "x.com",
+        "twitter.com"
+      ],
+      "appHosts": [
+        "x.com",
+        "www.x.com",
+        "mobile.x.com",
+        "twitter.com",
+        "www.twitter.com",
+        "mobile.twitter.com"
+      ],
+      "networkDomains": [
+        "twimg.com"
+      ],
+      "features": [
+        {
+          "id": "content",
+          "label": "Posts you open directly",
+          "default": "allow",
+          "locked": false
+        },
+        {
+          "id": "search",
+          "label": "Search",
+          "default": "allow",
+          "locked": false
+        },
+        {
+          "id": "messages",
+          "label": "Messages",
+          "default": "allow",
+          "locked": false
+        },
+        {
+          "id": "notifications",
+          "label": "Notifications",
+          "default": "allow",
+          "locked": false
+        },
+        {
+          "id": "compose",
+          "label": "Posting",
+          "default": "allow",
+          "locked": false
+        },
+        {
+          "id": "feed",
+          "label": "Home timeline & Explore",
+          "default": "block",
+          "locked": false
+        },
+        {
+          "id": "recommendations",
+          "label": "Trends & who to follow",
+          "default": "block",
+          "locked": false
+        },
+        {
+          "id": "profiles",
+          "label": "Profiles",
+          "default": "block",
+          "locked": false
+        },
+        {
+          "id": "essentials",
+          "label": "Sign-in & settings",
+          "default": "allow",
+          "locked": true
+        }
+      ],
+      "routes": [
+        {
+          "feature": "content",
+          "path": "^/(?:i/)?(?:[^/]+/)?status/([0-9]+)(?:/.*)?$"
+        },
+        {
+          "feature": "search",
+          "path": "^/search$",
+          "query": {
+            "q": "^[^&#]+$"
+          }
+        },
+        {
+          "feature": "messages",
+          "path": "^/(?:messages|i/chat)(?:/.*)?$"
+        },
+        {
+          "feature": "notifications",
+          "path": "^/(?:i/)?notifications(?:/.*)?$"
+        },
+        {
+          "feature": "compose",
+          "path": "^/compose/post$"
+        },
+        {
+          "feature": "essentials",
+          "path": "^/(?:i/flow/[^/]+|settings(?:/.*)?|login|logout)$"
+        },
+        {
+          "feature": "feed",
+          "path": "^/(?:home|explore|search|i/.*)(?:/.*)?$"
+        },
+        {
+          "feature": "profiles",
+          "path": "^/[a-z0-9_]{1,15}(?:/(?:with_replies|media|likes|highlights|articles|followers|following))?$"
+        }
+      ],
+      "fallbackFeature": "feed",
+      "androidPackages": [
+        "com.twitter.android"
+      ],
+      "examples": [
+        [
+          "https://x.com/home",
+          "feed"
+        ],
+        [
+          "https://x.com/",
+          "feed"
+        ],
+        [
+          "https://x.com/explore/tabs/trending",
+          "feed"
+        ],
+        [
+          "https://x.com/ada/status/123",
+          "content"
+        ],
+        [
+          "https://x.com/ada/status/123/photo/1",
+          "content"
+        ],
+        [
+          "https://twitter.com/ada/status/123",
+          "content"
+        ],
+        [
+          "https://x.com/i/status/123",
+          "content"
+        ],
+        [
+          "https://x.com/search?q=rust",
+          "search"
+        ],
+        [
+          "https://x.com/search",
+          "feed"
+        ],
+        [
+          "https://x.com/messages",
+          "messages"
+        ],
+        [
+          "https://x.com/notifications",
+          "notifications"
+        ],
+        [
+          "https://x.com/compose/post",
+          "compose"
+        ],
+        [
+          "https://x.com/i/flow/login",
+          "essentials"
+        ],
+        [
+          "https://x.com/settings/account",
+          "essentials"
+        ],
+        [
+          "https://x.com/ada",
+          "profiles"
+        ],
+        [
+          "https://x.com/ada/media",
+          "profiles"
+        ],
+        [
+          "https://twitter.com/home",
+          "feed"
+        ],
+        [
+          "https://api.x.com/ada/status/123",
+          "feed"
+        ]
+      ]
+    },
+    {
+      "id": "linkedin",
+      "label": "LinkedIn",
+      "hosts": [
+        "linkedin.com"
+      ],
+      "appHosts": [
+        "linkedin.com",
+        "www.linkedin.com",
+        "m.linkedin.com"
+      ],
+      "networkDomains": [
+        "licdn.com"
+      ],
+      "features": [
+        {
+          "id": "content",
+          "label": "Posts & articles you open directly",
+          "default": "allow",
+          "locked": false
+        },
+        {
+          "id": "search",
+          "label": "Search",
+          "default": "allow",
+          "locked": false
+        },
+        {
+          "id": "messages",
+          "label": "Messaging",
+          "default": "allow",
+          "locked": false
+        },
+        {
+          "id": "notifications",
+          "label": "Notifications",
+          "default": "allow",
+          "locked": false
+        },
+        {
+          "id": "compose",
+          "label": "Posting",
+          "default": "allow",
+          "locked": false
+        },
+        {
+          "id": "feed",
+          "label": "Feed",
+          "default": "block",
+          "locked": false
+        },
+        {
+          "id": "recommendations",
+          "label": "Recommendations",
+          "default": "block",
+          "locked": false
+        },
+        {
+          "id": "profiles",
+          "label": "Profiles",
+          "default": "block",
+          "locked": false
+        },
+        {
+          "id": "jobs",
+          "label": "Jobs",
+          "default": "block",
+          "locked": false
+        },
+        {
+          "id": "essentials",
+          "label": "Sign-in & settings",
+          "default": "allow",
+          "locked": true
+        }
+      ],
+      "routes": [
+        {
+          "feature": "content",
+          "path": "^/feed/update/urn:li:(?:activity|share|ugcpost):([0-9]+)(?:/.*)?$"
+        },
+        {
+          "feature": "content",
+          "path": "^/(?:posts|pulse)/([^/]+)$"
+        },
+        {
+          "feature": "search",
+          "path": "^/search/results/[^/]+$",
+          "query": {
+            "keywords": "^[^&#]+$"
+          }
+        },
+        {
+          "feature": "messages",
+          "path": "^/messaging(?:/.*)?$"
+        },
+        {
+          "feature": "notifications",
+          "path": "^/notifications(?:/.*)?$"
+        },
+        {
+          "feature": "compose",
+          "path": "^/(?:post/new|content-management)(?:/.*)?$"
+        },
+        {
+          "feature": "feed",
+          "path": "^/feed$"
+        },
+        {
+          "feature": "recommendations",
+          "path": "^/mynetwork(?:/.*)?$"
+        },
+        {
+          "feature": "profiles",
+          "path": "^/(?:in|company|school)/[^/]+(?:/.*)?$"
+        },
+        {
+          "feature": "jobs",
+          "path": "^/jobs(?:/.*)?$"
+        },
+        {
+          "feature": "essentials",
+          "path": "^/(?:login|signup|checkpoint|uas|authwall|psettings|mypreferences)(?:/.*)?$"
+        }
+      ],
+      "fallbackFeature": "feed",
+      "androidPackages": [
+        "com.linkedin.android"
+      ],
+      "examples": [
+        [
+          "https://www.linkedin.com/feed/",
+          "feed"
+        ],
+        [
+          "https://www.linkedin.com/feed/following/",
+          "feed"
+        ],
+        [
+          "https://www.linkedin.com/feed/update/urn:li:activity:123/",
+          "content"
+        ],
+        [
+          "https://www.linkedin.com/posts/ada_some-post-activity-123",
+          "content"
+        ],
+        [
+          "https://www.linkedin.com/pulse/some-article",
+          "content"
+        ],
+        [
+          "https://www.linkedin.com/search/results/content/?keywords=rust",
+          "search"
+        ],
+        [
+          "https://www.linkedin.com/search/results/content/",
+          "feed"
+        ],
+        [
+          "https://www.linkedin.com/messaging/",
+          "messages"
+        ],
+        [
+          "https://www.linkedin.com/notifications/",
+          "notifications"
+        ],
+        [
+          "https://www.linkedin.com/post/new/",
+          "compose"
+        ],
+        [
+          "https://www.linkedin.com/in/ada/",
+          "profiles"
+        ],
+        [
+          "https://www.linkedin.com/jobs/",
+          "jobs"
+        ],
+        [
+          "https://www.linkedin.com/login",
+          "essentials"
+        ],
+        [
+          "https://www.linkedin.com/mynetwork/",
+          "recommendations"
+        ],
+        [
+          "https://www.linkedin.com/learning/",
+          "feed"
+        ]
+      ]
+    },
+    {
+      "id": "instagram",
+      "label": "Instagram",
+      "hosts": [
+        "instagram.com"
+      ],
+      "appHosts": [
+        "instagram.com",
+        "www.instagram.com"
+      ],
+      "networkDomains": [
+        "cdninstagram.com",
+        "fbcdn.net"
+      ],
+      "features": [
+        {
+          "id": "content",
+          "label": "Posts & reels you open directly",
+          "default": "allow",
+          "locked": false
+        },
+        {
+          "id": "search",
+          "label": "Search",
+          "default": "allow",
+          "locked": false
+        },
+        {
+          "id": "messages",
+          "label": "Direct messages",
+          "default": "allow",
+          "locked": false
+        },
+        {
+          "id": "compose",
+          "label": "Posting",
+          "default": "allow",
+          "locked": false
+        },
+        {
+          "id": "feed",
+          "label": "Home feed",
+          "default": "block",
+          "locked": false
+        },
+        {
+          "id": "explore",
+          "label": "Explore & Reels tab",
+          "default": "block",
+          "locked": false
+        },
+        {
+          "id": "stories",
+          "label": "Stories",
+          "default": "block",
+          "locked": false
+        },
+        {
+          "id": "recommendations",
+          "label": "Suggestions",
+          "default": "block",
+          "locked": false
+        },
+        {
+          "id": "profiles",
+          "label": "Profiles",
+          "default": "block",
+          "locked": false
+        },
+        {
+          "id": "essentials",
+          "label": "Sign-in & settings",
+          "default": "allow",
+          "locked": true
+        }
+      ],
+      "routes": [
+        {
+          "feature": "content",
+          "path": "^/(?:[^/]+/)?(?:p|reel|reels|tv)/([-_a-z0-9]+)$"
+        },
+        {
+          "feature": "search",
+          "path": "^/explore/search$",
+          "query": {
+            "q": "^[^&#]+$"
+          }
+        },
+        {
+          "feature": "messages",
+          "path": "^/direct(?:/.*)?$"
+        },
+        {
+          "feature": "compose",
+          "path": "^/create(?:/.*)?$"
+        },
+        {
+          "feature": "feed",
+          "path": "^/$"
+        },
+        {
+          "feature": "explore",
+          "path": "^/(?:explore|reels)(?:/.*)?$"
+        },
+        {
+          "feature": "stories",
+          "path": "^/stories(?:/.*)?$"
+        },
+        {
+          "feature": "essentials",
+          "path": "^/(?:accounts|challenge|emails|session)(?:/.*)?$"
+        },
+        {
+          "feature": "profiles",
+          "path": "^/[-_.a-z0-9]+(?:/(?:tagged|reels|saved))?$"
+        }
+      ],
+      "fallbackFeature": "feed",
+      "androidPackages": [
+        "com.instagram.android"
+      ],
+      "examples": [
+        [
+          "https://www.instagram.com/",
+          "feed"
+        ],
+        [
+          "https://www.instagram.com/explore/",
+          "explore"
+        ],
+        [
+          "https://www.instagram.com/reels/",
+          "explore"
+        ],
+        [
+          "https://www.instagram.com/p/ABC123/",
+          "content"
+        ],
+        [
+          "https://www.instagram.com/reel/ABC123/",
+          "content"
+        ],
+        [
+          "https://www.instagram.com/explore/search/?q=rust",
+          "search"
+        ],
+        [
+          "https://www.instagram.com/direct/inbox/",
+          "messages"
+        ],
+        [
+          "https://www.instagram.com/create/select/",
+          "compose"
+        ],
+        [
+          "https://www.instagram.com/stories/ada/123/",
+          "stories"
+        ],
+        [
+          "https://www.instagram.com/accounts/login/",
+          "essentials"
+        ],
+        [
+          "https://www.instagram.com/ada/",
+          "profiles"
+        ]
+      ]
+    },
+    {
+      "id": "youtube",
+      "label": "YouTube",
+      "hosts": [
+        "youtube.com",
+        "youtu.be"
+      ],
+      "appHosts": [
+        "youtube.com",
+        "www.youtube.com",
+        "m.youtube.com",
+        "studio.youtube.com",
+        "youtu.be"
+      ],
+      "networkDomains": [
+        "ytimg.com",
+        "googlevideo.com",
+        "ggpht.com"
+      ],
+      "features": [
+        {
+          "id": "content",
+          "label": "Videos you open directly",
+          "default": "allow",
+          "locked": false
+        },
+        {
+          "id": "shorts",
+          "label": "Shorts you open directly",
+          "default": "allow",
+          "locked": false
+        },
+        {
+          "id": "comments",
+          "label": "Comments",
+          "default": "allow",
+          "locked": false
+        },
+        {
+          "id": "search",
+          "label": "Search",
+          "default": "allow",
+          "locked": false
+        },
+        {
+          "id": "notifications",
+          "label": "Notifications",
+          "default": "allow",
+          "locked": false
+        },
+        {
+          "id": "studio",
+          "label": "YouTube Studio & uploads",
+          "default": "allow",
+          "locked": false
+        },
+        {
+          "id": "feed",
+          "label": "Home, subscriptions & trending",
+          "default": "block",
+          "locked": false
+        },
+        {
+          "id": "recommendations",
+          "label": "Recommended & up next",
+          "default": "block",
+          "locked": false
+        },
+        {
+          "id": "channels",
+          "label": "Channel pages",
+          "default": "block",
+          "locked": false
+        },
+        {
+          "id": "essentials",
+          "label": "Sign-in & account",
+          "default": "allow",
+          "locked": true
+        }
+      ],
+      "routes": [
+        {
+          "feature": "studio",
+          "host": "studio.youtube.com"
+        },
+        {
+          "feature": "content",
+          "host": "youtu.be",
+          "path": "^/([-_a-z0-9]{11})$"
+        },
+        {
+          "feature": "content",
+          "path": "^/watch$",
+          "query": {
+            "v": "^[-_a-zA-Z0-9]{11}$"
+          }
+        },
+        {
+          "feature": "content",
+          "path": "^/live/([-_a-z0-9]{11})$"
+        },
+        {
+          "feature": "shorts",
+          "path": "^/shorts/([-_a-z0-9]{11})$"
+        },
+        {
+          "feature": "search",
+          "path": "^/results$",
+          "query": {
+            "search_query": "^[^&#]+$"
+          }
+        },
+        {
+          "feature": "notifications",
+          "path": "^/feed/notifications$"
+        },
+        {
+          "feature": "studio",
+          "path": "^/upload$"
+        },
+        {
+          "feature": "essentials",
+          "path": "^/(?:account(?:_[^/]+)?|signin|logout|premium|paid_memberships)(?:/.*)?$"
+        },
+        {
+          "feature": "channels",
+          "path": "^/(?:@[^/]+|channel/[^/]+|c/[^/]+|user/[^/]+)(?:/.*)?$"
+        }
+      ],
+      "fallbackFeature": "feed",
+      "androidPackages": [
+        "com.google.android.youtube"
+      ],
+      "examples": [
+        [
+          "https://www.youtube.com/",
+          "feed"
+        ],
+        [
+          "https://www.youtube.com/feed/subscriptions",
+          "feed"
+        ],
+        [
+          "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+          "content"
+        ],
+        [
+          "https://www.youtube.com/watch?list=abc&v=dQw4w9WgXcQ",
+          "content"
+        ],
+        [
+          "https://www.youtube.com/watch?v=short",
+          "feed"
+        ],
+        [
+          "https://youtu.be/dQw4w9WgXcQ",
+          "content"
+        ],
+        [
+          "https://youtu.be/",
+          "feed"
+        ],
+        [
+          "https://www.youtube.com/live/dQw4w9WgXcQ",
+          "content"
+        ],
+        [
+          "https://www.youtube.com/shorts/dQw4w9WgXcQ",
+          "shorts"
+        ],
+        [
+          "https://www.youtube.com/results?search_query=rust",
+          "search"
+        ],
+        [
+          "https://www.youtube.com/feed/notifications",
+          "notifications"
+        ],
+        [
+          "https://studio.youtube.com/",
+          "studio"
+        ],
+        [
+          "https://studio.youtube.com/channel/123/videos",
+          "studio"
+        ],
+        [
+          "https://www.youtube.com/account",
+          "essentials"
+        ],
+        [
+          "https://www.youtube.com/@somechannel/videos",
+          "channels"
+        ],
+        [
+          "https://music.youtube.com/results?search_query=music",
+          "feed"
+        ]
+      ]
+    },
+    {
+      "id": "theverge",
+      "label": "The Verge",
+      "hosts": [
+        "theverge.com"
+      ],
+      "appHosts": [
+        "theverge.com",
+        "www.theverge.com"
+      ],
+      "networkDomains": [],
+      "features": [
+        {
+          "id": "content",
+          "label": "Articles you open directly",
+          "default": "allow",
+          "locked": false
+        },
+        {
+          "id": "search",
+          "label": "Search",
+          "default": "allow",
+          "locked": false
+        },
+        {
+          "id": "feed",
+          "label": "Homepage & section pages",
+          "default": "block",
+          "locked": false
+        },
+        {
+          "id": "recommendations",
+          "label": "Recommended stories",
+          "default": "block",
+          "locked": false
+        },
+        {
+          "id": "profiles",
+          "label": "Author pages",
+          "default": "block",
+          "locked": false
+        },
+        {
+          "id": "essentials",
+          "label": "Sign-in & account",
+          "default": "allow",
+          "locked": true
+        }
+      ],
+      "routes": [
+        {
+          "feature": "content",
+          "path": "^/(?:[a-z0-9-]+|[0-9]{4}/[0-9]{1,2}/[0-9]{1,2})/[0-9]+/[^/]+$"
+        },
+        {
+          "feature": "search",
+          "path": "^/search$"
+        },
+        {
+          "feature": "profiles",
+          "path": "^/authors/[^/]+$"
+        },
+        {
+          "feature": "essentials",
+          "path": "^/(?:account|subscribe|sign-?in|login|logout|newsletters?)(?:/.*)?$"
+        }
+      ],
+      "fallbackFeature": "feed",
+      "androidPackages": [],
+      "examples": [
+        [
+          "https://www.theverge.com/",
+          "feed"
+        ],
+        [
+          "https://www.theverge.com/tech",
+          "feed"
+        ],
+        [
+          "https://www.theverge.com/reviews",
+          "feed"
+        ],
+        [
+          "https://www.theverge.com/tech/999944/meta-muse-charm-ai-interact-5g-modem",
+          "content"
+        ],
+        [
+          "https://www.theverge.com/2024/1/9/24031234/some-story",
+          "content"
+        ],
+        [
+          "https://www.theverge.com/search?q=pixel",
+          "search"
+        ],
+        [
+          "https://www.theverge.com/authors/emma-roth",
+          "profiles"
+        ],
+        [
+          "https://www.theverge.com/account",
+          "essentials"
+        ],
+        [
+          "https://www.theverge.com/subscribe",
+          "essentials"
+        ]
+      ]
+    },
+    {
+      "id": "theringer",
+      "label": "The Ringer",
+      "hosts": [
+        "theringer.com"
+      ],
+      "appHosts": [
+        "theringer.com",
+        "www.theringer.com"
+      ],
+      "networkDomains": [],
+      "features": [
+        {
+          "id": "content",
+          "label": "Articles you open directly",
+          "default": "allow",
+          "locked": false
+        },
+        {
+          "id": "episodes",
+          "label": "Podcast episodes you open directly",
+          "default": "allow",
+          "locked": false
+        },
+        {
+          "id": "search",
+          "label": "Search",
+          "default": "allow",
+          "locked": false
+        },
+        {
+          "id": "feed",
+          "label": "Homepage, topics & shows",
+          "default": "block",
+          "locked": false
+        },
+        {
+          "id": "recommendations",
+          "label": "Recommended stories",
+          "default": "block",
+          "locked": false
+        },
+        {
+          "id": "essentials",
+          "label": "Sign-in & account",
+          "default": "allow",
+          "locked": true
+        }
+      ],
+      "routes": [
+        {
+          "feature": "content",
+          "path": "^/[0-9]{4}/[0-9]{2}/[0-9]{2}/[^/]+/[^/]+$"
+        },
+        {
+          "feature": "episodes",
+          "path": "^/podcasts/[^/]+/[0-9]{4}/[0-9]{2}/[0-9]{2}/[^/]+$"
+        },
+        {
+          "feature": "search",
+          "path": "^/search$"
+        },
+        {
+          "feature": "essentials",
+          "path": "^/(?:account|subscribe|sign-?in|login|logout|newsletters?)(?:/.*)?$"
+        }
+      ],
+      "fallbackFeature": "feed",
+      "androidPackages": [],
+      "examples": [
+        [
+          "https://www.theringer.com/",
+          "feed"
+        ],
+        [
+          "https://www.theringer.com/topic/nba",
+          "feed"
+        ],
+        [
+          "https://www.theringer.com/podcasts",
+          "feed"
+        ],
+        [
+          "https://www.theringer.com/podcasts/the-rewatchables",
+          "feed"
+        ],
+        [
+          "https://www.theringer.com/creator/bill-simmons",
+          "feed"
+        ],
+        [
+          "https://www.theringer.com/videos",
+          "feed"
+        ],
+        [
+          "https://www.theringer.com/2026/09/24/nfl/nfl-best-bets-week-3",
+          "content"
+        ],
+        [
+          "https://www.theringer.com/podcasts/the-rewatchables/2026/09/21/law-abiding-citizen-with-bill-simmons-van-lathan-and-craig-horlbeck",
+          "episodes"
+        ],
+        [
+          "https://www.theringer.com/search?q=knicks",
+          "search"
+        ],
+        [
+          "https://www.theringer.com/account",
+          "essentials"
+        ]
+      ]
+    },
+    {
+      "id": "substack",
+      "label": "Substack",
+      "hosts": [
+        "substack.com"
+      ],
+      "appHosts": [
+        "substack.com",
+        "www.substack.com"
+      ],
+      "networkDomains": [
+        "substackcdn.com"
+      ],
+      "features": [
+        {
+          "id": "content",
+          "label": "Posts & notes you open directly",
+          "default": "allow",
+          "locked": false
+        },
+        {
+          "id": "publications",
+          "label": "Newsletter sites",
+          "default": "allow",
+          "locked": false
+        },
+        {
+          "id": "inbox",
+          "label": "Subscriptions inbox",
+          "default": "allow",
+          "locked": false
+        },
+        {
+          "id": "messages",
+          "label": "Chat & messages",
+          "default": "allow",
+          "locked": false
+        },
+        {
+          "id": "notifications",
+          "label": "Activity",
+          "default": "allow",
+          "locked": false
+        },
+        {
+          "id": "search",
+          "label": "Search",
+          "default": "allow",
+          "locked": false
+        },
+        {
+          "id": "feed",
+          "label": "Home, Notes & Explore",
+          "default": "block",
+          "locked": false
+        },
+        {
+          "id": "recommendations",
+          "label": "Recommendations",
+          "default": "block",
+          "locked": false
+        },
+        {
+          "id": "profiles",
+          "label": "Profiles",
+          "default": "block",
+          "locked": false
+        },
+        {
+          "id": "essentials",
+          "label": "Sign-in & account",
+          "default": "allow",
+          "locked": true
+        }
+      ],
+      "routes": [
+        {
+          "feature": "essentials",
+          "path": "^/(?:sign-?in|sign-?up|account|settings|subscriptions|redirect|app-link|verify|logout|email-login|profile/edit)(?:/.*)?$"
+        },
+        {
+          "feature": "content",
+          "path": "^/(?:@[^/]+/)?note/[cp]-[0-9]+$"
+        },
+        {
+          "feature": "content",
+          "path": "^/@[^/]+/p-[0-9]+$"
+        },
+        {
+          "feature": "content",
+          "path": "^/(?:home|inbox)/post/(?:p-)?[0-9]+$"
+        },
+        {
+          "feature": "content",
+          "path": "^/pub/[^/]+/p/[^/]+$"
+        },
+        {
+          "feature": "inbox",
+          "path": "^/inbox(?:/.*)?$"
+        },
+        {
+          "feature": "messages",
+          "path": "^/(?:chat|messages)(?:/.*)?$"
+        },
+        {
+          "feature": "notifications",
+          "path": "^/activity(?:/.*)?$"
+        },
+        {
+          "feature": "search",
+          "path": "^/search(?:/.*)?$"
+        },
+        {
+          "feature": "profiles",
+          "path": "^/(?:@[^/]+|profile/[^/]+)(?:/.*)?$"
+        },
+        {
+          "feature": "feed"
+        }
+      ],
+      "fallbackFeature": "publications",
+      "androidPackages": [
+        "com.substack.app"
+      ],
+      "examples": [
+        [
+          "https://substack.com/",
+          "feed"
+        ],
+        [
+          "https://substack.com/home",
+          "feed"
+        ],
+        [
+          "https://substack.com/notes",
+          "feed"
+        ],
+        [
+          "https://substack.com/browse",
+          "feed"
+        ],
+        [
+          "https://substack.com/top/technology",
+          "feed"
+        ],
+        [
+          "https://substack.com/leaderboard/bestseller/rising",
+          "feed"
+        ],
+        [
+          "https://substack.com/note/c-326587767",
+          "content"
+        ],
+        [
+          "https://substack.com/@saribotton/note/c-343882223",
+          "content"
+        ],
+        [
+          "https://substack.com/@saribotton/p-123456",
+          "content"
+        ],
+        [
+          "https://substack.com/home/post/p-123456",
+          "content"
+        ],
+        [
+          "https://substack.com/inbox/post/123456",
+          "content"
+        ],
+        [
+          "https://substack.com/inbox",
+          "inbox"
+        ],
+        [
+          "https://substack.com/chat",
+          "messages"
+        ],
+        [
+          "https://substack.com/chat/123/post/abc",
+          "messages"
+        ],
+        [
+          "https://substack.com/activity",
+          "notifications"
+        ],
+        [
+          "https://substack.com/search/ai?searching=top",
+          "search"
+        ],
+        [
+          "https://substack.com/@saribotton",
+          "profiles"
+        ],
+        [
+          "https://substack.com/profile/123-sari-botton",
+          "profiles"
+        ],
+        [
+          "https://substack.com/sign-in",
+          "essentials"
+        ],
+        [
+          "https://substack.com/redirect/abc-123",
+          "essentials"
+        ],
+        [
+          "https://natesnewsletter.substack.com/",
+          "publications"
+        ],
+        [
+          "https://natesnewsletter.substack.com/p/every-ai-you-use-forgets-you-heres",
+          "publications"
+        ]
+      ]
+    }
+  ]
+}

@@ -1,7 +1,7 @@
 #!/usr/bin/env tsx
 // Regenerates the site-catalog artifacts from packages/shared/src/sites:
 //   - apps/extension/src/site-catalog.js          (runtime catalog for the engine and blocked page)
-//   - native/common/resources/site-catalog.json   (daemon subset: hosts, network domains, features)
+//   - native/engine/resources/site-catalog.json   (daemon subset: hosts, network domains, features)
 //   - apps/extension/manifest.json                (content_scripts matches)
 // Run with `pnpm generate:sites` after editing a site module.
 
@@ -21,7 +21,7 @@ validateCatalog();
 
 const outputs: [string, string][] = [
   ['apps/extension/src/site-catalog.js', extensionCatalogModule()],
-  ['native/common/resources/site-catalog.json', nativeCatalogJson()],
+  ['native/engine/resources/site-catalog.json', nativeCatalogJson()],
 ];
 const manifestPath = path.join(root, 'apps/extension/manifest.json');
 const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'));

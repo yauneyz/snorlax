@@ -1,0 +1,25 @@
+[package]
+name = "talysman_engine"
+version = "0.7.0"
+edition = "2021"
+description = "Platform-free Talysman blocking engine: profiles, schedules, overrides, pools, streaks. Shared by the desktop daemons, Android (uniffi), and TypeScript (wasm)."
+publish = false
+
+[lib]
+name = "talysman_engine"
+path = "src/lib.rs"
+
+[features]
+default = ["premade"]
+# Built-in premade blocklists (~9 MB of embedded domain lists). Android builds leave this off.
+premade = []
+# Emit TypeScript bindings for every wire type (`cargo test --features ts export_bindings`).
+ts = ["dep:ts-rs"]
+
+[dependencies]
+hex = "0.4"
+regex = { version = "1", default-features = false, features = ["std", "unicode-case", "unicode-perl"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sha2 = "0.10"
+ts-rs = { version = "12", optional = true, features = ["serde-json-impl", "no-serde-warnings"] }

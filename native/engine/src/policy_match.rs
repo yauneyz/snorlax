@@ -68,10 +68,27 @@ fn norm_app_field(value: &Option<String>) -> Option<String> {
 }
 
 /// Do two app references identify the same executable (ignoring the human label)?
-fn same_app(a: &AppRef, b: &AppRef) -> bool {
+pub fn same_app(a: &AppRef, b: &AppRef) -> bool {
     norm_app_field(&a.linux_process_name) == norm_app_field(&b.linux_process_name)
         && norm_app_field(&a.windows_image_name) == norm_app_field(&b.windows_image_name)
         && norm_app_field(&a.mac_bundle_id) == norm_app_field(&b.mac_bundle_id)
+        && norm_app_field(&a.android_package) == norm_app_field(&b.android_package)
+}
+
+/// Does `app` (a blocklist entry) identify the running `target`? Unlike [`same_app`], only the
+/// fields the target actually carries are compared, so a desktop entry that names both a Windows
+/// image and a Linux process still matches a Linux process by name alone.
+pub fn app_matches(app: &AppRef, target: &AppRef) -> bool {
+    let pairs = [
+        (&app.android_package, &target.android_package),
+        (&app.linux_process_name, &target.linux_process_name),
+        (&app.windows_image_name, &target.windows_image_name),
+        (&app.mac_bundle_id, &target.mac_bundle_id),
+    ];
+    pairs.iter().any(|(a, t)| {
+        let (a, t) = (norm_app_field(a), norm_app_field(t));
+        a.is_some() && a == t
+    })
 }
 
 /// Whether `next` blocks at least everything `prev` blocked. Domains: every host `prev` sinkholes,
@@ -423,6 +440,7 @@ mod tests {
             windows_image_name: Some(name.into()),
             linux_process_name: None,
             mac_bundle_id: None,
+            android_package: None,
             label: name.into(),
         };
         let mut prev = policy(&[], &[], RuleAction::Allow);
@@ -441,6 +459,7 @@ mod tests {
             windows_image_name: Some("Chrome.exe".into()),
             linux_process_name: None,
             mac_bundle_id: None,
+            android_package: None,
             label: "Chrome".into(),
         }];
         let mut next = policy(&[], &[], RuleAction::Allow);
@@ -448,6 +467,7 @@ mod tests {
             windows_image_name: Some("chrome".into()),
             linux_process_name: None,
             mac_bundle_id: None,
+            android_package: None,
             label: "Google Chrome".into(),
         }];
         assert!(is_at_least_as_restrictive(&prev, &next));

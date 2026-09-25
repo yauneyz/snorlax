@@ -152,7 +152,12 @@ pub struct UsageTransition {
     pub source: FocusSource,
 }
 
-/// The authoritative snapshot returned by `getState` and broadcast on changes.
+/// The authoritative snapshot returned by `getState` and broadcast on changes (protocol 6).
+///
+/// `focusActive` and `policy` keep their v5 meaning for the natmsg hosts, tray, and CLIs: whether
+/// anything is enforced, and the single flat policy the network layer and the extension enforce
+/// (see `talysman_engine::effective::flatten_network`). Everything about profiles, schedules,
+/// overrides, pools, and the streak is in `engine`.
 #[derive(Clone, Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ServiceState {
@@ -160,16 +165,14 @@ pub struct ServiceState {
     pub service_version: String,
     pub focus_active: bool,
     pub focus_source: FocusSource,
-    pub profiles: Vec<Profile>,
-    pub active_profile_id: String,
-    /// Derived: the active profile's policy — what enforcement actually applies.
     pub policy: Policy,
-    pub schedule: Schedule,
+    pub engine: talysman_engine::EngineSnapshot,
     pub settings: Settings,
     pub paired_keys: Vec<PairedKey>,
     pub key_present: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub present_key_id: Option<String>,
+    /// Some active profile is held by a locked window.
     pub schedule_locked: bool,
 }
 

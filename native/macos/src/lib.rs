@@ -17,7 +17,6 @@ pub mod pairing;
 pub mod paths;
 pub mod policy_match;
 pub mod run;
-pub mod schedule;
 pub mod secure_store;
 pub mod service;
 pub mod state;

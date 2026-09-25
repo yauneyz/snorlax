@@ -1,5 +1,10 @@
 // Shared authoritative core: holds state + secure store + enforcement handles, dispatches RPCs,
-// and guards the disable path. Wrapped in an async Mutex and shared by every IPC connection.
+// and guards every key-gated path. Wrapped in an async Mutex and shared by every IPC connection.
+//
+// All decisions about profiles, schedules, overrides, pools, emergency unlocks and the streak are
+// made by `talysman_engine::Engine`; this shell supplies the clock, verifies the USB key when the
+// engine asks for one (`Gate::NeedsKey`), persists state, and pushes the engine's effective policy
+// into the platform enforcers as one flat network policy.
 
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -7,18 +12,16 @@ use std::time::{Duration, Instant};
 
 use rand::RngCore;
 use serde_json::{json, Value};
+use talysman_engine::engine::{Command, Gate, PopupTarget};
+use talysman_engine::{Auth, Ctx, Engine, EngineError, Tick};
 use tokio::sync::broadcast;
 
 use crate::constants::{err, PROTOCOL_VERSION, SERVICE_VERSION};
 use crate::enforce::{self, EnforceShared};
-use crate::model::{
-    DefaultAction, FocusSource, PairedKey, Policy, Profile, Schedule, ServiceState, TransitionKind,
-    MAX_PROFILE_NAME_LENGTH,
-};
+use crate::model::{DefaultAction, FocusSource, PairedKey, Policy, ServiceState, TransitionKind};
 use crate::pairing;
-use crate::schedule;
 use crate::secure_store::{KeySecret, SecureStore};
-use crate::state::PersistentState;
+use crate::state::{local_now, PersistentState};
 use crate::usb;
 
 /// The extension waits 12 seconds, leaving room for this authoritative fallback to arrive first.
@@ -29,6 +32,10 @@ const JUDGE_MAX_REQUEST_ID: usize = 128;
 const JUDGE_MAX_URL: usize = 4096;
 const JUDGE_MAX_TITLE: usize = 300;
 const JUDGE_MAX_CONTENT: usize = 4000;
+
+/// The engine never wants to sleep longer than an hour; clamp anyway so a clock jump can't
+/// park the schedule task for days.
+const MAX_TICK_DELAY: Duration = Duration::from_secs(60 * 60);
 
 /// A `judgeRequest` awaiting `submitJudgeVerdict`. The judge policy is captured at request time
 /// so the timeout sweep answers with the requesting profile's fallback, and so a verdict computed
@@ -62,8 +69,15 @@ impl RpcError {
     }
 }
 
+impl From<EngineError> for RpcError {
+    fn from(e: EngineError) -> Self {
+        RpcError { code: e.code, message: e.message }
+    }
+}
+
 pub struct Core {
     pub state: PersistentState,
+    pub engine: Engine,
     pub store: SecureStore,
     pub shared: Arc<EnforceShared>,
     pub key_present: bool,
@@ -73,13 +87,24 @@ pub struct Core {
     /// Judge requests relayed to Electron via `judgeRequested`, awaiting `submitJudgeVerdict`.
     /// Swept on a timer (see `sweep_expired_judges`) so a request is always eventually answered.
     pending_judges: HashMap<String, PendingJudge>,
+    /// The flat policy last pushed to the enforcers (and reported as `ServiceState.policy`).
+    network_policy: Policy,
+    /// Whether any profile was enforced at the last effective-policy push.
+    active: bool,
+    focus_source: FocusSource,
+    /// Tests stand in for USB enumeration with this.
+    #[cfg(test)]
+    pub test_present_key: Option<String>,
 }
 
 impl Core {
-    pub fn new(state: PersistentState, store: SecureStore, shared: Arc<EnforceShared>) -> Self {
+    pub fn new(mut state: PersistentState, store: SecureStore, shared: Arc<EnforceShared>) -> Self {
         let (events, _) = broadcast::channel(64);
+        let engine = Engine::new(state.engine_state());
+        state.engine = None;
         Core {
             state,
+            engine,
             store,
             shared,
             key_present: false,
@@ -87,6 +112,11 @@ impl Core {
             events,
             extension_event_at: HashMap::new(),
             pending_judges: HashMap::new(),
+            network_policy: Policy::default(),
+            active: false,
+            focus_source: FocusSource::Boot,
+            #[cfg(test)]
+            test_present_key: None,
         }
     }
 
@@ -98,8 +128,16 @@ impl Core {
         !self.state.paired_keys.is_empty()
     }
 
-    pub fn next_schedule_delay(&self) -> Duration {
-        schedule::next_transition_delay(&self.state.schedule)
+    fn ctx(&self) -> Ctx {
+        Ctx {
+            now: local_now(),
+            has_paired_keys: self.has_paired_keys(),
+            limits: Default::default(),
+        }
+    }
+
+    pub fn focus_active(&self) -> bool {
+        self.active
     }
 
     fn emit(&self, event: &str, payload: Value) {
@@ -108,40 +146,42 @@ impl Core {
             .send(json!({ "kind": "event", "event": event, "payload": payload }));
     }
 
-    fn schedule_locked(&self) -> bool {
-        let e = schedule::evaluate_now(&self.state.schedule);
-        e.active && e.locked
-    }
-
     pub fn snapshot(&self) -> ServiceState {
+        let ctx = self.ctx();
+        let engine = self.engine.snapshot(&ctx);
         ServiceState {
             protocol_version: PROTOCOL_VERSION,
             service_version: SERVICE_VERSION.to_string(),
-            focus_active: self.state.focus_active,
-            focus_source: self.state.focus_source,
-            profiles: self.state.profiles.clone(),
-            active_profile_id: self.state.active_profile_id.clone(),
-            policy: self.state.active_policy(),
-            schedule: self.state.schedule.clone(),
+            focus_active: self.active,
+            focus_source: self.focus_source,
+            policy: self.network_policy.clone(),
+            schedule_locked: engine
+                .profiles
+                .iter()
+                .any(|p| p.activation.active && p.activation.locked_until_ms.is_some()),
+            engine,
             settings: self.state.settings.clone(),
             paired_keys: self.state.paired_keys.clone(),
             key_present: self.key_present,
             present_key_id: self.present_key_id.clone(),
-            schedule_locked: self.schedule_locked(),
         }
     }
 
-    fn persist_state(&self) {
+    fn save(&mut self) {
+        self.state.engine = Some(self.engine.state.clone());
         if let Err(e) = self.state.save() {
             tracing::error!("state save failed: {e}");
         }
+        self.state.engine = None;
+    }
+
+    fn persist_state(&mut self) {
+        self.save();
         self.emit("stateChanged", json!({ "state": self.snapshot() }));
     }
 
-    fn persist_all(&self) {
-        if let Err(e) = self.state.save() {
-            tracing::error!("state save failed: {e}");
-        }
+    fn persist_all(&mut self) {
+        self.save();
         if let Err(e) = self.store.save() {
             tracing::error!("secure store save failed: {e}");
         }
@@ -149,15 +189,16 @@ impl Core {
     }
 
     /// Append one entry to the exact-usage transition log (architecture §7/Phase 7). Does not
-    /// save on its own — callers already persist state on their own cadence (`set_focus` calls
-    /// `persist_state()` right after; a presence-only change rides along on the next save
-    /// triggered elsewhere, which is an accepted tradeoff since the log only feeds `drainUsage`).
+    /// save on its own — every caller persists right after.
     fn record_transition(&mut self, kind: TransitionKind, source: FocusSource) {
         self.state.push_transition(kind, source);
     }
 
     /// Re-enumerate USB and update the cached presence; emits keyPresenceChanged on a change.
     pub fn recompute_presence(&mut self) {
+        #[cfg(test)]
+        let ids: Vec<String> = self.test_present_key.clone().into_iter().collect();
+        #[cfg(not(test))]
         let ids = usb::present_key_ids(&self.store);
         let present = !ids.is_empty();
         let present_id = ids.into_iter().next();
@@ -179,318 +220,148 @@ impl Core {
         }
     }
 
-    fn set_focus(&mut self, active: bool, source: FocusSource) {
-        self.pending_judges.clear();
-        self.state.focus_active = active;
-        self.state.focus_source = source;
-        if active {
-            // Keep the resolver-fed IP bank intact across sessions. Focus-on just opens the
-            // network gates over the already-warm set, then kicks a refresh for freshness.
-            self.shared.set_active(true);
-            enforce::apply_network(true);
-        } else {
-            self.shared.set_active(false);
-            enforce::apply_network(false);
-        }
-        self.record_transition(
-            if active {
-                TransitionKind::FocusOn
-            } else {
-                TransitionKind::FocusOff
-            },
-            source,
-        );
-        self.persist_state();
-        self.emit(
-            "focusChanged",
-            json!({ "active": active, "source": source }),
-        );
-    }
-
-    fn enable_focus(&mut self, source: FocusSource) -> Result<(), RpcError> {
-        if self.state.focus_active {
-            return Ok(());
-        }
-        if self.state.paired_keys.is_empty() {
-            return Err(RpcError::new(
-                err::NO_PAIRED_KEY,
-                "Pair a key before turning on focus.",
-            ));
-        }
-        self.set_focus(true, source);
-        tracing::info!("focus enabled ({:?})", source);
-        Ok(())
-    }
-
-    /// The guarded disable path.
-    fn disable_focus(&mut self, source: FocusSource) -> Result<(), RpcError> {
-        if self.schedule_locked() {
-            return Err(RpcError::new(
-                err::LOCKED,
-                "A locked schedule window is active.",
-            ));
-        }
+    /// Re-check USB presence; the engine's proof that a paired key is plugged in right now.
+    fn verified_key(&mut self) -> Option<Auth> {
         self.recompute_presence();
-        if !self.key_present {
-            return Err(RpcError::new(
-                err::KEY_REQUIRED,
-                "Insert your paired key to unlock.",
-            ));
-        }
-        self.set_focus(false, source);
-        tracing::info!("focus disabled ({:?})", source);
-        Ok(())
+        self.present_key_id
+            .clone()
+            .filter(|_| self.key_present)
+            .map(|key_id| Auth::KeyVerified { key_id })
     }
 
-    /// Toggle focus atomically. Turning focus on follows `enable_focus`; turning it off follows
-    /// the guarded `disable_focus` path, including a fresh USB-presence check.
-    fn toggle_focus(&mut self, source: FocusSource) -> Result<(), RpcError> {
-        if self.state.focus_active {
-            self.disable_focus(source)
-        } else {
-            self.enable_focus(source)
-        }
-    }
-
-    /// Re-check USB presence and fail with KEY_REQUIRED when no paired key is plugged in.
-    fn require_key(&mut self, message: &str) -> Result<(), RpcError> {
-        self.recompute_presence();
-        if !self.key_present {
-            return Err(RpcError::new(err::KEY_REQUIRED, message));
-        }
-        Ok(())
-    }
-
-    /// Push the active profile's policy into the enforcement layer and announce it. Enforcement
-    /// only ever sees this flat, already-resolved policy — it knows nothing about profiles.
-    fn apply_active_policy(&mut self) {
-        self.pending_judges.clear();
-        let policy = self.state.active_policy();
-        self.shared.set_policy(policy.clone());
-        self.shared.set_handshake_enabled(
-            self.state.settings.browser_handshake_enabled || !policy.sites.is_empty(),
-        );
-        self.emit("policyChanged", json!({ "policy": policy }));
-    }
-
-    fn emit_profiles(&self) {
-        self.emit(
-            "profilesChanged",
-            json!({
-                "profiles": self.state.profiles,
-                "activeProfileId": self.state.active_profile_id,
-            }),
-        );
-    }
-
-    /// Edit the **active** profile's policy — the flat shorthand the blocklist editor uses.
-    fn set_policy(&mut self, policy: Policy) -> Result<(), RpcError> {
-        let mut profile = self.state.active_profile().clone();
-        profile.policy = policy;
-        self.set_profile(profile)
-    }
-
-    /// Create or replace a profile. Tightening is always free. Relaxing requires the paired key
-    /// while focus or a locked schedule is enforcing, including edits to dormant profiles that
-    /// a schedule may activate later. With focus off and no locked window, edits are unlocked.
-    fn set_profile(&mut self, profile: Profile) -> Result<(), RpcError> {
-        if profile.id.trim().is_empty() {
-            return Err(RpcError::new(
-                err::BAD_REQUEST,
-                "Profile id cannot be empty.",
-            ));
-        }
-        let name = profile.name.trim().to_string();
-        if name.is_empty() {
-            return Err(RpcError::new(
-                err::BAD_REQUEST,
-                "Profile name cannot be empty.",
-            ));
-        }
-        if name.chars().count() > MAX_PROFILE_NAME_LENGTH {
-            return Err(RpcError::new(
-                err::BAD_REQUEST,
-                format!("Profile names are limited to {MAX_PROFILE_NAME_LENGTH} characters."),
-            ));
-        }
-
-        let existing = self.state.profiles.iter().position(|p| p.id == profile.id);
-        let profile = Profile { name, ..profile };
-        if existing.is_some_and(|idx| self.state.profiles[idx] == profile) {
-            return Ok(());
-        }
-        if let Some(idx) = existing {
-            let prev = self.state.profiles[idx].policy.clone();
-            let enforcing = self.state.focus_active || self.state.schedule.windows.iter().any(|w| w.locked);
-            if enforcing && !crate::policy_match::is_at_least_as_restrictive(&prev, &profile.policy) {
-                self.require_key("Insert your paired key to relax the blocklist.")?;
-            }
-        }
-
-        let is_active = profile.id == self.state.active_profile_id;
-        match existing {
-            Some(idx) => self.state.profiles[idx] = profile,
-            None => self.state.profiles.push(profile),
-        }
-        self.persist_state();
-        self.emit_profiles();
-        if is_active {
-            self.apply_active_policy();
-        }
-        Ok(())
-    }
-
-    /// Remove a profile. Key-gated when it is active or a schedule window points at it — both
-    /// cases drop enforcement the user had already committed to.
-    fn delete_profile(&mut self, profile_id: &str) -> Result<(), RpcError> {
-        let Some(idx) = self.state.profiles.iter().position(|p| p.id == profile_id) else {
-            return Err(RpcError::new(err::BAD_REQUEST, "Profile not found."));
-        };
-        if self.state.profiles.len() == 1 {
-            return Err(RpcError::new(
-                err::LAST_PROFILE,
-                "Keep at least one blocking profile.",
-            ));
-        }
-
-        let is_active = self.state.active_profile_id == profile_id;
-        let scheduled = self
-            .state
-            .schedule
-            .windows
-            .iter()
-            .any(|w| w.profile_id.as_deref() == Some(profile_id));
-        if is_active || scheduled {
-            if self.schedule_locked() {
-                return Err(RpcError::new(
-                    err::LOCKED,
-                    "A locked schedule window is active.",
-                ));
-            }
-            self.require_key("Insert your paired key to delete this profile.")?;
-        }
-
-        self.state.profiles.remove(idx);
-        // Windows that pointed at the deleted profile fall back to whatever is active when they
-        // fire, rather than silently enforcing nothing.
-        for w in &mut self.state.schedule.windows {
-            if w.profile_id.as_deref() == Some(profile_id) {
-                w.profile_id = None;
-            }
-        }
-        if is_active {
-            self.state.active_profile_id = self.state.profiles[0].id.clone();
-        }
-        self.persist_state();
-        self.emit_profiles();
-        if is_active {
-            self.apply_active_policy();
-        }
-        tracing::info!("profile {profile_id} deleted");
-        Ok(())
-    }
-
-    /// Switch which profile focus enforces. Refused outright inside a locked window. Otherwise
-    /// key-gated only when the switch *loosens* what is blocked and something is (or could soon
-    /// be) enforcing it — focus on now, or a locked window that will inherit the active profile.
-    fn set_active_profile(&mut self, profile_id: &str) -> Result<(), RpcError> {
-        let Some(next) = self
-            .state
+    /// Push the engine's effective policy into the enforcers and announce what changed. The
+    /// enforcers only ever see one flat policy plus an on/off switch.
+    fn apply_effective(&mut self, tick: &Tick) {
+        let policy = talysman_engine::effective::flatten_network(&tick.effective.layers);
+        let active = tick.effective.active();
+        let source = if !active {
+            self.focus_source
+        } else if self
+            .engine
+            .snapshot(&self.ctx())
             .profiles
             .iter()
-            .find(|p| p.id == profile_id)
-            .map(|p| p.policy.clone())
-        else {
-            return Err(RpcError::new(err::BAD_REQUEST, "Profile not found."));
+            .any(|p| p.activation.active && p.activation.latched)
+        {
+            FocusSource::User
+        } else {
+            FocusSource::Schedule
         };
-        if self.state.active_profile_id == profile_id {
-            return Ok(());
+        let policy_changed = policy != self.network_policy;
+        if policy_changed {
+            self.pending_judges.clear();
+            self.shared.set_policy(policy.clone());
+            self.network_policy = policy.clone();
+            self.emit("policyChanged", json!({ "policy": policy }));
         }
-        if self.schedule_locked() {
-            return Err(RpcError::new(
-                err::LOCKED,
-                "A locked schedule window is active.",
-            ));
+        self.shared
+            .set_handshake_enabled(self.state.settings.browser_handshake_enabled || !policy.sites.is_empty());
+        if active != self.active {
+            self.pending_judges.clear();
+            self.active = active;
+            self.focus_source = source;
+            self.shared.set_active(active);
+            enforce::apply_network(active);
+            self.record_transition(if active { TransitionKind::FocusOn } else { TransitionKind::FocusOff }, source);
+            self.emit("focusChanged", json!({ "active": active, "source": source }));
+            tracing::info!("enforcement {} ({:?})", if active { "on" } else { "off" }, source);
         }
-
-        let relaxes =
-            !crate::policy_match::is_at_least_as_restrictive(&self.state.active_policy(), &next);
-        let enforcing =
-            self.state.focus_active || self.state.schedule.windows.iter().any(|w| w.locked);
-        if relaxes && enforcing {
-            self.require_key("Insert your paired key to switch to a less restrictive profile.")?;
-        }
-
-        self.switch_active_profile(profile_id.to_string());
-        Ok(())
     }
 
-    /// Point enforcement at `profile_id` and push the new policy down. Callers gate first.
-    fn switch_active_profile(&mut self, profile_id: String) {
-        if self.state.active_profile_id == profile_id {
-            return;
-        }
-        self.state.active_profile_id = profile_id;
-        self.persist_state();
-        self.emit_profiles();
-        self.apply_active_policy();
-        tracing::info!("active profile is now {}", self.state.active_profile_id);
-    }
-
-    /// Tightening the schedule is always free. Relaxing it — dropping a covered minute, unlocking
-    /// a locked one, or repointing a window at a laxer blocking profile — requires the paired key;
-    /// with the key present the user may edit any window, including one that is currently active.
-    fn set_schedule(&mut self, schedule: Schedule) -> Result<(), RpcError> {
-        if self.state.schedule == schedule {
-            return Ok(());
-        }
-        for w in &schedule.windows {
-            if let Some(id) = &w.profile_id {
-                if !self.state.profiles.iter().any(|p| p.id == *id) {
-                    return Err(RpcError::new(
-                        err::BAD_REQUEST,
-                        format!("Unknown blocking profile: {id}"),
-                    ));
-                }
+    fn handle_tick(&mut self, tick: &Tick) -> bool {
+        use talysman_engine::engine::EngineEvent;
+        self.apply_effective(tick);
+        let mut changed = false;
+        for event in &tick.events {
+            changed = true;
+            if let EngineEvent::ScheduleFired { profile_id, action } = event {
+                self.record_transition(TransitionKind::ScheduleFired, FocusSource::Schedule);
+                self.emit("scheduleFired", json!({ "profileId": profile_id, "action": action }));
             }
         }
-        if !schedule::is_at_least_as_restrictive(
-            &self.state.schedule,
-            &schedule,
-            &self.state.profiles,
-            &self.state.active_profile_id,
-        ) {
-            self.require_key("Insert your paired key to relax the schedule.")?;
+        changed
+    }
+
+    /// Advance the engine clock (schedule edges, pool/override expiry) and return how long to
+    /// sleep before the next time-driven change.
+    pub fn tick(&mut self) -> Duration {
+        let ctx = self.ctx();
+        let tick = self.engine.tick(&ctx);
+        if self.handle_tick(&tick) {
+            self.persist_state();
         }
-        self.state.schedule = schedule;
+        let wait = tick.next_wake_ms.saturating_sub(ctx.now.epoch_ms).max(0) as u64;
+        // Wake a beat after the edge so the next tick lands on the far side of it.
+        Duration::from_millis(wait + 50).min(MAX_TICK_DELAY)
+    }
+
+    /// Run one engine command, verifying the USB key if (and only if) the engine asks for it.
+    fn run_command(&mut self, cmd: Command) -> Result<talysman_engine::Applied, RpcError> {
+        let ctx = self.ctx();
+        let auth = match self.engine.gate(&cmd, &ctx) {
+            Gate::NeedsKey { .. } => match self.verified_key() {
+                Some(auth) => auth,
+                None => {
+                    return Err(RpcError::new(err::KEY_REQUIRED, "Insert your paired key to do this."));
+                }
+            },
+            _ => Auth::None,
+        };
+        let applied = self.engine.apply(cmd, auth, &ctx)?;
+        self.handle_tick(&applied.tick);
         self.persist_state();
+        Ok(applied)
+    }
+
+    fn default_profile_id(&self) -> Option<String> {
+        self.engine
+            .state
+            .default_profile_id
+            .clone()
+            .or_else(|| self.engine.state.profiles.first().map(|p| p.id.clone()))
+    }
+
+    /// Legacy `enableFocus` (tray, focus CLI): latch the default profile on.
+    fn enable_focus(&mut self) -> Result<(), RpcError> {
+        if self.active {
+            return Ok(());
+        }
+        if !self.has_paired_keys() {
+            return Err(RpcError::new(err::NO_PAIRED_KEY, "Pair a key before turning on focus."));
+        }
+        let Some(profile_id) = self.default_profile_id() else {
+            return Err(RpcError::new(err::BAD_REQUEST, "No profile to turn on."));
+        };
+        self.run_command(Command::SetLatch { profile_id, on: true })?;
         Ok(())
     }
 
-    /// Toggle the browser handshake dead-man's switch. Enabling is free; **disabling** is gated
-    /// exactly like `disable_focus` (USB key + no locked window), so a user mid-session cannot
-    /// simply switch enforcement off.
+    /// Legacy `disableFocus`: override (1), everything off until re-enabled (key-gated).
+    fn disable_focus(&mut self) -> Result<(), RpcError> {
+        if !self.active {
+            return Ok(());
+        }
+        self.run_command(Command::StartOverrideAll)?;
+        Ok(())
+    }
+
+    /// Toggle the browser handshake dead-man's switch. Enabling is free; **disabling** needs the
+    /// key and is refused while a locked window holds an active profile.
     fn set_browser_handshake(&mut self, enabled: bool) -> Result<(), RpcError> {
         if self.state.settings.browser_handshake_enabled == enabled {
             return Ok(());
         }
         if !enabled {
-            if self.schedule_locked() {
-                return Err(RpcError::new(
-                    err::LOCKED,
-                    "A locked schedule window is active.",
-                ));
+            if self.snapshot().schedule_locked {
+                return Err(RpcError::new(err::LOCKED, "A locked schedule window is active."));
             }
-            self.recompute_presence();
-            if !self.key_present {
-                return Err(RpcError::new(
-                    err::KEY_REQUIRED,
-                    "Insert your paired key to change this setting.",
-                ));
+            if self.verified_key().is_none() {
+                return Err(RpcError::new(err::KEY_REQUIRED, "Insert your paired key to change this setting."));
             }
         }
         self.state.settings.browser_handshake_enabled = enabled;
-        self.shared.set_handshake_enabled(enabled || !self.state.active_policy().sites.is_empty());
+        self.shared
+            .set_handshake_enabled(enabled || !self.network_policy.sites.is_empty());
         self.persist_state();
         self.emit(
             "settingsChanged",
@@ -500,8 +371,7 @@ impl Core {
         Ok(())
     }
 
-    /// Toggle the tray helper's icon. Purely cosmetic (not a security boundary) — unlike
-    /// `set_browser_handshake`, never gated.
+    /// Toggle the tray helper's icon. Purely cosmetic (not a security boundary) — never gated.
     fn set_tray_icon_enabled(&mut self, enabled: bool) {
         if self.state.settings.tray_icon_enabled == enabled {
             return;
@@ -567,17 +437,17 @@ impl Core {
             .get("context")
             .filter(|context| context.get("site").and_then(Value::as_str).is_some())
             .map(|context| json!({ "site": context["site"], "feature": context.get("feature").cloned().unwrap_or(Value::Null) }));
-        let policy = self.state.active_policy();
+        let policy = self.network_policy.clone();
         tracing::info!(
             request_id = %request_id,
             url = %url,
             content_len = content.len(),
             smart_filtering_enabled = self.state.settings.smart_filtering_enabled,
-            focus_active = self.state.focus_active,
+            focus_active = self.focus_active(),
             judge_active = policy.judge.is_some(),
             "judge request received"
         );
-        if !self.state.focus_active {
+        if !self.focus_active() {
             self.emit_judge_result(&request_id, &url, DefaultAction::Allow, "Focus is off");
             return Ok(());
         }
@@ -620,7 +490,7 @@ impl Core {
         };
         // Discard a paid verdict if the judge policy changed while it was in flight. The extension
         // also invalidates its request on every state generation, so emitting here would be stale.
-        if !self.state.focus_active || self.state.active_policy().judge.as_ref() != Some(&pending.judge) {
+        if !self.focus_active() || self.network_policy.judge.as_ref() != Some(&pending.judge) {
             tracing::warn!(request_id, "judge verdict ignored: focus or judge policy changed");
             return;
         }
@@ -659,6 +529,16 @@ impl Core {
     }
 
     fn pair_key(&mut self, drive_id: &str, label: &str) -> Result<PairedKey, RpcError> {
+        // While anything is enforced, pairing a new key needs an already-paired key present:
+        // otherwise any spare USB stick could be paired and immediately used to switch off.
+        let ctx = self.ctx();
+        let auth = match self.engine.gate(&Command::PairKey, &ctx) {
+            Gate::NeedsKey { .. } => self.verified_key().ok_or_else(|| {
+                RpcError::new(err::KEY_REQUIRED, "Insert a key you already paired to pair another while blocking is on.")
+            })?,
+            _ => Auth::None,
+        };
+
         let drives = usb::list_removable_drives();
         let drive = drives
             .into_iter()
@@ -700,6 +580,8 @@ impl Core {
             paired_at: now_ms(),
         };
         self.state.paired_keys.push(key.clone());
+        let ctx = self.ctx();
+        let _ = self.engine.apply(Command::PairKey, auth, &ctx);
         self.persist_all();
         self.recompute_presence();
         Ok(key)
@@ -716,13 +598,14 @@ impl Core {
             ));
         }
         // Removing a key is itself key-gated (architecture §6).
-        self.recompute_presence();
-        if !self.key_present {
+        let Some(auth) = self.verified_key() else {
             return Err(RpcError::new(
                 err::KEY_REQUIRED,
                 "Insert a paired key to remove a key.",
             ));
-        }
+        };
+        let ctx = self.ctx();
+        self.engine.apply(Command::UnpairKey, auth, &ctx)?;
         self.state.paired_keys.retain(|k| k.id != key_id);
         self.store.remove_key(key_id);
         self.persist_all();
@@ -730,54 +613,40 @@ impl Core {
         Ok(())
     }
 
-    /// Re-arm enforcement at boot for whatever focus state we loaded from disk.
+    /// Re-arm enforcement at boot for whatever the engine says is active now (replaying schedule
+    /// events missed while the service was down).
     pub fn rearm_on_boot(&mut self) {
-        // Restore the persisted handshake setting into the shared enforcement state.
-        self.shared
-            .set_handshake_enabled(self.state.settings.browser_handshake_enabled || !self.state.active_policy().sites.is_empty());
-        // The active profile may have arrived from a state-file migration; make sure enforcement
-        // is holding its policy and not a stale one.
-        self.shared.set_policy(self.state.active_policy());
-        if self.state.focus_active && self.state.paired_keys.is_empty() {
-            tracing::warn!("clearing persisted focus state because no key is paired");
-            self.set_focus(false, FocusSource::Boot);
-        } else if self.state.focus_active {
+        if !self.has_paired_keys() {
+            let mut cleared = false;
+            for profile in &mut self.engine.state.profiles {
+                if profile.latch.is_on() {
+                    profile.latch = talysman_engine::model::Latch::Off;
+                    cleared = true;
+                }
+            }
+            if cleared {
+                tracing::warn!("clearing persisted profile latches because no key is paired");
+            }
+        }
+        let ctx = self.ctx();
+        let tick = self.engine.tick(&ctx);
+        self.handle_tick(&tick);
+        // Enforcement starts from a clean slate on boot; make sure it holds the engine's view.
+        self.shared.set_policy(self.network_policy.clone());
+        if self.active {
             self.shared.set_active(true);
             enforce::apply_network(true);
-            tracing::info!("re-armed enforcement on boot (focus was active)");
+            tracing::info!("re-armed enforcement on boot");
         }
+        self.save();
         self.recompute_presence();
     }
 
-    /// Evaluate the schedule and flip focus at window boundaries, switching to the blocking
-    /// profile the covering window names. Only auto-disables focus that the schedule itself
-    /// turned on (never a user-initiated focus session).
-    pub fn schedule_tick(&mut self) {
-        let eval = schedule::evaluate_now(&self.state.schedule);
-        // A covering window that names a profile switches enforcement to it, even mid-session —
-        // this is what "schedule by profile" means. The switch is not key-gated: it is the user's
-        // earlier, already-gated decision replaying on time.
-        if eval.active {
-            if let Some(id) = eval.profile_id.clone() {
-                if self.state.profiles.iter().any(|p| p.id == id) {
-                    self.switch_active_profile(id);
-                }
-            }
-        }
-        if eval.active && !self.state.focus_active && !self.state.paired_keys.is_empty() {
-            self.set_focus(true, FocusSource::Schedule);
-            if let Some(id) = eval.window_id {
-                self.record_transition(TransitionKind::ScheduleFired, FocusSource::Schedule);
-                self.emit("scheduleFired", json!({ "windowId": id, "active": true }));
-            }
-        } else if !eval.active
-            && self.state.focus_active
-            && self.state.focus_source == FocusSource::Schedule
-        {
-            self.set_focus(false, FocusSource::Schedule);
-            self.record_transition(TransitionKind::ScheduleFired, FocusSource::Schedule);
-            self.emit("scheduleFired", json!({ "windowId": "", "active": false }));
-        }
+    /// A process-killer just closed a blocked app: tell Electron so it can show the unlock popup.
+    pub fn app_blocked(&mut self, app: crate::model::AppRef) {
+        let ctx = self.ctx();
+        let popup = self.engine.popup_info(&PopupTarget::App { app: app.clone() }, &ctx);
+        self.emit("appBlocked", json!({ "app": app, "popupInfo": popup }));
     }
 
     /// Dispatch a parsed request. Returns the JSON `result` on success.
@@ -790,44 +659,36 @@ impl Core {
             "getKeyPresence" => {
                 Ok(json!({ "present": self.key_present, "keyId": self.present_key_id }))
             }
+            // v5 shorthands kept for the tray and focus CLIs.
             "enableFocus" => {
-                self.enable_focus(FocusSource::User)?;
+                self.enable_focus()?;
                 Ok(ok())
             }
             "disableFocus" => {
-                self.disable_focus(FocusSource::User)?;
+                self.disable_focus()?;
                 Ok(ok())
             }
             "toggleFocus" => {
-                self.toggle_focus(FocusSource::User)?;
-                Ok(json!({ "ok": true, "active": self.state.focus_active }))
+                if self.active {
+                    self.disable_focus()?;
+                } else {
+                    self.enable_focus()?;
+                }
+                Ok(json!({ "ok": true, "active": self.active }))
             }
-            "setPolicy" => {
-                let policy: Policy = parse_field(params, "policy")?;
-                policy.validate().map_err(|message| RpcError::new(err::BAD_REQUEST, message))?;
-                self.set_policy(policy)?;
-                Ok(ok())
+            "applyCommand" => {
+                let command: Command = parse_field(params, "command")?;
+                if params.get("dryRun").and_then(Value::as_bool) == Some(true) {
+                    let gate = self.engine.gate(&command, &self.ctx());
+                    return Ok(json!({ "gate": gate }));
+                }
+                let applied = self.run_command(command)?;
+                Ok(json!({ "ok": true, "journal": applied.journal }))
             }
-            "setProfile" => {
-                let profile: Profile = parse_field(params, "profile")?;
-                profile.policy.validate().map_err(|message| RpcError::new(err::BAD_REQUEST, message))?;
-                self.set_profile(profile)?;
-                Ok(ok())
-            }
-            "deleteProfile" => {
-                let profile_id = str_field(params, "profileId")?;
-                self.delete_profile(&profile_id)?;
-                Ok(ok())
-            }
-            "setActiveProfile" => {
-                let profile_id = str_field(params, "profileId")?;
-                self.set_active_profile(&profile_id)?;
-                Ok(ok())
-            }
-            "setSchedule" => {
-                let schedule: Schedule = parse_field(params, "schedule")?;
-                self.set_schedule(schedule)?;
-                Ok(ok())
+            "getPopupInfo" => {
+                let target: PopupTarget = parse_field(params, "target")?;
+                let info = self.engine.popup_info(&target, &self.ctx());
+                Ok(serde_json::to_value(info).unwrap())
             }
             "setBrowserHandshake" => {
                 let enabled = params
@@ -990,6 +851,125 @@ fn now_ms() -> u64 {
 }
 
 #[cfg(test)]
+mod test_support {
+    use super::*;
+    use talysman_engine::engine::ProfileInput;
+    use talysman_engine::model::{EngineState, Latch, LatchSource, Profile as EngineProfile, ProfileConfig};
+
+    /// A core with one profile holding `policy`, latched on when `active`, and a paired key.
+    pub fn core_with(policy: Policy, active: bool) -> (Core, broadcast::Receiver<Value>) {
+        let mut engine = EngineState::new("test");
+        engine.profiles.push(EngineProfile {
+            id: "p".into(),
+            name: "P".into(),
+            color: "#000".into(),
+            created_at_ms: 0,
+            config: ProfileConfig { policy, ..Default::default() },
+            latch: if active { Latch::On { since_ms: 0, source: LatchSource::User } } else { Latch::Off },
+        });
+        let mut state = PersistentState::default();
+        state.engine = Some(engine);
+        state.paired_keys.push(PairedKey { id: "k".into(), label: "K".into(), serial_ambiguous: false, paired_at: 0 });
+        let mut core = Core::new(state, SecureStore::default(), Arc::new(EnforceShared::new(Policy::default(), false)));
+        let rx = core.subscribe();
+        let ctx = core.ctx();
+        let tick = core.engine.tick(&ctx);
+        core.apply_effective(&tick);
+        (core, rx)
+    }
+
+    pub fn input(id: &str, policy: Policy) -> ProfileInput {
+        ProfileInput { id: id.into(), name: id.into(), color: "#000".into(), config: ProfileConfig { policy, ..Default::default() } }
+    }
+}
+
+#[cfg(test)]
+mod dispatch_tests {
+    use super::test_support::*;
+    use super::*;
+
+    fn blocks(domains: &[&str]) -> Policy {
+        Policy { blocked_domains: domains.iter().map(|d| d.to_string()).collect(), ..Default::default() }
+    }
+
+    fn apply(core: &mut Core, command: Value) -> Result<Value, RpcError> {
+        core.dispatch("applyCommand", &json!({ "command": command }))
+    }
+
+    #[test]
+    fn get_state_reports_the_flat_policy_and_the_engine_snapshot() {
+        let (mut core, _rx) = core_with(blocks(&["reddit.com"]), true);
+        let state = core.dispatch("getState", &Value::Null).unwrap_or_else(|_| panic!());
+        assert_eq!(state["protocolVersion"], PROTOCOL_VERSION);
+        assert_eq!(state["focusActive"], true);
+        assert_eq!(state["policy"]["blockedDomains"][0], "reddit.com");
+        assert_eq!(state["engine"]["profiles"][0]["activation"]["active"], true);
+        assert_eq!(state["engine"]["emergencyLeft"], 5);
+        assert!(core.shared.is_active());
+    }
+
+    #[test]
+    fn relaxing_needs_the_usb_key_and_dry_run_reports_it() {
+        let (mut core, _rx) = core_with(blocks(&["reddit.com"]), true);
+        let upsert = json!({ "type": "upsertProfile", "profile": input("p", blocks(&[])) });
+        let dry = core.dispatch("applyCommand", &json!({ "command": upsert, "dryRun": true })).unwrap_or_else(|_| panic!());
+        assert_eq!(dry["gate"]["kind"], "needsKey");
+        let refused = apply(&mut core, upsert.clone()).err().unwrap();
+        assert_eq!(refused.code, err::KEY_REQUIRED);
+        core.test_present_key = Some("k".into());
+        apply(&mut core, upsert).unwrap_or_else(|e| panic!("{}", e.message));
+        assert!(core.network_policy.blocked_domains.is_empty());
+    }
+
+    #[test]
+    fn disable_and_enable_focus_map_to_override_and_latch() {
+        let (mut core, mut rx) = core_with(blocks(&["reddit.com"]), true);
+        assert_eq!(core.dispatch("disableFocus", &json!({})).err().unwrap().code, err::KEY_REQUIRED);
+        core.test_present_key = Some("k".into());
+        core.dispatch("disableFocus", &json!({})).unwrap_or_else(|_| panic!());
+        assert!(!core.focus_active());
+        assert!(!core.shared.is_active());
+        let mut saw_focus_changed = false;
+        while let Ok(event) = rx.try_recv() {
+            saw_focus_changed |= event["event"] == "focusChanged" && event["payload"]["active"] == false;
+        }
+        assert!(saw_focus_changed);
+        core.dispatch("enableFocus", &json!({})).unwrap_or_else(|_| panic!());
+        assert!(core.focus_active());
+    }
+
+    #[test]
+    fn emergency_unlock_needs_no_key() {
+        let (mut core, _rx) = core_with(blocks(&["reddit.com"]), true);
+        apply(&mut core, json!({ "type": "emergencyUnlock" })).unwrap_or_else(|e| panic!("{}", e.message));
+        assert!(!core.focus_active());
+        assert_eq!(core.snapshot().engine.emergency_left, 4);
+    }
+
+    #[test]
+    fn pairing_while_active_needs_an_existing_key() {
+        let (mut core, _rx) = core_with(blocks(&["reddit.com"]), true);
+        let refused = core.dispatch("pairKey", &json!({ "driveId": "nope", "label": "" })).err().unwrap();
+        assert_eq!(refused.code, err::KEY_REQUIRED);
+        core.test_present_key = Some("k".into());
+        // Past the key gate, the (nonexistent) drive is what fails.
+        let refused = core.dispatch("pairKey", &json!({ "driveId": "nope", "label": "" })).err().unwrap();
+        assert_eq!(refused.code, err::BAD_REQUEST);
+    }
+
+    #[test]
+    fn popup_info_for_a_blocked_url() {
+        let (mut core, _rx) = core_with(blocks(&["reddit.com"]), true);
+        let info = core
+            .dispatch("getPopupInfo", &json!({ "target": { "kind": "url", "url": "https://www.reddit.com/" } }))
+            .unwrap_or_else(|_| panic!());
+        assert_eq!(info["verdict"]["kind"], "hard");
+        assert_eq!(info["blockingProfiles"][0]["id"], "p");
+        assert_eq!(info["unlockAvailable"], false);
+    }
+}
+
+#[cfg(test)]
 mod judge_tests {
     use super::*;
     use crate::model::{JudgePolicy, RuleAction};
@@ -1004,14 +984,9 @@ mod judge_tests {
     }
 
     fn core(judge: Option<JudgePolicy>, focus: bool, smart: bool) -> (Core, broadcast::Receiver<Value>) {
-        let mut state = PersistentState::default();
-        state.profiles[0].policy.default_action = RuleAction::Judge;
-        state.profiles[0].policy.judge = judge;
-        state.focus_active = focus;
-        state.settings.smart_filtering_enabled = smart;
-        let policy = state.active_policy().clone();
-        let core = Core::new(state, SecureStore::default(), Arc::new(EnforceShared::new(policy, focus)));
-        let rx = core.subscribe();
+        let policy = Policy { default_action: RuleAction::Judge, judge, ..Default::default() };
+        let (mut core, rx) = super::test_support::core_with(policy, focus);
+        core.state.settings.smart_filtering_enabled = smart;
         (core, rx)
     }
 
@@ -1072,7 +1047,7 @@ mod judge_tests {
     fn a_verdict_for_since_edited_tasks_is_discarded() {
         let (mut core, mut rx) = core(Some(judge("thesis", DefaultAction::Allow)), true, true);
         assert!(core.judge_request(&request("r1")).is_ok());
-        core.state.profiles[0].policy.judge = Some(judge("taxes", DefaultAction::Allow));
+        core.network_policy.judge = Some(judge("taxes", DefaultAction::Allow));
         core.submit_judge_verdict("r1", DefaultAction::Block, "Off-task".into());
         while let Ok(event) = rx.try_recv() {
             assert_ne!(event["event"], "judgeResult");

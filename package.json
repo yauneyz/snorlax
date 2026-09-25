@@ -35,6 +35,7 @@
     "build:extension": "node scripts/build-extension.mjs && node scripts/audit-extension.mjs",
     "update:blocklists": "node scripts/update-blocklists.mjs",
     "generate:sites": "tsx scripts/generate-site-catalog.ts",
+    "gen:types": "node scripts/generate-engine-types.mjs",
     "audit:extension": "node scripts/audit-extension.mjs",
     "palette:check": "node scripts/check-palette.mjs",
     "release:local": "node scripts/release-local.mjs",

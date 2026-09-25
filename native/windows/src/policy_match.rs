@@ -40,8 +40,13 @@ pub fn is_browser_image(image_name: &str) -> bool {
 
 /// Does a running process image name (e.g. "chrome.exe") match a blocked app?
 pub fn is_app_blocked(policy: &Policy, image_name: &str) -> bool {
+    blocked_app(policy, image_name).is_some()
+}
+
+/// The blocklist entry a running process matches, if any.
+pub fn blocked_app<'a>(policy: &'a Policy, image_name: &str) -> Option<&'a crate::model::AppRef> {
     let name = image_name.to_ascii_lowercase();
-    policy.apps.iter().any(|a| {
+    policy.apps.iter().find(|a| {
         a.windows_image_name
             .as_deref()
             .map(|n| n.eq_ignore_ascii_case(&name))
@@ -136,6 +141,7 @@ mod tests {
                 windows_image_name: Some("chrome.exe".into()),
                 linux_process_name: None,
                 mac_bundle_id: None,
+                android_package: None,
                 label: "Chrome".into(),
             }],
             ..Policy::default()

@@ -66,4 +66,5 @@ export default defineSite({
     ['https://www.reddit.com/login/', 'essentials'],
     ['https://ads.reddit.com/comments/abc123', 'feed'],
   ],
+  android: { packages: ['com.reddit.frontpage'] },
 });

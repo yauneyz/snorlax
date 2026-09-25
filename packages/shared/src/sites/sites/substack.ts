@@ -77,4 +77,5 @@ export default defineSite({
     ['https://natesnewsletter.substack.com/', 'publications'],
     ['https://natesnewsletter.substack.com/p/every-ai-you-use-forgets-you-heres', 'publications'],
   ],
+  android: { packages: ['com.substack.app'] },
 });

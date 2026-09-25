@@ -64,4 +64,5 @@ export default defineSite({
     ['https://twitter.com/home', 'feed'],
     ['https://api.x.com/ada/status/123', 'feed'],
   ],
+  android: { packages: ['com.twitter.android'] },
 });

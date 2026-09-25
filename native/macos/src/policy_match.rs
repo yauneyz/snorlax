@@ -45,9 +45,14 @@ pub fn is_browser_image(image_name: &str) -> bool {
 /// is available (bare executables), fall back to name matching against the linux/windows fields,
 /// which lets shared cross-platform policies still catch e.g. a raw "chromium" binary.
 pub fn is_app_blocked(policy: &Policy, image_name: &str, bundle_id: Option<&str>) -> bool {
+    blocked_app(policy, image_name, bundle_id).is_some()
+}
+
+/// The blocklist entry a running process matches, if any.
+pub fn blocked_app<'a>(policy: &'a Policy, image_name: &str, bundle_id: Option<&str>) -> Option<&'a crate::model::AppRef> {
     let name = image_name.to_ascii_lowercase();
     let bundle = bundle_id.map(|b| b.to_ascii_lowercase());
-    policy.apps.iter().any(|a| {
+    policy.apps.iter().find(|a| {
         if let (Some(pat), Some(b)) = (a.mac_bundle_id.as_deref(), bundle.as_deref()) {
             let pat = pat.to_ascii_lowercase();
             if b == pat || b.starts_with(&format!("{pat}.")) {
@@ -163,6 +168,7 @@ mod tests {
             windows_image_name: Some("chrome.exe".into()),
             linux_process_name: Some("chrome".into()),
             mac_bundle_id: Some("com.google.Chrome".into()),
+            android_package: None,
             label: "Chrome".into(),
         }
     }
@@ -212,6 +218,7 @@ mod tests {
             windows_image_name: None,
             linux_process_name: None,
             mac_bundle_id: Some("com.spotify.client".into()),
+            android_package: None,
             label: "Spotify".into(),
         }];
         assert!(is_app_blocked(&p, "Spotify", Some("com.spotify.client")));

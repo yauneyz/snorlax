@@ -81,9 +81,16 @@ export function validateSite(site: SiteDefinition): void {
 export function validateCatalog(sites: readonly SiteDefinition[] = SITE_DEFINITIONS): void {
   const ids = new Set<string>();
   const hosts = new Map<string, string>();
+  const packages = new Map<string, string>();
   for (const site of sites) {
     if (ids.has(site.id)) throw new Error(`duplicate site ${site.id}`);
     ids.add(site.id);
+    for (const pkg of site.android?.packages ?? []) {
+      if (!/^[a-z][a-z0-9_]*(\.[a-z0-9_]+)+$/i.test(pkg)) throw new Error(`site ${site.id}: invalid Android package ${pkg}`);
+      const owner = packages.get(pkg);
+      if (owner) throw new Error(`Android package ${pkg} belongs to both ${owner} and ${site.id}`);
+      packages.set(pkg, site.id);
+    }
     for (const host of site.hosts) {
       const owner = hosts.get(host);
       if (owner) throw new Error(`host ${host} belongs to both ${owner} and ${site.id}`);
@@ -108,13 +115,23 @@ function runtimeSite(site: SiteDefinition) {
   };
 }
 
-/** What the daemon needs: identity, network allowances, and the feature schema. */
+/**
+ * What the engine needs: identity, network allowances, the feature schema, routes (so browsers
+ * without the extension can be blocked route-by-route), Android packages, and the URL examples
+ * (the engine's `classify_url` is tested against them, keeping it in lockstep with site-engine.js).
+ */
 function nativeSite(site: SiteDefinition) {
   return {
     id: site.id,
+    label: site.label,
     hosts: site.hosts,
+    appHosts: site.appHosts,
     networkDomains: site.networkDomains,
-    features: site.features.map(({ id, default: action, locked }) => ({ id, default: action, locked: !!locked })),
+    features: site.features.map(({ id, label, default: action, locked }) => ({ id, label, default: action, locked: !!locked })),
+    routes: site.routes.map(({ feature, host, path, query }) => ({ feature, ...(host ? { host } : {}), ...(path ? { path } : {}), ...(query ? { query } : {}) })),
+    fallbackFeature: site.fallbackFeature,
+    androidPackages: site.android?.packages ?? [],
+    examples: site.examples,
   };
 }
 

@@ -1,6 +1,6 @@
 // Single source of truth for the built-in "premade blocklists" feature: every category's UI
 // metadata and the upstream source(s) that feed it. Read by both scripts/update-blocklists.mjs
-// (fetch/parse/normalize into native/common/resources/premade-lists/<id>.txt) and
+// (fetch/parse/normalize into native/engine/resources/premade-lists/<id>.txt) and
 // scripts/generate-premade-lists.mjs (derive extension DNR rulesets + packages/shared metadata
 // from those .txt files).
 //

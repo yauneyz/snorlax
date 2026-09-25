@@ -9,7 +9,7 @@
 // "shopping" must not also block console.aws.amazon.com just because a source list contains
 // some amazon.com subdomain).
 //
-// The override files at native/common/resources/premade-lists/overrides/<id>.json are the
+// The override files at native/engine/resources/premade-lists/overrides/<id>.json are the
 // manual escape hatch for cases normalization can't get right on its own: `include` adds known
 // canonical service domains a bulk source missed, `exclude` removes false positives (shared
 // infra, bad merge artifacts, etc). Both are plain arrays of registrable domains.

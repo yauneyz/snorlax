@@ -3,6 +3,8 @@
 //! close, process kill); this crate owns the **decisions** so they live in exactly one place and are
 //! unit-tested without touching the OS.
 //!
+//! Profiles, schedules, overrides, pools and streaks live in `talysman_engine`.
+//!
 //! Today this covers the browser handshake "dead-man's switch" — the browser classification table
 //! ([`browsers`]) and the escalation state machine ([`watchdog`]) — and the [`policy`] data model
 //! that every backend must accept and emit identically.
@@ -12,10 +14,10 @@ pub mod extension_compat;
 pub mod model;
 pub mod pairing;
 pub mod panic_log;
-pub mod policy;
-pub mod policy_match;
-pub mod premade_lists;
-pub mod site_catalog;
+/// The policy model, matching, catalog and premade lists are single-sourced in the platform-free
+/// engine (shared with Android and TypeScript); re-exported so `talysman_common::policy` etc. keep
+/// working for the daemons.
+pub use talysman_engine::{policy, policy_match, premade_lists, site_catalog};
 pub mod natmsg_frames;
 pub mod natmsg_legacy;
 pub mod watchdog;

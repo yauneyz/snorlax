@@ -35,10 +35,7 @@ pub async fn serve(socket_path: String, shutdown: watch::Receiver<bool>) {
 
     let state = PersistentState::load();
     let store = SecureStore::load();
-    let shared = Arc::new(EnforceShared::new(
-        state.active_policy(),
-        state.focus_active,
-    ));
+    let shared = Arc::new(EnforceShared::new(crate::model::Policy::default(), false));
 
     let core = Arc::new(Mutex::new(Core::new(state, store, shared.clone())));
     core.lock().await.rearm_on_boot();
@@ -118,11 +115,8 @@ pub async fn serve(socket_path: String, shutdown: watch::Receiver<bool>) {
         tokio::spawn(async move {
             loop {
                 while events.try_recv().is_ok() {}
-                let delay = {
-                    let mut core = core.lock().await;
-                    core.schedule_tick();
-                    core.next_schedule_delay()
-                };
+                // Schedule edges, pool unlocks and timed overrides all expire here.
+                let delay = core.lock().await.tick();
                 tokio::select! {
                     _ = sd.changed() => { if *sd.borrow() { break; } }
                     _ = tokio::time::sleep(delay) => {}

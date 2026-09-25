@@ -49,7 +49,7 @@ at its default, allowed, hidden, or judged — even over a default-deny policy) 
 2. Register it in `catalog.ts`.
 3. Run `pnpm generate:sites`. This validates the catalog and regenerates:
    - `apps/extension/src/site-catalog.js`
-   - `native/common/resources/site-catalog.json`
+   - `native/engine/resources/site-catalog.json`
    - the extension manifest's content-script matches
 4. Run `pnpm test`. The catalog tests cover the new site automatically.
 

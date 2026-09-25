@@ -191,8 +191,7 @@ fn uninstall() -> Result<()> {
     // stop. An authorized uninstall is different: remove all machine-level enforcement before
     // deleting the binaries, matching the Linux and macOS uninstall controllers.
     let mut state = talysman::state::PersistentState::load();
-    state.focus_active = false;
-    state.focus_source = talysman::model::FocusSource::User;
+    state.latch_all_off();
     state
         .save()
         .context("persist focus-off state before uninstall")?;

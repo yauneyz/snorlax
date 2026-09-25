@@ -33,6 +33,7 @@ path = "src/bin/focus-disable.rs"
 anyhow = "1"
 chrono = { version = "0.4", default-features = false, features = ["clock"] }
 talysman_common = { path = "../common" }
+talysman_engine = { path = "../engine" }
 plist = "1"
 rand = "0.8"
 serde = { version = "1", features = ["derive"] }

@@ -23,21 +23,30 @@ use serde::{Deserialize, Serialize};
 use crate::site_catalog::{self, CatalogSite};
 
 /// Platform-neutral app identity; each backend reads the field relevant to its OS.
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 #[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct AppRef {
     #[serde(skip_serializing_if = "Option::is_none", default)]
+    #[cfg_attr(feature = "ts", ts(optional))]
     pub windows_image_name: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none", default)]
+    #[cfg_attr(feature = "ts", ts(optional))]
     pub linux_process_name: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none", default)]
+    #[cfg_attr(feature = "ts", ts(optional))]
     pub mac_bundle_id: Option<String>,
+    /// e.g. "com.instagram.android" — matched on Android.
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    #[cfg_attr(feature = "ts", ts(optional))]
+    pub android_package: Option<String>,
     pub label: String,
 }
 
 /// Mirrors `RuleAction` in packages/shared/src/sites/types.ts: what any policy layer decides for a
 /// page. `Judge` hands the page to the AI judge (see `platform_core::judge_request`), which falls
 /// back to `JudgePolicy::fallback` when it can't answer.
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 #[derive(Clone, Copy, Debug, Default, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[serde(rename_all = "lowercase")]
 pub enum RuleAction {
@@ -70,6 +79,7 @@ impl RuleAction {
 /// The network-layer projection of `Policy::default_action` (see [`RuleAction::network`]), and
 /// the two-valued fallback a judge resolves to when it can't answer. Enforcement backends
 /// (nftables, pf, WinDivert) only ever see this.
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 #[derive(Clone, Copy, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
 pub enum DefaultAction {
@@ -91,7 +101,8 @@ impl From<DefaultAction> for RuleAction {
 // rulesets, and shared TypeScript metadata gain categories together.
 include!("premade_list_ids.rs");
 
-/// Mirrors `JudgeTask` in packages/shared/src/policy.ts.
+/// Something the user is working on; the AI judge allows pages that help with any task.
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct JudgeTask {
@@ -99,10 +110,12 @@ pub struct JudgeTask {
     pub id: String,
     pub title: String,
     #[serde(skip_serializing_if = "Option::is_none", default)]
+    #[cfg_attr(feature = "ts", ts(optional))]
     pub notes: Option<String>,
 }
 
-/// Mirrors `JudgePolicy` in packages/shared/src/policy.ts: what the AI judge weighs pages against.
+/// What the AI judge weighs pages against.
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 #[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct JudgePolicy {
@@ -114,8 +127,9 @@ pub struct JudgePolicy {
     pub fallback: DefaultAction,
 }
 
-/// Mirrors `SiteRule` in packages/shared/src/sites/types.ts. Feature ids are strings keyed by the
+/// A user's rule for one catalog site (TypeScript type generated from this). Feature ids are strings keyed by the
 /// site catalog (`crate::site_catalog`); omitted features use the catalog default.
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 #[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct SiteRule {
@@ -123,7 +137,7 @@ pub struct SiteRule {
     pub features: BTreeMap<String, RuleAction>,
 }
 
-/// Mirrors `Policy` in packages/shared/src/policy.ts. Layers, in order: `blocked_domains` (hard
+/// The web/app blocking policy of one profile (TypeScript type generated from this). Layers, in order: `blocked_domains` (hard
 /// block), `sites` (per-site feature rules from the site catalog), `allowed_domains` (hard allow),
 /// `enabled_premade_lists`, then `default_action`. Any `Judge` action is resolved by the AI judge
 /// configured in `judge`.
@@ -131,6 +145,7 @@ pub struct SiteRule {
 /// `sites` is keyed by catalog id *string*, not an enum: a persisted policy naming a site this
 /// build's catalog doesn't know (e.g. after a rollback) must still load — unknown sites are simply
 /// ignored by enforcement, and rejected only at the RPC boundary by [`Policy::validate`].
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 #[derive(Clone, Debug, Default, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct Policy {

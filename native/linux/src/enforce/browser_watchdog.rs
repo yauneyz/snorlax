@@ -21,6 +21,7 @@ use talysman_common::watchdog::{heartbeats_by_root, roots, Action, ScannedProc, 
 use crate::enforce::{apps, EnforceShared};
 
 const POLL: Duration = Duration::from_millis(1000);
+const APP_BLOCKED_DEBOUNCE: Duration = Duration::from_secs(5);
 
 pub async fn run_browser_watchdog(
     shared: Arc<EnforceShared>,
@@ -29,6 +30,7 @@ pub async fn run_browser_watchdog(
 ) {
     let mut sys = System::new();
     let mut wd = Watchdog::default();
+    let mut app_blocked_at: std::collections::HashMap<String, std::time::Instant> = std::collections::HashMap::new();
     let mut changes = shared.subscribe_changes();
     tracing::info!("browser watchdog started");
     loop {
@@ -47,7 +49,15 @@ pub async fn run_browser_watchdog(
             _ = tokio::time::sleep(POLL), if monitor_apps || monitor_browser => {
                 sys.refresh_processes();
                 if monitor_apps {
-                    apps::enforce_snapshot(&sys, &policy);
+                    // Tell Electron so it can offer the unlock popup; once per app per 5 s.
+                    for app in apps::enforce_snapshot(&sys, &policy) {
+                        let key = app.label.clone();
+                        let due = app_blocked_at.get(&key).is_none_or(|at: &std::time::Instant| at.elapsed() >= APP_BLOCKED_DEBOUNCE);
+                        if due {
+                            app_blocked_at.insert(key, std::time::Instant::now());
+                            let _ = events.send(json!({ "kind": "event", "event": "appBlocked", "payload": { "app": app } }));
+                        }
+                    }
                 }
                 if !monitor_browser {
                     continue;

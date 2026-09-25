@@ -1,10 +1,18 @@
 // Shared authoritative persisted state. Survives restarts so blocking resumes on boot.
+//
+// Schema 6: everything about profiles, schedules, overrides, pools, and the streak lives in
+// `engine` (a `talysman_engine::model::EngineState`). The v5 fields (`focusActive`,
+// `focusSource`, `profiles`, `activeProfileId`, `schedule`, and the even older bare `policy`) are
+// read once to migrate and never written back; the file read at migration is kept as
+// `state.v5.json.bak`.
 
 use std::fs;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
+use talysman_engine::model::EngineState;
+use talysman_engine::time::LocalNow;
 
 use crate::model::{
     FocusSource, PairedKey, Policy, Profile, Schedule, Settings, TransitionKind, UsageTransition,
@@ -23,25 +31,25 @@ fn now_ms() -> u64 {
         .unwrap_or(0)
 }
 
+/// Wall clock plus the local UTC offset, for the engine.
+pub fn local_now() -> LocalNow {
+    let now = chrono::Local::now();
+    LocalNow::new(now.timestamp_millis(), now.offset().local_minus_utc())
+}
+
+fn random_device_id() -> String {
+    use rand::RngCore;
+    let mut b = [0u8; 8];
+    rand::thread_rng().fill_bytes(&mut b);
+    b.iter().map(|byte| format!("{byte:02x}")).collect()
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PersistentState {
+    /// Profiles, schedules, overrides, pools, journal. `None` only in a v5 file before `migrate`.
     #[serde(default)]
-    pub focus_active: bool,
-    #[serde(default)]
-    pub focus_source: FocusSource,
-    /// Every blocking profile the user has defined. Never empty after `migrate`.
-    #[serde(default)]
-    pub profiles: Vec<Profile>,
-    /// Which profile focus enforces. Always resolves to a member of `profiles`.
-    #[serde(default)]
-    pub active_profile_id: String,
-    /// Pre-profile state files stored a single bare `policy`. Read once on load and folded into
-    /// the default profile by `migrate`; never written back.
-    #[serde(default, rename = "policy", skip_serializing)]
-    legacy_policy: Option<Policy>,
-    #[serde(default)]
-    pub schedule: Schedule,
+    pub engine: Option<EngineState>,
     #[serde(default)]
     pub settings: Settings,
     #[serde(default)]
@@ -54,22 +62,37 @@ pub struct PersistentState {
     /// pruned, so a client's `afterSeq` stays meaningful across a prune.
     #[serde(default)]
     pub usage_seq: u64,
+
+    // ---- v5 fields: read for migration only ----
+    #[serde(default, skip_serializing)]
+    focus_active: bool,
+    #[serde(default, skip_serializing)]
+    focus_source: FocusSource,
+    #[serde(default, skip_serializing)]
+    profiles: Vec<Profile>,
+    #[serde(default, skip_serializing)]
+    active_profile_id: String,
+    /// Pre-profile state files stored a single bare `policy`.
+    #[serde(default, rename = "policy", skip_serializing)]
+    legacy_policy: Option<Policy>,
+    #[serde(default, skip_serializing)]
+    schedule: Schedule,
 }
 
 impl Default for PersistentState {
     fn default() -> Self {
-        let profile = Profile::default();
         PersistentState {
-            focus_active: false,
-            focus_source: FocusSource::Boot,
-            active_profile_id: profile.id.clone(),
-            profiles: vec![profile],
-            legacy_policy: None,
-            schedule: Schedule::default(),
+            engine: None,
             settings: Settings::default(),
             paired_keys: Vec::new(),
             usage_log: Vec::new(),
             usage_seq: 0,
+            focus_active: false,
+            focus_source: FocusSource::Boot,
+            profiles: Vec::new(),
+            active_profile_id: String::new(),
+            legacy_policy: None,
+            schedule: Schedule::default(),
         }
     }
 }
@@ -89,9 +112,10 @@ impl PersistentState {
     }
 
     pub fn load() -> PersistentState {
-        let primary = fs::read(paths::state_file())
-            .ok()
-            .and_then(|bytes| Self::parse(&bytes, "state.json"));
+        let primary_bytes = fs::read(paths::state_file()).ok();
+        let primary = primary_bytes
+            .as_deref()
+            .and_then(|bytes| Self::parse(bytes, "state.json"));
 
         let mut state = match primary {
             Some(state) => state,
@@ -108,23 +132,65 @@ impl PersistentState {
                 }
             }
         };
-        state.migrate();
+        if state.migrate(&local_now()) {
+            if let Some(bytes) = primary_bytes {
+                let bak = paths::state_file().with_extension("v5.json.bak");
+                if let Err(e) = fs::write(&bak, bytes) {
+                    tracing::warn!("state: could not keep the v5 state file at {}: {e}", bak.display());
+                }
+            }
+            tracing::info!("state: migrated to schema 6");
+            if let Err(e) = state.save() {
+                tracing::error!("state: saving migrated state failed: {e}");
+            }
+        }
         state
     }
 
-    /// Bring a freshly-loaded state up to the current shape: seed a profile from the legacy
-    /// single-policy field (or an empty default), repair a dangling active id, and bound the
-    /// usage log (it may have grown while this client was offline).
-    fn migrate(&mut self) {
+    /// Bring a freshly-loaded state up to the current shape. Returns true when it upgraded a v5
+    /// (or older) file into engine state.
+    fn migrate(&mut self, now: &LocalNow) -> bool {
+        self.prune_usage_log();
+        if self.engine.is_some() {
+            return false;
+        }
         if self.profiles.is_empty() {
             let policy = self.legacy_policy.take().unwrap_or_default();
             self.profiles.push(Profile::from_policy(policy));
         }
         self.legacy_policy = None;
-        if !self.profiles.iter().any(|p| p.id == self.active_profile_id) {
-            self.active_profile_id = self.profiles[0].id.clone();
+        let v5 = serde_json::json!({
+            "focusActive": self.focus_active,
+            "focusSource": self.focus_source,
+            "profiles": self.profiles,
+            "activeProfileId": self.active_profile_id,
+            "schedule": self.schedule,
+        });
+        let ever_enabled = self.focus_active || self.usage_log.iter().any(|t| t.kind == TransitionKind::FocusOn);
+        self.engine = Some(talysman_engine::migrate::from_v5(
+            &v5,
+            &random_device_id(),
+            crate::model::DEFAULT_PROFILE_COLOR,
+            ever_enabled,
+            now,
+        ));
+        self.profiles.clear();
+        self.schedule = Schedule::default();
+        true
+    }
+
+    /// Engine state; `load` guarantees it is present.
+    pub fn engine_state(&self) -> EngineState {
+        self.engine.clone().unwrap_or_else(|| EngineState::new(&random_device_id()))
+    }
+
+    /// Latch every profile off (an authorized uninstall persisting "focus off").
+    pub fn latch_all_off(&mut self) {
+        if let Some(engine) = &mut self.engine {
+            for profile in &mut engine.profiles {
+                profile.latch = talysman_engine::model::Latch::Off;
+            }
         }
-        self.prune_usage_log();
     }
 
     /// Enforce `MAX_USAGE_LOG_ENTRIES` / `MAX_USAGE_LOG_AGE_MS`, whichever binds first. Entries
@@ -139,9 +205,8 @@ impl PersistentState {
     }
 
     /// Record one usage transition. `usage_seq` is never reset by pruning, so a client's
-    /// `afterSeq` cursor stays meaningful even after old entries fall off. Callers already
-    /// persist state on their own cadence (e.g. `set_focus`'s `persist_state()`); this does not
-    /// save on its own — see architecture §7/Phase 7 on why that's intentional.
+    /// `afterSeq` cursor stays meaningful even after old entries fall off. Callers persist state
+    /// on their own cadence; this does not save on its own.
     pub fn push_transition(&mut self, kind: TransitionKind, source: FocusSource) {
         self.usage_seq += 1;
         self.usage_log.push(UsageTransition {
@@ -151,19 +216,6 @@ impl PersistentState {
             source,
         });
         self.prune_usage_log();
-    }
-
-    /// The profile focus enforces. Falls back to the first profile, which `migrate` guarantees.
-    pub fn active_profile(&self) -> &Profile {
-        self.profiles
-            .iter()
-            .find(|p| p.id == self.active_profile_id)
-            .unwrap_or(&self.profiles[0])
-    }
-
-    /// The policy currently being enforced.
-    pub fn active_policy(&self) -> Policy {
-        self.active_profile().policy.clone()
     }
 
     /// Write via temp-file + fsync + rename, and roll the previous file to `.bak` first — a
@@ -199,155 +251,90 @@ mod migration_tests {
     use super::*;
     use crate::model::{RuleAction, DEFAULT_PROFILE_ID};
 
-    /// Pre-profile state files stored a single bare `policy` and no profiles at all. That
-    /// legacy `policy` also predates `blockedDomains`/`allowedDomains`/`defaultAction`/`judge`:
-    /// it used a `mode` + flat `domains` list, which `Policy::deserialize` converts on the fly
-    /// (see model.rs) before `migrate` ever sees it.
+    fn now() -> LocalNow {
+        LocalNow::new(1_790_000_000_000, 0)
+    }
+
+    fn migrated(json: &str) -> PersistentState {
+        let mut state: PersistentState = serde_json::from_str(json).unwrap();
+        assert!(state.migrate(&now()));
+        state
+    }
+
+    fn policy_of(state: &PersistentState, id: &str) -> Policy {
+        state.engine.as_ref().unwrap().profile(id).unwrap().config.policy.clone()
+    }
+
+    /// Pre-profile state files stored a single bare `policy` in the `{mode, domains}` shape.
     #[test]
     fn legacy_policy_becomes_the_default_profile() {
-        let legacy = r#"{
+        let state = migrated(
+            r#"{
             "focusActive": true,
             "focusSource": "user",
             "policy": { "mode": "whitelist", "domains": ["github.com"], "apps": [] },
             "schedule": { "windows": [] },
             "settings": { "browserHandshakeEnabled": true },
             "pairedKeys": []
-        }"#;
-
-        let mut state: PersistentState = serde_json::from_str(legacy).unwrap();
-        state.migrate();
-
-        assert_eq!(state.profiles.len(), 1);
-        assert_eq!(state.profiles[0].id, DEFAULT_PROFILE_ID);
-        assert_eq!(state.active_profile_id, DEFAULT_PROFILE_ID);
-        // whitelist -> allow only the listed domains, blocked by default.
-        assert_eq!(state.active_policy().default_action, RuleAction::Block);
-        assert!(state.active_policy().blocked_domains.is_empty());
-        assert_eq!(
-            state.active_policy().allowed_domains,
-            vec!["github.com".to_string()]
+        }"#,
         );
-        assert!(state.active_policy().judge.is_none());
-        // Unrelated fields survive the migration untouched.
-        assert!(state.focus_active);
+        let engine = state.engine.as_ref().unwrap();
+        assert_eq!(engine.profiles.len(), 1);
+        assert_eq!(engine.profiles[0].id, DEFAULT_PROFILE_ID);
+        assert!(engine.profiles[0].latch.is_on(), "user focus becomes a latch");
+        let policy = policy_of(&state, DEFAULT_PROFILE_ID);
+        assert_eq!(policy.default_action, RuleAction::Block);
+        assert_eq!(policy.allowed_domains, vec!["github.com".to_string()]);
         assert!(state.settings.browser_handshake_enabled);
     }
 
     #[test]
     fn an_empty_state_file_still_yields_one_profile() {
-        let mut state: PersistentState = serde_json::from_str("{}").unwrap();
-        state.migrate();
-
-        assert_eq!(state.profiles.len(), 1);
-        assert_eq!(state.active_profile_id, state.profiles[0].id);
+        let state = migrated("{}");
+        assert_eq!(state.engine.as_ref().unwrap().profiles.len(), 1);
     }
 
+    /// The v5 fields are read once and never written back.
     #[test]
-    fn a_dangling_active_id_falls_back_to_the_first_profile() {
-        let mut state = PersistentState::default();
-        state.profiles.push(Profile {
-            id: "evening".into(),
-            name: "Evening".into(),
-            color: crate::model::DEFAULT_PROFILE_COLOR.into(),
-            policy: Policy::default(),
-        });
-        state.active_profile_id = "deleted".into();
-        state.migrate();
-
-        assert_eq!(state.active_profile_id, DEFAULT_PROFILE_ID);
-    }
-
-    /// The legacy field is read once and never written back, so a migrated file does not carry
-    /// a stale duplicate of the policy alongside the profiles.
-    #[test]
-    fn the_legacy_policy_field_is_not_reserialized() {
-        let mut state: PersistentState =
-            serde_json::from_str(r#"{ "policy": { "mode": "block-all" } }"#).unwrap();
-        state.migrate();
-
+    fn legacy_fields_are_not_reserialized() {
+        let state = migrated(
+            r##"{
+            "profiles": [
+                { "id": "profile-default", "name": "Default", "policy": { "mode": "blacklist", "domains": ["youtube.com"], "apps": [] } },
+                { "id": "evening", "name": "Evening", "policy": { "mode": "block-all", "domains": [], "apps": [] } }
+            ],
+            "activeProfileId": "evening",
+            "focusActive": false,
+            "schedule": { "windows": [ { "id": "w", "days": ["mon"], "start": "09:00", "end": "17:00", "locked": true } ] }
+        }"##,
+        );
         let json: serde_json::Value = serde_json::to_value(&state).unwrap();
-        assert!(
-            json.get("policy").is_none(),
-            "top-level policy should be gone"
+        for key in ["policy", "profiles", "activeProfileId", "focusActive", "schedule"] {
+            assert!(json.get(key).is_none(), "{key} should be gone");
+        }
+        assert_eq!(policy_of(&state, "evening").default_action, RuleAction::Block);
+        let engine = state.engine.as_ref().unwrap();
+        assert_eq!(engine.default_profile_id.as_deref(), Some("evening"));
+        assert_eq!(engine.profile("evening").unwrap().config.schedule.len(), 1);
+        // A second load is a no-op.
+        let mut again: PersistentState = serde_json::from_value(json).unwrap();
+        assert!(!again.migrate(&now()));
+        assert_eq!(again.engine, state.engine);
+    }
+
+    #[test]
+    fn a_pre_v5_intent_still_migrates_to_a_judge() {
+        let state = migrated(
+            r##"{
+            "profiles": [ { "id": "profile-default", "name": "Default",
+                "policy": { "blockedDomains": ["youtube.com"], "allowedDomains": [], "defaultAction": "allow",
+                            "intent": { "positive": "finishing my thesis" }, "apps": [] } } ],
+            "activeProfileId": "profile-default"
+        }"##,
         );
-        // …but it survives where it now belongs, inside the default profile.
-        assert_eq!(state.active_policy().default_action, RuleAction::Block);
-        assert!(state.active_policy().blocked_domains.is_empty());
-        assert!(state.active_policy().allowed_domains.is_empty());
-        assert!(json["profiles"].is_array());
-    }
-
-    /// Real-world state files: the pre-profile migration above already happened months ago, so
-    /// almost every file on disk has `profiles[].policy` in the *old* `{mode, domains, apps}`
-    /// shape, not a top-level `policy`. `Policy::deserialize` must convert those in place too —
-    /// this is the shape the Smart-filtering migration actually has to handle in practice.
-    #[test]
-    fn a_legacy_shaped_policy_inside_an_existing_profile_is_converted() {
-        let legacy = r##"{
-            "profiles": [
-                {
-                    "id": "profile-default",
-                    "name": "Default",
-                    "policy": { "mode": "blacklist", "domains": ["youtube.com"], "apps": [] }
-                },
-                {
-                    "id": "evening",
-                    "name": "Evening",
-                    "policy": { "mode": "block-all", "domains": [], "apps": [] }
-                }
-            ],
-            "activeProfileId": "profile-default"
-        }"##;
-
-        let mut state: PersistentState = serde_json::from_str(legacy).unwrap();
-        state.migrate();
-
-        assert_eq!(state.profiles.len(), 2);
-        let default = &state.profiles[0].policy;
-        assert_eq!(default.default_action, RuleAction::Allow);
-        assert_eq!(default.blocked_domains, vec!["youtube.com".to_string()]);
-        assert!(default.allowed_domains.is_empty());
-        assert!(default.judge.is_none());
-
-        let evening = &state.profiles[1].policy;
-        assert_eq!(evening.default_action, RuleAction::Block);
-        assert!(evening.blocked_domains.is_empty());
-        assert!(evening.allowed_domains.is_empty());
-    }
-
-    /// A state file already in the current shape (no `mode` key anywhere, `defaultAction`
-    /// present) round-trips untouched — the common case going forward.
-    #[test]
-    fn a_fresh_install_with_no_legacy_mode_key_is_unaffected() {
-        let current = r##"{
-            "profiles": [
-                {
-                    "id": "profile-default",
-                    "name": "Default",
-                    "policy": {
-                        "blockedDomains": ["youtube.com"],
-                        "allowedDomains": [],
-                        "defaultAction": "allow",
-                        "intent": { "positive": "finishing my thesis" },
-                        "apps": []
-                    }
-                }
-            ],
-            "activeProfileId": "profile-default"
-        }"##;
-
-        let mut state: PersistentState = serde_json::from_str(current).unwrap();
-        state.migrate();
-
-        // A pre-v5 intent migrates to a judged default with one task.
-        let policy = state.active_policy();
+        let policy = policy_of(&state, DEFAULT_PROFILE_ID);
         assert_eq!(policy.default_action, RuleAction::Judge);
-        assert_eq!(policy.blocked_domains, vec!["youtube.com".to_string()]);
-        assert!(policy.allowed_domains.is_empty());
-        assert_eq!(
-            policy.judge.as_ref().map(|judge| judge.tasks[0].title.as_str()),
-            Some("finishing my thesis")
-        );
+        assert_eq!(policy.judge.as_ref().map(|j| j.tasks[0].title.as_str()), Some("finishing my thesis"));
     }
 
     fn transition(seq: u64, at: u64) -> UsageTransition {
@@ -362,33 +349,33 @@ mod migration_tests {
     #[test]
     fn migrate_prunes_usage_log_entries_older_than_35_days() {
         let mut state = PersistentState::default();
-        let now = now_ms();
+        let now_ms = now_ms();
         state
             .usage_log
-            .push(transition(1, now - MAX_USAGE_LOG_AGE_MS - 1)); // just too old
-        state.usage_log.push(transition(2, now - 1_000)); // recent
+            .push(transition(1, now_ms - MAX_USAGE_LOG_AGE_MS - 1)); // just too old
+        state.usage_log.push(transition(2, now_ms - 1_000)); // recent
         state.usage_seq = 2;
 
-        state.migrate();
+        state.migrate(&now());
 
         assert_eq!(state.usage_log.len(), 1);
         assert_eq!(state.usage_log[0].seq, 2);
+        assert!(state.engine.as_ref().unwrap().first_enabled_local_date.is_some());
     }
 
     #[test]
     fn migrate_caps_usage_log_at_max_entries_keeping_the_most_recent() {
         let mut state = PersistentState::default();
-        let now = now_ms();
+        let now_ms = now_ms();
         let total = MAX_USAGE_LOG_ENTRIES + 5;
         for i in 0..total {
-            state.usage_log.push(transition(i as u64, now));
+            state.usage_log.push(transition(i as u64, now_ms));
         }
         state.usage_seq = total as u64;
 
-        state.migrate();
+        state.migrate(&now());
 
         assert_eq!(state.usage_log.len(), MAX_USAGE_LOG_ENTRIES);
-        // The oldest 5 (seq 0..5) should have been dropped; the tail survives.
         assert_eq!(state.usage_log.first().unwrap().seq, 5);
         assert_eq!(state.usage_log.last().unwrap().seq, total as u64 - 1);
     }
@@ -404,8 +391,6 @@ mod migration_tests {
         assert_eq!(state.usage_log[1].seq, 2);
     }
 
-    /// `load()`'s recovery path hinges on `parse` telling corrupt bytes apart from good ones
-    /// without panicking — this is the piece that replaces the old bare `unwrap_or_default()`.
     #[test]
     fn parse_returns_none_on_corrupt_bytes_and_some_on_valid_json() {
         assert!(PersistentState::parse(b"not json at all", "test").is_none());

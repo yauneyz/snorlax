@@ -1,6 +1,6 @@
 /**
  * TS mirror of the daemon's relaxation gate for site rules and the AI judge
- * (native/common/src/policy_match.rs `is_at_least_as_restrictive`). The daemon is authoritative;
+ * (native/engine/src/policy_match.rs `is_at_least_as_restrictive`). The daemon is authoritative;
  * this lets the mock service and the UI predict when a change needs the paired key.
  */
 import type { Policy } from '@talysman/shared';

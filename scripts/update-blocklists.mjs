@@ -2,7 +2,7 @@
 // Refreshes all premade-blocklist category source files end-to-end: fetches every upstream
 // source declared in scripts/blocklists/sources.mjs, parses it, normalizes it to registrable
 // domains (with the curated overrides layer applied), merges multi-source categories, and
-// writes native/common/resources/premade-lists/<id>.txt — then regenerates the derived
+// writes native/engine/resources/premade-lists/<id>.txt — then regenerates the derived
 // extension DNR rulesets and packages/shared metadata via generate-premade-lists.mjs.
 //
 // Usage: pnpm run update:blocklists [category-id ...]   (no args = all categories)
@@ -23,7 +23,7 @@ import { parseSource } from './blocklists/parse.mjs';
 import { composeCategory, normalizeCategory, loadOverrides } from './blocklists/normalize.mjs';
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const SRC_DIR = path.join(repoRoot, 'native/common/resources/premade-lists');
+const SRC_DIR = path.join(repoRoot, 'native/engine/resources/premade-lists');
 const OVERRIDES_DIR = path.join(SRC_DIR, 'overrides');
 const PROVENANCE_PATH = path.join(SRC_DIR, 'provenance.json');
 

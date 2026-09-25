@@ -63,4 +63,5 @@ export default defineSite({
     ['https://www.linkedin.com/mynetwork/', 'recommendations'],
     ['https://www.linkedin.com/learning/', 'feed'],
   ],
+  android: { packages: ['com.linkedin.android'] },
 });

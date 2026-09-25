@@ -57,4 +57,5 @@ export default defineSite({
     ['https://www.instagram.com/accounts/login/', 'essentials'],
     ['https://www.instagram.com/ada/', 'profiles'],
   ],
+  android: { packages: ['com.instagram.android'] },
 });
