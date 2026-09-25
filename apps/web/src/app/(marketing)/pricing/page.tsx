@@ -71,10 +71,10 @@ const faqs = [
     a: (
       <>
         <p>
-          They are removed, not paused. When your plan drops to Free the app brings your setup back
-          inside the Free limits: scheduled windows are cleared, extra blocking profiles are
-          deleted, app blocks are dropped, and a blocklist longer than {FREE_BLOCKED_SITE_LIMIT}{" "}
-          sites is trimmed. The profile you are actively using is always the one kept.
+          Scheduled windows are cleared and extra blocking profiles are deleted. Your active
+          profile keeps up to {FREE_BLOCKED_SITE_LIMIT} blocked websites on Free; its extra blocked
+          websites and Pro policy settings are saved on this computer and restored if you return to
+          Pro. The profile you are actively using is always the one kept.
         </p>
         <p>
           One wrinkle worth knowing: loosening enforcement is key-gated like everything else, so if
