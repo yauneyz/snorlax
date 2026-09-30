@@ -77,6 +77,43 @@ export function validateSite(site: SiteDefinition): void {
   }
   if (site.examples.length === 0) throw new Error(`${at}: add examples`);
   for (const [, feature] of site.examples) known(feature, 'example');
+  for (const keep of site.keep ?? []) {
+    if (keep.feature) known(keep.feature, `keep "${keep.name}"`);
+    for (const feature of keep.on ?? []) known(feature, `keep "${keep.name}".on`);
+  }
+  for (const url of site.captureSeeds ?? []) {
+    if (!site.appHosts.includes(new URL(url).hostname)) throw new Error(`${at}: capture seed ${url} is not on an app host`);
+  }
+  for (const element of site.elements) {
+    const errors = lintSelector(element.selector).filter((finding) => finding.level === 'error');
+    if (errors.length > 0) throw new Error(`${at}: ${element.feature} selector ${element.selector}: ${errors[0].message}`);
+  }
+}
+
+export interface SelectorFinding {
+  level: 'error' | 'warning';
+  message: string;
+}
+
+/**
+ * Selectors that break when the site ships. Generated class names change on every deploy, so
+ * they're errors. Positional selectors break when siblings move, and quoted UI text only matches
+ * one language, so those are warnings. Prefer roles, `data-testid`-style attributes, element
+ * names, and `href` patterns.
+ */
+export function lintSelector(selector: string): SelectorFinding[] {
+  const findings: SelectorFinding[] = [];
+  for (const [, name] of selector.matchAll(/\.(-?[_a-zA-Z][-_a-zA-Z0-9]*)/g)) {
+    // Atomic CSS (Meta's `x1n2onr6`), emotion/styled-components, and CSS-module hashes.
+    if (/^x[0-9a-z]{4,8}$/.test(name) && /[0-9]/.test(name)) findings.push({ level: 'error', message: `.${name} is a generated atomic class` });
+    else if (/^(?:css|sc|jsx)-[0-9a-z]{5,}$/i.test(name)) findings.push({ level: 'error', message: `.${name} is a generated class` });
+    else if (/_[0-9a-zA-Z]{5}$/.test(name) && /[0-9]/.test(name.slice(-5))) findings.push({ level: 'error', message: `.${name} looks like a CSS-module hash` });
+  }
+  if (/:nth-(?:last-)?(?:child|of-type)/.test(selector)) findings.push({ level: 'warning', message: 'positional selector breaks when siblings move' });
+  for (const [, attr, value] of selector.matchAll(/\[(aria-label|title|alt|placeholder)[~|^$*]?="([^"]*)"/g)) {
+    if (/[A-Za-z]{2,}/.test(value)) findings.push({ level: 'warning', message: `[${attr}="${value}"] only matches one UI language` });
+  }
+  return findings;
 }
 
 function checkNodeMatch(match: AndroidNodeMatch, where: string): void {

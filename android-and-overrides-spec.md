@@ -638,7 +638,8 @@ Written after implementing phases 1–4 on the `android-and-overrides` branch.
 - Firefox bridge: fixed port 47623, and the user types an 8-character pairing code from Settings
   into the extension popup. There is no `talysman://ext-pair` deep link. Only the Firefox build of
   the extension contains the loopback socket, and the extension audit allows exactly that one.
-- Facebook and Snapchat are app-only catalog entries (`defineApp`). Every Android screen matcher
+- Snapchat is an app-only catalog entry (`defineApp`); Facebook is a full site with an `android`
+  block. Every Android screen matcher
   carries a `maxTested` app version and **needs checking on a real device**.
 
 **Not done yet**

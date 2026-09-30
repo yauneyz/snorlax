@@ -5,7 +5,8 @@
  * Builds the Linux artifacts with the repo's own toolchain, adds the AppImage to
  * /nix/store, and writes+stages the current host's
  * ~/nixos-config/pkgs/snorlax/releases/<host>.nix so `nixos-rebuild` picks up the
- * new version. pkgs/snorlax/default.nix wraps that AppImage via appimageTools.
+ * new version. pkgs/snorlax/default.nix wraps that AppImage via appimageTools. The
+ * Firefox extension build gets the same treatment (pkgs/talysman-firefox/releases/<host>.nix).
  *
  * The privileged daemon is NOT shipped via this AppImage on NixOS — it is built from
  * native/linux by pkgs/snorlax-daemon and started by a declarative systemd unit. So we
@@ -232,6 +233,69 @@ function installIntoNixStore(version) {
 }
 
 /**
+ * Add the Firefox extension package that build:linux just produced to /nix/store and write
+ * ~/nixos-config/pkgs/talysman-firefox/releases/<host>.nix, which that package unpacks and
+ * home-manager links into each Firefox Developer Edition profile. Firefox picks the new
+ * build up on its next start.
+ */
+function installFirefoxExtension() {
+  const extDistDir = join(root, 'apps/extension/dist');
+  const manifest = JSON.parse(readFileSync(join(extDistDir, 'firefox/manifest.json'), 'utf8'));
+  const extVersion = manifest.version;
+  const addonId = manifest.browser_specific_settings?.gecko?.id;
+  if (!addonId) {
+    throw new Error('dist/firefox/manifest.json has no browser_specific_settings.gecko.id');
+  }
+  const builtZip = join(extDistDir, `talysman-firefox-${extVersion}.zip`);
+  if (!existsSync(builtZip)) {
+    throw new Error(`${builtZip} not found — build:linux should have produced it`);
+  }
+  if (dryRun) {
+    console.log(`🧪 [DRY RUN] would add ${relative(root, builtZip)} (${addonId}) to the Nix store`);
+    return;
+  }
+
+  const nixFirefoxDir = join(nixosConfigDir, 'pkgs/talysman-firefox');
+  if (!existsSync(nixFirefoxDir)) {
+    throw new Error(`${nixFirefoxDir} not found — update nixos-config before releasing`);
+  }
+  // Stable name so the Nix store key doesn't depend on the version string.
+  const stableXpi = join(extDistDir, 'talysman-firefox.xpi');
+  copyFileSync(builtZip, stableXpi);
+  const storePath = capture('nix-store', ['--add-fixed', 'sha256', stableXpi]);
+  const sha256 = capture('nix-hash', ['--type', 'sha256', '--flat', '--base32', stableXpi]);
+
+  const releaseHost = hostname().split('.')[0];
+  const releasesDir = join(nixFirefoxDir, 'releases');
+  mkdirSync(releasesDir, { recursive: true });
+  const releaseNix = join(releasesDir, `${releaseHost}.nix`);
+  const body =
+    `{\n` +
+    `  version = "${extVersion}";\n` +
+    `  addonId = "${addonId}";\n` +
+    `  src = builtins.fetchurl {\n` +
+    `    url = "file://${storePath}";\n` +
+    `    sha256 = "${sha256}";\n` +
+    `  };\n` +
+    `}\n`;
+  writeFileSync(releaseNix, body);
+  console.log(`🦊 Wrote ${releaseNix}`);
+  console.log(`   storePath = ${storePath}`);
+
+  const repoRoot = capture('git', ['rev-parse', '--show-toplevel'], { cwd: nixFirefoxDir });
+  run('git', ['add', '-f', relative(repoRoot, nixFirefoxDir)], { cwd: repoRoot });
+  const visible = capture(
+    'nix',
+    ['eval', '--raw', `.#nixosConfigurations.${releaseHost}.pkgs.talysman-firefox.version`],
+    { cwd: repoRoot },
+  );
+  if (visible !== extVersion) {
+    throw new Error(`flake sees talysman-firefox ${visible}, expected ${extVersion}`);
+  }
+  console.log(`✅ Nix flake sees talysman-firefox ${visible} — run 'rebuild', then restart Firefox`);
+}
+
+/**
  * Re-lock the `snorlax` flake input in ~/nixos-config so the NixOS daemon
  * (pkgs/snorlax-daemon → talysman-svc + talysman-natmsg) is rebuilt from the current
  * committed source on the next `rebuild`. Without this, native changes never reach the
@@ -290,6 +354,7 @@ console.log('🔏 Embedding local entitlement public key for release-local build
 buildAppImage();
 writeLocalEntitlementLicense(localEntitlementKey.privateKey, version);
 installIntoNixStore(version);
+installFirefoxExtension();
 if (noDaemonSync) {
   console.log('\n⏭️  --no-daemon-sync: skipped snorlax flake-input re-lock (daemon unchanged)');
 } else {

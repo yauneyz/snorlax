@@ -425,8 +425,8 @@ mod tests {
     /// A rolled-back daemon must not wipe state over a site added in a newer catalog.
     #[test]
     fn unknown_sites_load_but_fail_validation() {
-        let p = parse(r#"{"defaultAction":"allow","sites":{"tiktok":{"features":{"feed":"block"}}}}"#);
-        assert!(p.sites.contains_key("tiktok"));
+        let p = parse(r#"{"defaultAction":"allow","sites":{"myspace":{"features":{"feed":"block"}}}}"#);
+        assert!(p.sites.contains_key("myspace"));
         assert!(p.site_network_domains().is_empty());
         assert!(p.validate().is_err());
         let bad_feature = parse(r#"{"defaultAction":"allow","sites":{"reddit":{"features":{"nope":"block"}}}}"#);

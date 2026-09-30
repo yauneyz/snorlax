@@ -52,6 +52,36 @@ at its default, allowed, hidden, or judged — even over a default-deny policy) 
    - `native/engine/resources/site-catalog.json`
    - the extension manifest's content-script matches
 4. Run `pnpm test`. The catalog tests cover the new site automatically.
+5. Check the selectors against the real site (below).
+
+### Checking selectors against real pages
+
+`examples` only test routing. To test `elements` against real markup:
+
+1. `pnpm capture:sites <id>` opens Chrome with a dedicated profile for the site
+   (`~/.cache/talysman/site-profiles/<id>`). Sign in on the first run; after that `--headless`
+   works. It visits `captureSeeds`, then follows links until every feature has a page, and saves
+   script-free snapshots to `.site-captures/<id>/`. That directory is gitignored because the
+   snapshots contain account data.
+2. `pnpm check:sites <id>` reloads the snapshots offline and fails when:
+   - a feature hides nothing on its own page;
+   - an element covers a `keep` anchor, or the page's main content, on another feature's page;
+   - a `keep` anchor no longer exists.
+   It warns about selectors that never match and flags brittle ones. Generated class names are
+   rejected at generation time. Positional selectors and translated labels are warnings.
+
+Anchor selectors on roles, ARIA attributes, `data-*` test ids, and `href` patterns. A feature is
+defined by the pages the site serves, so check where tabs actually land. For example, Facebook's
+Reels tab redirects to `/reel/<id>`.
+
+### Sites for a single install
+
+Set `audience` to limit which installs *offer* a site in the desktop UI — e.g.
+`audience: 'local-release'` shows it only in `pnpm release:local` builds (the NixOS install) and
+dev builds. Everything else about the site is unchanged: it's still in every generated artifact
+and enforced everywhere, and an install that already has it on keeps seeing it so it can be
+turned off. To add a new group, extend `SiteAudience` in `types.ts` and decide where the desktop
+derives membership (`siteAudiences` in `SiteRules.tsx`).
 
 Ids of sites and features are persisted in user policies, so never rename them. A daemon or
 extension that doesn't know a site still loads policies that name it:

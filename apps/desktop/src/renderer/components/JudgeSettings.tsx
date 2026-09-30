@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import type { JudgePolicy, JudgeTask, Policy } from '@talysman/shared';
-import { Input, Kicker, Select } from './ui/index.js';
+import { Input, Select } from './ui/index.js';
 
 const EMPTY_JUDGE: JudgePolicy = { tasks: [], avoid: [], fallback: 'allow' };
 
@@ -74,20 +74,7 @@ export function JudgeSettings({
   }
 
   return (
-    <div className="mt-3 rounded-[10px] border border-white/[0.07] bg-white/[0.02] p-3.5">
-      <div className="flex items-baseline gap-2.5">
-        <Kicker>AI filter</Kicker>
-        {policy.judge && (
-          <button
-            onClick={() => saveJudge({ ...judge, tasks: [] })}
-            className="ml-auto text-[11px] font-medium text-slate-500 transition hover:text-dangerInk"
-          >
-            turn off
-          </button>
-        )}
-      </div>
-
-      <div className="mt-2.5 flex flex-col gap-3">
+    <div className="grid grid-cols-2 gap-5">
         <div>
           <label className="mb-1 block text-[11px] text-slate-450">What are you working on?</label>
           <ul className="flex flex-col gap-1.5">
@@ -154,19 +141,8 @@ export function JudgeSettings({
             placeholder="Celebrity news, travel influencer content"
             disabled={!allowed || !policy.judge}
           />
-        </div>
-
-        {policy.judge && (
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-            <label className="flex items-center gap-2 text-[11px] text-slate-400">
-              <input
-                type="checkbox"
-                checked={policy.defaultAction === 'judge'}
-                onChange={(e) => onSave({ ...policy, defaultAction: e.target.checked ? 'judge' : 'allow' })}
-              />
-              Judge every page that isn’t blocked or allowed below
-            </label>
-            <label className="flex items-center gap-2 text-[11px] text-slate-400">
+          {policy.judge && (
+            <label className="mt-3 flex items-center gap-2 text-[11px] text-slate-400">
               If the AI can’t answer
               <Select
                 value={judge.fallback}
@@ -177,24 +153,31 @@ export function JudgeSettings({
                 <option value="block">block the page</option>
               </Select>
             </label>
-          </div>
-        )}
+          )}
+        </div>
 
-        {!allowed ? (
-          <button
-            onClick={onUpgrade}
-            className="self-start text-[11px] font-medium text-slate-400 transition hover:text-slate-200"
-          >
-            Upgrade to enable the AI filter →
-          </button>
-        ) : (
-          <p className="text-[11px] leading-relaxed text-slate-450">
-            Your tasks only apply where a rule is set to AI: tick the box above (or pick Smart) to
-            judge every unlisted page, or set a site feature like Reddit posts to “AI”. Judged
-            pages load, then get checked — usually within a few seconds.
-          </p>
-        )}
-      </div>
+        <div className="col-span-2 flex items-center gap-4">
+          {!allowed ? (
+            <button
+              onClick={onUpgrade}
+              className="text-[11px] font-medium text-slate-400 transition hover:text-slate-200"
+            >
+              Upgrade to enable the AI filter →
+            </button>
+          ) : (
+            <p className="text-[11px] leading-relaxed text-slate-450">
+              Judged pages load, then get checked — usually within a few seconds.
+            </p>
+          )}
+          {policy.judge && (
+            <button
+              onClick={() => saveJudge({ ...judge, tasks: [] })}
+              className="ml-auto shrink-0 text-[11px] font-medium text-slate-500 transition hover:text-dangerInk"
+            >
+              Turn off AI filter
+            </button>
+          )}
+        </div>
     </div>
   );
 }

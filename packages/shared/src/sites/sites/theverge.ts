@@ -6,6 +6,7 @@ export default defineSite({
   hosts: ['theverge.com'],
   appHosts: ['theverge.com', 'www.theverge.com'],
   networkDomains: [],
+  audience: 'local-release',
   features: [
     { id: 'content', label: 'Articles you open directly', default: 'allow' },
     { id: 'search', label: 'Search', default: 'allow' },

@@ -79,7 +79,6 @@ export function createWindow(): BrowserWindow {
   const devUrl = process.env['ELECTRON_RENDERER_URL'];
   if (config.isDev && devUrl) {
     void win.loadURL(devUrl);
-    win.webContents.openDevTools({ mode: 'detach' });
   } else {
     void win.loadFile(join(__dirname, '../renderer/index.html'));
   }

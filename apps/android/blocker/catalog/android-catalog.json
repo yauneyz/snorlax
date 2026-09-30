@@ -276,13 +276,48 @@
       "label": "YouTube",
       "features": [
         {
-          "id": "content",
-          "label": "Videos you open directly",
-          "default": "allow"
+          "id": "feed",
+          "label": "Home feed",
+          "default": "block"
+        },
+        {
+          "id": "sidebar",
+          "label": "Video sidebar",
+          "default": "block"
+        },
+        {
+          "id": "recommendations",
+          "label": "Recommended videos",
+          "default": "block"
+        },
+        {
+          "id": "live_chat",
+          "label": "Live chat",
+          "default": "block"
+        },
+        {
+          "id": "playlist",
+          "label": "Playlist panel",
+          "default": "block"
+        },
+        {
+          "id": "fundraiser",
+          "label": "Fundraisers",
+          "default": "block"
+        },
+        {
+          "id": "end_screen",
+          "label": "End screen video wall",
+          "default": "block"
+        },
+        {
+          "id": "end_cards",
+          "label": "End screen cards",
+          "default": "block"
         },
         {
           "id": "shorts",
-          "label": "Shorts you open directly",
+          "label": "Shorts",
           "default": "allow"
         },
         {
@@ -291,34 +326,84 @@
           "default": "allow"
         },
         {
-          "id": "search",
-          "label": "Search",
+          "id": "profile_photos",
+          "label": "Profile photos in comments",
+          "default": "allow"
+        },
+        {
+          "id": "mixes",
+          "label": "Mixes",
+          "default": "allow"
+        },
+        {
+          "id": "merch",
+          "label": "Merch, tickets & offers",
+          "default": "block"
+        },
+        {
+          "id": "video_info",
+          "label": "Video info",
+          "default": "allow"
+        },
+        {
+          "id": "buttons_bar",
+          "label": "Like & share buttons",
+          "default": "allow"
+        },
+        {
+          "id": "channel_info",
+          "label": "Channel & subscribe button",
+          "default": "allow"
+        },
+        {
+          "id": "description",
+          "label": "Video description",
+          "default": "allow"
+        },
+        {
+          "id": "header",
+          "label": "Top header",
           "default": "allow"
         },
         {
           "id": "notifications",
-          "label": "Notifications",
+          "label": "Notification bell",
+          "default": "block"
+        },
+        {
+          "id": "inapt_search",
+          "label": "Unrelated search results",
+          "default": "block"
+        },
+        {
+          "id": "trending",
+          "label": "Explore & trending",
+          "default": "allow"
+        },
+        {
+          "id": "more_from_youtube",
+          "label": "More from YouTube",
+          "default": "block"
+        },
+        {
+          "id": "subscriptions",
+          "label": "Subscriptions",
+          "default": "allow"
+        },
+        {
+          "id": "content",
+          "label": "Videos you open directly",
+          "default": "allow"
+        },
+        {
+          "id": "search",
+          "label": "Search",
           "default": "allow"
         },
         {
           "id": "studio",
           "label": "YouTube Studio & uploads",
           "default": "allow"
-        },
-        {
-          "id": "feed",
-          "label": "Home, subscriptions & trending",
-          "default": "block"
-        },
-        {
-          "id": "recommendations",
-          "label": "Recommended & up next",
-          "default": "block"
-        },
-        {
-          "id": "channels",
-          "label": "Channel pages",
-          "default": "block"
         }
       ],
       "packages": [
@@ -354,7 +439,18 @@
           "feature": "feed",
           "match": [
             {
-              "contentDesc": "^(Home|Subscriptions)$",
+              "contentDesc": "^Home$",
+              "selected": true
+            }
+          ],
+          "action": "overlay",
+          "maxTested": "19.x"
+        },
+        {
+          "feature": "subscriptions",
+          "match": [
+            {
+              "contentDesc": "^Subscriptions$",
               "selected": true
             }
           ],
@@ -423,8 +519,23 @@
       "label": "Facebook",
       "features": [
         {
+          "id": "content",
+          "label": "Posts & photos you open directly",
+          "default": "allow"
+        },
+        {
+          "id": "search",
+          "label": "Search",
+          "default": "allow"
+        },
+        {
           "id": "messages",
           "label": "Messages",
+          "default": "allow"
+        },
+        {
+          "id": "notifications",
+          "label": "Notifications",
           "default": "allow"
         },
         {
@@ -438,6 +549,11 @@
           "default": "allow"
         },
         {
+          "id": "events",
+          "label": "Events",
+          "default": "allow"
+        },
+        {
           "id": "feed",
           "label": "News feed",
           "default": "block"
@@ -445,6 +561,21 @@
         {
           "id": "reels",
           "label": "Reels & video",
+          "default": "block"
+        },
+        {
+          "id": "stories",
+          "label": "Stories",
+          "default": "block"
+        },
+        {
+          "id": "recommendations",
+          "label": "Suggestions & sponsored",
+          "default": "block"
+        },
+        {
+          "id": "profiles",
+          "label": "Profiles & pages",
           "default": "block"
         }
       ],
@@ -478,6 +609,192 @@
           "maxTested": "480.x"
         }
       ]
+    },
+    {
+      "id": "tiktok",
+      "label": "TikTok",
+      "features": [
+        {
+          "id": "content",
+          "label": "Videos you open directly",
+          "default": "allow"
+        },
+        {
+          "id": "search",
+          "label": "Search",
+          "default": "allow"
+        },
+        {
+          "id": "messages",
+          "label": "Messages",
+          "default": "allow"
+        },
+        {
+          "id": "compose",
+          "label": "Uploading & TikTok Studio",
+          "default": "allow"
+        },
+        {
+          "id": "feed",
+          "label": "For You, Following & Explore",
+          "default": "block"
+        },
+        {
+          "id": "recommendations",
+          "label": "Suggested videos & accounts",
+          "default": "block"
+        },
+        {
+          "id": "profiles",
+          "label": "Profiles",
+          "default": "block"
+        }
+      ],
+      "packages": [
+        "com.zhiliaoapp.musically",
+        "com.ss.android.ugc.trill"
+      ],
+      "screens": []
+    },
+    {
+      "id": "threads",
+      "label": "Threads",
+      "features": [
+        {
+          "id": "content",
+          "label": "Posts you open directly",
+          "default": "allow"
+        },
+        {
+          "id": "search",
+          "label": "Search",
+          "default": "allow"
+        },
+        {
+          "id": "notifications",
+          "label": "Activity",
+          "default": "allow"
+        },
+        {
+          "id": "compose",
+          "label": "Posting",
+          "default": "allow"
+        },
+        {
+          "id": "feed",
+          "label": "For you & Following feeds",
+          "default": "block"
+        },
+        {
+          "id": "recommendations",
+          "label": "Search suggestions",
+          "default": "block"
+        },
+        {
+          "id": "profiles",
+          "label": "Profiles",
+          "default": "block"
+        }
+      ],
+      "packages": [
+        "com.instagram.barcelona"
+      ],
+      "screens": []
+    },
+    {
+      "id": "pinterest",
+      "label": "Pinterest",
+      "features": [
+        {
+          "id": "content",
+          "label": "Pins you open directly",
+          "default": "allow"
+        },
+        {
+          "id": "search",
+          "label": "Search",
+          "default": "allow"
+        },
+        {
+          "id": "compose",
+          "label": "Creating pins",
+          "default": "allow"
+        },
+        {
+          "id": "feed",
+          "label": "Home feed",
+          "default": "block"
+        },
+        {
+          "id": "explore",
+          "label": "Explore & Today",
+          "default": "block"
+        },
+        {
+          "id": "recommendations",
+          "label": "More ideas",
+          "default": "block"
+        },
+        {
+          "id": "profiles",
+          "label": "Profiles & boards",
+          "default": "block"
+        }
+      ],
+      "packages": [
+        "com.pinterest"
+      ],
+      "screens": []
+    },
+    {
+      "id": "bluesky",
+      "label": "Bluesky",
+      "features": [
+        {
+          "id": "content",
+          "label": "Posts you open directly",
+          "default": "allow"
+        },
+        {
+          "id": "search",
+          "label": "Search",
+          "default": "allow"
+        },
+        {
+          "id": "messages",
+          "label": "Chat",
+          "default": "allow"
+        },
+        {
+          "id": "notifications",
+          "label": "Notifications",
+          "default": "allow"
+        },
+        {
+          "id": "compose",
+          "label": "Posting",
+          "default": "allow"
+        },
+        {
+          "id": "feed",
+          "label": "Discover, Following & custom feeds",
+          "default": "block"
+        },
+        {
+          "id": "recommendations",
+          "label": "Explore, trending & suggested follows",
+          "default": "block"
+        },
+        {
+          "id": "profiles",
+          "label": "Profiles",
+          "default": "block"
+        }
+      ],
+      "packages": [
+        "xyz.blueskyweb.app"
+      ],
+      "screens": []
     },
     {
       "id": "snapchat",

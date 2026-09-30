@@ -872,13 +872,48 @@ export const SITE_CATALOG = {
     ],
     "features": [
       {
-        "id": "content",
-        "label": "Videos you open directly",
-        "default": "allow"
+        "id": "feed",
+        "label": "Home feed",
+        "default": "block"
+      },
+      {
+        "id": "sidebar",
+        "label": "Video sidebar",
+        "default": "block"
+      },
+      {
+        "id": "recommendations",
+        "label": "Recommended videos",
+        "default": "block"
+      },
+      {
+        "id": "live_chat",
+        "label": "Live chat",
+        "default": "block"
+      },
+      {
+        "id": "playlist",
+        "label": "Playlist panel",
+        "default": "block"
+      },
+      {
+        "id": "fundraiser",
+        "label": "Fundraisers",
+        "default": "block"
+      },
+      {
+        "id": "end_screen",
+        "label": "End screen video wall",
+        "default": "block"
+      },
+      {
+        "id": "end_cards",
+        "label": "End screen cards",
+        "default": "block"
       },
       {
         "id": "shorts",
-        "label": "Shorts you open directly",
+        "label": "Shorts",
         "default": "allow"
       },
       {
@@ -887,13 +922,78 @@ export const SITE_CATALOG = {
         "default": "allow"
       },
       {
-        "id": "search",
-        "label": "Search",
+        "id": "profile_photos",
+        "label": "Profile photos in comments",
+        "default": "allow"
+      },
+      {
+        "id": "mixes",
+        "label": "Mixes",
+        "default": "allow"
+      },
+      {
+        "id": "merch",
+        "label": "Merch, tickets & offers",
+        "default": "block"
+      },
+      {
+        "id": "video_info",
+        "label": "Video info",
+        "default": "allow"
+      },
+      {
+        "id": "buttons_bar",
+        "label": "Like & share buttons",
+        "default": "allow"
+      },
+      {
+        "id": "channel_info",
+        "label": "Channel & subscribe button",
+        "default": "allow"
+      },
+      {
+        "id": "description",
+        "label": "Video description",
+        "default": "allow"
+      },
+      {
+        "id": "header",
+        "label": "Top header",
         "default": "allow"
       },
       {
         "id": "notifications",
-        "label": "Notifications",
+        "label": "Notification bell",
+        "default": "block"
+      },
+      {
+        "id": "inapt_search",
+        "label": "Unrelated search results",
+        "default": "block"
+      },
+      {
+        "id": "trending",
+        "label": "Explore & trending",
+        "default": "allow"
+      },
+      {
+        "id": "more_from_youtube",
+        "label": "More from YouTube",
+        "default": "block"
+      },
+      {
+        "id": "subscriptions",
+        "label": "Subscriptions",
+        "default": "allow"
+      },
+      {
+        "id": "content",
+        "label": "Videos you open directly",
+        "default": "allow"
+      },
+      {
+        "id": "search",
+        "label": "Search",
         "default": "allow"
       },
       {
@@ -902,24 +1002,15 @@ export const SITE_CATALOG = {
         "default": "allow"
       },
       {
-        "id": "feed",
-        "label": "Home, subscriptions & trending",
-        "default": "block"
-      },
-      {
-        "id": "recommendations",
-        "label": "Recommended & up next",
-        "default": "block"
-      },
-      {
-        "id": "channels",
-        "label": "Channel pages",
-        "default": "block"
-      },
-      {
         "id": "essentials",
         "label": "Sign-in & account",
         "default": "allow",
+        "locked": true
+      },
+      {
+        "id": "promos",
+        "label": "Promos & surveys",
+        "default": "block",
         "locked": true
       }
     ],
@@ -959,49 +1050,107 @@ export const SITE_CATALOG = {
         }
       },
       {
-        "feature": "notifications",
-        "path": "^/feed/notifications$"
-      },
-      {
         "feature": "studio",
         "path": "^/upload$"
       },
       {
         "feature": "essentials",
         "path": "^/(?:account(?:_[^/]+)?|signin|logout|premium|paid_memberships)(?:/.*)?$"
-      },
-      {
-        "feature": "channels",
-        "path": "^/(?:@[^/]+|channel/[^/]+|c/[^/]+|user/[^/]+)(?:/.*)?$"
       }
     ],
     "fallbackFeature": "feed",
     "elements": [
       {
         "feature": "feed",
-        "selector": "ytd-browse, ytm-browse",
-        "on": [
-          "feed"
-        ]
+        "selector": "ytd-browse[page-subtype=home] .ytd-rich-grid-renderer, ytd-browse[role=main]:not([page-subtype]):not(:has(#header #page-header-container)):has(ytd-feed-filter-chip-bar-renderer) .ytd-rich-grid-renderer, div[tab-identifier=FEwhat_to_watch]"
+      },
+      {
+        "feature": "sidebar",
+        "selector": "#secondary.ytd-watch-flexy"
       },
       {
         "feature": "recommendations",
-        "selector": "#secondary, #related, ytd-watch-next-secondary-results-renderer, .ytp-endscreen-content, .ytp-ce-element, .ytp-autonav-endscreen-countdown-overlay, ytd-compact-video-renderer, ytd-reel-shelf-renderer, ytd-rich-shelf-renderer, #navigation-button-up, #navigation-button-down",
-        "on": [
-          "content",
-          "shorts"
-        ]
+        "selector": "#items.ytd-watch-next-secondary-results-renderer, .ytd-watch-grid > #contents, .ytp-pause-overlay, ytm-item-section-renderer[section-identifier=related-items]"
       },
       {
-        "feature": "recommendations",
-        "selector": "ytd-search ytd-shelf-renderer, ytd-search ytd-reel-shelf-renderer, ytd-search ytd-horizontal-card-list-renderer",
-        "on": [
-          "search"
-        ]
+        "feature": "live_chat",
+        "selector": "ytd-live-chat-frame#chat"
+      },
+      {
+        "feature": "playlist",
+        "selector": "#playlist, ytm-playlist"
+      },
+      {
+        "feature": "fundraiser",
+        "selector": "#donation-shelf, ytm-donation-shelf-renderer-outer"
+      },
+      {
+        "feature": "end_screen",
+        "selector": ".html5-endscreen:not(.mweb-endscreen), .ytp-fullscreen-grid, .ytp-mweb-endscreen-play-next, .ytp-mweb-endscreen-play-previous"
+      },
+      {
+        "feature": "end_cards",
+        "selector": ".ytp-ce-element, .ytp-ce-hide-button-container"
+      },
+      {
+        "feature": "shorts",
+        "selector": ".yt-simple-endpoint[title=Shorts], #player-shorts-container, .ytd-shorts, yt-chip-cloud-chip-renderer:has(yt-formatted-string[title=Shorts]), yt-tab-shape[tab-title=Shorts], ytd-compact-video-renderer:has(a[href*=\"/shorts/\"]), ytd-notification-renderer:has(> a[href^=\"/shorts/\"]), ytd-reel-shelf-renderer, ytd-rich-grid-renderer[is-shorts-grid], ytd-rich-item-renderer:has(a[href*=\"/shorts/\"]), ytd-rich-shelf-renderer[is-shorts], ytd-video-renderer:has(a[href*=\"/shorts/\"]), ytm-reel-shelf-renderer, ytm-rich-grid-renderer.is_shorts, ytm-video-with-context-renderer:has(a[href*=\"/shorts/\"]), ytm-pivot-bar-renderer > ytm-pivot-bar-item-renderer:has(.pivot-shorts)"
       },
       {
         "feature": "comments",
-        "selector": "ytd-comments#comments, ytm-comment-section-renderer"
+        "selector": "#comment-teaser, #comments, ytm-comment-section-renderer, ytm-comments-entry-point-header-renderer, ytm-engagement-panel"
+      },
+      {
+        "feature": "profile_photos",
+        "selector": ".ytd-comment-renderer yt-img-shadow, .comment-icon-container"
+      },
+      {
+        "feature": "mixes",
+        "selector": ".ytp-videowall-still[data-is-mix=true], a[href*=\"start_radio=1\"], ytd-browse[page-subtype=home] ytd-video-meta-block[radio-meta], ytd-compact-radio-renderer, ytd-radio-renderer, ytd-rich-item-renderer:has(a[href*=\"start_radio=1\"]), ytm-compact-radio-renderer, ytm-radio-renderer"
+      },
+      {
+        "feature": "merch",
+        "selector": "#clarify-box, #offer-module, #ticket-shelf, .ytp-drawer, yt-alert-with-actions-renderer, ytd-merch-shelf-renderer, ytd-metadata-row-container-renderer > #always-shown, ytm-compact-offer-module-renderer"
+      },
+      {
+        "feature": "video_info",
+        "selector": "#primary-inner > #info, ytd-watch-metadata, ytm-item-section-renderer[section-identifier=slim-video-metadata]"
+      },
+      {
+        "feature": "buttons_bar",
+        "selector": "#actions.ytd-watch-metadata, #info > #menu-container, .slim-video-metadata-actions"
+      },
+      {
+        "feature": "channel_info",
+        "selector": "#owner.ytd-watch-metadata, #top-row.ytd-video-secondary-info-renderer, ytm-slim-owner-renderer"
+      },
+      {
+        "feature": "description",
+        "selector": "#description.ytd-watch-metadata, ytd-expander.ytd-video-secondary-info-renderer, .slim-video-metadata-header-content > c3-icon, .slim-video-metadata-info"
+      },
+      {
+        "feature": "header",
+        "selector": "#guide-spacer, #masthead-container, .mobile-topbar-header"
+      },
+      {
+        "feature": "notifications",
+        "selector": "#buttons.ytd-masthead > ytd-notification-topbar-button-renderer.ytd-masthead, ytd-notification-topbar-button-shape-renderer"
+      },
+      {
+        "feature": "inapt_search",
+        "selector": "#primary > .ytd-two-column-search-results-renderer ytd-horizontal-card-list-renderer, #primary > .ytd-two-column-search-results-renderer ytd-shelf-renderer"
+      },
+      {
+        "feature": "trending",
+        "selector": ".yt-simple-endpoint[href^=\"/feed/explore\"], .yt-simple-endpoint[href^=\"/feed/trending\"], ytd-browse[page-subtype=trending], ytd-guide-section-renderer:has(.yt-simple-endpoint[href^=\"/feed/storefront\"]), div[tab-identifier=FEexplore], div[tab-identifier=FEtrending], ytm-pivot-bar-renderer > ytm-pivot-bar-item-renderer:has(.pivot-trending)"
+      },
+      {
+        "feature": "more_from_youtube",
+        "selector": "#sections > ytd-guide-section-renderer:nth-last-child(2)"
+      },
+      {
+        "feature": "subscriptions",
+        "selector": ".yt-simple-endpoint[href^=\"/feed/subscriptions\"], ytd-browse[page-subtype=subscriptions], ytd-guide-section-renderer:has(.yt-simple-endpoint[href^=\"/feed/subscriptions\"]), div[tab-identifier=FEsubscriptions], ytm-pivot-bar-renderer > ytm-pivot-bar-item-renderer:has(.pivot-subs)"
       },
       {
         "feature": "content",
@@ -1011,32 +1160,10 @@ export const SITE_CATALOG = {
         ]
       },
       {
-        "feature": "shorts",
-        "selector": "ytd-shorts",
-        "on": [
-          "shorts"
-        ]
-      },
-      {
-        "feature": "shorts",
-        "selector": "ytd-reel-shelf-renderer, ytd-rich-shelf-renderer[is-shorts], ytd-guide-entry-renderer:has(a[title=\"Shorts\"]), ytd-mini-guide-entry-renderer[aria-label=\"Shorts\"]"
-      },
-      {
         "feature": "search",
         "selector": "ytd-search, ytm-search",
         "on": [
           "search"
-        ]
-      },
-      {
-        "feature": "notifications",
-        "selector": "ytd-notification-topbar-button-renderer"
-      },
-      {
-        "feature": "notifications",
-        "selector": "ytd-browse, ytm-browse",
-        "on": [
-          "notifications"
         ]
       },
       {
@@ -1047,11 +1174,8 @@ export const SITE_CATALOG = {
         ]
       },
       {
-        "feature": "channels",
-        "selector": "ytd-browse, ytm-browse",
-        "on": [
-          "channels"
-        ]
+        "feature": "promos",
+        "selector": "#masthead-ad.ytd-rich-grid-renderer.style-scope, div#home-page-skeleton, paper-dialog > ytd-single-option-survey-renderer[dialog], ytd-mealbar-promo-renderer[dialog], ytd-primetime-promo-renderer, #surveys, .mealbar-promo-renderer"
       }
     ]
   },
@@ -1466,6 +1590,967 @@ export const SITE_CATALOG = {
       {
         "feature": "profiles",
         "selector": "main.reader-nav-page",
+        "on": [
+          "profiles"
+        ]
+      }
+    ]
+  },
+  "facebook": {
+    "id": "facebook",
+    "label": "Facebook",
+    "hosts": [
+      "facebook.com",
+      "fb.watch"
+    ],
+    "appHosts": [
+      "facebook.com",
+      "www.facebook.com",
+      "m.facebook.com",
+      "web.facebook.com",
+      "mbasic.facebook.com",
+      "fb.watch"
+    ],
+    "networkDomains": [
+      "fbcdn.net",
+      "facebook.net",
+      "fbsbx.com"
+    ],
+    "features": [
+      {
+        "id": "content",
+        "label": "Posts & photos you open directly",
+        "default": "allow"
+      },
+      {
+        "id": "search",
+        "label": "Search",
+        "default": "allow"
+      },
+      {
+        "id": "messages",
+        "label": "Messages",
+        "default": "allow"
+      },
+      {
+        "id": "notifications",
+        "label": "Notifications",
+        "default": "allow"
+      },
+      {
+        "id": "groups",
+        "label": "Groups",
+        "default": "allow"
+      },
+      {
+        "id": "marketplace",
+        "label": "Marketplace",
+        "default": "allow"
+      },
+      {
+        "id": "events",
+        "label": "Events",
+        "default": "allow"
+      },
+      {
+        "id": "feed",
+        "label": "News feed",
+        "default": "block"
+      },
+      {
+        "id": "reels",
+        "label": "Reels & video",
+        "default": "block"
+      },
+      {
+        "id": "stories",
+        "label": "Stories",
+        "default": "block"
+      },
+      {
+        "id": "recommendations",
+        "label": "Suggestions & sponsored",
+        "default": "block"
+      },
+      {
+        "id": "profiles",
+        "label": "Profiles & pages",
+        "default": "block"
+      },
+      {
+        "id": "essentials",
+        "label": "Sign-in & settings",
+        "default": "allow",
+        "locked": true
+      }
+    ],
+    "routes": [
+      {
+        "feature": "reels",
+        "host": "fb.watch"
+      },
+      {
+        "feature": "content",
+        "path": "^/groups/[^/]+/(?:posts|permalink)/([0-9]+)(?:/.*)?$",
+        "judge": {
+          "contentSelector": "[role=\"main\"]"
+        }
+      },
+      {
+        "feature": "content",
+        "path": "^/(?:[^/]+/)?(?:posts|videos|photos)/([^/]+)(?:/.*)?$",
+        "judge": {
+          "contentSelector": "[role=\"main\"]"
+        }
+      },
+      {
+        "feature": "content",
+        "path": "^/share/p/([-_a-z0-9]+)$"
+      },
+      {
+        "feature": "content",
+        "path": "^/(?:permalink|story)\\.php$",
+        "query": {
+          "story_fbid": "^[^&#]+$"
+        }
+      },
+      {
+        "feature": "content",
+        "path": "^/photo(?:\\.php)?$",
+        "query": {
+          "fbid": "^[0-9]+$"
+        }
+      },
+      {
+        "feature": "search",
+        "path": "^/search(?:/[^/]+)?$",
+        "query": {
+          "q": "^[^&#]+$"
+        }
+      },
+      {
+        "feature": "messages",
+        "path": "^/messages(?:/.*)?$"
+      },
+      {
+        "feature": "notifications",
+        "path": "^/notifications$"
+      },
+      {
+        "feature": "groups",
+        "path": "^/groups(?:/.*)?$"
+      },
+      {
+        "feature": "marketplace",
+        "path": "^/marketplace(?:/.*)?$"
+      },
+      {
+        "feature": "events",
+        "path": "^/events(?:/.*)?$"
+      },
+      {
+        "feature": "reels",
+        "path": "^/(?:reels?|watch|share/[rv])(?:/.*)?$"
+      },
+      {
+        "feature": "stories",
+        "path": "^/stories(?:/.*)?$"
+      },
+      {
+        "feature": "recommendations",
+        "path": "^/friends/suggestions(?:/.*)?$"
+      },
+      {
+        "feature": "essentials",
+        "path": "^/(?:login|login\\.php|logout\\.php|checkpoint|recover|r\\.php|reg|settings|privacy|security|help|two_step_verification|dialog|v[0-9.]+/dialog)(?:/.*)?$"
+      },
+      {
+        "feature": "feed",
+        "path": "^/(?:home\\.php|search(?:/[^/]+)?)$"
+      },
+      {
+        "feature": "profiles",
+        "path": "^/(?:profile\\.php|people/[^/]+/[0-9]+|[.a-z0-9]+)(?:/(?:about|friends|photos|videos|reels|followers|following)[_a-z]*)?$"
+      }
+    ],
+    "fallbackFeature": "feed",
+    "elements": [
+      {
+        "feature": "feed",
+        "selector": "[role=\"main\"] [aria-posinset], [role=\"main\"] [role=\"article\"]",
+        "on": [
+          "feed"
+        ]
+      },
+      {
+        "feature": "reels",
+        "selector": "[role=\"navigation\"] a[href*=\"/reel\"], [role=\"navigation\"] a[href*=\"/watch\"]"
+      },
+      {
+        "feature": "reels",
+        "selector": "[role=\"main\"]",
+        "on": [
+          "reels"
+        ]
+      },
+      {
+        "feature": "stories",
+        "selector": "[role=\"main\"] [role=\"region\"]:has(a[href*=\"/stories/\"])"
+      },
+      {
+        "feature": "stories",
+        "selector": "[role=\"main\"]",
+        "on": [
+          "stories"
+        ]
+      },
+      {
+        "feature": "recommendations",
+        "selector": "#right_rail_container, [role=\"complementary\"]",
+        "on": [
+          "feed"
+        ]
+      },
+      {
+        "feature": "recommendations",
+        "selector": "[role=\"main\"]",
+        "on": [
+          "recommendations"
+        ]
+      },
+      {
+        "feature": "content",
+        "selector": "[role=\"main\"]",
+        "on": [
+          "content"
+        ]
+      },
+      {
+        "feature": "search",
+        "selector": "[role=\"main\"]",
+        "on": [
+          "search"
+        ]
+      },
+      {
+        "feature": "messages",
+        "selector": "[role=\"main\"]",
+        "on": [
+          "messages"
+        ]
+      },
+      {
+        "feature": "notifications",
+        "selector": "[role=\"main\"]",
+        "on": [
+          "notifications"
+        ]
+      },
+      {
+        "feature": "groups",
+        "selector": "[role=\"main\"]",
+        "on": [
+          "groups"
+        ]
+      },
+      {
+        "feature": "marketplace",
+        "selector": "[role=\"main\"]",
+        "on": [
+          "marketplace"
+        ]
+      },
+      {
+        "feature": "events",
+        "selector": "[role=\"main\"]",
+        "on": [
+          "events"
+        ]
+      },
+      {
+        "feature": "profiles",
+        "selector": "[role=\"main\"]",
+        "on": [
+          "profiles"
+        ]
+      }
+    ]
+  },
+  "tiktok": {
+    "id": "tiktok",
+    "label": "TikTok",
+    "hosts": [
+      "tiktok.com"
+    ],
+    "appHosts": [
+      "tiktok.com",
+      "www.tiktok.com",
+      "m.tiktok.com",
+      "vm.tiktok.com",
+      "vt.tiktok.com"
+    ],
+    "networkDomains": [
+      "tiktokcdn.com",
+      "tiktokcdn-us.com",
+      "tiktokv.com",
+      "tiktokv.us",
+      "ttwstatic.com",
+      "byteoversea.com",
+      "ibytedtos.com",
+      "ibyteimg.com"
+    ],
+    "features": [
+      {
+        "id": "content",
+        "label": "Videos you open directly",
+        "default": "allow"
+      },
+      {
+        "id": "search",
+        "label": "Search",
+        "default": "allow"
+      },
+      {
+        "id": "messages",
+        "label": "Messages",
+        "default": "allow"
+      },
+      {
+        "id": "compose",
+        "label": "Uploading & TikTok Studio",
+        "default": "allow"
+      },
+      {
+        "id": "feed",
+        "label": "For You, Following & Explore",
+        "default": "block"
+      },
+      {
+        "id": "recommendations",
+        "label": "Suggested videos & accounts",
+        "default": "block"
+      },
+      {
+        "id": "profiles",
+        "label": "Profiles",
+        "default": "block"
+      },
+      {
+        "id": "essentials",
+        "label": "Sign-in & settings",
+        "default": "allow",
+        "locked": true
+      }
+    ],
+    "routes": [
+      {
+        "feature": "content",
+        "host": "vm.tiktok.com",
+        "path": "^/([a-z0-9]+)$"
+      },
+      {
+        "feature": "content",
+        "host": "vt.tiktok.com",
+        "path": "^/([a-z0-9]+)$"
+      },
+      {
+        "feature": "content",
+        "path": "^/@[^/]+/(?:video|photo)/([0-9]+)$",
+        "judge": {
+          "contentSelector": "[id^=\"main-content\"], main"
+        }
+      },
+      {
+        "feature": "content",
+        "path": "^/(?:t|embed(?:/v2)?)/([a-z0-9]+)$"
+      },
+      {
+        "feature": "search",
+        "path": "^/search(?:/(?:user|video|live|photo))?$",
+        "query": {
+          "q": "^[^&#]+$"
+        }
+      },
+      {
+        "feature": "messages",
+        "path": "^/messages$"
+      },
+      {
+        "feature": "compose",
+        "path": "^/(?:upload|tiktokstudio|creator-center)(?:/.*)?$"
+      },
+      {
+        "feature": "essentials",
+        "path": "^/(?:login|signup|logout|setting|legal|passport|feedback)(?:/.*)?$"
+      },
+      {
+        "feature": "profiles",
+        "path": "^/@[^/]+$"
+      }
+    ],
+    "fallbackFeature": "feed",
+    "elements": [
+      {
+        "feature": "feed",
+        "selector": "[id^=\"main-content\"], main",
+        "on": [
+          "feed"
+        ]
+      },
+      {
+        "feature": "recommendations",
+        "selector": "[data-e2e*=\"suggest\"], [data-e2e*=\"recommend\"], [data-e2e*=\"related\"]"
+      },
+      {
+        "feature": "content",
+        "selector": "[id^=\"main-content\"], main",
+        "on": [
+          "content"
+        ]
+      },
+      {
+        "feature": "search",
+        "selector": "[id^=\"main-content\"], main",
+        "on": [
+          "search"
+        ]
+      },
+      {
+        "feature": "messages",
+        "selector": "[id^=\"main-content\"], main",
+        "on": [
+          "messages"
+        ]
+      },
+      {
+        "feature": "compose",
+        "selector": "[data-e2e=\"upload-icon\"]"
+      },
+      {
+        "feature": "compose",
+        "selector": "[id^=\"main-content\"], main",
+        "on": [
+          "compose"
+        ]
+      },
+      {
+        "feature": "profiles",
+        "selector": "[id^=\"main-content\"], main",
+        "on": [
+          "profiles"
+        ]
+      }
+    ]
+  },
+  "threads": {
+    "id": "threads",
+    "label": "Threads",
+    "hosts": [
+      "threads.com",
+      "threads.net"
+    ],
+    "appHosts": [
+      "threads.com",
+      "www.threads.com",
+      "threads.net",
+      "www.threads.net"
+    ],
+    "networkDomains": [
+      "cdninstagram.com",
+      "fbcdn.net"
+    ],
+    "features": [
+      {
+        "id": "content",
+        "label": "Posts you open directly",
+        "default": "allow"
+      },
+      {
+        "id": "search",
+        "label": "Search",
+        "default": "allow"
+      },
+      {
+        "id": "notifications",
+        "label": "Activity",
+        "default": "allow"
+      },
+      {
+        "id": "compose",
+        "label": "Posting",
+        "default": "allow"
+      },
+      {
+        "id": "feed",
+        "label": "For you & Following feeds",
+        "default": "block"
+      },
+      {
+        "id": "recommendations",
+        "label": "Search suggestions",
+        "default": "block"
+      },
+      {
+        "id": "profiles",
+        "label": "Profiles",
+        "default": "block"
+      },
+      {
+        "id": "essentials",
+        "label": "Sign-in & settings",
+        "default": "allow",
+        "locked": true
+      }
+    ],
+    "routes": [
+      {
+        "feature": "content",
+        "path": "^/@[^/]+/post/([-_a-z0-9]+)(?:/.*)?$",
+        "judge": {
+          "contentSelector": "main, [role=\"main\"]"
+        }
+      },
+      {
+        "feature": "search",
+        "path": "^/search$",
+        "query": {
+          "q": "^[^&#]+$"
+        }
+      },
+      {
+        "feature": "recommendations",
+        "path": "^/search$"
+      },
+      {
+        "feature": "notifications",
+        "path": "^/activity(?:/.*)?$"
+      },
+      {
+        "feature": "compose",
+        "path": "^/intent/post$"
+      },
+      {
+        "feature": "essentials",
+        "path": "^/(?:login|logout|settings|accounts)(?:/.*)?$"
+      },
+      {
+        "feature": "profiles",
+        "path": "^/@[^/]+(?:/(?:replies|media|reposts))?$"
+      }
+    ],
+    "fallbackFeature": "feed",
+    "elements": [
+      {
+        "feature": "feed",
+        "selector": "main, [role=\"main\"]",
+        "on": [
+          "feed"
+        ]
+      },
+      {
+        "feature": "recommendations",
+        "selector": "main, [role=\"main\"]",
+        "on": [
+          "recommendations"
+        ]
+      },
+      {
+        "feature": "content",
+        "selector": "main, [role=\"main\"]",
+        "on": [
+          "content"
+        ]
+      },
+      {
+        "feature": "search",
+        "selector": "main, [role=\"main\"]",
+        "on": [
+          "search"
+        ]
+      },
+      {
+        "feature": "notifications",
+        "selector": "main, [role=\"main\"]",
+        "on": [
+          "notifications"
+        ]
+      },
+      {
+        "feature": "compose",
+        "selector": "[role=\"dialog\"]",
+        "on": [
+          "compose"
+        ]
+      },
+      {
+        "feature": "compose",
+        "selector": ":is(a, [role=\"button\"]):has(svg[aria-label=\"Create\"])"
+      },
+      {
+        "feature": "profiles",
+        "selector": "main, [role=\"main\"]",
+        "on": [
+          "profiles"
+        ]
+      }
+    ]
+  },
+  "pinterest": {
+    "id": "pinterest",
+    "label": "Pinterest",
+    "hosts": [
+      "pinterest.com",
+      "pin.it"
+    ],
+    "appHosts": [
+      "pinterest.com",
+      "www.pinterest.com",
+      "ar.pinterest.com",
+      "at.pinterest.com",
+      "au.pinterest.com",
+      "br.pinterest.com",
+      "ca.pinterest.com",
+      "ch.pinterest.com",
+      "cl.pinterest.com",
+      "co.pinterest.com",
+      "cz.pinterest.com",
+      "de.pinterest.com",
+      "dk.pinterest.com",
+      "es.pinterest.com",
+      "fi.pinterest.com",
+      "fr.pinterest.com",
+      "gr.pinterest.com",
+      "hu.pinterest.com",
+      "id.pinterest.com",
+      "ie.pinterest.com",
+      "in.pinterest.com",
+      "it.pinterest.com",
+      "jp.pinterest.com",
+      "kr.pinterest.com",
+      "mx.pinterest.com",
+      "nl.pinterest.com",
+      "no.pinterest.com",
+      "nz.pinterest.com",
+      "pe.pinterest.com",
+      "ph.pinterest.com",
+      "pl.pinterest.com",
+      "pt.pinterest.com",
+      "ro.pinterest.com",
+      "ru.pinterest.com",
+      "se.pinterest.com",
+      "sk.pinterest.com",
+      "tr.pinterest.com",
+      "uk.pinterest.com",
+      "za.pinterest.com",
+      "pin.it"
+    ],
+    "networkDomains": [
+      "pinimg.com"
+    ],
+    "features": [
+      {
+        "id": "content",
+        "label": "Pins you open directly",
+        "default": "allow"
+      },
+      {
+        "id": "search",
+        "label": "Search",
+        "default": "allow"
+      },
+      {
+        "id": "compose",
+        "label": "Creating pins",
+        "default": "allow"
+      },
+      {
+        "id": "feed",
+        "label": "Home feed",
+        "default": "block"
+      },
+      {
+        "id": "explore",
+        "label": "Explore & Today",
+        "default": "block"
+      },
+      {
+        "id": "recommendations",
+        "label": "More ideas",
+        "default": "block"
+      },
+      {
+        "id": "profiles",
+        "label": "Profiles & boards",
+        "default": "block"
+      },
+      {
+        "id": "essentials",
+        "label": "Sign-in & settings",
+        "default": "allow",
+        "locked": true
+      }
+    ],
+    "routes": [
+      {
+        "feature": "content",
+        "host": "pin.it",
+        "path": "^/([a-z0-9]+)$"
+      },
+      {
+        "feature": "content",
+        "path": "^/pin/([-_a-z0-9]+)(?:/.*)?$",
+        "judge": {
+          "contentSelector": "[data-test-id=\"closeup-body\"], [role=\"main\"]"
+        }
+      },
+      {
+        "feature": "search",
+        "path": "^/search/(?:pins|boards|users|videos)$",
+        "query": {
+          "q": "^[^&#]+$"
+        }
+      },
+      {
+        "feature": "compose",
+        "path": "^/(?:pin-builder|pin-creation-tool|idea-pin-builder)(?:/.*)?$"
+      },
+      {
+        "feature": "explore",
+        "path": "^/(?:today|ideas|explore)(?:/.*)?$"
+      },
+      {
+        "feature": "essentials",
+        "path": "^/(?:login|signup|logout|settings|password|reset|oauth|_)(?:/.*)?$"
+      },
+      {
+        "feature": "feed",
+        "path": "^/(?:homefeed|search)(?:/.*)?$"
+      },
+      {
+        "feature": "profiles",
+        "path": "^/[^/]+(?:/[^/]+)?$"
+      }
+    ],
+    "fallbackFeature": "feed",
+    "elements": [
+      {
+        "feature": "feed",
+        "selector": ".mainContainer, [role=\"main\"]",
+        "on": [
+          "feed"
+        ]
+      },
+      {
+        "feature": "explore",
+        "selector": ".mainContainer, [role=\"main\"]",
+        "on": [
+          "explore"
+        ]
+      },
+      {
+        "feature": "explore",
+        "selector": "a[href=\"/ideas/\"], a[href=\"/today/\"]"
+      },
+      {
+        "feature": "recommendations",
+        "selector": "[data-test-id*=\"related\"], [data-test-id*=\"more-ideas\"], .masonryContainer",
+        "on": [
+          "content"
+        ]
+      },
+      {
+        "feature": "content",
+        "selector": ".mainContainer, [role=\"main\"]",
+        "on": [
+          "content"
+        ]
+      },
+      {
+        "feature": "search",
+        "selector": ".mainContainer, [role=\"main\"]",
+        "on": [
+          "search"
+        ]
+      },
+      {
+        "feature": "compose",
+        "selector": ".mainContainer, [role=\"main\"]",
+        "on": [
+          "compose"
+        ]
+      },
+      {
+        "feature": "profiles",
+        "selector": ".mainContainer, [role=\"main\"]",
+        "on": [
+          "profiles"
+        ]
+      }
+    ]
+  },
+  "bluesky": {
+    "id": "bluesky",
+    "label": "Bluesky",
+    "hosts": [
+      "bsky.app"
+    ],
+    "appHosts": [
+      "bsky.app"
+    ],
+    "networkDomains": [
+      "bsky.network",
+      "bsky.social"
+    ],
+    "features": [
+      {
+        "id": "content",
+        "label": "Posts you open directly",
+        "default": "allow"
+      },
+      {
+        "id": "search",
+        "label": "Search",
+        "default": "allow"
+      },
+      {
+        "id": "messages",
+        "label": "Chat",
+        "default": "allow"
+      },
+      {
+        "id": "notifications",
+        "label": "Notifications",
+        "default": "allow"
+      },
+      {
+        "id": "compose",
+        "label": "Posting",
+        "default": "allow"
+      },
+      {
+        "id": "feed",
+        "label": "Discover, Following & custom feeds",
+        "default": "block"
+      },
+      {
+        "id": "recommendations",
+        "label": "Explore, trending & suggested follows",
+        "default": "block"
+      },
+      {
+        "id": "profiles",
+        "label": "Profiles",
+        "default": "block"
+      },
+      {
+        "id": "essentials",
+        "label": "Sign-in & settings",
+        "default": "allow",
+        "locked": true
+      }
+    ],
+    "routes": [
+      {
+        "feature": "content",
+        "path": "^/profile/[^/]+/post/([a-z0-9]+)(?:/.*)?$",
+        "judge": {
+          "contentSelector": "main, [role=\"main\"]"
+        }
+      },
+      {
+        "feature": "search",
+        "path": "^/search$",
+        "query": {
+          "q": "^[^&#]+$"
+        }
+      },
+      {
+        "feature": "recommendations",
+        "path": "^/(?:search|explore)$"
+      },
+      {
+        "feature": "messages",
+        "path": "^/messages(?:/.*)?$"
+      },
+      {
+        "feature": "notifications",
+        "path": "^/notifications(?:/.*)?$"
+      },
+      {
+        "feature": "compose",
+        "path": "^/intent/compose$"
+      },
+      {
+        "feature": "essentials",
+        "path": "^/(?:settings|moderation)(?:/.*)?$"
+      },
+      {
+        "feature": "feed",
+        "path": "^/(?:feeds|lists|hashtag/[^/]+|profile/[^/]+/(?:feed|lists)/[^/]+)$"
+      },
+      {
+        "feature": "profiles",
+        "path": "^/profile/[^/]+(?:/[a-z-]+)?$"
+      }
+    ],
+    "fallbackFeature": "feed",
+    "elements": [
+      {
+        "feature": "feed",
+        "selector": "main, [role=\"main\"]",
+        "on": [
+          "feed"
+        ]
+      },
+      {
+        "feature": "recommendations",
+        "selector": "[data-testid*=\"trending\" i], [data-testid*=\"suggested\" i]"
+      },
+      {
+        "feature": "recommendations",
+        "selector": "main, [role=\"main\"]",
+        "on": [
+          "recommendations"
+        ]
+      },
+      {
+        "feature": "content",
+        "selector": "main, [role=\"main\"]",
+        "on": [
+          "content"
+        ]
+      },
+      {
+        "feature": "search",
+        "selector": "main, [role=\"main\"]",
+        "on": [
+          "search"
+        ]
+      },
+      {
+        "feature": "messages",
+        "selector": "main, [role=\"main\"]",
+        "on": [
+          "messages"
+        ]
+      },
+      {
+        "feature": "notifications",
+        "selector": "main, [role=\"main\"]",
+        "on": [
+          "notifications"
+        ]
+      },
+      {
+        "feature": "compose",
+        "selector": "[role=\"dialog\"]",
+        "on": [
+          "compose"
+        ]
+      },
+      {
+        "feature": "profiles",
+        "selector": "main, [role=\"main\"]",
         "on": [
           "profiles"
         ]

@@ -1,8 +1,8 @@
-- improve soft blocking on desktop
-  - build the entire stack, as much as possible
-- improve soft blocker ui, blocklist UI in general
-- landing/pricing copy for soft blocking
-- add soft blocklist to marketing copy, pricing page
+- blocklist UI is ideal
+- get streaks/pools/etc all under control. Really make the app sing again
+  - ask claude for a UI check and suggestions
+- landing/pricing copy for soft blocking and AI
+- add soft blocklist and AI to marketing copy, pricing page
 - improve pricing page copy in general
 - create a motion graphic with AI
 - ship new builds, extension, etc, ship model

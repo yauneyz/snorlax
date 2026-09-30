@@ -887,14 +887,56 @@
       ],
       "features": [
         {
-          "id": "content",
-          "label": "Videos you open directly",
-          "default": "allow",
+          "id": "feed",
+          "label": "Home feed",
+          "default": "block",
+          "locked": false
+        },
+        {
+          "id": "sidebar",
+          "label": "Video sidebar",
+          "default": "block",
+          "locked": false
+        },
+        {
+          "id": "recommendations",
+          "label": "Recommended videos",
+          "default": "block",
+          "locked": false
+        },
+        {
+          "id": "live_chat",
+          "label": "Live chat",
+          "default": "block",
+          "locked": false
+        },
+        {
+          "id": "playlist",
+          "label": "Playlist panel",
+          "default": "block",
+          "locked": false
+        },
+        {
+          "id": "fundraiser",
+          "label": "Fundraisers",
+          "default": "block",
+          "locked": false
+        },
+        {
+          "id": "end_screen",
+          "label": "End screen video wall",
+          "default": "block",
+          "locked": false
+        },
+        {
+          "id": "end_cards",
+          "label": "End screen cards",
+          "default": "block",
           "locked": false
         },
         {
           "id": "shorts",
-          "label": "Shorts you open directly",
+          "label": "Shorts",
           "default": "allow",
           "locked": false
         },
@@ -905,14 +947,92 @@
           "locked": false
         },
         {
-          "id": "search",
-          "label": "Search",
+          "id": "profile_photos",
+          "label": "Profile photos in comments",
+          "default": "allow",
+          "locked": false
+        },
+        {
+          "id": "mixes",
+          "label": "Mixes",
+          "default": "allow",
+          "locked": false
+        },
+        {
+          "id": "merch",
+          "label": "Merch, tickets & offers",
+          "default": "block",
+          "locked": false
+        },
+        {
+          "id": "video_info",
+          "label": "Video info",
+          "default": "allow",
+          "locked": false
+        },
+        {
+          "id": "buttons_bar",
+          "label": "Like & share buttons",
+          "default": "allow",
+          "locked": false
+        },
+        {
+          "id": "channel_info",
+          "label": "Channel & subscribe button",
+          "default": "allow",
+          "locked": false
+        },
+        {
+          "id": "description",
+          "label": "Video description",
+          "default": "allow",
+          "locked": false
+        },
+        {
+          "id": "header",
+          "label": "Top header",
           "default": "allow",
           "locked": false
         },
         {
           "id": "notifications",
-          "label": "Notifications",
+          "label": "Notification bell",
+          "default": "block",
+          "locked": false
+        },
+        {
+          "id": "inapt_search",
+          "label": "Unrelated search results",
+          "default": "block",
+          "locked": false
+        },
+        {
+          "id": "trending",
+          "label": "Explore & trending",
+          "default": "allow",
+          "locked": false
+        },
+        {
+          "id": "more_from_youtube",
+          "label": "More from YouTube",
+          "default": "block",
+          "locked": false
+        },
+        {
+          "id": "subscriptions",
+          "label": "Subscriptions",
+          "default": "allow",
+          "locked": false
+        },
+        {
+          "id": "content",
+          "label": "Videos you open directly",
+          "default": "allow",
+          "locked": false
+        },
+        {
+          "id": "search",
+          "label": "Search",
           "default": "allow",
           "locked": false
         },
@@ -923,27 +1043,15 @@
           "locked": false
         },
         {
-          "id": "feed",
-          "label": "Home, subscriptions & trending",
-          "default": "block",
-          "locked": false
-        },
-        {
-          "id": "recommendations",
-          "label": "Recommended & up next",
-          "default": "block",
-          "locked": false
-        },
-        {
-          "id": "channels",
-          "label": "Channel pages",
-          "default": "block",
-          "locked": false
-        },
-        {
           "id": "essentials",
           "label": "Sign-in & account",
           "default": "allow",
+          "locked": true
+        },
+        {
+          "id": "promos",
+          "label": "Promos & surveys",
+          "default": "block",
           "locked": true
         }
       ],
@@ -980,20 +1088,12 @@
           }
         },
         {
-          "feature": "notifications",
-          "path": "^/feed/notifications$"
-        },
-        {
           "feature": "studio",
           "path": "^/upload$"
         },
         {
           "feature": "essentials",
           "path": "^/(?:account(?:_[^/]+)?|signin|logout|premium|paid_memberships)(?:/.*)?$"
-        },
-        {
-          "feature": "channels",
-          "path": "^/(?:@[^/]+|channel/[^/]+|c/[^/]+|user/[^/]+)(?:/.*)?$"
         }
       ],
       "fallbackFeature": "feed",
@@ -1007,6 +1107,14 @@
         ],
         [
           "https://www.youtube.com/feed/subscriptions",
+          "feed"
+        ],
+        [
+          "https://www.youtube.com/feed/notifications",
+          "feed"
+        ],
+        [
+          "https://www.youtube.com/@somechannel/videos",
           "feed"
         ],
         [
@@ -1042,10 +1150,6 @@
           "search"
         ],
         [
-          "https://www.youtube.com/feed/notifications",
-          "notifications"
-        ],
-        [
           "https://studio.youtube.com/",
           "studio"
         ],
@@ -1056,10 +1160,6 @@
         [
           "https://www.youtube.com/account",
           "essentials"
-        ],
-        [
-          "https://www.youtube.com/@somechannel/videos",
-          "channels"
         ],
         [
           "https://music.youtube.com/results?search_query=music",
@@ -1505,13 +1605,45 @@
     {
       "id": "facebook",
       "label": "Facebook",
-      "hosts": [],
-      "appHosts": [],
-      "networkDomains": [],
+      "hosts": [
+        "facebook.com",
+        "fb.watch"
+      ],
+      "appHosts": [
+        "facebook.com",
+        "www.facebook.com",
+        "m.facebook.com",
+        "web.facebook.com",
+        "mbasic.facebook.com",
+        "fb.watch"
+      ],
+      "networkDomains": [
+        "fbcdn.net",
+        "facebook.net",
+        "fbsbx.com"
+      ],
       "features": [
+        {
+          "id": "content",
+          "label": "Posts & photos you open directly",
+          "default": "allow",
+          "locked": false
+        },
+        {
+          "id": "search",
+          "label": "Search",
+          "default": "allow",
+          "locked": false
+        },
         {
           "id": "messages",
           "label": "Messages",
+          "default": "allow",
+          "locked": false
+        },
+        {
+          "id": "notifications",
+          "label": "Notifications",
           "default": "allow",
           "locked": false
         },
@@ -1528,6 +1660,12 @@
           "locked": false
         },
         {
+          "id": "events",
+          "label": "Events",
+          "default": "allow",
+          "locked": false
+        },
+        {
           "id": "feed",
           "label": "News feed",
           "default": "block",
@@ -1538,14 +1676,1004 @@
           "label": "Reels & video",
           "default": "block",
           "locked": false
+        },
+        {
+          "id": "stories",
+          "label": "Stories",
+          "default": "block",
+          "locked": false
+        },
+        {
+          "id": "recommendations",
+          "label": "Suggestions & sponsored",
+          "default": "block",
+          "locked": false
+        },
+        {
+          "id": "profiles",
+          "label": "Profiles & pages",
+          "default": "block",
+          "locked": false
+        },
+        {
+          "id": "essentials",
+          "label": "Sign-in & settings",
+          "default": "allow",
+          "locked": true
         }
       ],
-      "routes": [],
-      "fallbackFeature": "messages",
+      "routes": [
+        {
+          "feature": "reels",
+          "host": "fb.watch"
+        },
+        {
+          "feature": "content",
+          "path": "^/groups/[^/]+/(?:posts|permalink)/([0-9]+)(?:/.*)?$"
+        },
+        {
+          "feature": "content",
+          "path": "^/(?:[^/]+/)?(?:posts|videos|photos)/([^/]+)(?:/.*)?$"
+        },
+        {
+          "feature": "content",
+          "path": "^/share/p/([-_a-z0-9]+)$"
+        },
+        {
+          "feature": "content",
+          "path": "^/(?:permalink|story)\\.php$",
+          "query": {
+            "story_fbid": "^[^&#]+$"
+          }
+        },
+        {
+          "feature": "content",
+          "path": "^/photo(?:\\.php)?$",
+          "query": {
+            "fbid": "^[0-9]+$"
+          }
+        },
+        {
+          "feature": "search",
+          "path": "^/search(?:/[^/]+)?$",
+          "query": {
+            "q": "^[^&#]+$"
+          }
+        },
+        {
+          "feature": "messages",
+          "path": "^/messages(?:/.*)?$"
+        },
+        {
+          "feature": "notifications",
+          "path": "^/notifications$"
+        },
+        {
+          "feature": "groups",
+          "path": "^/groups(?:/.*)?$"
+        },
+        {
+          "feature": "marketplace",
+          "path": "^/marketplace(?:/.*)?$"
+        },
+        {
+          "feature": "events",
+          "path": "^/events(?:/.*)?$"
+        },
+        {
+          "feature": "reels",
+          "path": "^/(?:reels?|watch|share/[rv])(?:/.*)?$"
+        },
+        {
+          "feature": "stories",
+          "path": "^/stories(?:/.*)?$"
+        },
+        {
+          "feature": "recommendations",
+          "path": "^/friends/suggestions(?:/.*)?$"
+        },
+        {
+          "feature": "essentials",
+          "path": "^/(?:login|login\\.php|logout\\.php|checkpoint|recover|r\\.php|reg|settings|privacy|security|help|two_step_verification|dialog|v[0-9.]+/dialog)(?:/.*)?$"
+        },
+        {
+          "feature": "feed",
+          "path": "^/(?:home\\.php|search(?:/[^/]+)?)$"
+        },
+        {
+          "feature": "profiles",
+          "path": "^/(?:profile\\.php|people/[^/]+/[0-9]+|[.a-z0-9]+)(?:/(?:about|friends|photos|videos|reels|followers|following)[_a-z]*)?$"
+        }
+      ],
+      "fallbackFeature": "feed",
       "androidPackages": [
         "com.facebook.katana"
       ],
-      "examples": []
+      "examples": [
+        [
+          "https://www.facebook.com/",
+          "feed"
+        ],
+        [
+          "https://www.facebook.com/home.php",
+          "feed"
+        ],
+        [
+          "https://www.facebook.com/ada/posts/pfbid0abc123",
+          "content"
+        ],
+        [
+          "https://www.facebook.com/ada/videos/123456/",
+          "content"
+        ],
+        [
+          "https://www.facebook.com/groups/rustlang/posts/123456/",
+          "content"
+        ],
+        [
+          "https://www.facebook.com/groups/rustlang/permalink/123456/",
+          "content"
+        ],
+        [
+          "https://www.facebook.com/permalink.php?story_fbid=pfbid0abc&id=4",
+          "content"
+        ],
+        [
+          "https://www.facebook.com/photo/?fbid=123456",
+          "content"
+        ],
+        [
+          "https://www.facebook.com/watch/?v=123456",
+          "reels"
+        ],
+        [
+          "https://www.facebook.com/reel/123456",
+          "reels"
+        ],
+        [
+          "https://www.facebook.com/reel/?s=tab",
+          "reels"
+        ],
+        [
+          "https://www.facebook.com/share/p/AbC123/",
+          "content"
+        ],
+        [
+          "https://www.facebook.com/share/r/AbC123/",
+          "reels"
+        ],
+        [
+          "https://fb.watch/abc123/",
+          "reels"
+        ],
+        [
+          "https://www.facebook.com/search/top/?q=rust",
+          "search"
+        ],
+        [
+          "https://www.facebook.com/search/top/",
+          "feed"
+        ],
+        [
+          "https://www.facebook.com/messages/t/123",
+          "messages"
+        ],
+        [
+          "https://www.facebook.com/notifications",
+          "notifications"
+        ],
+        [
+          "https://www.facebook.com/groups/feed/",
+          "groups"
+        ],
+        [
+          "https://www.facebook.com/marketplace/nyc/",
+          "marketplace"
+        ],
+        [
+          "https://www.facebook.com/events/123456/",
+          "events"
+        ],
+        [
+          "https://www.facebook.com/watch/",
+          "reels"
+        ],
+        [
+          "https://www.facebook.com/reel/",
+          "reels"
+        ],
+        [
+          "https://www.facebook.com/stories/123/abc/",
+          "stories"
+        ],
+        [
+          "https://www.facebook.com/friends/suggestions",
+          "recommendations"
+        ],
+        [
+          "https://www.facebook.com/login/",
+          "essentials"
+        ],
+        [
+          "https://www.facebook.com/settings/?tab=account",
+          "essentials"
+        ],
+        [
+          "https://www.facebook.com/v19.0/dialog/oauth",
+          "essentials"
+        ],
+        [
+          "https://www.facebook.com/ada.lovelace",
+          "profiles"
+        ],
+        [
+          "https://www.facebook.com/ada.lovelace/about",
+          "profiles"
+        ],
+        [
+          "https://www.facebook.com/profile.php?id=123",
+          "profiles"
+        ],
+        [
+          "https://m.facebook.com/",
+          "feed"
+        ],
+        [
+          "https://developers.facebook.com/docs/",
+          "feed"
+        ]
+      ]
+    },
+    {
+      "id": "tiktok",
+      "label": "TikTok",
+      "hosts": [
+        "tiktok.com"
+      ],
+      "appHosts": [
+        "tiktok.com",
+        "www.tiktok.com",
+        "m.tiktok.com",
+        "vm.tiktok.com",
+        "vt.tiktok.com"
+      ],
+      "networkDomains": [
+        "tiktokcdn.com",
+        "tiktokcdn-us.com",
+        "tiktokv.com",
+        "tiktokv.us",
+        "ttwstatic.com",
+        "byteoversea.com",
+        "ibytedtos.com",
+        "ibyteimg.com"
+      ],
+      "features": [
+        {
+          "id": "content",
+          "label": "Videos you open directly",
+          "default": "allow",
+          "locked": false
+        },
+        {
+          "id": "search",
+          "label": "Search",
+          "default": "allow",
+          "locked": false
+        },
+        {
+          "id": "messages",
+          "label": "Messages",
+          "default": "allow",
+          "locked": false
+        },
+        {
+          "id": "compose",
+          "label": "Uploading & TikTok Studio",
+          "default": "allow",
+          "locked": false
+        },
+        {
+          "id": "feed",
+          "label": "For You, Following & Explore",
+          "default": "block",
+          "locked": false
+        },
+        {
+          "id": "recommendations",
+          "label": "Suggested videos & accounts",
+          "default": "block",
+          "locked": false
+        },
+        {
+          "id": "profiles",
+          "label": "Profiles",
+          "default": "block",
+          "locked": false
+        },
+        {
+          "id": "essentials",
+          "label": "Sign-in & settings",
+          "default": "allow",
+          "locked": true
+        }
+      ],
+      "routes": [
+        {
+          "feature": "content",
+          "host": "vm.tiktok.com",
+          "path": "^/([a-z0-9]+)$"
+        },
+        {
+          "feature": "content",
+          "host": "vt.tiktok.com",
+          "path": "^/([a-z0-9]+)$"
+        },
+        {
+          "feature": "content",
+          "path": "^/@[^/]+/(?:video|photo)/([0-9]+)$"
+        },
+        {
+          "feature": "content",
+          "path": "^/(?:t|embed(?:/v2)?)/([a-z0-9]+)$"
+        },
+        {
+          "feature": "search",
+          "path": "^/search(?:/(?:user|video|live|photo))?$",
+          "query": {
+            "q": "^[^&#]+$"
+          }
+        },
+        {
+          "feature": "messages",
+          "path": "^/messages$"
+        },
+        {
+          "feature": "compose",
+          "path": "^/(?:upload|tiktokstudio|creator-center)(?:/.*)?$"
+        },
+        {
+          "feature": "essentials",
+          "path": "^/(?:login|signup|logout|setting|legal|passport|feedback)(?:/.*)?$"
+        },
+        {
+          "feature": "profiles",
+          "path": "^/@[^/]+$"
+        }
+      ],
+      "fallbackFeature": "feed",
+      "androidPackages": [
+        "com.zhiliaoapp.musically",
+        "com.ss.android.ugc.trill"
+      ],
+      "examples": [
+        [
+          "https://www.tiktok.com/",
+          "feed"
+        ],
+        [
+          "https://www.tiktok.com/foryou",
+          "feed"
+        ],
+        [
+          "https://www.tiktok.com/following",
+          "feed"
+        ],
+        [
+          "https://www.tiktok.com/explore",
+          "feed"
+        ],
+        [
+          "https://www.tiktok.com/tag/rust",
+          "feed"
+        ],
+        [
+          "https://www.tiktok.com/@ada/video/7234567890123456789",
+          "content"
+        ],
+        [
+          "https://www.tiktok.com/@ada/photo/7234567890123456789",
+          "content"
+        ],
+        [
+          "https://www.tiktok.com/t/ZTabc123/",
+          "content"
+        ],
+        [
+          "https://vm.tiktok.com/ZMabc123/",
+          "content"
+        ],
+        [
+          "https://vm.tiktok.com/",
+          "feed"
+        ],
+        [
+          "https://www.tiktok.com/search?q=rust",
+          "search"
+        ],
+        [
+          "https://www.tiktok.com/search/user?q=rust",
+          "search"
+        ],
+        [
+          "https://www.tiktok.com/search",
+          "feed"
+        ],
+        [
+          "https://www.tiktok.com/messages",
+          "messages"
+        ],
+        [
+          "https://www.tiktok.com/tiktokstudio/upload",
+          "compose"
+        ],
+        [
+          "https://www.tiktok.com/login",
+          "essentials"
+        ],
+        [
+          "https://www.tiktok.com/setting",
+          "essentials"
+        ],
+        [
+          "https://www.tiktok.com/@ada",
+          "profiles"
+        ],
+        [
+          "https://www.tiktok.com/@ada/live",
+          "feed"
+        ],
+        [
+          "https://ads.tiktok.com/",
+          "feed"
+        ]
+      ]
+    },
+    {
+      "id": "threads",
+      "label": "Threads",
+      "hosts": [
+        "threads.com",
+        "threads.net"
+      ],
+      "appHosts": [
+        "threads.com",
+        "www.threads.com",
+        "threads.net",
+        "www.threads.net"
+      ],
+      "networkDomains": [
+        "cdninstagram.com",
+        "fbcdn.net"
+      ],
+      "features": [
+        {
+          "id": "content",
+          "label": "Posts you open directly",
+          "default": "allow",
+          "locked": false
+        },
+        {
+          "id": "search",
+          "label": "Search",
+          "default": "allow",
+          "locked": false
+        },
+        {
+          "id": "notifications",
+          "label": "Activity",
+          "default": "allow",
+          "locked": false
+        },
+        {
+          "id": "compose",
+          "label": "Posting",
+          "default": "allow",
+          "locked": false
+        },
+        {
+          "id": "feed",
+          "label": "For you & Following feeds",
+          "default": "block",
+          "locked": false
+        },
+        {
+          "id": "recommendations",
+          "label": "Search suggestions",
+          "default": "block",
+          "locked": false
+        },
+        {
+          "id": "profiles",
+          "label": "Profiles",
+          "default": "block",
+          "locked": false
+        },
+        {
+          "id": "essentials",
+          "label": "Sign-in & settings",
+          "default": "allow",
+          "locked": true
+        }
+      ],
+      "routes": [
+        {
+          "feature": "content",
+          "path": "^/@[^/]+/post/([-_a-z0-9]+)(?:/.*)?$"
+        },
+        {
+          "feature": "search",
+          "path": "^/search$",
+          "query": {
+            "q": "^[^&#]+$"
+          }
+        },
+        {
+          "feature": "recommendations",
+          "path": "^/search$"
+        },
+        {
+          "feature": "notifications",
+          "path": "^/activity(?:/.*)?$"
+        },
+        {
+          "feature": "compose",
+          "path": "^/intent/post$"
+        },
+        {
+          "feature": "essentials",
+          "path": "^/(?:login|logout|settings|accounts)(?:/.*)?$"
+        },
+        {
+          "feature": "profiles",
+          "path": "^/@[^/]+(?:/(?:replies|media|reposts))?$"
+        }
+      ],
+      "fallbackFeature": "feed",
+      "androidPackages": [
+        "com.instagram.barcelona"
+      ],
+      "examples": [
+        [
+          "https://www.threads.com/",
+          "feed"
+        ],
+        [
+          "https://www.threads.com/following",
+          "feed"
+        ],
+        [
+          "https://www.threads.net/",
+          "feed"
+        ],
+        [
+          "https://www.threads.com/@ada/post/C1abcDEF_23",
+          "content"
+        ],
+        [
+          "https://www.threads.net/@ada/post/C1abcDEF_23/media",
+          "content"
+        ],
+        [
+          "https://www.threads.com/search?q=rust",
+          "search"
+        ],
+        [
+          "https://www.threads.com/search",
+          "recommendations"
+        ],
+        [
+          "https://www.threads.com/activity",
+          "notifications"
+        ],
+        [
+          "https://www.threads.com/intent/post?text=hi",
+          "compose"
+        ],
+        [
+          "https://www.threads.com/login",
+          "essentials"
+        ],
+        [
+          "https://www.threads.com/settings/account",
+          "essentials"
+        ],
+        [
+          "https://www.threads.com/@ada",
+          "profiles"
+        ],
+        [
+          "https://www.threads.com/@ada/replies",
+          "profiles"
+        ]
+      ]
+    },
+    {
+      "id": "pinterest",
+      "label": "Pinterest",
+      "hosts": [
+        "pinterest.com",
+        "pin.it"
+      ],
+      "appHosts": [
+        "pinterest.com",
+        "www.pinterest.com",
+        "ar.pinterest.com",
+        "at.pinterest.com",
+        "au.pinterest.com",
+        "br.pinterest.com",
+        "ca.pinterest.com",
+        "ch.pinterest.com",
+        "cl.pinterest.com",
+        "co.pinterest.com",
+        "cz.pinterest.com",
+        "de.pinterest.com",
+        "dk.pinterest.com",
+        "es.pinterest.com",
+        "fi.pinterest.com",
+        "fr.pinterest.com",
+        "gr.pinterest.com",
+        "hu.pinterest.com",
+        "id.pinterest.com",
+        "ie.pinterest.com",
+        "in.pinterest.com",
+        "it.pinterest.com",
+        "jp.pinterest.com",
+        "kr.pinterest.com",
+        "mx.pinterest.com",
+        "nl.pinterest.com",
+        "no.pinterest.com",
+        "nz.pinterest.com",
+        "pe.pinterest.com",
+        "ph.pinterest.com",
+        "pl.pinterest.com",
+        "pt.pinterest.com",
+        "ro.pinterest.com",
+        "ru.pinterest.com",
+        "se.pinterest.com",
+        "sk.pinterest.com",
+        "tr.pinterest.com",
+        "uk.pinterest.com",
+        "za.pinterest.com",
+        "pin.it"
+      ],
+      "networkDomains": [
+        "pinimg.com"
+      ],
+      "features": [
+        {
+          "id": "content",
+          "label": "Pins you open directly",
+          "default": "allow",
+          "locked": false
+        },
+        {
+          "id": "search",
+          "label": "Search",
+          "default": "allow",
+          "locked": false
+        },
+        {
+          "id": "compose",
+          "label": "Creating pins",
+          "default": "allow",
+          "locked": false
+        },
+        {
+          "id": "feed",
+          "label": "Home feed",
+          "default": "block",
+          "locked": false
+        },
+        {
+          "id": "explore",
+          "label": "Explore & Today",
+          "default": "block",
+          "locked": false
+        },
+        {
+          "id": "recommendations",
+          "label": "More ideas",
+          "default": "block",
+          "locked": false
+        },
+        {
+          "id": "profiles",
+          "label": "Profiles & boards",
+          "default": "block",
+          "locked": false
+        },
+        {
+          "id": "essentials",
+          "label": "Sign-in & settings",
+          "default": "allow",
+          "locked": true
+        }
+      ],
+      "routes": [
+        {
+          "feature": "content",
+          "host": "pin.it",
+          "path": "^/([a-z0-9]+)$"
+        },
+        {
+          "feature": "content",
+          "path": "^/pin/([-_a-z0-9]+)(?:/.*)?$"
+        },
+        {
+          "feature": "search",
+          "path": "^/search/(?:pins|boards|users|videos)$",
+          "query": {
+            "q": "^[^&#]+$"
+          }
+        },
+        {
+          "feature": "compose",
+          "path": "^/(?:pin-builder|pin-creation-tool|idea-pin-builder)(?:/.*)?$"
+        },
+        {
+          "feature": "explore",
+          "path": "^/(?:today|ideas|explore)(?:/.*)?$"
+        },
+        {
+          "feature": "essentials",
+          "path": "^/(?:login|signup|logout|settings|password|reset|oauth|_)(?:/.*)?$"
+        },
+        {
+          "feature": "feed",
+          "path": "^/(?:homefeed|search)(?:/.*)?$"
+        },
+        {
+          "feature": "profiles",
+          "path": "^/[^/]+(?:/[^/]+)?$"
+        }
+      ],
+      "fallbackFeature": "feed",
+      "androidPackages": [
+        "com.pinterest"
+      ],
+      "examples": [
+        [
+          "https://www.pinterest.com/",
+          "feed"
+        ],
+        [
+          "https://www.pinterest.com/homefeed/",
+          "feed"
+        ],
+        [
+          "https://www.pinterest.com/pin/123456789/",
+          "content"
+        ],
+        [
+          "https://uk.pinterest.com/pin/123456789/",
+          "content"
+        ],
+        [
+          "https://pin.it/abc123",
+          "content"
+        ],
+        [
+          "https://pin.it/",
+          "feed"
+        ],
+        [
+          "https://www.pinterest.com/search/pins/?q=rust",
+          "search"
+        ],
+        [
+          "https://www.pinterest.com/search/pins/",
+          "feed"
+        ],
+        [
+          "https://www.pinterest.com/pin-builder/",
+          "compose"
+        ],
+        [
+          "https://www.pinterest.com/today/",
+          "explore"
+        ],
+        [
+          "https://www.pinterest.com/ideas/home-decor/123/",
+          "explore"
+        ],
+        [
+          "https://www.pinterest.com/login/",
+          "essentials"
+        ],
+        [
+          "https://www.pinterest.com/settings/",
+          "essentials"
+        ],
+        [
+          "https://www.pinterest.com/ada/",
+          "profiles"
+        ],
+        [
+          "https://www.pinterest.com/ada/kitchen/",
+          "profiles"
+        ],
+        [
+          "https://ads.pinterest.com/",
+          "feed"
+        ]
+      ]
+    },
+    {
+      "id": "bluesky",
+      "label": "Bluesky",
+      "hosts": [
+        "bsky.app"
+      ],
+      "appHosts": [
+        "bsky.app"
+      ],
+      "networkDomains": [
+        "bsky.network",
+        "bsky.social"
+      ],
+      "features": [
+        {
+          "id": "content",
+          "label": "Posts you open directly",
+          "default": "allow",
+          "locked": false
+        },
+        {
+          "id": "search",
+          "label": "Search",
+          "default": "allow",
+          "locked": false
+        },
+        {
+          "id": "messages",
+          "label": "Chat",
+          "default": "allow",
+          "locked": false
+        },
+        {
+          "id": "notifications",
+          "label": "Notifications",
+          "default": "allow",
+          "locked": false
+        },
+        {
+          "id": "compose",
+          "label": "Posting",
+          "default": "allow",
+          "locked": false
+        },
+        {
+          "id": "feed",
+          "label": "Discover, Following & custom feeds",
+          "default": "block",
+          "locked": false
+        },
+        {
+          "id": "recommendations",
+          "label": "Explore, trending & suggested follows",
+          "default": "block",
+          "locked": false
+        },
+        {
+          "id": "profiles",
+          "label": "Profiles",
+          "default": "block",
+          "locked": false
+        },
+        {
+          "id": "essentials",
+          "label": "Sign-in & settings",
+          "default": "allow",
+          "locked": true
+        }
+      ],
+      "routes": [
+        {
+          "feature": "content",
+          "path": "^/profile/[^/]+/post/([a-z0-9]+)(?:/.*)?$"
+        },
+        {
+          "feature": "search",
+          "path": "^/search$",
+          "query": {
+            "q": "^[^&#]+$"
+          }
+        },
+        {
+          "feature": "recommendations",
+          "path": "^/(?:search|explore)$"
+        },
+        {
+          "feature": "messages",
+          "path": "^/messages(?:/.*)?$"
+        },
+        {
+          "feature": "notifications",
+          "path": "^/notifications(?:/.*)?$"
+        },
+        {
+          "feature": "compose",
+          "path": "^/intent/compose$"
+        },
+        {
+          "feature": "essentials",
+          "path": "^/(?:settings|moderation)(?:/.*)?$"
+        },
+        {
+          "feature": "feed",
+          "path": "^/(?:feeds|lists|hashtag/[^/]+|profile/[^/]+/(?:feed|lists)/[^/]+)$"
+        },
+        {
+          "feature": "profiles",
+          "path": "^/profile/[^/]+(?:/[a-z-]+)?$"
+        }
+      ],
+      "fallbackFeature": "feed",
+      "androidPackages": [
+        "xyz.blueskyweb.app"
+      ],
+      "examples": [
+        [
+          "https://bsky.app/",
+          "feed"
+        ],
+        [
+          "https://bsky.app/feeds",
+          "feed"
+        ],
+        [
+          "https://bsky.app/hashtag/rust",
+          "feed"
+        ],
+        [
+          "https://bsky.app/profile/bsky.app/feed/whats-hot",
+          "feed"
+        ],
+        [
+          "https://bsky.app/profile/ada.bsky.social/post/3kabc123xyz",
+          "content"
+        ],
+        [
+          "https://bsky.app/profile/ada.bsky.social/post/3kabc123xyz/liked-by",
+          "content"
+        ],
+        [
+          "https://bsky.app/search?q=rust",
+          "search"
+        ],
+        [
+          "https://bsky.app/search",
+          "recommendations"
+        ],
+        [
+          "https://bsky.app/messages/abc",
+          "messages"
+        ],
+        [
+          "https://bsky.app/notifications",
+          "notifications"
+        ],
+        [
+          "https://bsky.app/intent/compose?text=hi",
+          "compose"
+        ],
+        [
+          "https://bsky.app/settings/account",
+          "essentials"
+        ],
+        [
+          "https://bsky.app/profile/ada.bsky.social",
+          "profiles"
+        ],
+        [
+          "https://bsky.app/profile/ada.bsky.social/followers",
+          "profiles"
+        ],
+        [
+          "https://docs.bsky.app/",
+          "feed"
+        ]
+      ]
     },
     {
       "id": "snapchat",

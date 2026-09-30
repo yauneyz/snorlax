@@ -41,7 +41,23 @@
         "*://theringer.com/*",
         "*://*.theringer.com/*",
         "*://substack.com/*",
-        "*://*.substack.com/*"
+        "*://*.substack.com/*",
+        "*://facebook.com/*",
+        "*://*.facebook.com/*",
+        "*://fb.watch/*",
+        "*://*.fb.watch/*",
+        "*://tiktok.com/*",
+        "*://*.tiktok.com/*",
+        "*://threads.com/*",
+        "*://*.threads.com/*",
+        "*://threads.net/*",
+        "*://*.threads.net/*",
+        "*://pinterest.com/*",
+        "*://*.pinterest.com/*",
+        "*://pin.it/*",
+        "*://*.pin.it/*",
+        "*://bsky.app/*",
+        "*://*.bsky.app/*"
       ],
       "js": [
         "site-content.js"

@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { SITE_DEFINITIONS } from '@talysman/shared';
+import { SITE_DEFINITIONS, sitesForAudiences } from '@talysman/shared';
 import type { RuleAction } from '@talysman/shared';
 import {
   contentScriptMatches,
@@ -49,6 +49,15 @@ describe('site catalog', () => {
     expect(readFileSync(resolve(root, 'apps/android/blocker/catalog/android-catalog.json'), 'utf8')).toBe(androidCatalogJson());
     const manifest = JSON.parse(readFileSync(resolve(root, 'apps/extension/manifest.json'), 'utf8'));
     expect(manifest.content_scripts).toEqual([{ matches: contentScriptMatches(), js: ['site-content.js'], run_at: 'document_start' }]);
+  });
+
+  it('offers audience-limited sites only to their audience', () => {
+    const everyone = sitesForAudiences(new Set()).map((site) => site.id);
+    const localRelease = sitesForAudiences(new Set(['local-release'])).map((site) => site.id);
+    expect(everyone).not.toContain('theverge');
+    expect(everyone).not.toContain('theringer');
+    expect(everyone).toContain('reddit');
+    expect(localRelease).toEqual(SITE_DEFINITIONS.map((site) => site.id));
   });
 
   it('compiles each enabled site to two allow rules inside the site priority', () => {

@@ -1,21 +1,60 @@
 import { useState } from 'react';
-import type { Policy, RuleAction, SiteDefinition } from '@talysman/shared';
-import { SITE_DEFINITIONS, effectiveSiteFeatures } from '@talysman/shared';
-import { Kicker } from './ui/index.js';
+import type { Policy, RuleAction, SiteAudience, SiteDefinition } from '@talysman/shared';
+import { SITE_DEFINITIONS, effectiveSiteFeatures, sitesForAudiences } from '@talysman/shared';
+import { Switch } from './ui/index.js';
 import { cx, effectiveAction } from '../lib/utils.js';
+import { useFocusStore } from '../store/useFocusStore.js';
 
 const ACTION_LABELS: Record<RuleAction, string> = { allow: 'Allow', judge: 'AI', block: 'Hide' };
+
+/** The site audiences this install belongs to (see `SiteDefinition.audience`). */
+function siteAudiences(isLocalRelease: boolean, appEnv: string): ReadonlySet<SiteAudience> {
+  const audiences = new Set<SiteAudience>();
+  // Dev builds see everything so audience-limited sites can be worked on.
+  if (isLocalRelease || appEnv !== 'production') audiences.add('local-release');
+  return audiences;
+}
 
 function coversHost(entry: string, host: string): boolean {
   const base = entry.toLowerCase().replace(/^\*\./, '');
   return host === base || host.endsWith(`.${base}`);
 }
 
+/** Catalog sites this install offers, plus any already on (so they can be turned off). */
+export function useListedSites(policy: Policy): SiteDefinition[] {
+  const isLocalRelease = useFocusStore((s) => s.isLocalRelease);
+  const appEnv = useFocusStore((s) => s.appEnv);
+  const sites = policy.sites ?? {};
+  const offered = new Set(sitesForAudiences(siteAudiences(isLocalRelease, appEnv)));
+  return SITE_DEFINITIONS.filter((site) => offered.has(site) || sites[site.id]);
+}
+
+/** A site's features as they'll actually be enforced (AI resolved to its fallback when AI mode is off). */
+function resolvedFeatures(site: SiteDefinition, policy: Policy, aiMode: boolean): Record<string, RuleAction> {
+  return Object.fromEntries(
+    Object.entries(effectiveSiteFeatures(site.id, policy.sites?.[site.id])).map(([id, action]) => [
+      id,
+      effectiveAction(action, policy, aiMode),
+    ]),
+  );
+}
+
+/** How many of a site's configurable features are hidden / left to the AI. */
+export function siteRuleCounts(site: SiteDefinition, policy: Policy, aiMode: boolean) {
+  const features = resolvedFeatures(site, policy, aiMode);
+  const configurable = site.features.filter((feature) => !feature.locked);
+  return {
+    hidden: configurable.filter((feature) => features[feature.id] === 'block').length,
+    judged: configurable.filter((feature) => features[feature.id] === 'judge').length,
+  };
+}
+
 /**
- * Site rules ("soft blocks"): one row per catalog site. The site itself always stays reachable;
- * turning it on applies its catalog defaults — typically feeds and recommendations hidden, direct
- * content, search, and messaging shown — and each feature can then be set to Allow, AI (hidden
- * page by page when it doesn't fit your tasks), or Hide.
+ * Site rules ("soft blocks"): the catalog sites down the left, each with an on/off switch; the
+ * selected site's features on the right. The site itself always stays reachable; turning it on
+ * applies its catalog defaults — typically feeds and recommendations hidden, direct content,
+ * search, and messaging shown — and each feature can then be set to Allow, AI (hidden page by
+ * page when it doesn't fit your tasks), or Hide.
  * Everything here is rendered from the site catalog; there is no per-site UI code.
  */
 export function SiteRules({
@@ -41,15 +80,20 @@ export function SiteRules({
   onError: (message: string) => void;
   onUpgrade: () => void;
 }) {
-  const [expanded, setExpanded] = useState<string | null>(null);
   const sites = policy.sites ?? {};
+  const listed = useListedSites(policy);
+  // Start on the first site that's on, so opening the section shows something to edit.
+  const [selectedId, setSelectedId] = useState<string | null>(
+    () => listed.find((site) => sites[site.id])?.id ?? listed[0]?.id ?? null,
+  );
+  const selected = listed.find((site) => site.id === selectedId) ?? listed[0];
 
   function toggleSite(site: SiteDefinition) {
     if (!supported) return;
+    setSelectedId(site.id);
     if (sites[site.id]) {
       const { [site.id]: _removed, ...rest } = sites;
       onSave({ ...policy, sites: rest });
-      if (expanded === site.id) setExpanded(null);
       return;
     }
     if (limitReached) {
@@ -69,7 +113,6 @@ export function SiteRules({
       blockedDomains: policy.blockedDomains.filter((entry) => !covering.includes(entry)),
       sites: { ...sites, [site.id]: { features: {} } },
     });
-    setExpanded(site.id);
   }
 
   function setFeature(site: SiteDefinition, featureId: string, action: RuleAction) {
@@ -87,93 +130,107 @@ export function SiteRules({
     onSave({ ...policy, sites: { ...sites, [site.id]: { features } } });
   }
 
+  if (!supported) {
+    return <p className="text-[12px] text-slate-450">Update the Talysman desktop service to use soft blocks.</p>;
+  }
+
+  const rule = selected ? sites[selected.id] : undefined;
+  const features = selected ? resolvedFeatures(selected, policy, aiMode) : {};
+  const customized = rule && Object.keys(rule.features).length > 0;
+
   return (
-    <div className="mt-6">
-      <div className="flex items-baseline gap-2.5">
-        <Kicker>Site rules</Kicker>
-        <span className="text-[11px] text-slate-600">
-          {Object.keys(sites).length}/{SITE_DEFINITIONS.length} on
-        </span>
-      </div>
-      <p className="mt-1 text-[11px] leading-snug text-slate-400">
-        {supported
-          ? 'Keep using a site — search, messages, notifications, posting, a specific post — with its feeds and recommendations hidden. Loosening a rule needs your key while focus is on.'
-          : 'Update the Talysman desktop service to use site rules.'}
-      </p>
-      <div className="mt-2.5 flex flex-col gap-1.5">
-        {SITE_DEFINITIONS.map((site) => {
-          const rule = sites[site.id];
-          const enabled = Boolean(rule);
-          const open = enabled && expanded === site.id;
-          const features = Object.fromEntries(
-            Object.entries(effectiveSiteFeatures(site.id, rule)).map(([id, action]) => [
-              id,
-              effectiveAction(action, policy, aiMode),
-            ]),
-          );
-          const configurable = site.features.filter((feature) => !feature.locked);
-          const blockedCount = configurable.filter((feature) => features[feature.id] === 'block').length;
-          const judgedCount = configurable.filter((feature) => features[feature.id] === 'judge').length;
+    <div className="grid grid-cols-[200px_minmax(0,1fr)] gap-4">
+      <ul className="flex flex-col gap-0.5 border-r border-white/[0.06] pr-3">
+        {listed.map((site) => {
+          const on = Boolean(sites[site.id]);
+          const isSelected = site.id === selected?.id;
+          const { hidden } = siteRuleCounts(site, policy, aiMode);
           return (
-            <div
-              key={site.id}
-              className={cx(
-                'rounded-[10px] border transition',
-                enabled ? 'border-seal/30 bg-seal/[0.06]' : 'border-white/[0.07] bg-white/[0.025]',
-                !supported && 'opacity-50',
-              )}
-            >
-              <div className="flex items-center gap-3 px-3 py-2.5">
+            <li key={site.id}>
+              <div
+                className={cx(
+                  'flex items-center gap-2 rounded-[8px] px-2.5 py-[5px] transition',
+                  isSelected ? 'bg-white/[0.07]' : 'hover:bg-white/[0.035]',
+                )}
+              >
                 <button
                   type="button"
-                  onClick={() => enabled && setExpanded(open ? null : site.id)}
-                  disabled={!enabled}
-                  aria-expanded={open}
-                  className="flex min-w-0 flex-1 items-center gap-2 text-left"
+                  onClick={() => setSelectedId(site.id)}
+                  className="flex min-w-0 flex-1 items-baseline gap-2 text-left"
                 >
-                  <span className="text-[12.5px] font-semibold text-slate-250">{site.label}</span>
-                  {enabled && (
-                    <span className="truncate text-[11px] text-slate-450">
-                      {blockedCount} hidden{judgedCount > 0 ? ` · ${judgedCount} AI` : ''} · {open ? 'hide' : 'customize'}
-                    </span>
-                  )}
+                  <span className={cx('truncate text-[12.5px] font-semibold', on ? 'text-slate-100' : 'text-slate-400')}>
+                    {site.label}
+                  </span>
+                  {on && <span className="shrink-0 text-[10.5px] text-slate-500">{hidden} hidden</span>}
                 </button>
                 <button
                   type="button"
                   role="switch"
-                  aria-checked={enabled}
-                  aria-label={`Site rules for ${site.label}`}
+                  aria-checked={on}
+                  aria-label={`Soft block ${site.label}`}
                   onClick={() => toggleSite(site)}
-                  disabled={!supported}
-                  className="text-[11px] font-medium text-slate-400 transition hover:text-slate-200"
                 >
-                  {enabled ? 'On' : limitReached ? 'Upgrade' : 'Off'}
+                  <Switch on={on} className="scale-[0.85]" />
                 </button>
               </div>
-              {open && (
-                <ul className="flex flex-col gap-1 border-t border-white/[0.06] px-3 py-2">
-                  {configurable.map((feature) => (
-                    <li key={feature.id} className="flex items-center gap-3 py-1">
-                      <span className="min-w-0 flex-1">
-                        <span className="block text-[12px] text-slate-250">{feature.label}</span>
-                        {feature.description && (
-                          <span className="block text-[10.5px] leading-snug text-slate-450">{feature.description}</span>
-                        )}
-                      </span>
-                      <ActionPicker
-                        value={features[feature.id] ?? effectiveAction(feature.default, policy, aiMode)}
-                        aiMode={aiMode}
-                        smartAllowed={smartAllowed}
-                        onChange={(action) => setFeature(site, feature.id, action)}
-                      />
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
+            </li>
           );
         })}
-      </div>
+      </ul>
+
+      {selected && (
+        <div className="min-w-0">
+          <div className="flex items-baseline gap-2.5">
+            <span className="text-[14px] font-semibold text-slate-100">{selected.label}</span>
+            <span className="font-mono text-[10.5px] text-slate-500">{selected.hosts[0]}</span>
+            {customized && (
+              <button
+                type="button"
+                onClick={() => onSave({ ...policy, sites: { ...sites, [selected.id]: { features: {} } } })}
+                className="ml-auto text-[11px] font-medium text-slate-450 transition hover:text-slate-200"
+              >
+                Reset to recommended
+              </button>
+            )}
+          </div>
+
+          {!rule ? (
+            <div className="mt-3 rounded-[10px] border border-dashed border-white/[0.10] px-4 py-5 text-center">
+              <p className="text-[12px] text-slate-400">
+                Turn this on to keep using {selected.label} with its distracting parts hidden.
+              </p>
+              <button
+                type="button"
+                onClick={() => toggleSite(selected)}
+                className="mt-2.5 text-[12px] font-semibold text-slate-100 transition hover:text-white"
+              >
+                {limitReached ? 'Upgrade to add more →' : `Soft block ${selected.label} →`}
+              </button>
+            </div>
+          ) : (
+            <ul className="mt-2 flex flex-col">
+              {selected.features
+                .filter((feature) => !feature.locked)
+                .map((feature) => (
+                  <li key={feature.id} className="flex items-center gap-3 border-b border-white/[0.05] py-2 last:border-b-0">
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-[12.5px] text-slate-250">{feature.label}</span>
+                      {feature.description && (
+                        <span className="block text-[10.5px] leading-snug text-slate-450">{feature.description}</span>
+                      )}
+                    </span>
+                    <ActionPicker
+                      value={features[feature.id] ?? effectiveAction(feature.default, policy, aiMode)}
+                      aiMode={aiMode}
+                      smartAllowed={smartAllowed}
+                      onChange={(action) => setFeature(selected, feature.id, action)}
+                    />
+                  </li>
+                ))}
+            </ul>
+          )}
+        </div>
+      )}
     </div>
   );
 }

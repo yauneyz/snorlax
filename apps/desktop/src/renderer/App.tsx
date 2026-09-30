@@ -21,7 +21,7 @@ type Route = 'dashboard' | 'blocklists' | 'schedule' | 'keys' | 'account' | 'pla
 
 const NAV: { route: Route; label: string }[] = [
   { route: 'dashboard', label: 'Dashboard' },
-  { route: 'blocklists', label: 'Profiles' },
+  { route: 'blocklists', label: 'Blocklists' },
   { route: 'schedule', label: 'Schedule' },
   { route: 'keys', label: 'Keys' },
   { route: 'account', label: 'Account' },
@@ -152,9 +152,6 @@ export default function App() {
                 className="block h-1.5 w-1.5 rounded-full bg-signal shadow-[0_0_10px_rgb(var(--color-signal)/0.6)]"
               />
               <span className="desktop-route-title">{activeRoute?.label}</span>
-              <span className="font-mono text-[9px] font-semibold uppercase tracking-[0.14em] text-slate-500">
-                Control surface
-              </span>
             </div>
             {usingMock && (
               <span className="font-mono text-[10px] tracking-[0.14em] text-warn">MOCK SERVICE</span>

@@ -6,6 +6,7 @@ export default defineSite({
   hosts: ['theringer.com'],
   appHosts: ['theringer.com', 'www.theringer.com'],
   networkDomains: [],
+  audience: 'local-release',
   features: [
     { id: 'content', label: 'Articles you open directly', default: 'allow' },
     { id: 'episodes', label: 'Podcast episodes you open directly', default: 'allow' },

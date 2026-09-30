@@ -11,6 +11,8 @@ build/
 coverage/
 playwright-report/
 test-results/
+# Signed-in page snapshots from `pnpm capture:sites`; they contain account data.
+.site-captures/
 *.tsbuildinfo
 apps/desktop/out/
 apps/desktop/resources/bin/current/

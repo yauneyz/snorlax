@@ -179,3 +179,49 @@ export function Modal({
     </div>
   );
 }
+
+/**
+ * The circled "?" — hover or focus it for a one- or two-sentence explanation. Use sparingly: one
+ * per concept a newcomer can't guess from its label, never on things that explain themselves.
+ */
+export function HelpTip({ children, label = 'What is this?' }: { children: React.ReactNode; label?: string }) {
+  return (
+    <span className="group relative inline-flex">
+      <button
+        type="button"
+        aria-label={label}
+        onClick={(e) => e.stopPropagation()}
+        className="flex h-[15px] w-[15px] items-center justify-center rounded-full border border-white/[0.16] text-[9.5px] font-semibold leading-none text-slate-450 transition hover:border-white/30 hover:text-slate-200 focus-visible:border-white/30 focus-visible:text-slate-200 focus-visible:outline-none"
+      >
+        ?
+      </button>
+      <span
+        role="tooltip"
+        className="pointer-events-none absolute left-1/2 top-[calc(100%+7px)] z-30 w-[250px] -translate-x-1/2 rounded-[9px] border border-white/[0.12] bg-[rgb(var(--color-panel)/0.98)] px-3 py-2 text-left text-[11.5px] font-normal normal-case leading-relaxed tracking-normal text-slate-250 opacity-0 shadow-[0_12px_30px_rgb(var(--color-black)/0.55)] transition group-focus-within:opacity-100 group-hover:opacity-100"
+      >
+        {children}
+      </span>
+    </span>
+  );
+}
+
+/** Small on/off switch. Render inside a button (or pass `onClick`) — it's purely visual. */
+export function Switch({ on, className }: { on: boolean; className?: string }) {
+  return (
+    <span
+      aria-hidden
+      className={cx(
+        'relative block h-5 w-9 shrink-0 rounded-full transition',
+        on ? 'bg-seal/70' : 'bg-white/10',
+        className,
+      )}
+    >
+      <span
+        className={cx(
+          'absolute top-0.5 h-4 w-4 rounded-full bg-white transition-all',
+          on ? 'left-[18px]' : 'left-0.5',
+        )}
+      />
+    </span>
+  );
+}

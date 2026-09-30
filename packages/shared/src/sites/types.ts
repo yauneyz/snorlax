@@ -66,6 +66,17 @@ export interface SiteElement {
   on?: string[];
 }
 
+export interface SiteKeep {
+  /** What this is, for reports (e.g. "search box"). */
+  name: string;
+  /** CSS selector for the part that must stay visible. */
+  selector: string;
+  /** The feature that owns it and may hide it. Omitted ⇒ no feature may hide it. */
+  feature?: string;
+  /** Only check on pages of these features. Omitted ⇒ every page it appears on. */
+  on?: string[];
+}
+
 export interface SiteDefinition {
   /** Stable id. Persisted in user policies — never rename. */
   id: string;
@@ -95,9 +106,32 @@ export interface SiteDefinition {
    * against the compiled DNR rules, so they double as the site's regression suite.
    */
   examples: [url: string, feature: string][];
+  /**
+   * Page parts that must survive hiding: `pnpm check:sites` fails when an element of any other
+   * feature covers one of these in a captured page. This is what keeps "hide the feed, not the
+   * page" true after the site changes its markup.
+   */
+  keep?: SiteKeep[];
+  /**
+   * Real pages `pnpm capture:sites` starts from (examples use made-up ids). It then follows links
+   * on those pages to reach every feature that still lacks a capture. Omitted ⇒ the home page.
+   */
+  captureSeeds?: string[];
   /** The site's Android app(s), driven by the same features (see `AndroidAppDefinition`). */
   android?: AndroidAppDefinition;
+  /**
+   * Restricts which installs offer this site in the UI. Omitted ⇒ everyone. Enforcement is
+   * unaffected: every build still ships and enforces the whole catalog, so a policy naming the
+   * site keeps working anywhere.
+   */
+  audience?: SiteAudience;
 }
+
+/**
+ * A group of installs a site can be limited to (see `SiteDefinition.audience`).
+ * - `local-release`: builds from `pnpm release:local` (the NixOS install), plus dev builds.
+ */
+export type SiteAudience = 'local-release';
 
 /**
  * A catalog entry's Android app. The same `SiteRule` drives the website (extension) and the app

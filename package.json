@@ -35,6 +35,8 @@
     "build:extension": "node scripts/build-extension.mjs && node scripts/audit-extension.mjs",
     "update:blocklists": "node scripts/update-blocklists.mjs",
     "generate:sites": "tsx scripts/generate-site-catalog.ts",
+    "capture:sites": "tsx scripts/capture-sites.ts",
+    "check:sites": "tsx scripts/check-site-selectors.ts",
     "gen:types": "node scripts/generate-engine-types.mjs",
     "build:engine-wasm": "node scripts/build-engine-wasm.mjs",
     "build:android-engine": "node scripts/build-android-engine.mjs",
