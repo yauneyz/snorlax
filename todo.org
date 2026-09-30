@@ -1,21 +1,26 @@
-- got my first user post
-
-- improve soft blocking
+- improve soft blocking on desktop
   - build the entire stack, as much as possible
 - improve soft blocker ui, blocklist UI in general
-- include a phone app for max power (should have the foqos idea)
 - landing/pricing copy for soft blocking
 - add soft blocklist to marketing copy, pricing page
 - improve pricing page copy in general
 - ship new builds, extension, etc, ship model
+- post in discord/x/indie-hackers sub about the new features
 
 - send to instagram guy
 
 - post on X, reddit, linkedin, etc
 
+- email 5 outlets that might cover me
+- start working on marketing by creating 
+ 
+
 
 - read "learn creator outreach" materials
 - Message 15 people
+
+
+- fix the app
 
 - "How I" content
 - show hn
@@ -24,7 +29,7 @@
 - reach out to lists to get in them
 
 - stats layer
-- "GoodPhone" - a marketing app that lets your phone show you all the good things you should be doing. Who to call, leisure checklist, etc. 
+- "GoodPhone" - a marketing app that lets your phone show you all the good things you should be doing. Who to call, leisure checklist, etc.
 
 
 

@@ -9,6 +9,7 @@
 //! ([`browsers`]) and the escalation state machine ([`watchdog`]) — and the [`policy`] data model
 //! that every backend must accept and emit identically.
 
+pub mod active_ping;
 pub mod browsers;
 pub mod extension_compat;
 pub mod model;

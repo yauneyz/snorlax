@@ -157,6 +157,13 @@ export interface RequestMap {
   };
 
   /**
+   * Electron main → service: the analytics `device_id` and web API origin the service uses for its
+   * once-per-UTC-day DAU-protected ping. Additive in protocol 6; older services answer BAD_REQUEST.
+   * The service accepts only production and loopback origins.
+   */
+  setAnalyticsIdentity: { params: { deviceId: string; apiBaseUrl: string }; result: Ok };
+
+  /**
    * Extension → (via natmsg) → service: a rule resolved to `judge` for this page. Fire-and-forget;
    * the service attaches the active `JudgePolicy`, broadcasts `judgeRequested` for Electron to
    * pick up, and answers (or times out to `JudgePolicy.fallback`) via `judgeResult`.

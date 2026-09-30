@@ -249,6 +249,18 @@
         "latestSeq": "number"
       }
     },
+    "setAnalyticsIdentity": {
+      "params": {
+        "deviceId": "string",
+        "apiBaseUrl": "string"
+      },
+      "result": {
+        "ok": true
+      },
+      "errors": [
+        "BAD_REQUEST"
+      ]
+    },
     "listRemovableDrives": {
       "params": null,
       "result": {

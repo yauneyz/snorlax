@@ -337,6 +337,9 @@ export class MockServiceConnection implements ServiceConnection {
         return { transitions, latestSeq: this.usageSeq } as Result<M>;
       }
 
+      case 'setAnalyticsIdentity':
+        return OK;
+
       case 'listRemovableDrives':
         return { drives: MOCK_DRIVES } as Result<M>;
 

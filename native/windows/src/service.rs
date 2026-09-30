@@ -136,6 +136,9 @@ pub async fn serve(pipe_path: String, shutdown: watch::Receiver<bool>) {
         });
     }
 
+    // Once-per-UTC-day DAU-protected ping (the only process up all day to see it).
+    tokio::spawn(crate::core::run_protected_ping(core.clone(), shutdown.clone()));
+
     // Park completely while no judge is pending, then wake exactly at the oldest deadline.
     {
         let core = core.clone();

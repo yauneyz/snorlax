@@ -14,14 +14,15 @@ use rand::RngCore;
 use serde_json::{json, Value};
 use talysman_engine::engine::{Command, Gate, PopupTarget};
 use talysman_engine::{Auth, Ctx, Engine, EngineError, Tick};
-use tokio::sync::broadcast;
+use talysman_common::active_ping;
+use tokio::sync::{broadcast, watch, Mutex};
 
 use crate::constants::{err, PROTOCOL_VERSION, SERVICE_VERSION};
 use crate::enforce::{self, EnforceShared};
 use crate::model::{DefaultAction, FocusSource, PairedKey, Policy, ServiceState, TransitionKind};
 use crate::pairing;
 use crate::secure_store::{KeySecret, SecureStore};
-use crate::state::{local_now, PersistentState};
+use crate::state::{local_now, AnalyticsIdentity, PersistentState};
 use crate::usb;
 
 /// The extension waits 12 seconds, leaving room for this authoritative fallback to arrive first.
@@ -36,6 +37,10 @@ const JUDGE_MAX_CONTENT: usize = 4000;
 /// The engine never wants to sleep longer than an hour; clamp anyway so a clock jump can't
 /// park the schedule task for days.
 const MAX_TICK_DELAY: Duration = Duration::from_secs(60 * 60);
+
+/// How often the DAU-protected ping loop re-checks. Protection is detected from the transition
+/// log, not sampled, so this only bounds how late in the day the ping lands (and retries).
+const PROTECTED_PING_INTERVAL: Duration = Duration::from_secs(5 * 60);
 
 /// A `judgeRequest` awaiting `submitJudgeVerdict`. The judge policy is captured at request time
 /// so the timeout sweep answers with the requesting profile's fallback, and so a verdict computed
@@ -192,6 +197,31 @@ impl Core {
     /// save on its own — every caller persists right after.
     fn record_transition(&mut self, kind: TransitionKind, source: FocusSource) {
         self.state.push_transition(kind, source);
+    }
+
+    /// The DAU-protected ping owed for today, if any: the desktop app has handed over an
+    /// identity, focus was on at some point this UTC day (on now, or a `FocusOn` recorded today),
+    /// and today's ping hasn't been accepted yet.
+    pub fn protected_ping_due(&self) -> Option<(AnalyticsIdentity, String)> {
+        let identity = self.state.analytics.clone()?;
+        let today = utc_date(now_ms());
+        if self.state.last_protected_ping.as_deref() == Some(today.as_str()) {
+            return None;
+        }
+        let protected_today = self.active
+            || self
+                .state
+                .usage_log
+                .iter()
+                .rev()
+                .any(|t| t.kind == TransitionKind::FocusOn && utc_date(t.at) == today);
+        protected_today.then_some((identity, today))
+    }
+
+    /// Record that the server accepted `date`'s ping. Not user-visible, so no `stateChanged`.
+    pub fn mark_protected_ping(&mut self, date: String) {
+        self.state.last_protected_ping = Some(date);
+        self.save();
     }
 
     /// Re-enumerate USB and update the cached presence; emits keyPresenceChanged on a change.
@@ -772,6 +802,20 @@ impl Core {
                     .collect();
                 Ok(json!({ "transitions": transitions, "latestSeq": self.state.usage_seq }))
             }
+            "setAnalyticsIdentity" => {
+                let device_id = str_field(params, "deviceId")?;
+                if !active_ping::is_uuid(&device_id) {
+                    return Err(RpcError::new(err::BAD_REQUEST, "Bad deviceId"));
+                }
+                let origin = active_ping::canonical_origin(&str_field(params, "apiBaseUrl")?)
+                    .ok_or_else(|| RpcError::new(err::BAD_REQUEST, "apiBaseUrl not allowed"))?;
+                let identity = AnalyticsIdentity { device_id, origin };
+                if self.state.analytics.as_ref() != Some(&identity) {
+                    self.state.analytics = Some(identity);
+                    self.save();
+                }
+                Ok(ok())
+            }
             "listRemovableDrives" => {
                 let drives: Vec<Value> = usb::list_removable_drives()
                     .into_iter()
@@ -815,6 +859,35 @@ impl Core {
             )),
         }
     }
+}
+
+/// Send at most one DAU-protected ping per UTC day (see `Core::protected_ping_due`). The HTTP
+/// call runs on a blocking thread with the Core lock released; a failure just retries next pass.
+pub async fn run_protected_ping(core: Arc<Mutex<Core>>, mut shutdown: watch::Receiver<bool>) {
+    loop {
+        let due = core.lock().await.protected_ping_due();
+        if let Some((identity, date)) = due {
+            let sent = tokio::task::spawn_blocking(move || {
+                active_ping::send_protected(&identity.origin, &identity.device_id)
+            })
+            .await;
+            match sent {
+                Ok(Ok(())) => core.lock().await.mark_protected_ping(date),
+                Ok(Err(e)) => tracing::debug!("protected ping failed: {e}"),
+                Err(e) => tracing::debug!("protected ping task failed: {e}"),
+            }
+        }
+        tokio::select! {
+            _ = shutdown.changed() => { if *shutdown.borrow() { break; } }
+            _ = tokio::time::sleep(PROTECTED_PING_INTERVAL) => {}
+        }
+    }
+}
+
+fn utc_date(epoch_ms: u64) -> String {
+    chrono::DateTime::from_timestamp_millis(epoch_ms as i64)
+        .map(|d| d.date_naive().to_string())
+        .unwrap_or_default()
 }
 
 fn ok() -> Value {
@@ -1065,5 +1138,67 @@ mod judge_tests {
         assert!(core.judge_request(&wide).is_ok());
         assert!(core.judge_request(&request("r2")).is_ok());
         assert!(core.judge_request(&request("r2")).is_err());
+    }
+}
+
+#[cfg(test)]
+mod protected_ping_tests {
+    use super::test_support::*;
+    use super::*;
+
+    const DEVICE: &str = "00000000-0000-4000-8000-000000000002";
+
+    fn identify(core: &mut Core) {
+        core.dispatch(
+            "setAnalyticsIdentity",
+            &json!({ "deviceId": DEVICE, "apiBaseUrl": "https://talysman.app" }),
+        )
+        .unwrap_or_else(|_| panic!("identity rejected"));
+    }
+
+    #[test]
+    fn identity_is_validated_and_canonicalized() {
+        let (mut core, _rx) = core_with(Policy::default(), false);
+        let bad_host = json!({ "deviceId": DEVICE, "apiBaseUrl": "https://evil.example" });
+        assert!(core.dispatch("setAnalyticsIdentity", &bad_host).is_err());
+        let bad_id = json!({ "deviceId": "nope", "apiBaseUrl": "https://talysman.app" });
+        assert!(core.dispatch("setAnalyticsIdentity", &bad_id).is_err());
+        identify(&mut core);
+        let identity = core.state.analytics.clone().unwrap();
+        assert_eq!(identity.device_id, DEVICE);
+        assert_eq!(identity.origin, "https://www.talysman.app");
+    }
+
+    #[test]
+    fn nothing_is_due_without_an_identity_or_without_focus_today() {
+        let (core, _rx) = core_with(Policy::default(), true);
+        assert!(core.protected_ping_due().is_none(), "no identity yet");
+
+        let (mut core, _rx) = core_with(Policy::default(), false);
+        identify(&mut core);
+        assert!(core.protected_ping_due().is_none(), "focus never on today");
+    }
+
+    #[test]
+    fn due_once_per_utc_day_while_focus_is_on() {
+        let (mut core, _rx) = core_with(Policy::default(), true);
+        identify(&mut core);
+        let (identity, date) = core.protected_ping_due().expect("focus is on");
+        assert_eq!(identity.device_id, DEVICE);
+        assert_eq!(date, utc_date(now_ms()));
+        core.mark_protected_ping(date);
+        assert!(core.protected_ping_due().is_none(), "already sent today");
+        core.state.last_protected_ping = Some("2000-01-01".into());
+        assert!(core.protected_ping_due().is_some(), "a new day owes a new ping");
+    }
+
+    #[test]
+    fn a_focus_session_earlier_today_counts_after_focus_turned_off() {
+        let (mut core, _rx) = core_with(Policy::default(), false);
+        identify(&mut core);
+        core.state.push_transition(TransitionKind::FocusOn, FocusSource::User);
+        core.state.push_transition(TransitionKind::FocusOff, FocusSource::User);
+        assert!(!core.focus_active());
+        assert!(core.protected_ping_due().is_some());
     }
 }

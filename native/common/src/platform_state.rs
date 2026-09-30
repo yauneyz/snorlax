@@ -62,6 +62,13 @@ pub struct PersistentState {
     /// pruned, so a client's `afterSeq` stays meaningful across a prune.
     #[serde(default)]
     pub usage_seq: u64,
+    /// Analytics identity handed over by the desktop app (`setAnalyticsIdentity`): its
+    /// `device_id` and the already-canonicalized API origin. `None` until the app first runs.
+    #[serde(default)]
+    pub analytics: Option<AnalyticsIdentity>,
+    /// UTC date (`YYYY-MM-DD`) of the last accepted DAU-protected ping. At most one per day.
+    #[serde(default)]
+    pub last_protected_ping: Option<String>,
 
     // ---- v5 fields: read for migration only ----
     #[serde(default, skip_serializing)]
@@ -79,6 +86,13 @@ pub struct PersistentState {
     schedule: Schedule,
 }
 
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AnalyticsIdentity {
+    pub device_id: String,
+    pub origin: String,
+}
+
 impl Default for PersistentState {
     fn default() -> Self {
         PersistentState {
@@ -87,6 +101,8 @@ impl Default for PersistentState {
             paired_keys: Vec::new(),
             usage_log: Vec::new(),
             usage_seq: 0,
+            analytics: None,
+            last_protected_ping: None,
             focus_active: false,
             focus_source: FocusSource::Boot,
             profiles: Vec::new(),
