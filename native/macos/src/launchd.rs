@@ -2,9 +2,18 @@
 
 use std::path::PathBuf;
 use std::process::Command;
+use std::thread::sleep;
+use std::time::{Duration, Instant};
 
 pub const LABEL: &str = "app.talysman.svc";
 pub const PLIST_PATH: &str = "/Library/LaunchDaemons/app.talysman.svc.plist";
+
+/// How long `bootout` waits for launchd to finish tearing the old job down.
+const UNLOAD_TIMEOUT: Duration = Duration::from_secs(15);
+const UNLOAD_POLL: Duration = Duration::from_millis(250);
+/// `bootstrap` attempts before falling back to the legacy `load -w`.
+const BOOTSTRAP_ATTEMPTS: u32 = 3;
+const BOOTSTRAP_RETRY_DELAY: Duration = Duration::from_secs(1);
 
 /// The LaunchDaemon plist. RunAtLoad + KeepAlive make launchd both start the daemon on boot and
 /// restart it if it dies — the launchd counterpart of the systemd unit's Restart=always.
@@ -46,21 +55,43 @@ fn xml_escape(s: &str) -> String {
         .replace('>', "&gt;")
 }
 
-/// Stop and unload the daemon. Best effort: not loaded is not an error.
+/// Whether launchd currently has the daemon's job loaded.
+pub fn is_loaded() -> bool {
+    Command::new("launchctl")
+        .args(["print", &format!("system/{LABEL}")])
+        .output()
+        .map(|out| out.status.success())
+        .unwrap_or(false)
+}
+
+/// Stop and unload the daemon, then wait until launchd has actually dropped the job. `bootout`
+/// can return while the old job is still being torn down, and a `bootstrap` inside that window
+/// fails with "5: Input/output error" -- which would fail the upgrade's reinstall. Best effort:
+/// not loaded is not an error.
 pub fn bootout() {
     let _ = Command::new("launchctl")
         .args(["bootout", &format!("system/{LABEL}")])
         .output();
+    let deadline = Instant::now() + UNLOAD_TIMEOUT;
+    while is_loaded() && Instant::now() < deadline {
+        sleep(UNLOAD_POLL);
+    }
 }
 
-/// Load and start the daemon from the installed plist. Falls back to the legacy `load -w` for
-/// older macOS where `bootstrap` is unavailable.
+/// Load and start the daemon from the installed plist, retrying briefly in case launchd is
+/// still settling after a `bootout`. Falls back to the legacy `load -w` for older macOS where
+/// `bootstrap` is unavailable.
 pub fn bootstrap() -> std::io::Result<bool> {
-    let out = Command::new("launchctl")
-        .args(["bootstrap", "system", PLIST_PATH])
-        .output()?;
-    if out.status.success() {
-        return Ok(true);
+    for attempt in 0..BOOTSTRAP_ATTEMPTS {
+        if attempt > 0 {
+            sleep(BOOTSTRAP_RETRY_DELAY);
+        }
+        let out = Command::new("launchctl")
+            .args(["bootstrap", "system", PLIST_PATH])
+            .output()?;
+        if out.status.success() {
+            return Ok(true);
+        }
     }
     let legacy = Command::new("launchctl")
         .args(["load", "-w", PLIST_PATH])
