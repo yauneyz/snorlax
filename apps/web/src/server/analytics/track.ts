@@ -369,6 +369,44 @@ async function fanoutToPosthog(input: TrackInput): Promise<void> {
  * Upserts tier-2 daily usage rows. Counters are cumulative for the day, so the underlying
  * RPC uses `greatest()` and a replayed or out-of-order batch is a no-op.
  */
+export type ActiveDayKind = "protected" | "ui";
+
+/**
+ * Record that a device was active today (UTC, stamped here, never trusted from the client).
+ * Idempotent: the (device, date, kind) key absorbs client retries. See migration 0015.
+ */
+export async function reportActiveDay(input: {
+  deviceId: string;
+  userId?: string | null;
+  kind: ActiveDayKind;
+  now?: Date;
+}): Promise<void> {
+  try {
+    if (!ingestAllowed()) {
+      noteSkip();
+      return;
+    }
+    const db = supabaseAdmin();
+    // Only worth an identity round trip when there's an account to attach; an unlinked device
+    // still counts, as its own person.
+    if (input.userId) {
+      const identifiers = identifiersFor({ deviceId: input.deviceId, userId: input.userId });
+      const { error } = await db.rpc("analytics_link", { p_identifiers: identifiers });
+      if (error) throw new Error(`analytics_link failed: ${error.message}`);
+    }
+    const utcDate = (input.now ?? new Date()).toISOString().slice(0, 10);
+    const { error } = await db
+      .from("analytics_active_days")
+      .upsert(
+        { device_id: input.deviceId, utc_date: utcDate, kind: input.kind },
+        { onConflict: "device_id,utc_date,kind", ignoreDuplicates: true },
+      );
+    if (error) throw new Error(`analytics_active_days upsert failed: ${error.message}`);
+  } catch (err) {
+    await captureException(err, { scope: "analytics.reportActiveDay", deviceId: input.deviceId });
+  }
+}
+
 export async function reportUsage(input: UsageReport): Promise<void> {
   try {
     if (!ingestAllowed()) {

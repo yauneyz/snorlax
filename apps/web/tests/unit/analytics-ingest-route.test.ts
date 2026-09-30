@@ -5,12 +5,14 @@ import { NextRequest } from "next/server";
 const mocks = vi.hoisted(() => ({
   track: vi.fn().mockResolvedValue(undefined),
   reportUsage: vi.fn().mockResolvedValue(undefined),
+  reportActiveDay: vi.fn().mockResolvedValue(undefined),
   requireBearerUser: vi.fn(),
 }));
 
 vi.mock("@/server/analytics/track", () => ({
   track: mocks.track,
   reportUsage: mocks.reportUsage,
+  reportActiveDay: mocks.reportActiveDay,
 }));
 vi.mock("@/lib/auth/require-bearer-user", () => ({
   UnauthorizedError: class UnauthorizedError extends Error {},
@@ -19,6 +21,7 @@ vi.mock("@/lib/auth/require-bearer-user", () => ({
 
 import { POST as trackPost } from "@/app/api/analytics/track/route";
 import { POST as usagePost } from "@/app/api/analytics/usage/route";
+import { POST as activePost } from "@/app/api/analytics/active/route";
 import {
   attributionFromRequest,
   resetAnalyticsRateLimitsForTests,
@@ -192,6 +195,46 @@ describe("POST /api/analytics/usage", () => {
       }),
     );
     expect(old.status).toBe(400);
+  });
+});
+
+describe("POST /api/analytics/active", () => {
+  it("accepts an anonymous protected ping from the service", async () => {
+    const response = await activePost(
+      request("/api/analytics/active", { device_id: deviceId, kind: "protected" }),
+    );
+    expect(response.status).toBe(202);
+    expect(mocks.requireBearerUser).not.toHaveBeenCalled();
+    expect(mocks.reportActiveDay).toHaveBeenCalledWith({
+      deviceId,
+      userId: null,
+      kind: "protected",
+    });
+  });
+
+  it("links a ui ping to the bearer's account", async () => {
+    mocks.requireBearerUser.mockResolvedValueOnce({ id: "user-1" });
+    const response = await activePost(
+      request(
+        "/api/analytics/active",
+        { device_id: deviceId, kind: "ui" },
+        { authorization: "Bearer token" },
+      ),
+    );
+    expect(response.status).toBe(202);
+    expect(mocks.reportActiveDay).toHaveBeenCalledWith({ deviceId, userId: "user-1", kind: "ui" });
+  });
+
+  it("rejects unknown kinds, client-supplied dates, and bad device ids", async () => {
+    for (const body of [
+      { device_id: deviceId, kind: "opened" },
+      { device_id: deviceId, kind: "ui", utc_date: "2020-01-01" },
+      { device_id: "nope", kind: "ui" },
+    ]) {
+      const response = await activePost(request("/api/analytics/active", body));
+      expect(response.status).toBe(400);
+    }
+    expect(mocks.reportActiveDay).not.toHaveBeenCalled();
   });
 });
 

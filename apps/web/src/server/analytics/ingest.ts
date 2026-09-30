@@ -13,6 +13,7 @@ import type { Attribution, UsageRow } from "@/server/analytics/track";
 export const TRACK_BODY_LIMIT = 8 * 1024;
 export const USAGE_BODY_LIMIT = 32 * 1024;
 export const MAX_USAGE_ROWS = 40;
+export const ACTIVE_BODY_LIMIT = 1024;
 
 const uuid = z.string().uuid();
 const nullablePlatform = analyticsPlatform.optional().nullable();
@@ -62,6 +63,21 @@ const usageBodySchema = z
     rows: z.array(usageRowSchema).min(1).max(MAX_USAGE_ROWS),
   })
   .strict();
+
+const activeBodySchema = z
+  .object({
+    device_id: uuid,
+    kind: z.enum(["protected", "ui"]),
+  })
+  .strict();
+
+export function parseActiveBody(
+  value: unknown,
+): { ok: true; deviceId: string; kind: "protected" | "ui" } | { ok: false; message: string } {
+  const parsed = activeBodySchema.safeParse(value);
+  if (!parsed.success) return { ok: false, message: firstIssue(parsed.error) };
+  return { ok: true, deviceId: parsed.data.device_id, kind: parsed.data.kind };
+}
 
 export type ParsedTrackBody = {
   event: AnalyticsEventName;

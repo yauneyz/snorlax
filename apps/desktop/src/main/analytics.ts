@@ -45,6 +45,8 @@ interface TelemetryState {
   focusSessionsTracked?: number;
   drainUsageSupported?: boolean;
   lastUsageSeq?: number;
+  /** UTC date (`YYYY-MM-DD`) of the last accepted DAU-UI ping — at most one per day. */
+  lastUiPingDate?: string;
 }
 
 interface UsageDay {
@@ -120,6 +122,7 @@ async function loadTelemetry(): Promise<TelemetryState> {
       appInstalledReported: parsed.appInstalledReported ?? false,
       focusSessionsTracked: parsed.focusSessionsTracked ?? 0,
       lastUsageSeq: parsed.lastUsageSeq ?? 0,
+      lastUiPingDate: parsed.lastUiPingDate,
       // drainUsageSupported is intentionally not restored from disk — cached per session only.
     };
   } catch {
@@ -268,8 +271,55 @@ async function saveUsage(data: Record<string, UsageDay>): Promise<void> {
   }
 }
 
+// ---------------------------------------------------------------------------
+// daily active pings — the source of DAU. One boolean per device per UTC day and kind: `ui` from
+// here (this process runs exactly while the UI is open), `protected` from the service, which
+// is the only thing running all day (see native/common/src/active_ping.rs).
+// ---------------------------------------------------------------------------
+
+async function pingUiActiveOncePerDay(): Promise<void> {
+  const today = new Date().toISOString().slice(0, 10);
+  if ((await loadTelemetry()).lastUiPingDate === today) return;
+  const { identity } = await loadDeviceIdentity();
+  try {
+    // Optional, as for usage rows: a token lets the server link this device to the account.
+    const token = await getAccessToken();
+    const res = await fetch(`${config.apiBaseUrl}/api/analytics/active`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: JSON.stringify({ device_id: identity.deviceId, kind: 'ui' }),
+      signal: AbortSignal.timeout(FLUSH_TIMEOUT_MS),
+    });
+    if (!res.ok) return;
+  } catch {
+    return; // retried on the next flush or window open
+  }
+  await chain(async () => {
+    const current = await loadTelemetry();
+    await saveTelemetry({ ...current, lastUiPingDate: today });
+  });
+}
+
+/** Hand the service what it needs for its own daily `protected` ping. Old services lack the
+ * RPC and answer BAD_REQUEST; the service persists the identity, so once per launch is plenty. */
+async function shareAnalyticsIdentity(service: ServiceConnection): Promise<void> {
+  try {
+    const { identity } = await loadDeviceIdentity();
+    await service.request('setAnalyticsIdentity', {
+      deviceId: identity.deviceId,
+      apiBaseUrl: config.apiBaseUrl,
+    });
+  } catch (error) {
+    logger.debug('[analytics] service did not accept the analytics identity', error);
+  }
+}
+
 /** Bump today's observed app-open counter. Superseded by Phase 7 for focus time, not opens. */
 export function recordAppOpen(): void {
+  void pingUiActiveOncePerDay();
   void chain(async () => {
     const usage = await loadUsage();
     const day = localDateString(new Date());
@@ -408,6 +458,8 @@ async function flushUsage(service: ServiceConnection | undefined): Promise<void>
 }
 
 export async function flushNow(service?: ServiceConnection): Promise<void> {
+  // Also here, not only on window open: a window left open across UTC midnight is a new day.
+  void pingUiActiveOncePerDay();
   await flushEvents();
   await flushUsage(service);
 }
@@ -423,6 +475,7 @@ let boundService: ServiceConnection | undefined;
  * to the service events that drive extension_connected / focus_session_completed / app_opens. */
 export function initAnalytics(service: ServiceConnection): void {
   boundService = service;
+  void shareAnalyticsIdentity(service);
   void flushNow(service);
   flushTimer = setInterval(() => void flushNow(boundService), FLUSH_INTERVAL_MS);
 

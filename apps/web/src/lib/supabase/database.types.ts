@@ -5,6 +5,8 @@
  */
 import type {
   ActiveEntitlementRow,
+  AnalyticsActiveDailyRow,
+  AnalyticsActiveDayRow,
   AnalyticsDauRow,
   AnalyticsChannelFunnelRow,
   AnalyticsEngagementDailyRow,
@@ -129,6 +131,13 @@ export type Database = {
         Update: Partial<AnalyticsUsageDailyRow>;
         Relationships: [];
       };
+      analytics_active_days: {
+        Row: AnalyticsActiveDayRow;
+        Insert: Pick<AnalyticsActiveDayRow, "device_id" | "utc_date" | "kind"> &
+          Partial<AnalyticsActiveDayRow>;
+        Update: Partial<AnalyticsActiveDayRow>;
+        Relationships: [];
+      };
       smart_filter_judge_usage: {
         Row: SmartFilterJudgeUsageRow;
         Insert: Pick<SmartFilterJudgeUsageRow, "user_id" | "usage_date"> &
@@ -168,6 +177,22 @@ export type Database = {
       };
       analytics_dev_funnel: {
         Row: AnalyticsFunnelRow;
+        Relationships: [];
+      };
+      analytics_active_resolved: {
+        Row: AnalyticsActiveDayRow & { person_id: string | null };
+        Relationships: [];
+      };
+      analytics_dev_active_resolved: {
+        Row: AnalyticsActiveDayRow & { person_id: string | null };
+        Relationships: [];
+      };
+      analytics_active_daily: {
+        Row: AnalyticsActiveDailyRow;
+        Relationships: [];
+      };
+      analytics_dev_active_daily: {
+        Row: AnalyticsActiveDailyRow;
         Relationships: [];
       };
       analytics_dau: {

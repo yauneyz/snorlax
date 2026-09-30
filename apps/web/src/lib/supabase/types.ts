@@ -220,7 +220,25 @@ export type AnalyticsFunnelRow = {
   canceled_at: string | null;
 };
 
-/** Daily active users. `dau_protected` (focus_seconds >= 60) is the headline metric. */
+/** One device active on one UTC day (migration 0015): the raw source of DAU. */
+export type AnalyticsActiveDayRow = {
+  device_id: string;
+  utc_date: string;
+  kind: "protected" | "ui";
+  reported_at: string;
+};
+
+/** DAU in people per UTC day. `dau_protected` (focus on at any point that day) is the headline. */
+export type AnalyticsActiveDailyRow = {
+  utc_date: string;
+  dau_protected: number;
+  dau_ui: number;
+  mau_protected: number;
+  installed_base_30d: number;
+};
+
+/** Per-local-date usage rollup. Its dau_* columns predate analytics_active_daily; DAU panels
+ * read that instead. */
 export type AnalyticsDauRow = {
   local_date: string;
   devices_reporting: number;

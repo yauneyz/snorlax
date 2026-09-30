@@ -80,4 +80,42 @@ mod tests {
         assert_eq!(canonical_origin("http://localhost.evil.example"), None);
         assert_eq!(canonical_origin(""), None);
     }
+
+    /// Serve one request on a loopback port with `status`, returning the raw request text.
+    fn serve_once(status: &'static str) -> (String, std::thread::JoinHandle<String>) {
+        use std::io::{Read, Write};
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let origin = format!("http://{}", listener.local_addr().unwrap());
+        let handle = std::thread::spawn(move || {
+            let (mut stream, _) = listener.accept().unwrap();
+            let mut buf = vec![0u8; 4096];
+            let n = stream.read(&mut buf).unwrap();
+            let mut request = String::from_utf8_lossy(&buf[..n]).to_string();
+            if !request.contains("\"kind\"") {
+                let n = stream.read(&mut buf).unwrap();
+                request.push_str(&String::from_utf8_lossy(&buf[..n]));
+            }
+            write!(stream, "HTTP/1.1 {status}\r\ncontent-length: 0\r\nconnection: close\r\n\r\n").unwrap();
+            request
+        });
+        (origin, handle)
+    }
+
+    #[test]
+    fn posts_the_device_and_kind_as_json() {
+        let (origin, server) = serve_once("202 Accepted");
+        send_protected(&origin, "00000000-0000-4000-8000-000000000002").unwrap();
+        let request = server.join().unwrap();
+        assert!(request.starts_with("POST /api/analytics/active "), "{request}");
+        assert!(request.to_ascii_lowercase().contains("content-type: application/json"));
+        assert!(request.contains(r#""device_id":"00000000-0000-4000-8000-000000000002""#));
+        assert!(request.contains(r#""kind":"protected""#));
+    }
+
+    #[test]
+    fn a_rejected_ping_is_an_error_so_it_retries() {
+        let (origin, server) = serve_once("400 Bad Request");
+        assert!(send_protected(&origin, "00000000-0000-4000-8000-000000000002").is_err());
+        server.join().unwrap();
+    }
 }

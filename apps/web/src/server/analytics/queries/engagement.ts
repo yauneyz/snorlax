@@ -1,6 +1,6 @@
 import "server-only";
 import { cache } from "react";
-import type { AnalyticsEngagementDailyRow } from "@/lib/supabase/types";
+import type { AnalyticsActiveDailyRow, AnalyticsEngagementDailyRow } from "@/lib/supabase/types";
 import { audienceView, type AnalyticsAudience } from "@/server/analytics/audience";
 import type { AnalyticsTarget } from "@/server/analytics/db";
 import { fetchProdSummary, pickSection } from "@/server/analytics/summary-client";
@@ -23,11 +23,24 @@ export const queryEngagementFromDb = cache(
     }),
 );
 
-function toSummary(rows: AnalyticsEngagementDailyRow[]): EngagementSummary {
-  const latest = rows[0];
-  if (!latest) return { activeUsers: null, engagement: null };
+/** DAU from the once-per-UTC-day pings (migration 0015). Always queries Supabase directly. */
+export const queryActiveUsersFromDb = cache(
+  async (target: AnalyticsTarget, audience: AnalyticsAudience = "prod") =>
+    withAnalyticsTarget<AnalyticsActiveDailyRow[]>(target, async (db) => {
+      const { data, error } = await db
+        .from(audienceView(audience, "analytics_active_daily", "analytics_dev_active_daily"))
+        .select("*")
+        .order("utc_date", { ascending: false })
+        .limit(90);
+      if (error) throw queryError(error.message);
+      return data ?? [];
+    }),
+);
 
-  const activeUsers: ActiveUsersMetrics = {
+export function toActiveUsers(rows: AnalyticsActiveDailyRow[]): ActiveUsersMetrics | null {
+  const latest = rows[0];
+  if (!latest) return null;
+  return {
     dauProtected: latest.dau_protected,
     dauUi: latest.dau_ui,
     mauProtected: latest.mau_protected,
@@ -35,16 +48,20 @@ function toSummary(rows: AnalyticsEngagementDailyRow[]): EngagementSummary {
     series: rows
       .slice(0, 14)
       .reverse()
-      .map((row) => ({ date: row.local_date, dauProtected: row.dau_protected })),
+      .map((row) => ({ date: row.utc_date, dauProtected: row.dau_protected })),
   };
-  const engagement: EngagementMetrics = {
+}
+
+export function toEngagement(rows: AnalyticsEngagementDailyRow[]): EngagementMetrics | null {
+  const latest = rows[0];
+  if (!latest) return null;
+  return {
     medianFocusMinutes: latest.median_focus_minutes ?? 0,
     scheduledFocusHours: latest.scheduled_focus_hours ?? 0,
     manualFocusHours: latest.manual_focus_hours ?? 0,
     sessionsCompleted: latest.sessions_completed ?? 0,
     sessionsAborted: latest.sessions_aborted ?? 0,
   };
-  return { activeUsers, engagement };
 }
 
 /**
@@ -66,7 +83,15 @@ export const queryEngagement = cache(
       if (!engagement.ok) return engagement;
       return { ok: true, rows: { activeUsers: activeUsers.rows, engagement: engagement.rows } };
     }
-    const result = await queryEngagementFromDb(target, audience);
-    return result.ok ? { ok: true, rows: toSummary(result.rows) } : result;
+    const [active, engagement] = await Promise.all([
+      queryActiveUsersFromDb(target, audience),
+      queryEngagementFromDb(target, audience),
+    ]);
+    if (!active.ok) return active;
+    if (!engagement.ok) return engagement;
+    return {
+      ok: true,
+      rows: { activeUsers: toActiveUsers(active.rows), engagement: toEngagement(engagement.rows) },
+    };
   },
 );

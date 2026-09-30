@@ -2,7 +2,12 @@ import "server-only";
 import { NextRequest, NextResponse } from "next/server";
 import { config } from "@/lib/config";
 import { queryChannelsFromDb } from "@/server/analytics/queries/channels";
-import { queryEngagementFromDb } from "@/server/analytics/queries/engagement";
+import {
+  queryActiveUsersFromDb,
+  queryEngagementFromDb,
+  toActiveUsers,
+  toEngagement,
+} from "@/server/analytics/queries/engagement";
 import { queryFunnelFromDb } from "@/server/analytics/queries/funnel";
 import { retentionPct } from "@/server/analytics/queries/helpers";
 import { queryInstallHealthFromDb } from "@/server/analytics/queries/install-health";
@@ -43,17 +48,27 @@ export async function GET(request: NextRequest) {
   // Always the raw *FromDb queries — never the branching queryX() used by /insights, which
   // for target="prod" would call back into this very route.
   const target = "prod" as const;
-  const [funnel, engagement, revenue, retention, installHealth, channels, visitorBreakdown, pmf] =
-    await Promise.all([
-      queryFunnelFromDb(target),
-      queryEngagementFromDb(target),
-      queryRevenueFromDb(target),
-      queryRetentionFromDb(target),
-      queryInstallHealthFromDb(target),
-      queryChannelsFromDb(target),
-      queryVisitorBreakdownFromDb(target),
-      queryPmf(target),
-    ]);
+  const [
+    funnel,
+    activeUsers,
+    engagement,
+    revenue,
+    retention,
+    installHealth,
+    channels,
+    visitorBreakdown,
+    pmf,
+  ] = await Promise.all([
+    queryFunnelFromDb(target),
+    queryActiveUsersFromDb(target),
+    queryEngagementFromDb(target),
+    queryRevenueFromDb(target),
+    queryRetentionFromDb(target),
+    queryInstallHealthFromDb(target),
+    queryChannelsFromDb(target),
+    queryVisitorBreakdownFromDb(target),
+    queryPmf(target),
+  ]);
 
   const body = {
     generatedAt: new Date().toISOString(),
@@ -75,34 +90,9 @@ export async function GET(request: NextRequest) {
         : null,
     ),
 
-    activeUsers: section(engagement, (rows) => {
-      const latest = rows[0];
-      return latest
-        ? {
-            dauProtected: latest.dau_protected,
-            dauUi: latest.dau_ui,
-            mauProtected: latest.mau_protected,
-            installedBase30d: latest.installed_base_30d,
-            series: rows
-              .slice(0, 14)
-              .reverse()
-              .map((row) => ({ date: row.local_date, dauProtected: row.dau_protected })),
-          }
-        : null;
-    }),
+    activeUsers: section(activeUsers, toActiveUsers),
 
-    engagement: section(engagement, (rows) => {
-      const latest = rows[0];
-      return latest
-        ? {
-            medianFocusMinutes: latest.median_focus_minutes ?? 0,
-            scheduledFocusHours: latest.scheduled_focus_hours ?? 0,
-            manualFocusHours: latest.manual_focus_hours ?? 0,
-            sessionsCompleted: latest.sessions_completed ?? 0,
-            sessionsAborted: latest.sessions_aborted ?? 0,
-          }
-        : null;
-    }),
+    engagement: section(engagement, toEngagement),
 
     revenue: section(revenue, (row) =>
       row

@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   rpc: vi.fn(),
   insert: vi.fn(),
+  upsert: vi.fn(),
   captureException: vi.fn(),
   posthogCapture: vi.fn(),
   posthogFlush: vi.fn(),
@@ -13,7 +14,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock("@/lib/supabase/admin", () => ({
   supabaseAdmin: () => ({
     rpc: mocks.rpc,
-    from: () => ({ insert: mocks.insert }),
+    from: () => ({ insert: mocks.insert, upsert: mocks.upsert }),
   }),
 }));
 vi.mock("@/lib/sentry", () => ({ captureException: mocks.captureException }));
@@ -25,6 +26,7 @@ import {
   clampOccurredAt,
   deriveIdempotencyKey,
   ingestAllowed,
+  reportActiveDay,
   reportUsage,
   track,
 } from "@/server/analytics/track";
@@ -33,6 +35,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   mocks.rpc.mockResolvedValue({ data: "person-1", error: null });
   mocks.insert.mockResolvedValue({ error: null });
+  mocks.upsert.mockResolvedValue({ error: null });
   mocks.getPosthogServer.mockReturnValue(null);
   mocks.posthogFlush.mockResolvedValue(undefined);
 });
@@ -260,6 +263,34 @@ describe("reportUsage", () => {
   it("never throws when the rpc fails", async () => {
     mocks.rpc.mockResolvedValue({ data: null, error: { message: "boom" } });
     await expect(reportUsage({ deviceId: "d1", rows: [row] })).resolves.toBeUndefined();
+    expect(mocks.captureException).toHaveBeenCalled();
+  });
+});
+
+describe("reportActiveDay", () => {
+  // 23:30 in UTC-7 is already the next day in UTC; the server's UTC date is what counts.
+  const now = new Date("2026-09-30T06:30:00.000Z");
+
+  it("stamps the server's UTC date and lets the primary key absorb retries", async () => {
+    await reportActiveDay({ deviceId: "d1", kind: "protected", now });
+    expect(mocks.rpc).not.toHaveBeenCalled();
+    expect(mocks.upsert).toHaveBeenCalledWith(
+      { device_id: "d1", utc_date: "2026-09-30", kind: "protected" },
+      { onConflict: "device_id,utc_date,kind", ignoreDuplicates: true },
+    );
+  });
+
+  it("links the device to the account when there is one", async () => {
+    await reportActiveDay({ deviceId: "d1", userId: "u1", kind: "ui", now });
+    expect(mocks.rpc).toHaveBeenCalledWith("analytics_link", {
+      p_identifiers: ["device:d1", "user:u1"],
+    });
+    expect(mocks.upsert).toHaveBeenCalled();
+  });
+
+  it("never throws on a database failure", async () => {
+    mocks.upsert.mockResolvedValue({ error: { message: "boom" } });
+    await expect(reportActiveDay({ deviceId: "d1", kind: "ui", now })).resolves.toBeUndefined();
     expect(mocks.captureException).toHaveBeenCalled();
   });
 });

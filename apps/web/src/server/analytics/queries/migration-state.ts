@@ -10,6 +10,7 @@ const EXPECTED_ANALYTICS_TABLES = [
   "analytics_usage_daily",
   "analytics_ignored_users",
   "analytics_ignored_persons",
+  "analytics_active_days",
 ] as const;
 
 const EXPECTED_ANALYTICS_VIEWS = [
@@ -35,6 +36,10 @@ const EXPECTED_ANALYTICS_VIEWS = [
   "analytics_dev_retention_cohorts",
   "analytics_dev_install_health",
   "analytics_dev_revenue_summary",
+  "analytics_active_resolved",
+  "analytics_active_daily",
+  "analytics_dev_active_resolved",
+  "analytics_dev_active_daily",
 ] as const;
 
 export const EXPECTED_ANALYTICS_RELATIONS = [
