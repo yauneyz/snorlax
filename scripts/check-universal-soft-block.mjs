@@ -56,16 +56,18 @@ try {
   // React replacing the nodes with identical markup must rebind the cached IDs locally.
   await page.evaluate((markup) => { document.querySelector('#related').outerHTML = markup; }, recommendations);
   await page.waitForFunction(() => getComputedStyle(document.querySelector('#related')).display === 'none');
-  assert.equal(await page.evaluate(() => universalRequests.length), 1);
-  // A newly added protected form invalidates a learned hide immediately on the next scan.
-  await page.evaluate(() => document.querySelector('#related').insertAdjacentHTML('beforeend', '<form><input type="search"></form>'));
-  await page.waitForFunction(() => getComputedStyle(document.querySelector('#related')).display !== 'none');
+  // Hidden regions drop out of later summaries, so a follow-up request may be outstanding; it
+  // must not include the hidden aside.
+  assert(await page.evaluate(() => universalRequests.slice(1).every((r) => !r.content.includes('"related"'))));
+  // A feed region may hold video and forms; only the page shell and navigation are off limits.
+  const summaryRegions = await page.evaluate(() => JSON.parse(universalRequests[0].content).regions);
+  assert(!summaryRegions.some((r) => r.tag === 'body' || r.tag === 'header'));
   // Disabled rules restore all hidden elements, including while a request is outstanding.
   await page.evaluate(() => universalListeners.forEach((fn) => fn({ type: 'talysman:universal-policy', enabled: false })));
   assert.equal(await page.locator('#related').isVisible(), true);
   assert.equal(await page.locator('#story').isVisible(), true);
   assert.deepEqual(errors, []);
-  console.log('OK Universal browser checks: normal page load, bounded extraction excluding form values and article prose, delayed hiding, primary content preservation, DOM replacement, guard invalidation, and disable cleanup.');
+  console.log('OK Universal browser checks: normal page load, bounded extraction excluding form values and article prose, delayed hiding, primary content preservation, DOM replacement, shell/navigation exclusion, and disable cleanup.');
 } finally {
   await browser.close();
 }

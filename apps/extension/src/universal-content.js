@@ -13,8 +13,9 @@ let universalLastContent = '';
 let universalUrl = location.href;
 let universalRetryAt = 0;
 let universalFailures = 0;
+// Hides learned on this route accumulate: hidden regions drop out of later snapshots, so a
+// later answer that omits them is not a vote to show them again.
 let universalLearned = [];
-let universalRegionIds = [];
 const universalHidden = new Map();
 const universalMarker = `data-talysman-universal-${Math.random().toString(36).slice(2)}`;
 let universalStyle = null;
@@ -27,7 +28,7 @@ function universalRestore() {
 }
 
 function universalApply() {
-  const wanted = new Set(universalLearned.flatMap(universalMatchingNodes));
+  const wanted = new Set(universalLearned.flatMap((entry) => universalMatchingNodes(entry, document)));
   for (const node of universalHidden.keys()) {
     if (!wanted.has(node)) {
       node.removeAttribute(universalMarker);
@@ -69,17 +70,13 @@ async function universalScan() {
   if (document.visibilityState === 'hidden') { universalDebug('scan skipped: hidden'); return; }
   let snapshot;
   try {
-    snapshot = universalSnapshot(document);
+    snapshot = universalSnapshot(document, (node) => node.hasAttribute(universalMarker));
   } catch (error) {
     console.warn('[talysman] universal snapshot failed', error);
     return;
   }
   universalDebug('snapshot', { nodes: snapshot.nodes.length, chars: snapshot.content.length, same: snapshot.content === universalLastContent });
-  if (snapshot.content === universalLastContent) {
-    universalLearned = universalRegionIds.filter((id) => snapshot.nodes[id]).map((id) => snapshot.nodes[id]);
-    universalApply();
-    return;
-  }
+  if (snapshot.content === universalLastContent) return;
   if (snapshot.nodes.length === 0) return;
   const epoch = universalEpoch;
   const url = location.href;
@@ -95,12 +92,15 @@ async function universalScan() {
       return;
     }
     if (!Array.isArray(reply?.regions)) throw new Error('Classification unavailable');
-    if (universalSnapshot(document).content !== snapshot.content) { universalDebug('result discarded: DOM changed during classification'); universalDirty = true; return; }
     universalFailures = 0;
     universalRetryAt = 0;
     universalLastContent = snapshot.content;
-    universalRegionIds = reply.regions;
-    universalLearned = reply.regions.filter((id) => Number.isInteger(id) && snapshot.nodes[id]).map((id) => snapshot.nodes[id]);
+    // IDs index this snapshot's nodes; they stay valid while those nodes are attached, and the
+    // signature rebinds them after a re-render.
+    for (const id of reply.regions) {
+      const entry = Number.isInteger(id) ? snapshot.nodes[id] : undefined;
+      if (entry && !universalLearned.some((known) => known.node === entry.node)) universalLearned.push(entry);
+    }
     universalApply();
     universalDebug('applied', { regions: reply.regions, learned: universalLearned.length, hidden: universalHidden.size });
   } catch (error) {

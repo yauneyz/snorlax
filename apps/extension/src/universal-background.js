@@ -59,9 +59,13 @@ export function createUniversalClassifier({ api, eligible, sendNative }) {
       return true;
     },
     async classify(message, sender) {
-      const url = sender.url;
-      debug('classify request', { frameId: sender.frameId, tab: Boolean(sender.tab), senderUrl: url, messageUrl: message.url, eligible: Boolean(url && eligible(url)), chars: message.content?.length });
-      if (sender.frameId !== 0 || !sender.tab || !url || message.url !== url || !eligible(url)) return { disabled: true };
+      // Firefox keeps sender.url at the document's load URL across pushState (x.com/ → x.com/home),
+      // so trust the content script's current URL only within the sender's origin.
+      const url = typeof message.url === 'string' ? message.url : '';
+      let sameOrigin = false;
+      try { sameOrigin = new URL(url).origin === new URL(sender.url).origin; } catch { /* invalid URL */ }
+      debug('classify request', { frameId: sender.frameId, tab: Boolean(sender.tab), senderUrl: sender.url, messageUrl: url, sameOrigin, eligible: Boolean(sameOrigin && eligible(url)), chars: message.content?.length });
+      if (sender.frameId !== 0 || !sender.tab || !sameOrigin || !eligible(url)) return { disabled: true };
       if (typeof message.content !== 'string' || message.content.length > 24000 || url.length > 4096) return null;
       let summary;
       try { summary = JSON.parse(message.content); } catch { return null; }

@@ -177,6 +177,7 @@ function authHeaders(value: AiConnection): Record<string, string> {
 export async function completeAiChat(
   messages: Array<{ role: 'system' | 'user'; content: string }>,
   timeoutMs = TIMEOUT_MS,
+  options: { temperature?: number } = {},
 ): Promise<string> {
   try {
     const value = await load();
@@ -187,7 +188,7 @@ export async function completeAiChat(
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...authHeaders(value) },
       body: JSON.stringify({
-        model, messages, stream: false,
+        model, messages, stream: false, ...options,
         ...(value.endpoint === LOCAL_ENDPOINT ? { chat_template_kwargs: { enable_thinking: false } } : {}),
       }),
       signal,

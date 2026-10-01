@@ -100,7 +100,8 @@ async function handleJudgeRequested(service: ServiceConnection, request: JudgeRe
       const raw = await completeAiChat([
         { role: 'system', content: UNIVERSAL_SYSTEM_PROMPT },
         { role: 'user', content: request.content },
-      ], 22_000);
+      // Deterministic answers keep the same layout from flapping between hide sets.
+      ], 22_000, { temperature: 0 });
       logger.info(`[universal] raw reply ${request.requestId}: ${raw.slice(0, 300)}`);
       const regions = parseUniversalRegions(raw, request.content);
       logger.info(`[universal] submitting ${regions.length} region(s) for ${request.requestId}`);

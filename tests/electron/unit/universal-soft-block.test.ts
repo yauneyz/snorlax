@@ -45,7 +45,12 @@ describe('universal precedence', () => {
 it('validates model output against the supplied nodes', () => {
   expect(parseUniversalRegions('{"regions":[0,0]}', content)).toEqual([0]);
   expect(parseUniversalRegions('{"regions":[]}', content)).toEqual([]);
-  for (const raw of ['{"regions":[999]}', '{"regions":["aside"]}', '{"selectors":["body"]}', 'null']) {
+  expect(parseUniversalRegions('```json\n{"hide":[{"id":0,"kind":"rail"}]}\n```', content)).toEqual([0]);
+  expect(parseUniversalRegions('{"hide":[]}', content)).toEqual([]);
+  // A picked sidebar that holds the search box is dropped in favour of its finer picks.
+  const sidebar = JSON.stringify({ regions: [{ id: 0, contains: { editor: true } }, { id: 1, parent: 0, contains: { editor: false } }, { id: 2, contains: { editor: true } }] });
+  expect(parseUniversalRegions('{"hide":[{"id":0},{"id":1},{"id":2}]}', sidebar)).toEqual([1, 2]);
+  for (const raw of ['{"regions":[999]}', '{"hide":[{"id":7}]}', '{"hide":[{"kind":"feed"}]}', '{"regions":["aside"]}', '{"selectors":["body"]}', 'null']) {
     expect(() => parseUniversalRegions(raw, content)).toThrow();
   }
 });
@@ -80,6 +85,12 @@ it('rejects frames, mismatched URLs and oversized summaries before sending conte
   const { classifier, sendNative } = setup();
   expect(await classifier.classify(request, { ...sender, frameId: 1 })).toEqual({ disabled: true });
   expect(await classifier.classify({ ...request, url: 'https://other.test' }, sender)).toEqual({ disabled: true });
+  // Firefox reports the load URL after pushState; same-origin routes are still classified.
+  const routed = classifier.classify({ ...request, url: 'https://www.youtube.com/feed' }, sender);
+  await vi.waitFor(() => expect(sendNative).toHaveBeenCalledTimes(1));
+  classifier.invalidate();
+  expect(await routed).toBeNull();
+  sendNative.mockClear();
   expect(await classifier.classify({ ...request, content: 'x'.repeat(24001) }, sender)).toBeNull();
   expect(sendNative).not.toHaveBeenCalled();
 });
