@@ -82,6 +82,11 @@ export function SiteRules({
 }) {
   const sites = policy.sites ?? {};
   const listed = useListedSites(policy);
+  const isLocalRelease = useFocusStore((s) => s.isLocalRelease);
+  const appEnv = useFocusStore((s) => s.appEnv);
+  // Universal soft block isn't ready to ship: dev and `release:local` builds only, plus any
+  // install where it's already on so it can be turned off.
+  const universalOffered = siteAudiences(isLocalRelease, appEnv).has('local-release') || Boolean(policy.universalSoftBlock);
   // Start on the first site that's on, so opening the section shows something to edit.
   const [selectedId, setSelectedId] = useState<string | null>(
     () => listed.find((site) => sites[site.id])?.id ?? listed[0]?.id ?? null,
@@ -140,22 +145,24 @@ export function SiteRules({
 
   return (
     <>
-      <div className="mb-4 flex items-center gap-4 rounded-[10px] border border-white/[0.10] p-4">
-        <div className="min-w-0 flex-1">
-          <p className="text-[14px] font-semibold text-slate-100">Universal soft block <span className="text-[11px] text-slate-450">Experimental</span></p>
-          <p className="mt-1 text-[12px] text-slate-400">After pages load, use AI to hide feeds, recommendations, and other distractions on sites without an enabled soft block. Learns each site independently.</p>
-          <p className="mt-1 text-[11px] text-slate-450">Sends a compact page structure and short labels to your AI connection. Requires AI mode in Settings.{policy.universalSoftBlock && !aiMode ? ' Paused while AI mode is off.' : ''}</p>
+      {universalOffered && (
+        <div className="mb-4 flex items-center gap-4 rounded-[10px] border border-white/[0.10] p-4">
+          <div className="min-w-0 flex-1">
+            <p className="text-[14px] font-semibold text-slate-100">Universal soft block <span className="text-[11px] text-slate-450">Experimental</span></p>
+            <p className="mt-1 text-[12px] text-slate-400">After pages load, use AI to hide feeds, recommendations, and other distractions on sites without an enabled soft block. Learns each site independently.</p>
+            <p className="mt-1 text-[11px] text-slate-450">Sends a compact page structure and short labels to your AI connection. Requires AI mode in Settings.{policy.universalSoftBlock && !aiMode ? ' Paused while AI mode is off.' : ''}</p>
+          </div>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={Boolean(policy.universalSoftBlock)}
+            aria-label="Universal soft block"
+            onClick={() => onSave({ ...policy, universalSoftBlock: !policy.universalSoftBlock })}
+          >
+            <Switch on={Boolean(policy.universalSoftBlock)} />
+          </button>
         </div>
-        <button
-          type="button"
-          role="switch"
-          aria-checked={Boolean(policy.universalSoftBlock)}
-          aria-label="Universal soft block"
-          onClick={() => onSave({ ...policy, universalSoftBlock: !policy.universalSoftBlock })}
-        >
-          <Switch on={Boolean(policy.universalSoftBlock)} />
-        </button>
-      </div>
+      )}
     <div className="grid grid-cols-[200px_minmax(0,1fr)] gap-4">
       <ul className="flex flex-col gap-0.5 border-r border-white/[0.06] pr-3">
         {listed.map((site) => {
