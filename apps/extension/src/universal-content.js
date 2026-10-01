@@ -67,7 +67,13 @@ async function universalScan() {
   universalApply();
   if (universalBusy) { universalDirty = true; return; }
   if (document.visibilityState === 'hidden') { universalDebug('scan skipped: hidden'); return; }
-  const snapshot = universalSnapshot(document);
+  let snapshot;
+  try {
+    snapshot = universalSnapshot(document);
+  } catch (error) {
+    console.warn('[talysman] universal snapshot failed', error);
+    return;
+  }
   universalDebug('snapshot', { nodes: snapshot.nodes.length, chars: snapshot.content.length, same: snapshot.content === universalLastContent });
   if (snapshot.content === universalLastContent) {
     universalLearned = universalRegionIds.filter((id) => snapshot.nodes[id]).map((id) => snapshot.nodes[id]);

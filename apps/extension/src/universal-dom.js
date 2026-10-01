@@ -72,10 +72,14 @@ export function universalSnapshot(doc) {
   const walker = doc.createTreeWalker(doc.body, 1 /* SHOW_ELEMENT */);
   let visited = 0;
   const url = new URL(doc.URL);
+  // Firefox content scripts see the page's URLSearchParams through Xrays; its iterators aren't
+  // iterable there, so collect keys with forEach.
+  const queryKeys = new Set();
+  url.searchParams.forEach((_, key) => queryKeys.add(key));
   const context = {
     // Query values and arbitrary URL slugs are not transmitted. Route words aid disambiguation.
     route: url.pathname.split('/').filter(Boolean).map((part) => /^[a-z_-]{1,24}$/i.test(part) ? part : ':item').slice(0, 6),
-    queryKeys: [...new Set(url.searchParams.keys())].slice(0, 8).map((key) => universalText(key, 32)),
+    queryKeys: [...queryKeys].slice(0, 8).map((key) => universalText(key, 32)),
     heading: universalText(doc.querySelector('h1')?.textContent),
     hasSearch: Boolean(doc.querySelector('input[type="search"], [role="search"]')),
   };
