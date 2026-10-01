@@ -4,6 +4,8 @@ export function universalEligible(policy, decision) {
 }
 
 export function createUniversalClassifier({ api, eligible, sendNative }) {
+  // DEBUG(universal): temporary instrumentation.
+  const debug = (...args) => console.info('[talysman:universal]', ...args);
   const pending = new Map();
   const flights = new Map();
   const cache = new Map();
@@ -41,6 +43,7 @@ export function createUniversalClassifier({ api, eligible, sendNative }) {
     result(message) {
       const request = pending.get(message.requestId);
       if (!request) return false;
+      debug('native result', message);
       const regions = message.regions;
       if (request.generation !== generation || !Array.isArray(regions) || regions.length > 80
         || regions.some((id) => !Number.isInteger(id) || !request.ids.has(id))) {
@@ -57,6 +60,7 @@ export function createUniversalClassifier({ api, eligible, sendNative }) {
     },
     async classify(message, sender) {
       const url = sender.url;
+      debug('classify request', { frameId: sender.frameId, tab: Boolean(sender.tab), senderUrl: url, messageUrl: message.url, eligible: Boolean(url && eligible(url)), chars: message.content?.length });
       if (sender.frameId !== 0 || !sender.tab || !url || message.url !== url || !eligible(url)) return { disabled: true };
       if (typeof message.content !== 'string' || message.content.length > 24000 || url.length > 4096) return null;
       let summary;
@@ -73,16 +77,18 @@ export function createUniversalClassifier({ api, eligible, sendNative }) {
       await ready;
       if (started !== generation || !eligible(url)) return { disabled: true };
       const hit = cache.get(key);
-      if (hit?.expires > Date.now()) return { regions: hit.regions };
+      if (hit?.expires > Date.now()) { debug('cache hit', hit.regions); return { regions: hit.regions }; }
       if (flights.has(key)) return flights.get(key);
-      if (pending.size >= 4) return null;
+      if (pending.size >= 4) { debug('dropped: 4 requests pending'); return null; }
       const requestId = `universal-${crypto.randomUUID()}`;
       const result = new Promise((resolve) => {
         const timer = setTimeout(() => finish(requestId, null), 30_000);
         pending.set(requestId, { resolve, timer, key, ids, generation });
         try {
-          if (!sendNative({ type: 'judge-request', purpose: 'universal', requestId, url, title: '', content: message.content })) finish(requestId, null);
-        } catch { finish(requestId, null); }
+          const sent = sendNative({ type: 'judge-request', purpose: 'universal', requestId, url, title: '', content: message.content });
+          debug('sent to native', requestId, { sent });
+          if (!sent) finish(requestId, null);
+        } catch (error) { debug('sendNative threw', String(error)); finish(requestId, null); }
       });
       flights.set(key, result);
       try { return await result; }

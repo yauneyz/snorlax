@@ -403,6 +403,8 @@ const universalClassifier = createUniversalClassifier({
 
 browserApi.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message?.type === 'talysman:universal-policy') {
+    // DEBUG(universal): temporary instrumentation.
+    console.info('[talysman:universal] policy query', { url: sender.url, frameId: sender.frameId, active: currentPolicy.active, universalSoftBlock: currentPolicy.universalSoftBlock, decision: decide(currentPolicy, sender.url) });
     sendResponse({ enabled: sender.frameId === 0 && universalAllowed(sender.url) });
     return false;
   }

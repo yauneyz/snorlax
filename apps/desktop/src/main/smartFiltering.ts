@@ -94,12 +94,16 @@ async function handleJudgeRequested(service: ServiceConnection, request: JudgeRe
     return;
   }
   if (request.purpose === 'universal') {
+    // DEBUG(universal): temporary instrumentation.
+    logger.info(`[universal] request ${request.requestId} ${request.url} (${request.content.length} chars)`);
     try {
       const raw = await completeAiChat([
         { role: 'system', content: UNIVERSAL_SYSTEM_PROMPT },
         { role: 'user', content: request.content },
       ], 22_000);
+      logger.info(`[universal] raw reply ${request.requestId}: ${raw.slice(0, 300)}`);
       const regions = parseUniversalRegions(raw, request.content);
+      logger.info(`[universal] submitting ${regions.length} region(s) for ${request.requestId}`);
       await service.request('submitJudgeVerdict', { requestId: request.requestId, verdict: 'allow', reason: '', regions });
     } catch (error) {
       // The daemon's bounded timeout leaves unknown regions visible. Never cache a failed call.

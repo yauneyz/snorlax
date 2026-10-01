@@ -1,6 +1,8 @@
 import { universalSnapshot, universalMatchingNodes } from './universal-dom.js';
 
 const universalApi = globalThis.chrome || globalThis.browser;
+// DEBUG(universal): temporary instrumentation.
+const universalDebug = (...args) => console.info('[talysman:universal]', ...args);
 let universalEnabled = false;
 let universalEpoch = 0;
 let universalTimer = null;
@@ -53,7 +55,7 @@ function universalSchedule() {
 }
 
 async function universalScan() {
-  if (!universalEnabled || document.readyState !== 'complete') return;
+  if (!universalEnabled || document.readyState !== 'complete') { universalDebug('scan skipped', { enabled: universalEnabled, readyState: document.readyState }); return; }
   if (location.href !== universalUrl) {
     universalUrl = location.href;
     universalEpoch++;
@@ -64,8 +66,9 @@ async function universalScan() {
   }
   universalApply();
   if (universalBusy) { universalDirty = true; return; }
-  if (document.visibilityState === 'hidden') return;
+  if (document.visibilityState === 'hidden') { universalDebug('scan skipped: hidden'); return; }
   const snapshot = universalSnapshot(document);
+  universalDebug('snapshot', { nodes: snapshot.nodes.length, chars: snapshot.content.length, same: snapshot.content === universalLastContent });
   if (snapshot.content === universalLastContent) {
     universalLearned = universalRegionIds.filter((id) => snapshot.nodes[id]).map((id) => snapshot.nodes[id]);
     universalApply();
@@ -76,21 +79,26 @@ async function universalScan() {
   const url = location.href;
   universalBusy = true;
   try {
+    universalDebug('classify ->', url);
+    const started = Date.now();
     const reply = await universalApi.runtime.sendMessage({ type: 'talysman:universal-classify', url, content: snapshot.content });
+    universalDebug('classify <-', reply, `${Date.now() - started}ms`, { epochOk: epoch === universalEpoch, urlNow: location.href });
     if (!universalEnabled || epoch !== universalEpoch || url !== location.href) return;
     if (reply?.disabled) {
       universalSetEnabled(false);
       return;
     }
     if (!Array.isArray(reply?.regions)) throw new Error('Classification unavailable');
-    if (universalSnapshot(document).content !== snapshot.content) { universalDirty = true; return; }
+    if (universalSnapshot(document).content !== snapshot.content) { universalDebug('result discarded: DOM changed during classification'); universalDirty = true; return; }
     universalFailures = 0;
     universalRetryAt = 0;
     universalLastContent = snapshot.content;
     universalRegionIds = reply.regions;
     universalLearned = reply.regions.filter((id) => Number.isInteger(id) && snapshot.nodes[id]).map((id) => snapshot.nodes[id]);
     universalApply();
-  } catch {
+    universalDebug('applied', { regions: reply.regions, learned: universalLearned.length, hidden: universalHidden.size });
+  } catch (error) {
+    universalDebug('classify failed', String(error));
     universalFailures++;
     universalRetryAt = Date.now() + Math.min(300_000, 15_000 * 2 ** Math.min(universalFailures - 1, 5));
     universalDirty = true;
@@ -101,6 +109,7 @@ async function universalScan() {
 }
 
 function universalSetEnabled(enabled) {
+  universalDebug('setEnabled', enabled, location.href);
   if (enabled === universalEnabled) return;
   universalEnabled = enabled;
   universalEpoch++;
