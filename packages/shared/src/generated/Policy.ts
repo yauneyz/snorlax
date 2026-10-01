@@ -19,4 +19,4 @@ export type Policy = { blockedDomains: Array<string>, allowedDomains: Array<stri
 /**
  * Built-in bulk blocklist categories the user has toggled on. See `crate::premade_lists`.
  */
-enabledPremadeLists: Array<PremadeListId>, sites: { [key in string]: SiteRule }, };
+enabledPremadeLists: Array<PremadeListId>, sites: { [key in string]: SiteRule }, universalSoftBlock?: boolean, };

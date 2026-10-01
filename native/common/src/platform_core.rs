@@ -50,6 +50,7 @@ struct PendingJudge {
     requested_at: Instant,
     url: String,
     judge: crate::model::JudgePolicy,
+    universal_policy: Option<Policy>,
 }
 
 fn verdict_for(action: DefaultAction) -> &'static str {
@@ -285,7 +286,7 @@ impl Core {
             self.emit("policyChanged", json!({ "policy": policy }));
         }
         self.shared
-            .set_handshake_enabled(self.state.settings.browser_handshake_enabled || !policy.sites.is_empty());
+            .set_handshake_enabled(self.state.settings.browser_handshake_enabled || policy.universal_soft_block || !policy.sites.is_empty());
         if active != self.active {
             self.pending_judges.clear();
             self.active = active;
@@ -391,7 +392,7 @@ impl Core {
         }
         self.state.settings.browser_handshake_enabled = enabled;
         self.shared
-            .set_handshake_enabled(enabled || !self.network_policy.sites.is_empty());
+            .set_handshake_enabled(enabled || self.network_policy.universal_soft_block || !self.network_policy.sites.is_empty());
         self.persist_state();
         self.emit(
             "settingsChanged",
@@ -446,6 +447,7 @@ impl Core {
         let url = text("url");
         let title = text("title");
         let content = text("content");
+        let universal = params.get("purpose").and_then(Value::as_str) == Some("universal");
         // Limits count characters: the extension caps page text by characters, and non-ASCII
         // pages are several bytes per character.
         let too_long = |value: &str, max: usize| value.chars().count() > max;
@@ -453,7 +455,7 @@ impl Core {
             || too_long(&request_id, JUDGE_MAX_REQUEST_ID)
             || too_long(&url, JUDGE_MAX_URL)
             || too_long(&title, JUDGE_MAX_TITLE)
-            || too_long(&content, JUDGE_MAX_CONTENT)
+            || too_long(&content, if universal { 24_000 } else { JUDGE_MAX_CONTENT })
         {
             return Err(RpcError::new(err::BAD_REQUEST, "Invalid judge request size."));
         }
@@ -483,7 +485,14 @@ impl Core {
         }
         // A stale extension request after the profile or settings changed must not wake Electron
         // or sit pending. Answer immediately with what the policy falls back to.
-        let Some(judge) = policy.judge.clone().filter(|judge| !judge.tasks.is_empty()) else {
+        let judge = if universal && policy.universal_soft_block {
+            Some(crate::model::JudgePolicy { tasks: vec![], avoid: vec![], fallback: DefaultAction::Allow })
+        } else if universal {
+            None
+        } else {
+            policy.judge.clone().filter(|judge| !judge.tasks.is_empty())
+        };
+        let Some(judge) = judge else {
             self.emit_judge_result(&request_id, &url, DefaultAction::Allow, "AI filtering is not configured");
             return Ok(());
         };
@@ -493,7 +502,8 @@ impl Core {
         }
         self.pending_judges.insert(
             request_id.clone(),
-            PendingJudge { requested_at: Instant::now(), url: url.clone(), judge: judge.clone() },
+            PendingJudge { requested_at: Instant::now(), url: url.clone(), judge: judge.clone(),
+                universal_policy: if universal { Some(policy) } else { None } },
         );
         let mut payload = json!({
             "requestId": request_id,
@@ -502,7 +512,9 @@ impl Core {
             "content": content,
             "judge": judge,
         });
-        if let Some(context) = context {
+        if universal {
+            payload["purpose"] = json!("universal");
+        } else if let Some(context) = context {
             payload["context"] = context;
         }
         self.emit("judgeRequested", payload);
@@ -536,7 +548,7 @@ impl Core {
         let now = Instant::now();
         let mut expired: Vec<(String, PendingJudge)> = Vec::new();
         self.pending_judges.retain(|request_id, pending| {
-            if now.duration_since(pending.requested_at) >= JUDGE_TIMEOUT {
+            if now.duration_since(pending.requested_at) >= if pending.universal_policy.is_some() { Duration::from_secs(25) } else { JUDGE_TIMEOUT } {
                 expired.push((request_id.clone(), pending.clone()));
                 false
             } else {
@@ -554,7 +566,7 @@ impl Core {
     pub fn next_judge_delay(&self) -> Option<Duration> {
         self.pending_judges
             .values()
-            .map(|pending| JUDGE_TIMEOUT.saturating_sub(pending.requested_at.elapsed()))
+            .map(|pending| (if pending.universal_policy.is_some() { Duration::from_secs(25) } else { JUDGE_TIMEOUT }).saturating_sub(pending.requested_at.elapsed()))
             .min()
     }
 
@@ -850,7 +862,19 @@ impl Core {
                 let request_id = str_field(params, "requestId")?;
                 let verdict: DefaultAction = parse_field(params, "verdict")?;
                 let reason = str_field(params, "reason")?;
-                self.submit_judge_verdict(&request_id, verdict, reason);
+                if self.pending_judges.get(&request_id).is_some_and(|p| p.universal_policy.is_some()) {
+                    let regions = params.get("regions").and_then(Value::as_array)
+                        .filter(|items| items.len() <= 80 && items.iter().all(|v| v.as_u64().is_some_and(|n| n < 120)))
+                        .ok_or_else(|| RpcError::new(err::BAD_REQUEST, "Invalid universal regions."))?;
+                    let pending = self.pending_judges.remove(&request_id).unwrap();
+                    if self.focus_active() && self.state.settings.smart_filtering_enabled
+                        && pending.universal_policy.as_ref() == Some(&self.network_policy) {
+                        self.emit("judgeResult", json!({ "requestId": request_id, "url": pending.url,
+                            "verdict": "allow", "reason": "", "regions": regions }));
+                    }
+                } else {
+                    self.submit_judge_verdict(&request_id, verdict, reason);
+                }
                 Ok(ok())
             }
             other => Err(RpcError::new(
@@ -1070,6 +1094,57 @@ mod judge_tests {
             }
         }
         panic!("no {name} event");
+    }
+
+    #[test]
+    fn universal_regions_round_trip_without_tasks_or_catalog_context() {
+        let policy = Policy { universal_soft_block: true, ..Default::default() };
+        let (mut core, mut rx) = super::test_support::core_with(policy, true);
+        core.state.settings.smart_filtering_enabled = true;
+        let request = json!({ "requestId": "u1", "purpose": "universal", "url": "https://unknown.test/",
+            "content": "{\"regions\":[{\"id\":0}]}", "context": { "site": "youtube", "feature": "feed" } });
+        core.judge_request(&request).unwrap_or_else(|_| panic!());
+        let event = next_event(&mut rx, "judgeRequested");
+        assert_eq!(event["purpose"], "universal");
+        assert!(event.get("context").is_none());
+        assert_eq!(event["judge"]["tasks"], json!([]));
+        core.dispatch("submitJudgeVerdict", &json!({ "requestId": "u1", "verdict": "allow", "reason": "", "regions": [0] }))
+            .unwrap_or_else(|_| panic!());
+        assert_eq!(next_event(&mut rx, "judgeResult")["regions"], json!([0]));
+    }
+
+    #[test]
+    fn universal_disabled_or_ai_off_never_emits_a_request() {
+        for (enabled, smart) in [(false, true), (true, false)] {
+            let policy = Policy { universal_soft_block: enabled, ..Default::default() };
+            let (mut core, mut rx) = super::test_support::core_with(policy, true);
+            core.state.settings.smart_filtering_enabled = smart;
+            core.judge_request(&json!({ "requestId": "u1", "purpose": "universal", "url": "https://unknown.test/", "content": "{}" }))
+                .unwrap_or_else(|_| panic!());
+            assert_eq!(next_event(&mut rx, "judgeResult")["verdict"], "allow");
+            assert!(core.pending_judges.is_empty());
+        }
+    }
+
+    #[test]
+    fn universal_timeout_has_no_regions_and_policy_changes_discard_results() {
+        let policy = Policy { universal_soft_block: true, ..Default::default() };
+        let (mut core, mut rx) = super::test_support::core_with(policy, true);
+        core.state.settings.smart_filtering_enabled = true;
+        let request = json!({ "requestId": "u1", "purpose": "universal", "url": "https://unknown.test/", "content": "{}" });
+        core.judge_request(&request).unwrap_or_else(|_| panic!());
+        next_event(&mut rx, "judgeRequested");
+        core.pending_judges.get_mut("u1").unwrap().requested_at = Instant::now() - Duration::from_secs(26);
+        core.sweep_expired_judges();
+        let fallback = next_event(&mut rx, "judgeResult");
+        assert_eq!(fallback["verdict"], "allow");
+        assert!(fallback.get("regions").is_none());
+        core.judge_request(&request).unwrap_or_else(|_| panic!());
+        next_event(&mut rx, "judgeRequested");
+        core.network_policy.universal_soft_block = false;
+        core.dispatch("submitJudgeVerdict", &json!({ "requestId": "u1", "verdict": "allow", "reason": "", "regions": [0] }))
+            .unwrap_or_else(|_| panic!());
+        while let Ok(event) = rx.try_recv() { assert_ne!(event["event"], "judgeResult"); }
     }
 
     fn request(id: &str) -> Value {

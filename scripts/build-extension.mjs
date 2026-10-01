@@ -136,6 +136,7 @@ function bundledBackground(firefox = false) {
       "premade-rules.js",
       "legacy-compat.js",
       firefox ? "loopback-port.js" : "loopback-stub.js",
+      "universal-background.js",
       "background.js",
     ])
   );
@@ -180,6 +181,7 @@ function stageStore(name, manifest, background) {
   );
   writeFileSync(resolve(outputDir, "background.js"), background);
   writeFileSync(resolve(outputDir, "site-content.js"), bundledSiteContent());
+  writeFileSync(resolve(outputDir, "universal-content.js"), "(() => {\n" + concatModules(["universal-dom.js", "universal-content.js"]) + "\n})();\n");
   for (const [name, source] of Object.entries(iconFiles)) {
     copyFileSync(source, resolve(outputDir, name));
   }

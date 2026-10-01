@@ -25,6 +25,8 @@ export interface JudgePage {
   /** Visible text, focused on the route's content selector when the catalog provides one. */
   content: string;
   context?: JudgeContext;
+  /** Catalog-independent region discovery; content is a bounded DOM summary. */
+  purpose?: 'universal';
 }
 
 /** Bounds enforced by the daemon and the legacy web endpoint. */

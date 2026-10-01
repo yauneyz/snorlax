@@ -373,6 +373,7 @@ pub fn flatten_network(layers: &[Layer]) -> Policy {
             flat.default_action = policy.default_action;
         }
     }
+    flat.universal_soft_block = policies.iter().any(|p| p.universal_soft_block);
     flat.judge = policies
         .iter()
         .find(|p| p.judge.is_some() && p.uses_judge())

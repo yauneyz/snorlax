@@ -57,5 +57,7 @@ export function profileSummary(profile: Profile, aiMode: boolean): string {
     sites = onlySoftSites ? softLabel : `${sites} · ${softLabel}`;
   }
 
+  if (policy.universalSoftBlock) sites = `${sites} · universal soft block${aiMode ? '' : ' (paused)'}`;
+
   return apps.length > 0 ? `${sites} · ${apps.length} app${apps.length === 1 ? '' : 's'}` : sites;
 }

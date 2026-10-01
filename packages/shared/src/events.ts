@@ -55,7 +55,7 @@ export interface EventMap {
    * synthesized by the daemon (timeout sweep, AI filtering off) from `JudgePolicy.fallback`.
    * Relayed by natmsg back to the extension.
    */
-  judgeResult: { requestId: string; url: string; verdict: JudgeVerdict; reason: string };
+  judgeResult: { requestId: string; url: string; verdict: JudgeVerdict; reason: string; regions?: number[] };
 }
 
 export type EventName = keyof EventMap;

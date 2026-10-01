@@ -105,6 +105,11 @@ pub fn app_matches(app: &AppRef, target: &AppRef) -> bool {
 /// This is what gates un-keyed policy edits: loosening enforcement requires the USB key, so a
 /// false here is what forces the prompt.
 pub fn is_at_least_as_restrictive(prev: &Policy, next: &Policy) -> bool {
+    if prev.universal_soft_block && (!next.universal_soft_block
+        || next.sites.keys().any(|id| !prev.sites.contains_key(id))
+        || next.allowed_domains.iter().any(|host| !prev.allowed_domains.contains(host))) {
+        return false;
+    }
     let mut hosts: Vec<String> = Vec::new();
     for pattern in prev
         .blocked_domains
@@ -240,6 +245,7 @@ mod tests {
             apps: Vec::new(),
             enabled_premade_lists: Vec::new(),
             sites: Default::default(),
+            universal_soft_block: false,
         }
     }
 
@@ -249,6 +255,21 @@ mod tests {
             crate::policy::SiteRule { features: features.iter().map(|(f, a)| ((*f).into(), *a)).collect() },
         );
         p
+    }
+
+    #[test]
+    fn universal_setting_round_trips_and_exemptions_need_the_key() {
+        let enabled = Policy { universal_soft_block: true, ..Default::default() };
+        let round_trip: Policy = serde_json::from_value(serde_json::to_value(&enabled).unwrap()).unwrap();
+        assert!(round_trip.universal_soft_block);
+        assert!(!is_at_least_as_restrictive(&enabled, &Policy::default()));
+        let mut exempt = enabled.clone();
+        exempt.allowed_domains.push("example.com".into());
+        assert!(!is_at_least_as_restrictive(&enabled, &exempt));
+        exempt = enabled.clone();
+        exempt.sites.insert("youtube".into(), Default::default());
+        assert!(!is_at_least_as_restrictive(&enabled, &exempt));
+        assert!(is_at_least_as_restrictive(&Policy::default(), &enabled));
     }
 
     #[test]

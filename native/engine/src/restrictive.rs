@@ -14,6 +14,9 @@ use crate::site_catalog;
 
 fn policy_relaxations(prev: &Policy, next: &Policy) -> Vec<String> {
     let mut out = Vec::new();
+    if prev.universal_soft_block && !next.universal_soft_block {
+        out.push("Turns off universal soft block".into());
+    }
     for pattern in &prev.blocked_domains {
         let base = pattern.trim().trim_start_matches("*.").to_ascii_lowercase();
         if is_host_blocked(prev, &base) && !is_host_blocked(next, &base) {

@@ -305,7 +305,8 @@
       "params": {
         "requestId": "string",
         "verdict": "allow|block",
-        "reason": "string"
+        "reason": "string",
+        "regions": "number[]?"
       },
       "result": {
         "ok": true
@@ -353,7 +354,8 @@
       "requestId": "string",
       "url": "string",
       "verdict": "allow|block",
-      "reason": "string"
+      "reason": "string",
+      "regions": "number[]?"
     },
     "appBlocked": {
       "app": "AppRef"

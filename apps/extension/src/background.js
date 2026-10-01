@@ -26,6 +26,8 @@
 // are hidden in-page by site-content.js, and a judge rejection on a site page hides that page's
 // feature there rather than leaving the page.
 
+import { createUniversalClassifier, universalEligible } from './universal-background.js';
+
 import { buildRules } from './rules.js';
 import { heartbeatDelayForState } from './heartbeat-timing.js';
 import { extractPageContent } from './content-extract.js';
@@ -215,10 +217,12 @@ function applyState(frame) {
     defaultAction,
     enabledPremadeLists: Array.isArray(state.enabledPremadeLists) ? state.enabledPremadeLists : [],
     sites: sanitizeSites(state.sites),
+    universalSoftBlock: state.universalSoftBlock === true,
     judge: sanitizeJudge(state.judge),
   };
   policyGeneration += 1;
   invalidatePendingJudges();
+  universalClassifier.invalidate();
   blockingMode = deriveModeLabel(currentPolicy);
   hasReceivedState = true;
   lastApplyOk = false;
@@ -383,7 +387,29 @@ function handleServiceResponse(msg) {
   resolve(msg);
 }
 
+function universalAllowed(url) {
+  return universalEligible(currentPolicy, decide(currentPolicy, url));
+}
+
+const universalClassifier = createUniversalClassifier({
+  api: browserApi,
+  eligible: universalAllowed,
+  sendNative: (frame) => {
+    if (!port) return false;
+    port.postMessage(frame);
+    return true;
+  },
+});
+
 browserApi.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (message?.type === 'talysman:universal-policy') {
+    sendResponse({ enabled: sender.frameId === 0 && universalAllowed(sender.url) });
+    return false;
+  }
+  if (message?.type === 'talysman:universal-classify') {
+    void universalClassifier.classify(message, sender).then(sendResponse, () => sendResponse(null));
+    return true;
+  }
   if (message?.type === 'talysman:site-policy') {
     sendResponse(sitePolicyMessage());
     return false;
@@ -453,6 +479,7 @@ function connect() {
       return;
     }
     if (msg && msg.type === 'judge-result') {
+      if (universalClassifier.result(msg)) return;
       handleJudgeResult(upgradeLegacyJudgeResult(msg)); // LEGACY-COMPAT(v5)
       return;
     }
@@ -790,6 +817,10 @@ function evaluateNavigation(tabId, url, phase) {
   if (!currentPolicy.active || typeof tabId !== 'number' || tabId < 0) return false;
   if (!url || !/^https?:\/\//i.test(url)) return false; // extension/browser-internal pages
   const decision = decide(currentPolicy, url);
+  if (phase === 'spa' || phase === 'complete') {
+    Promise.resolve(browserApi.tabs.sendMessage(tabId, { type: 'talysman:universal-policy', enabled: universalAllowed(url) })).catch(() => {});
+    Promise.resolve(browserApi.tabs.sendMessage(tabId, { type: 'talysman:universal-navigate' })).catch(() => {});
+  }
   if (decision.action === 'block') {
     void redirectIfStillOnUrl(tabId, url, decision, policyGeneration);
     return true;
@@ -850,6 +881,9 @@ async function notifySiteContentScripts() {
   try {
     const message = { type: 'talysman:site-policy-updated', ...sitePolicyMessage() };
     for (const tab of await browserApi.tabs.query({})) {
+      if (typeof tab.id === 'number') {
+        Promise.resolve(browserApi.tabs.sendMessage(tab.id, { type: 'talysman:universal-policy', enabled: universalAllowed(tab.url) })).catch(() => {});
+      }
       if (typeof tab.id === 'number' && siteForUrl(tab.url)) {
         Promise.resolve(browserApi.tabs.sendMessage(tab.id, message)).catch(() => {});
       }

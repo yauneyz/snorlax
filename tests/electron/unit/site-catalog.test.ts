@@ -48,7 +48,10 @@ describe('site catalog', () => {
     expect(readFileSync(resolve(root, 'native/engine/resources/site-catalog.json'), 'utf8')).toBe(nativeCatalogJson());
     expect(readFileSync(resolve(root, 'apps/android/blocker/catalog/android-catalog.json'), 'utf8')).toBe(androidCatalogJson());
     const manifest = JSON.parse(readFileSync(resolve(root, 'apps/extension/manifest.json'), 'utf8'));
-    expect(manifest.content_scripts).toEqual([{ matches: contentScriptMatches(), js: ['site-content.js'], run_at: 'document_start' }]);
+    expect(manifest.content_scripts).toEqual([
+      { matches: contentScriptMatches(), js: ['site-content.js'], run_at: 'document_start' },
+      { matches: ['http://*/*', 'https://*/*'], js: ['universal-content.js'], run_at: 'document_start' },
+    ]);
   });
 
   it('offers audience-limited sites only to their audience', () => {

@@ -160,3 +160,38 @@ The `HOST_NAME` (`com.talysman.host`) must match between `background.js` and
    ECH on and over a reused connection. Toggle focus off → the site loads within the push latency.
 5. **VPN:** repeat step 4 with a VPN active — the extension blocks identically (it never touched the
    network path).
+
+
+## Universal soft block (experimental)
+
+Enable **Universal soft block** under **Soft blocks** in a desktop profile, with AI mode and an
+AI connection configured in Settings. Rebuild the native service, desktop, and extension together.
+Pages load normally. The scanner starts after `load`, then hides selected regions asynchronously;
+there is no loading overlay, navigation delay, or whole-page fallback when inference fails.
+
+An enabled catalog soft block takes precedence. A catalog entry that is **not enabled** provides
+no selectors, features, routes, or model hints to the universal algorithm. Explicit hard blocks,
+always-allow rules, and the existing default block/judge behavior retain their precedence.
+
+The independent scanner summarizes up to 120 candidate regions / 24,000 characters from the top
+frame's light DOM. It excludes scripts, styles, form values, and article prose, but sends short
+headings, labels, and structural attributes to the configured AI endpoint. The model returns only
+region IDs. Local structure and protected-control checks validate every hide; the extension uses
+its own CSS attribute to apply it. Unknown or ambiguous regions stay visible. Shadow DOM, embedded
+frames, and canvas-rendered interfaces are not analyzed in this first version.
+
+Identical structural summaries share an origin-scoped cache across URLs and tabs. Cache storage
+contains hashes and region IDs, not captured markup. Successful results expire after seven days;
+empty results after one hour. Failed requests are not cached, retries back off, at most four
+classifications run concurrently, and repeated cards are summarized together. Navigation and
+policy changes discard stale responses. Turning the setting or focus off restores hidden regions.
+
+Regression checks:
+
+```sh
+node scripts/check-universal-soft-block.mjs # CHROME_PATH can select Chromium
+pnpm test -- tests/electron/unit/universal-soft-block.test.ts
+```
+
+Browser checks use synthetic pages and delayed model replies; they verify mechanics, not model
+accuracy against the hand-curated catalog.

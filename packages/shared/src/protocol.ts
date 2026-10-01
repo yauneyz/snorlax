@@ -174,7 +174,7 @@ export interface RequestMap {
    * `requestId`s are ignored (the timeout sweep may have already answered with the fallback).
    */
   submitJudgeVerdict: {
-    params: { requestId: string; verdict: JudgeVerdict; reason: string };
+    params: { requestId: string; verdict: JudgeVerdict; reason: string; regions?: number[] };
     result: Ok;
   };
 

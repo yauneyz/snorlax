@@ -244,17 +244,17 @@ export function maxProfiles(limits: ProductLimits | null): LimitedValue {
 
 /** Whether the policy asks the AI judge for anything. */
 export function policyUsesJudge(policy: Policy): boolean {
-  return policy.judge !== null
+  return policy.universalSoftBlock === true || policy.judge !== null
     || policy.defaultAction === 'judge'
     || Object.entries(policy.sites ?? {}).some(([id, rule]) => siteRuleUsesJudge(id, rule));
 }
 
 /**
  * Whether any rule actually sends pages to the AI judge — a judged default or a judged site
- * feature. Tasks alone are inert. TS mirror of the daemon's `Policy::uses_judge`.
+ * feature, or universal region discovery. Tasks alone are inert.
  */
 export function policyHasJudgeRule(policy: Policy): boolean {
-  return policy.defaultAction === 'judge'
+  return policy.universalSoftBlock === true || policy.defaultAction === 'judge'
     || Object.entries(policy.sites ?? {}).some(([id, rule]) => siteRuleUsesJudge(id, rule));
 }
 
@@ -370,6 +370,7 @@ export function constrainPolicyToLimits(policy: Policy, limits: ProductLimits | 
 
   return {
     ...policy,
+    ...(policy.universalSoftBlock && !smartFilteringAllowed(limits) ? { universalSoftBlock: false } : {}),
     blockedDomains,
     allowedDomains:
       maxAllowed === null ? policy.allowedDomains : policy.allowedDomains.slice(0, maxAllowed),

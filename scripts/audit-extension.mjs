@@ -41,6 +41,7 @@ const expectedFiles = [
   "popup.js",
   "premade-lists",
   "site-content.js",
+  "universal-content.js",
 ];
 
 function fail(message) {
@@ -231,6 +232,7 @@ for (const [store, directory] of Object.entries({
     "popup.html",
     "popup.css",
     "site-content.js",
+    "universal-content.js",
   ]
     .map((file) => readFileSync(resolve(storeDir, file), "utf8"))
     .join("\n");
@@ -263,7 +265,7 @@ for (const [store, directory] of Object.entries({
 
   // The bundles concatenate source modules into one scope (scripts/build-extension.mjs). A
   // repeated top-level function silently replaces the earlier one, so reject any collision.
-  for (const bundle of ["background.js", "site-content.js"]) {
+  for (const bundle of ["background.js", "site-content.js", "universal-content.js"]) {
     const names = [...readFileSync(resolve(storeDir, bundle), "utf8").matchAll(
       /^(?:async\s+)?(?:function\*?|const|let|class)\s+([A-Za-z_$][\w$]*)/gm,
     )].map((match) => match[1]);

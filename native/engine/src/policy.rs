@@ -157,6 +157,10 @@ pub struct Policy {
     /// Built-in bulk blocklist categories the user has toggled on. See `crate::premade_lists`.
     pub enabled_premade_lists: Vec<PremadeListId>,
     pub sites: BTreeMap<String, SiteRule>,
+    // Learn distracting page regions independently of the site catalog.
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    #[cfg_attr(feature = "ts", ts(as = "Option<bool>", optional))]
+    pub universal_soft_block: bool,
 }
 
 impl Policy {
@@ -258,6 +262,8 @@ struct PolicyWire {
     #[serde(default)]
     soft_blocked_sites: Vec<String>,
     #[serde(default)]
+    universal_soft_block: bool,
+    #[serde(default)]
     intent: Option<LegacyIntent>,
 }
 
@@ -289,6 +295,7 @@ impl<'de> Deserialize<'de> for Policy {
                 apps: wire.apps,
                 enabled_premade_lists: Vec::new(),
                 sites: BTreeMap::new(),
+                universal_soft_block: false,
             });
         }
         let mut default_action = wire.default_action.unwrap_or_default();
@@ -319,6 +326,7 @@ impl<'de> Deserialize<'de> for Policy {
             apps: wire.apps,
             enabled_premade_lists: wire.enabled_premade_lists,
             sites,
+            universal_soft_block: wire.universal_soft_block,
         })
     }
 }

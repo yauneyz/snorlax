@@ -38,6 +38,21 @@ describe('engine-wasm', () => {
     expect(Engine.load(engine.export()).export()).toEqual(engine.export());
   });
 
+  it('retains universal blocking and requires a key to disable it', () => {
+    const engine = Engine.empty('test');
+    const universal = config([]);
+    universal.policy.universalSoftBlock = true;
+    engine.apply(upsert('universal', universal), { kind: 'none' }, ctx());
+    engine.apply({ type: 'setLatch', profileId: 'universal', on: true }, { kind: 'none' }, ctx());
+    expect(engine.networkPolicy(ctx()).universalSoftBlock).toBe(true);
+    expect(Engine.load(engine.export()).networkPolicy(ctx()).universalSoftBlock).toBe(true);
+    expect(engine.gate(upsert('universal', config([])), ctx())).toMatchObject({ kind: 'needsKey' });
+    // The setting survives flattening multiple active profiles too.
+    engine.apply(upsert('other', config(['example.com'])), { kind: 'none' }, ctx());
+    engine.apply({ type: 'setLatch', profileId: 'other', on: true }, { kind: 'none' }, ctx());
+    expect(engine.networkPolicy(ctx()).universalSoftBlock).toBe(true);
+  });
+
   it('exposes popup info, URL classification, and relaxations', () => {
     const engine = Engine.empty('test');
     engine.apply(upsert('a', config(['reddit.com'])), { kind: 'none' }, ctx());

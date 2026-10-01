@@ -82,7 +82,7 @@ impl Blocking {
 
     /// Site rules need the extension's handshake: without it nothing enforces them in the page.
     pub fn handshake_required(&self) -> bool {
-        self.handshake_enabled || self.policy.catalog_sites().next().is_some()
+        self.handshake_enabled || self.policy.universal_soft_block || self.policy.catalog_sites().next().is_some()
     }
 }
 
@@ -134,6 +134,7 @@ pub fn state_frame(blocking: &Blocking, caps: &ExtensionCaps) -> Value {
         "defaultAction": blocking.resolve(blocking.policy.default_action),
         "enabledPremadeLists": blocking.policy.enabled_premade_lists,
         "sites": sites,
+        "universalSoftBlock": blocking.policy.universal_soft_block && blocking.smart_filtering_enabled,
         "judge": blocking.available_judge(),
         "handshakeEnabled": blocking.handshake_required(),
     })
@@ -158,6 +159,9 @@ pub fn judge_request_params(frame: &Value) -> Value {
             "feature": context.get("feature").cloned().unwrap_or(Value::Null),
         });
     }
+    if frame.get("purpose").and_then(Value::as_str) == Some("universal") {
+        params["purpose"] = json!("universal");
+    }
     params
 }
 
@@ -170,6 +174,9 @@ pub fn judge_result_frame(payload: &Value, caps: &ExtensionCaps) -> Value {
         "verdict": payload.get("verdict").cloned().unwrap_or(Value::Null),
         "reason": payload.get("reason").cloned().unwrap_or(Value::Null),
     });
+    if let Some(regions) = payload.get("regions") {
+        frame["regions"] = regions.clone();
+    }
     if !caps.speaks_site_rules() {
         natmsg_legacy::add_legacy_judge_result_fields(&mut frame); // LEGACY-COMPAT(v5)
     }
@@ -258,6 +265,19 @@ mod tests {
         policy.sites.insert("youtube".into(), SiteRule::default());
         policy.sites.insert("from-the-future".into(), SiteRule::default());
         Blocking { active: true, policy, handshake_enabled: false, smart_filtering_enabled: true }
+    }
+
+    #[test]
+    fn universal_flag_and_regions_survive_native_transport() {
+        let mut blocking = Blocking { active: true, smart_filtering_enabled: true,
+            policy: Policy { universal_soft_block: true, ..Default::default() }, ..Default::default() };
+        assert_eq!(state_frame(&blocking, &caps(&[]))["universalSoftBlock"], true);
+        blocking.smart_filtering_enabled = false;
+        assert_eq!(state_frame(&blocking, &caps(&[]))["universalSoftBlock"], false);
+        let params = judge_request_params(&json!({ "requestId": "u", "purpose": "universal", "content": "{}" }));
+        assert_eq!(params["purpose"], "universal");
+        let result = judge_result_frame(&json!({ "requestId": "u", "regions": [1, 2] }), &caps(&[]));
+        assert_eq!(result["regions"], json!([1, 2]));
     }
 
     #[test]

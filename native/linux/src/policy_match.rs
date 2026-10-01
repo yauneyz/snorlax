@@ -74,6 +74,7 @@ mod restrictiveness_tests {
             apps: vec![],
             enabled_premade_lists: vec![],
             sites: Default::default(),
+            universal_soft_block: false,
         }
     }
 
@@ -87,6 +88,7 @@ mod restrictiveness_tests {
             apps: vec![],
             enabled_premade_lists: vec![],
             sites: Default::default(),
+            universal_soft_block: false,
         }
     }
 
@@ -100,6 +102,7 @@ mod restrictiveness_tests {
             apps: vec![],
             enabled_premade_lists: vec![],
             sites: Default::default(),
+            universal_soft_block: false,
         }
     }
 

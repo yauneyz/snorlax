@@ -576,7 +576,9 @@ export function Blocklists({ onUpgrade }: { onUpgrade: () => void }) {
   const softHidden = softCounts.reduce((sum, c) => sum + c.hidden, 0);
   const softJudged = softCounts.reduce((sum, c) => sum + c.judged, 0);
   const softSummary =
-    softOn.length === 0
+    policy.universalSoftBlock
+      ? `Universal ${aiMode ? 'on' : 'paused · AI mode off'}${softOn.length ? ` · ${softOn.length} site rules` : ''}`
+      : softOn.length === 0
       ? `Off · ${listedSites.length} sites available`
       : `${softOn.length} of ${listedSites.length} sites · ${softHidden} features hidden${softJudged ? ` · ${softJudged} AI` : ''}`;
 
@@ -936,9 +938,9 @@ export function Blocklists({ onUpgrade }: { onUpgrade: () => void }) {
               recommendations hidden.
             </>
           }
-          active={softOn.length > 0}
+          active={softOn.length > 0 || Boolean(policy.universalSoftBlock)}
           summary={softSummary}
-          chips={softOn.map((site) => site.label)}
+          chips={[...(policy.universalSoftBlock ? ['Universal'] : []), ...softOn.map((site) => site.label)]}
           open={openSection === 'soft'}
           onToggle={() => toggleSection('soft')}
         >

@@ -269,6 +269,7 @@ export function normalizePolicy(input: Policy | (Partial<Policy> & LegacyPolicyF
     apps,
     enabledPremadeLists,
     sites,
+    ...(policy.universalSoftBlock === true ? { universalSoftBlock: true } : {}),
     rejected,
   };
 }

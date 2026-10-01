@@ -13,6 +13,7 @@
 
 import { siteDefinition, type EventPayload, type JudgeHttpResponse } from '@talysman/shared';
 import { logger } from './logging.js';
+import { UNIVERSAL_SYSTEM_PROMPT, parseUniversalRegions } from './universalSoftBlock.js';
 import type { ServiceConnection } from './service/connection.js';
 import { aiModeEnabledSync } from './aiMode.js';
 import { completeAiChat, markAiConnectionFailed } from './aiConnection.js';
@@ -90,6 +91,20 @@ async function handleJudgeRequested(service: ServiceConnection, request: JudgeRe
   // sharing the daemon could turn it on. Never send page content to the judge while opted out.
   if (!aiModeEnabledSync()) {
     logger.info(`[judge] skipping judgeRequested ${request.requestId}: AI mode is off`);
+    return;
+  }
+  if (request.purpose === 'universal') {
+    try {
+      const raw = await completeAiChat([
+        { role: 'system', content: UNIVERSAL_SYSTEM_PROMPT },
+        { role: 'user', content: request.content },
+      ], 22_000);
+      const regions = parseUniversalRegions(raw, request.content);
+      await service.request('submitJudgeVerdict', { requestId: request.requestId, verdict: 'allow', reason: '', regions });
+    } catch (error) {
+      // The daemon's bounded timeout leaves unknown regions visible. Never cache a failed call.
+      logger.warn(`[universal] classification failed: ${(error as Error).message}`);
+    }
     return;
   }
   let verdict: JudgeHttpResponse;

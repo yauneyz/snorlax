@@ -270,6 +270,9 @@ export function contentScriptMatches(sites: readonly SiteDefinition[] = SITE_DEF
 export function manifestWithContentScripts(manifest: Record<string, unknown>, sites: readonly SiteDefinition[] = SITE_DEFINITIONS) {
   return {
     ...manifest,
-    content_scripts: [{ matches: contentScriptMatches(sites), js: ['site-content.js'], run_at: 'document_start' }],
+    content_scripts: [
+      { matches: contentScriptMatches(sites), js: ['site-content.js'], run_at: 'document_start' },
+      { matches: ['http://*/*', 'https://*/*'], js: ['universal-content.js'], run_at: 'document_start' },
+    ],
   };
 }

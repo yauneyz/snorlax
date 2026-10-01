@@ -149,10 +149,12 @@ export function effectiveFeatures(siteId, rule) {
  * @returns {Decision|null}
  */
 export function siteDecision(state, url) {
+  let enabledSite;
+  try { enabledSite = siteForHostname(new URL(url).hostname); } catch { return null; }
+  const rule = enabledSite && state.sites?.[enabledSite.id];
+  if (!rule) return null;
   const target = classifyUrl(url);
   if (!target) return null;
-  const rule = state.sites && state.sites[target.site];
-  if (!rule) return null;
   const features = effectiveFeatures(target.site, rule);
   const base = { layer: 'site', site: target.site, feature: target.feature };
   const action = features[target.feature] || 'block';

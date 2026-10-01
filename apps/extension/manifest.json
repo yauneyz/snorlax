@@ -63,6 +63,16 @@
         "site-content.js"
       ],
       "run_at": "document_start"
+    },
+    {
+      "matches": [
+        "http://*/*",
+        "https://*/*"
+      ],
+      "js": [
+        "universal-content.js"
+      ],
+      "run_at": "document_start"
     }
   ],
   "web_accessible_resources": [
