@@ -10,6 +10,7 @@ import { contextBridge, ipcRenderer } from 'electron';
 import type { AppRef, TransitionKind, UsageTransition } from '@talysman/shared';
 import type { CheckoutPrice, SubscriptionPlan } from '../shared/productLimits.js';
 import type { AppPickerItem } from '../shared/appPicker.js';
+import type { AiConnectionInput, AiConnectionStatus } from '../main/aiConnection.js';
 
 const Channels = {
   serviceRequest: 'service:request',
@@ -43,6 +44,8 @@ const Channels = {
   resetOnboarding: 'app:resetOnboarding',
   aiModeStatus: 'app:aiModeStatus',
   setAiMode: 'app:setAiMode',
+  aiConnectionStatus: 'app:aiConnectionStatus',
+  testAiConnection: 'app:testAiConnection',
   reportRendererError: 'app:reportRendererError',
   closePopup: 'app:closePopup',
   openOverrides: 'app:openOverrides',
@@ -81,7 +84,7 @@ export interface SubscriptionDetailInfo {
   canceledAt?: string | null;
 }
 
-export type AppEventName = 'authChanged' | 'entitlementChanged' | 'openOverrides';
+export type AppEventName = 'authChanged' | 'entitlementChanged' | 'openOverrides' | 'aiConnectionChanged';
 
 export interface ActionResult {
   ok: boolean;
@@ -235,6 +238,9 @@ const api = {
   /** Turn AI mode on/off; resolves with the persisted value. */
   setAiMode: (enabled: boolean): Promise<{ enabled: boolean }> =>
     ipcRenderer.invoke(Channels.setAiMode, { enabled }),
+  aiConnectionStatus: (): Promise<AiConnectionStatus> => ipcRenderer.invoke(Channels.aiConnectionStatus),
+  testAiConnection: (input: AiConnectionInput): Promise<AiConnectionStatus> =>
+    ipcRenderer.invoke(Channels.testAiConnection, input),
 
   /** Report an uncaught renderer error/rejection so it's tracked and pushed like a main-process one. */
   reportRendererError: (message: string, stack?: string): Promise<void> =>

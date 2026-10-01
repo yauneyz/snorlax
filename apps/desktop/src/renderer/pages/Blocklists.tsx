@@ -245,7 +245,6 @@ export function Blocklists({ onUpgrade }: { onUpgrade: () => void }) {
   const engine = useFocusStore((s) => s.engine);
   const defaultProfileId = useFocusStore((s) => s.defaultProfileId);
   const pairedKeys = useFocusStore((s) => s.pairedKeys);
-  const setOverridesOpen = useFocusStore((s) => s.setOverridesOpen);
   const keyPresent = useFocusStore((s) => s.keyPresent);
   const productLimits = useFocusStore((s) => s.productLimits);
   const aiMode = useFocusStore((s) => s.aiMode);
@@ -387,6 +386,9 @@ export function Blocklists({ onUpgrade }: { onUpgrade: () => void }) {
     });
 
   const turnOn = (profileId: string) => runProfileRequest(() => runCommand({ type: 'setLatch', profileId, on: true }));
+  // Turning one profile off is a key-gated override scoped to that profile.
+  const turnOff = (profileId: string) =>
+    runProfileRequest(() => runCommand({ type: 'startOverrideExempt', profiles: [profileId], items: [] }));
 
   const makeDefault = (profileId: string) =>
     runProfileRequest(() => runCommand({ type: 'setDefaultProfile', profileId }));
@@ -783,7 +785,7 @@ export function Blocklists({ onUpgrade }: { onUpgrade: () => void }) {
               label={`${selected.name} ${isActive ? 'on' : 'off'}`}
               on={isActive}
               disabled={!isActive && pairedKeys.length === 0}
-              onChange={() => (isActive ? setOverridesOpen(true) : void turnOn(selected.id))}
+              onChange={() => void (isActive ? turnOff(selected.id) : turnOn(selected.id))}
             />
           </div>
         )}
@@ -1077,7 +1079,7 @@ export function Blocklists({ onUpgrade }: { onUpgrade: () => void }) {
 
         {selected && (
           <BlocklistSection
-            title="Unlock pools"
+            title="Unlock groups"
             help={
               <>
                 Keyless unlocks you allow yourself each day. Unlocking one item in a pool opens

@@ -14,9 +14,9 @@ import { config } from "@/lib/config";
 
 /**
  * The AI judge. Every policy rule set to `judge` — a judged default for unlisted pages, or a site
- * feature such as "Reddit posts" — ends up here via the daemon and Electron main (see
- * packages/shared/src/judge.ts). The model weighs the page against the user's tasks and "help me
- * avoid" list and answers allow or block.
+ * feature such as "Reddit posts" — was historically sent here by Electron. Current desktop builds
+ * call the user-configured OpenAI-compatible endpoint directly. This route remains for legacy
+ * desktop clients.
  */
 
 /** Never fail open: malformed model output or an ambiguous verdict lands here. */

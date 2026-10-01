@@ -2,6 +2,19 @@ package app.talysman.android.ui
 
 import android.content.Intent
 import android.provider.Settings
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.layout.size
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.LocalContentColor
+import androidx.compose.material3.OutlinedIconButton
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -65,9 +78,17 @@ fun HomeScreen(app: TalysmanApp, snapshot: EngineSnapshot, onOverrides: () -> Un
         )
         StreakBadge(snapshot.streak.currentDays, snapshot.streak.bestDays)
         snapshot.overrides.timed?.let { Muted("Paused until ${formatClock(it.untilMs, now)}") }
-        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
             if (snapshot.anyActive) {
-                Button(onClick = onOverrides) { Text("Turn off…") }
+                val hasKeys = app.keys.hasKeys()
+                Button(
+                    onClick = { runner.run(Commands.startOverrideAll()) },
+                    enabled = hasKeys,
+                    colors = ButtonDefaults.buttonColors(containerColor = TalysmanPalette.Danger, contentColor = Color.White),
+                ) { Text("Turn off") }
+                OutlinedIconButton(onClick = onOverrides, modifier = Modifier.size(48.dp)) {
+                    if (hasKeys) PauseIcon(contentDescription = "Pause until…") else UnlockIcon(contentDescription = "Temporary unlock")
+                }
             } else {
                 Button(onClick = {
                     snapshot.defaultProfileId?.let { runner.run(Commands.setLatch(it, true)) }
@@ -86,7 +107,8 @@ fun HomeScreen(app: TalysmanApp, snapshot: EngineSnapshot, onOverrides: () -> Un
                 Text(status.profile.name, color = TalysmanPalette.ForegroundStrong, modifier = Modifier.weight(1f))
                 Muted(activationLabel(status))
                 Switch(checked = on, onCheckedChange = { turnOn ->
-                    if (turnOn) runner.run(Commands.setLatch(status.profile.id, true)) else onOverrides()
+                    if (turnOn) runner.run(Commands.setLatch(status.profile.id, true))
+                    else runner.run(Commands.startOverrideExempt(emptyList(), listOf(status.profile.id)))
                 })
             }
         }
@@ -110,6 +132,29 @@ fun HomeScreen(app: TalysmanApp, snapshot: EngineSnapshot, onOverrides: () -> Un
                 Muted("$name $verb · ${formatClock(event.atMs, now)}")
             }
         }
-        Muted("${snapshot.emergencyLeft} emergency unlocks left")
+    }
+}
+
+@Composable
+private fun PauseIcon(contentDescription: String) {
+    val color = LocalContentColor.current
+    Canvas(Modifier.size(18.dp).semantics { this.contentDescription = contentDescription }) {
+        val w = 2.2.dp.toPx()
+        listOf(0.375f, 0.625f).forEach { x ->
+            drawLine(color, Offset(size.width * x, size.height * 0.25f), Offset(size.width * x, size.height * 0.75f), w, StrokeCap.Round)
+        }
+    }
+}
+
+@Composable
+private fun UnlockIcon(contentDescription: String) {
+    val color = LocalContentColor.current
+    Canvas(Modifier.size(18.dp).semantics { this.contentDescription = contentDescription }) {
+        val u = size.width / 24f
+        val stroke = Stroke(width = 2.dp.toPx(), cap = StrokeCap.Round)
+        drawRoundRect(color, Offset(5 * u, 11 * u), Size(14 * u, 10 * u), CornerRadius(2 * u), style = stroke)
+        // Open shackle: rises from the left post and stops short of the right one.
+        drawLine(color, Offset(8 * u, 11 * u), Offset(8 * u, 7 * u), stroke.width, StrokeCap.Round)
+        drawArc(color, 180f, 150f, false, Offset(8 * u, 3 * u), Size(8 * u, 8 * u), style = stroke)
     }
 }

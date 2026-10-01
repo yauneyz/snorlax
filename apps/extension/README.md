@@ -67,9 +67,11 @@ service (named pipe)  ──►  talysman-natmsg.exe  ──►  extension backg
   rule IDs, so arbitrary category combinations do not consume one enabled ruleset per category.
   `scripts/generate-premade-lists.mjs` also generates the manifest, browser mapping, native enum,
   and shared UI metadata from `scripts/blocklists/sources.mjs`.
-- `src/popup.html` / `popup.js` — a read-only toolbar status surface showing the desktop connection,
-  focus state, reconnect/fail-safe state, and rule-application health. It never receives or displays
-  the user's configured domains; blocking remains controlled by the desktop app.
+- `src/popup.html` / `popup.js` — the toolbar status surface showing the desktop connection,
+  focus state, reconnect/fail-safe state, and rule-application health. Its one control spends a
+  temporary unlock from the active tab's unlock group (the same keyless `requestPoolUnlock` /
+  `confirmPoolUnlock` relay the blocked page uses). It never receives the user's configured domain
+  lists; blocking remains controlled by the desktop app.
 - `talysman-natmsg` (`talysman-natmsg.exe` on Windows) — bridges browser stdio ⇄ the service IPC,
   shaping the policy from `getState` and pushed events into the frame each extension build can
   enforce (`native/common/src/natmsg_frames.rs`).
@@ -150,7 +152,7 @@ The `HOST_NAME` (`com.talysman.host`) must match between `background.js` and
    `native/macos/Cargo.toml` command for native host manifests.
 2. **Build + load unpacked (dev/testers):** `pnpm build:extension`, then load
    `apps/extension/dist/chrome` in Chrome or `apps/extension/dist/edge-dev` in Edge. Open the toolbar
-   action to verify the connection and focus status; the popup intentionally contains no controls.
+   action to verify the connection and focus status, and the unlock button on a blocked tab.
 3. **Store release prep:** `pnpm release:extension`, then inspect
    `apps/extension/release/store/` and `apps/extension/release/store-submission.json`.
 4. **End-to-end:** run the service (`talysman-svc --console`), enable focus with `reddit.com`

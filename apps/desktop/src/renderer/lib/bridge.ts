@@ -14,6 +14,7 @@ import type {
 } from '@talysman/shared';
 import type { CheckoutPrice, SubscriptionPlan } from '../../shared/productLimits.js';
 import type { AppPickerItem } from '../../shared/appPicker.js';
+import type { AiConnectionInput, AiConnectionStatus } from '../../main/aiConnection.js';
 import type {
   AppEventName,
   AppUpdateCheckResult,
@@ -91,6 +92,10 @@ export const resetOnboarding = () => window.api.resetOnboarding();
 
 export const aiModeStatus = () => window.api.aiModeStatus();
 export const setAiMode = (enabled: boolean) => window.api.setAiMode(enabled);
+export const aiConnectionStatus = (): Promise<AiConnectionStatus> => window.api.aiConnectionStatus();
+export const testAiConnection = (input: AiConnectionInput): Promise<AiConnectionStatus> =>
+  window.api.testAiConnection(input);
+export type { AiConnectionInput, AiConnectionStatus };
 
 export type {
   AppUpdateCheckResult,

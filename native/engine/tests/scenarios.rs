@@ -320,7 +320,6 @@ fn worked_example_3_pool_unlock_with_friction() {
     assert_eq!(popup.blocking_profiles[0].id, "a");
 
     let pools = vec![pool_ref("a", "social")];
-    assert_eq!(err_code(e.apply(Command::ConfirmPoolUnlock { pools: pools.clone() }, Auth::None, &ctx)), codes::FRICTION_PENDING);
     e.apply(Command::RequestPoolUnlock { pools: pools.clone() }, Auth::None, &ctx).unwrap();
     assert_eq!(err_code(e.apply(Command::ConfirmPoolUnlock { pools: pools.clone() }, Auth::None, &at(10, 0))), codes::FRICTION_PENDING);
     let ready = Ctx::new(ctx.now.epoch_ms + 15_000, 0, true);
@@ -495,4 +494,14 @@ fn state_round_trips_through_json() {
     assert_eq!(snap["pools"][0]["leftToday"], 3);
     assert_eq!(snap["pendingUnlocks"].as_array().unwrap().len(), 1);
     assert_eq!(snap["profiles"][0]["profile"]["latch"]["state"], "on");
+}
+
+#[test]
+fn direct_confirm_skips_friction() {
+    let ctx = at(10, 0);
+    let mut e = engine_with(vec![("a", pooled_instagram(3, Friction::Breathing { secs: 15 }))], &ctx);
+    on(&mut e, "a", &ctx);
+    let pools = vec![pool_ref("a", "social")];
+    e.apply(Command::ConfirmPoolUnlock { pools: pools.clone() }, Auth::None, &ctx).unwrap();
+    assert_eq!(e.decide_app(&instagram(), &ctx).verdict, Verdict::Allow);
 }

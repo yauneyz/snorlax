@@ -1,5 +1,5 @@
-- blocklist UI is ideal
 - get streaks/pools/etc all under control. Really make the app sing again
+  - better "unlock pool" UI - comes from the block page
   - ask claude for a UI check and suggestions
 - landing/pricing copy for soft blocking and AI
 - add soft blocklist and AI to marketing copy, pricing page

@@ -1,9 +1,9 @@
 /**
- * The AI judge wire contract, shared by the daemon RPCs/events, Electron main, and the web judge
- * endpoint. Every `judge` action in a policy resolves through this flow:
+ * The AI judge wire contract, shared by the daemon RPCs/events, Electron main, and the legacy web
+ * judge endpoint. Desktop `judge` actions resolve through this flow:
  *
  *   extension ──judge-request──▶ natmsg ──judgeRequest──▶ daemon ──judgeRequested──▶ Electron main
- *   ──POST /api/desktop/judge──▶ LLM ──▶ submitJudgeVerdict ──▶ daemon ──judgeResult──▶ extension
+ *   ──POST configured /v1/chat/completions──▶ LLM ──▶ submitJudgeVerdict ──▶ daemon ──judgeResult──▶ extension
  *
  * The daemon attaches the active `JudgePolicy` (tasks/avoid) itself; the extension never sends
  * it. Anything that doesn't answer in time resolves to `JudgePolicy.fallback`.
@@ -27,7 +27,7 @@ export interface JudgePage {
   context?: JudgeContext;
 }
 
-/** Bounds enforced by the daemon and the web endpoint. */
+/** Bounds enforced by the daemon and the legacy web endpoint. */
 export const JUDGE_LIMITS = {
   requestId: 128,
   url: 4096,
@@ -35,7 +35,7 @@ export const JUDGE_LIMITS = {
   content: 4000,
 } as const;
 
-/** What Electron main posts to the web judge endpoint. */
+/** Request body used by the legacy web judge endpoint. */
 export interface JudgeHttpRequest extends JudgePage {
   judge: Pick<JudgePolicy, 'tasks' | 'avoid'>;
 }

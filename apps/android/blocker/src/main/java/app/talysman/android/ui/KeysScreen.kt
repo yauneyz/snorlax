@@ -91,7 +91,7 @@ fun KeysScreen(app: TalysmanApp, snapshot: EngineSnapshot) {
             OutlinedButton(onClick = { startPairing(KeyActivity.MODE_PAIR_QR) }) { Text("Make QR key") }
         }
         message?.let { Muted(it) }
-        Muted("Lost every key? An emergency unlock turns everything off; then you can pair a new one.")
+        Muted("Lost every key? An emergency unlock (in Settings) turns everything off; then you can pair a new one.")
         Muted("${snapshot.emergencyLeft} emergency unlocks left")
     }
 }

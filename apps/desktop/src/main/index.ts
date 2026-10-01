@@ -112,7 +112,7 @@ async function ensureProtocolCompatible(service: ServiceConnection, mock: MockSe
       );
     }
   }
-  await applyAiMode(service);
+  await applyAiMode(service, true);
 }
 
 /**

@@ -360,6 +360,22 @@ function serviceRequest(method, params) {
   });
 }
 
+/**
+ * What the toolbar popup offers to unlock: the active tab's page, or — when the tab shows the
+ * blocked page — the URL it was blocked on.
+ */
+async function activeTabTarget() {
+  try {
+    const [tab] = await browserApi.tabs.query({ active: true, currentWindow: true });
+    if (!tab || typeof tab.id !== 'number' || !tab.url) return null;
+    if (/^https?:/i.test(tab.url)) return { tabId: tab.id, url: tab.url, blocked: false };
+    const url = tab.url.startsWith(browserApi.runtime.getURL('blocked.html')) ? attemptedUrlByTab.get(tab.id) : null;
+    return url ? { tabId: tab.id, url, blocked: true } : null;
+  } catch {
+    return null;
+  }
+}
+
 function handleServiceResponse(msg) {
   const resolve = pendingServiceRequests.get(msg.requestId);
   if (!resolve) return;
@@ -377,6 +393,10 @@ browserApi.runtime.onMessage.addListener((message, sender, sendResponse) => {
     const url = tabId === undefined ? null : attemptedUrlByTab.get(tabId) ?? null;
     sendResponse({ url, decision: url ? decide(currentPolicy, url) : null });
     return false;
+  }
+  if (message?.type === 'talysman:active-tab') {
+    void activeTabTarget().then(sendResponse);
+    return true;
   }
   if (message?.type === 'talysman:service') {
     void serviceRequest(message.method, message.params).then(sendResponse);

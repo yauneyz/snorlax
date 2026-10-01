@@ -485,10 +485,10 @@ impl Engine {
                 if gate != Gate::Free {
                     return gate;
                 }
-                let friction = self.max_friction_secs(pools);
+                // A confirm with no request behind it skips the pool's friction: the dashboard's
+                // temporary unlock runs its own short countdown instead.
                 match self.pending_for(pools) {
                     Some(p) if p.ready_ms > now.epoch_ms => denied(codes::FRICTION_PENDING, "Take a breath first."),
-                    None if friction > 0 => denied(codes::FRICTION_PENDING, "Start the unlock first."),
                     _ => Gate::Free,
                 }
             }

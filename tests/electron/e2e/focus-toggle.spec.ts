@@ -32,16 +32,13 @@ test('focus requires a paired key and turning it off requires the key to be conn
     await enableButton.click();
     await expect(win.getByText('FOCUSED')).toBeVisible();
 
-    // Turning off is an override: without the key the service refuses and says why.
-    await win.getByRole('button', { name: 'Turn off…' }).click();
-    const dialog = win.getByRole('dialog', { name: 'Turn blocking off' });
-    await expect(dialog.getByText('INSERT YOUR KEY')).toBeVisible();
-    await dialog.getByRole('button', { name: /Turn everything off/ }).click();
-    await expect(dialog.getByText(/Insert your key/)).toBeVisible();
+    // Turning off is an override: without the key the button is greyed out.
+    const turnOff = win.getByRole('button', { name: 'Turn off', exact: true });
+    await expect(turnOff).toBeDisabled();
 
     // With the (simulated) key it goes through, and "Re-enable all" brings it back.
     await win.evaluate(() => window.api.devToggleKey());
-    await dialog.getByRole('button', { name: /Turn everything off/ }).click();
+    await turnOff.click();
     await expect(win.getByText('UNPROTECTED')).toBeVisible();
     await win.getByRole('button', { name: 'Re-enable all' }).click();
     await expect(win.getByText('FOCUSED')).toBeVisible();

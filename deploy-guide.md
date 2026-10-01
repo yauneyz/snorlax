@@ -41,7 +41,7 @@ The runtime pieces:
 | Release hosting  | None                                                    | `talysman-release-artifacts-prod` in `us-east-1`                                                         |
 | Database + auth  | Local Supabase stack (Docker, `supabase start`)         | Cloud project `lkanoehzgogtrxzycutl.supabase.co`                                                         |
 | Stripe           | Test mode + `stripe listen` webhook forwarding (no registered endpoint — by design) | Live mode + dashboard webhook endpoint `we_1TzB2xRN4BfSLyzwzq2fONlJ`                  |
-| LLM              | Local `llm-serve` (`LLM_PROVIDER=local`)                 | Disabled; production uses classic blocklist/allowlist filtering                                          |
+| LLM              | Desktop connection to local `llm-serve`; web judge route can use `LLM_PROVIDER=local` | Desktop users configure their own OpenAI-compatible endpoint; the web judge route remains for older clients |
 | App URL          | `http://localhost:3000`                                 | **`https://www.talysman.app`** (canonical; the apex 308-redirects to it)                                 |
 | Email            | Inbucket (local mail catcher, port 54324)               | Resend                                                                                                   |
 | Sentry / PostHog | Disabled (placeholder values auto-detected and skipped) | Enabled when real values are in `.credentials`                                                           |
@@ -106,7 +106,7 @@ Gotchas baked into the script (worth knowing, they will bite otherwise):
   stdin and are never printed by the script.
 - Empty values are skipped on push, so optional stuff (Sentry, PostHog) never creates
   empty vars on Vercel.
-- Smart/LLM filtering is enabled only in development mode. Production does not require an OpenAI key.
+- Desktop AI mode uses each user's configured OpenAI-compatible connection. The desktop build does not require a shared OpenAI key.
 - Placeholder detection: values containing `...` (from the example file) are treated as
   "unset" for PostHog/Sentry, so a half-filled `.credentials` degrades gracefully.
 

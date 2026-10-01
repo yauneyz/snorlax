@@ -1,7 +1,7 @@
 /**
  * Every profile with its own switch (spec §5.5). Several can be on at once; what's enforced is
  * the union. Turning one on is free; turning one off is an override (it needs the key and breaks
- * the streak), so the switch opens the override sheet scoped to that profile.
+ * the streak), so the switch runs an override scoped to that profile.
  */
 import React, { useState } from 'react';
 import { ErrorCode } from '@talysman/shared';
@@ -9,7 +9,6 @@ import { useFocusStore } from '../store/useFocusStore.js';
 import { activationLabel, runCommand } from '../lib/engine.js';
 import { cx, profileSummary } from '../lib/utils.js';
 import { Modal, ProfileDot } from './ui/index.js';
-import { OverrideDialog } from './OverrideDialog.js';
 
 export function ProfileSwitch({ on, disabled, onChange, label }: { on: boolean; disabled?: boolean; onChange: () => void; label: string }) {
   return (
@@ -39,7 +38,6 @@ export function ProfileList({ onClose }: { onClose: () => void }) {
   const pairedKeys = useFocusStore((s) => s.pairedKeys);
   const aiMode = useFocusStore((s) => s.aiMode);
   const [error, setError] = useState<string | null>(null);
-  const [overrideFor, setOverrideFor] = useState<string | null>(null);
 
   async function turnOn(profileId: string) {
     setError(null);
@@ -48,6 +46,15 @@ export function ProfileList({ onClose }: { onClose: () => void }) {
     } catch (e) {
       const code = (e as { code?: string }).code;
       setError(code === ErrorCode.NO_PAIRED_KEY ? 'Pair a key before turning on a profile.' : (e as Error).message);
+    }
+  }
+
+  async function turnOff(profileId: string) {
+    setError(null);
+    try {
+      await runCommand({ type: 'startOverrideExempt', profiles: [profileId], items: [] });
+    } catch (e) {
+      setError((e as Error).message);
     }
   }
 
@@ -85,7 +92,7 @@ export function ProfileList({ onClose }: { onClose: () => void }) {
                   label={`${profile.name} ${on ? 'on' : 'off'}`}
                   on={on}
                   disabled={!on && pairedKeys.length === 0}
-                  onChange={() => (on ? setOverrideFor(profile.id) : void turnOn(profile.id))}
+                  onChange={() => void (on ? turnOff(profile.id) : turnOn(profile.id))}
                 />
               </div>
             );
@@ -94,7 +101,6 @@ export function ProfileList({ onClose }: { onClose: () => void }) {
         {pairedKeys.length === 0 && <p className="mt-3 text-[12px] text-warn">Pair a key to turn profiles on.</p>}
         {error && <p className="mt-3 text-[12px] text-dangerInk">{error}</p>}
       </Modal>
-      {overrideFor && <OverrideDialog initialProfileId={overrideFor} onClose={() => setOverrideFor(null)} />}
     </>
   );
 }

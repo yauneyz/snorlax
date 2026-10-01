@@ -1,15 +1,20 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { productFeaturesForEnvironment } from '@talysman/product';
 import { useFocusStore } from '../store/useFocusStore.js';
 import {
   checkForUpdates,
+  aiConnectionStatus,
+  onAppEvent,
+  testAiConnection,
+  type AiConnectionStatus,
   devPushUsageTransition,
   devSimulateExtension,
   devToggleKey,
   uninstallService,
   type SubscriptionPlan,
 } from '../lib/bridge.js';
-import { Badge, Button, Card, CardTitle } from '../components/ui/index.js';
+import { Badge, Button, Card, CardTitle, Input } from '../components/ui/index.js';
+import { EmergencyConfirm } from '../components/EmergencyConfirm.js';
 import { cx } from '../lib/utils.js';
 
 const SMART_FILTERING_ENABLED = productFeaturesForEnvironment(
@@ -39,6 +44,8 @@ export function Settings() {
   const setAiMode = useFocusStore((s) => s.setAiMode);
   const replayOnboarding = useFocusStore((s) => s.replayOnboarding);
   const platform = useFocusStore((s) => s.platform);
+  const emergencyLeft = useFocusStore((s) => s.engine.emergencyLeft);
+  const [emergencyOpen, setEmergencyOpen] = useState(false);
   const [firstRunError, setFirstRunError] = useState<string | null>(null);
   const [confirmingUninstall, setConfirmingUninstall] = useState(false);
   const [uninstallBusy, setUninstallBusy] = useState(false);
@@ -54,12 +61,38 @@ export function Settings() {
   const [trayError, setTrayError] = useState<string | null>(null);
   const [aiModeBusy, setAiModeBusy] = useState(false);
   const [aiModeError, setAiModeError] = useState<string | null>(null);
+  const [aiConnection, setAiConnection] = useState<AiConnectionStatus | null>(null);
+  const [connectionExpanded, setConnectionExpanded] = useState(false);
+  const [connectionBusy, setConnectionBusy] = useState(false);
+  const [aiUrl, setAiUrl] = useState('');
+  const [aiModel, setAiModel] = useState('');
+  const [aiKey, setAiKey] = useState('');
+  const [aiHeaders, setAiHeaders] = useState('');
+  const [clearAiKey, setClearAiKey] = useState(false);
+  const [clearAiHeaders, setClearAiHeaders] = useState(false);
   const [updateBusy, setUpdateBusy] = useState(false);
   const [updateStatus, setUpdateStatus] = useState<{
     message: string;
     error?: boolean;
   } | null>(null);
   const showDeveloper = appEnv !== 'production' || usingMock;
+
+  useEffect(() => {
+    if (!SMART_FILTERING_ENABLED) return;
+    let active = true;
+    void aiConnectionStatus().then((status) => {
+      if (!active) return;
+      setAiConnection(status);
+      setAiUrl(status.url);
+      setAiModel(status.model);
+    });
+    const unsubscribe = onAppEvent((event) => {
+      if (event === 'aiConnectionChanged') {
+        void aiConnectionStatus().then((status) => { if (active) setAiConnection(status); });
+      }
+    });
+    return () => { active = false; unsubscribe(); };
+  }, []);
 
   async function runUninstall() {
     setConfirmingUninstall(false);
@@ -123,6 +156,10 @@ export function Settings() {
   }
 
   async function toggleAiMode() {
+    if (!aiMode && !aiConnection?.healthy) {
+      setConnectionExpanded(true);
+      return;
+    }
     setAiModeBusy(true);
     setAiModeError(null);
     try {
@@ -131,6 +168,30 @@ export function Settings() {
       setAiModeError((e as Error).message);
     } finally {
       setAiModeBusy(false);
+    }
+  }
+
+  async function runAiConnectionTest() {
+    setConnectionBusy(true);
+    setAiModeError(null);
+    try {
+      const status = await testAiConnection({
+        url: aiUrl,
+        model: aiModel,
+        apiKey: aiKey,
+        extraHeaders: aiHeaders,
+        clearApiKey: clearAiKey,
+        clearExtraHeaders: clearAiHeaders,
+      });
+      setAiConnection(status);
+      setAiKey('');
+      setAiHeaders('');
+      setClearAiKey(false);
+      setClearAiHeaders(false);
+    } catch (e) {
+      setAiModeError((e as Error).message);
+    } finally {
+      setConnectionBusy(false);
     }
   }
 
@@ -307,7 +368,9 @@ export function Settings() {
             </p>
             <div className="flex items-center justify-between gap-3">
               <span className="font-medium text-slate-200">
-                Status: <Badge tone={aiMode ? 'ok' : 'neutral'}>{aiMode ? 'On' : 'Off'}</Badge>
+                Status: <Badge tone={aiMode ? aiConnection?.healthy ? 'ok' : 'danger' : 'neutral'}>
+                  {aiMode ? aiConnection?.healthy ? 'On' : 'On, waiting for connection' : 'Off'}
+                </Badge>
               </span>
               <Button
                 variant={aiMode ? 'ghost' : 'primary'}
@@ -317,10 +380,63 @@ export function Settings() {
                 {aiMode ? 'Turn off' : 'Turn on'}
               </Button>
             </div>
+            <div className="flex items-center justify-between gap-3 rounded-lg border border-white/[0.08] bg-white/[0.025] px-3 py-2">
+              <span className="flex items-center gap-2 text-[12.5px]">
+                <span aria-label={aiConnection?.healthy ? 'Connection working' : 'Connection needs attention'}
+                  className={cx('h-2.5 w-2.5 rounded-full', aiConnection?.healthy ? 'bg-ok shadow-[0_0_8px_rgb(var(--color-success)/0.6)]' : 'bg-danger shadow-[0_0_8px_rgb(var(--color-danger)/0.55)]')} />
+                {aiConnection?.healthy ? 'AI connection working' : 'AI connection needs a successful test'}
+              </span>
+              <Button variant="ghost" onClick={() => setConnectionExpanded(!connectionExpanded)}>
+                {connectionExpanded ? 'Hide setup' : 'Connection setup'}
+              </Button>
+            </div>
+            {aiConnection?.error && <p className="text-[12.5px] text-dangerInk">{aiConnection.error}</p>}
+            {connectionExpanded && (
+              <div className="flex flex-col gap-3 rounded-lg border border-white/[0.08] p-3">
+                {aiConnection?.localPreset && <p className="text-[12px] text-slate-400">Local preset: llm-serve at 127.0.0.1:11434. Model auto discovers the active target.</p>}
+                <label className="text-[12px] text-slate-300">OpenAI compatible URL
+                  <Input value={aiUrl} onChange={(e) => setAiUrl(e.target.value)} placeholder="https://api.openai.com/v1" className="mt-1" />
+                </label>
+                <label className="text-[12px] text-slate-300">Model ID
+                  <Input value={aiModel} onChange={(e) => setAiModel(e.target.value)} placeholder="Model ID or auto" className="mt-1" />
+                </label>
+                <label className="text-[12px] text-slate-300">API key (optional)
+                  <Input type="password" value={aiKey} onChange={(e) => setAiKey(e.target.value)} placeholder={aiConnection?.hasApiKey ? 'Saved key (leave blank to keep)' : 'Bearer token'} className="mt-1" autoComplete="off" />
+                </label>
+                {aiConnection?.hasApiKey && <label className="flex items-center gap-2 text-[12px] text-slate-400"><input type="checkbox" checked={clearAiKey} onChange={(e) => setClearAiKey(e.target.checked)} />Remove saved key</label>}
+                <label className="text-[12px] text-slate-300">Extra headers (optional JSON)
+                  <Input value={aiHeaders} onChange={(e) => setAiHeaders(e.target.value)} placeholder={aiConnection?.hasExtraHeaders ? 'Saved headers (leave blank to keep)' : '{"Header-Name":"value"}'} className="mt-1" autoComplete="off" />
+                </label>
+                {aiConnection?.hasExtraHeaders && <label className="flex items-center gap-2 text-[12px] text-slate-400"><input type="checkbox" checked={clearAiHeaders} onChange={(e) => setClearAiHeaders(e.target.checked)} />Remove saved headers</label>}
+                <p className="text-[12px] text-slate-400">Testing sends a short prompt to this endpoint. Once connected, pages set to AI are sent there for judgment.</p>
+                <div><Button disabled={connectionBusy || !aiUrl.trim() || !aiModel.trim()} onClick={() => void runAiConnectionTest()}>{connectionBusy ? 'Testing…' : 'Test connection'}</Button></div>
+              </div>
+            )}
             {aiModeError && <p className="text-[12.5px] text-warn">{aiModeError}</p>}
           </div>
         </Card>
       )}
+
+      <Card>
+        <CardTitle hint="Keyless, five per device for life. Use it when your key is lost or broken.">
+          Emergency unlock
+        </CardTitle>
+        <div className="flex flex-col gap-3 text-sm text-slate-300">
+          <p className="text-slate-400">
+            Turns everything off — even locked windows — until you or a schedule turn it back on. Resets your
+            streak. You can never get an emergency unlock back.
+          </p>
+          <div className="flex items-center justify-between gap-3">
+            <span className="font-medium text-slate-200">
+              Left: <Badge tone={emergencyLeft === 0 ? 'danger' : 'neutral'}>{emergencyLeft}</Badge>
+            </span>
+            <Button variant="danger" disabled={emergencyLeft === 0} onClick={() => setEmergencyOpen(true)}>
+              Use emergency unlock…
+            </Button>
+          </div>
+        </div>
+      </Card>
+      {emergencyOpen && <EmergencyConfirm onClose={() => setEmergencyOpen(false)} />}
 
       {platform === 'darwin' && (
         <Card>

@@ -37,6 +37,14 @@
         </dl>
       </section>
 
+      <!-- Spend one of the current page's unlock-group unlocks (the same keyless command the blocked page sends). -->
+      <section class="unlock-card" id="unlock" hidden>
+        <p class="unlock-title" id="unlock-title"></p>
+        <p class="unlock-detail" id="unlock-detail"></p>
+        <button type="button" id="unlock-button" hidden></button>
+        <p class="unlock-detail error" id="unlock-error" hidden></p>
+      </section>
+
       <!-- Firefox for Android: connect to the Talysman app instead of the desktop. -->
       <form class="pairing" id="pairing" hidden>
         <label for="pairing-code">Talysman app pairing code</label>
@@ -52,8 +60,6 @@
 
       <footer>
         <span id="version"></span>
-        <span aria-hidden="true">·</span>
-        <span>Read-only status</span>
       </footer>
     </main>
 

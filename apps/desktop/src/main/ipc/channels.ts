@@ -63,6 +63,8 @@ export const Channels = {
   aiModeStatus: 'app:aiModeStatus',
   /** invoke: { enabled } → persist AI mode and push the capability flag to the daemon. */
   setAiMode: 'app:setAiMode',
+  aiConnectionStatus: 'app:aiConnectionStatus',
+  testAiConnection: 'app:testAiConnection',
   /** invoke: { message, stack? } → report an uncaught renderer error/rejection for tracking. */
   reportRendererError: 'app:reportRendererError',
   /** invoke: close the app-blocked unlock popup window. */

@@ -184,3 +184,47 @@ footer {
   font: inherit;
   font-weight: 650;
 }
+
+.unlock-card {
+  display: grid;
+  gap: 8px;
+  margin-top: 14px;
+  padding: 13px 15px;
+  border: 1px solid rgb(var(--color-border));
+  border-radius: 12px;
+  background: rgb(var(--color-panel));
+}
+
+.unlock-title {
+  color: rgb(var(--color-foreground-strong));
+  font-size: 12px;
+  font-weight: 650;
+  line-height: 1.4;
+}
+
+.unlock-detail {
+  color: rgb(var(--color-foreground-muted));
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.unlock-detail.error {
+  color: rgb(var(--color-danger));
+}
+
+.unlock-card button {
+  padding: 8px 12px;
+  border: 1px solid rgb(var(--color-signal));
+  border-radius: 999px;
+  background: rgb(var(--color-signal));
+  color: rgb(var(--color-signal-ink));
+  font: inherit;
+  font-size: 12px;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.unlock-card button:disabled {
+  opacity: 0.6;
+  cursor: default;
+}

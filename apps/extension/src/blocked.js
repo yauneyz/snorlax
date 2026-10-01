@@ -3,7 +3,7 @@
 // Site rules never lead here — they hide parts of a page instead of blocking it.
 //
 // Below the explanation sits the unlock popup (spec §3.10): which profiles block the page, the
-// streak, the page's unlock pool with what's left today, the pause before an unlock, and a link
+// streak, the page's unlock group with what's left today, the pause before an unlock, and a link
 // to the desktop app's key-gated options. Its data comes from the service through the background
 // worker and the native host, which only relay popup info and the keyless pool-unlock commands.
 //
@@ -87,7 +87,7 @@
     var button = el('unlock-button');
     if (!info.pools.length) {
       show('pool');
-      show('pool-title', 'This page isn’t in an unlock pool.');
+      show('pool-title', 'This page isn’t in an unlock group.');
       show('pool-detail', 'Change that, or turn blocking off, in the Talysman app.');
       button.hidden = true;
     } else {
@@ -134,6 +134,11 @@
       if (response && response.ok) {
         info = response.result;
         render();
+      } else if (!info) {
+        // Without popup info there's no unlock button; say why rather than showing nothing.
+        show('unlock');
+        el('other-options').hidden = true;
+        show('unlock-error', 'Unlock options unavailable: ' + ((response && response.message) || 'no answer from the Talysman app.'));
       }
       return response;
     });

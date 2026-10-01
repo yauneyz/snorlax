@@ -2,7 +2,7 @@
  * The block/unlock popup (spec §3.10), shown in its own small window when the service closes a
  * blocked app. Same content as the extension's blocked page: who's blocking it, the streak, the
  * item's pool with unlocks left today, the pause (countdown or breathing) before an unlock, and a
- * way to the key-gated override options.
+ * way to the dashboard's pause / temporary unlock.
  */
 import React, { useCallback, useEffect, useState } from 'react';
 import type { PoolRef, PopupInfo, PopupTarget } from '@talysman/shared';
@@ -107,7 +107,7 @@ export function UnlockPopup({ target }: { target: PopupTarget }) {
           {left === 0 && <div className="mt-1 text-[12px] text-warn">Resets at midnight.</div>}
         </div>
       ) : (
-        <p className="text-[12.5px] text-slate-400">This isn’t in an unlock pool.</p>
+        <p className="text-[12.5px] text-slate-400">This isn’t in an unlock group.</p>
       )}
 
       {pending && !ready && (
@@ -138,7 +138,7 @@ export function UnlockPopup({ target }: { target: PopupTarget }) {
           Not now
         </Button>
         <button onClick={() => void openOverrides()} className="text-[11.5px] text-slate-450 hover:text-slate-300">
-          Other options ({info.emergencyLeft} emergency unlocks left)
+          Other options
           {info.lockedUntilMs !== null && ` · locked until ${formatClock(info.lockedUntilMs)}`}
         </button>
         {error && <p className="text-[12px] text-dangerInk">{error}</p>}

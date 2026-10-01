@@ -64,11 +64,13 @@ import {
 } from '../../shared/productLimits.js';
 import { completeOnboarding, getOnboardingStatus, resetOnboarding } from '../onboarding.js';
 import { getAiModeEnabled, setAiModeEnabled } from '../aiMode.js';
+import { getAiConnectionStatus, onAiConnectionChange, testAiConnection, type AiConnectionInput } from '../aiConnection.js';
+import { applyAiMode } from '../aiMode.js';
 import { Channels } from './channels.js';
 import { closeUnlockPopup, showUnlockPopup } from '../popupWindow.js';
 
 /** Events pushed to renderers so the UI re-pulls auth/entitlement after a change. */
-export type AppEvent = 'authChanged' | 'entitlementChanged' | 'openOverrides';
+export type AppEvent = 'authChanged' | 'entitlementChanged' | 'openOverrides' | 'aiConnectionChanged';
 
 let activeService: ServiceConnection | undefined;
 const features = productFeaturesForEnvironment(config.appEnv);
@@ -514,10 +516,17 @@ export async function registerIpcHandlers(ctx: HandlerContext): Promise<void> {
   });
 
   // --- AI mode ---
+  onAiConnectionChange(() => broadcastAppEvent('aiConnectionChanged'));
   ipcHandle(Channels.aiModeStatus, async () => ({ enabled: await getAiModeEnabled(service) }));
   ipcHandle(Channels.setAiMode, async (_e, args: { enabled: boolean }) => {
     await setAiModeEnabled(service, args?.enabled === true);
     return { enabled: await getAiModeEnabled(service) };
+  });
+  ipcHandle(Channels.aiConnectionStatus, () => getAiConnectionStatus());
+  ipcHandle(Channels.testAiConnection, async (_e, input: AiConnectionInput) => {
+    const status = await testAiConnection(input);
+    await applyAiMode(service);
+    return status;
   });
 
   ipcHandle(Channels.reportRendererError, (_e, args: { message: string; stack?: string }) => {

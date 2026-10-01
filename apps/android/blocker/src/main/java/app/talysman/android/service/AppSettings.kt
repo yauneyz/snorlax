@@ -15,4 +15,9 @@ class AppSettings(context: Context) {
     var onboarded: Boolean
         get() = prefs.getBoolean("onboarded", false)
         set(value) = prefs.edit().putBoolean("onboarded", value).apply()
+
+    /** The unlock group ("profileId/poolId") last used for a temporary unlock from Home. */
+    var lastUnlockPool: String?
+        get() = prefs.getString("lastUnlockPool", null)
+        set(value) = prefs.edit().putString("lastUnlockPool", value).apply()
 }

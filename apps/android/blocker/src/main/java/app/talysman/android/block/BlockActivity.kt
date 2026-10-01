@@ -198,7 +198,7 @@ private fun BlockScreen(
             }
             StreakBadge(info.streak.currentDays, info.streak.bestDays)
             if (info.pools.isEmpty()) {
-                Text("This isn’t in an unlock pool.", color = TalysmanPalette.ForegroundMuted)
+                Text("This isn’t in an unlock group.", color = TalysmanPalette.ForegroundMuted)
             } else {
                 val left = info.pools.minOf { it.leftToday }
                 val perDay = info.pools.minOf { it.unlocksPerDay }
@@ -229,7 +229,7 @@ private fun BlockScreen(
         error?.let { Text(it, color = TalysmanPalette.Danger) }
         OutlinedButton(onClick = onNotNow, modifier = Modifier.fillMaxWidth()) { Text("Not now") }
         TextButton(onClick = onOtherOptions) {
-            Text("Other options (${info?.emergencyLeft ?: 5} emergency unlocks left)", color = TalysmanPalette.ForegroundMuted)
+            Text("Other options", color = TalysmanPalette.ForegroundMuted)
         }
     }
 }

@@ -18,6 +18,7 @@ import { config } from './config.js';
 import { logger } from './logging.js';
 import type { ServiceConnection } from './service/connection.js';
 import { effectiveSmartFiltering, resolveAiModeEnabled } from './aiModePolicy.js';
+import { isAiConnectionHealthy, testAiConnection } from './aiConnection.js';
 
 const STORE_FILE = 'ai-mode.json';
 
@@ -65,12 +66,18 @@ export async function getAiModeEnabled(service: ServiceConnection): Promise<bool
 }
 
 /** Push the effective capability flag (build flag AND AI mode) to the daemon. */
-export async function applyAiMode(service: ServiceConnection): Promise<void> {
-  const enabled = effectiveSmartFiltering(features.smartFiltering, await getAiModeEnabled(service));
+export async function applyAiMode(service: ServiceConnection, testOnStartup = false): Promise<void> {
+  const requested = await getAiModeEnabled(service);
+  if (requested && testOnStartup && !isAiConnectionHealthy()) await testAiConnection();
+  const enabled = effectiveSmartFiltering(features.smartFiltering, requested && isAiConnectionHealthy());
   await service.request('setSmartFilteringEnabled', { enabled });
 }
 
 export async function setAiModeEnabled(service: ServiceConnection, enabled: boolean): Promise<void> {
+  if (enabled && !isAiConnectionHealthy()) {
+    const status = await testAiConnection();
+    if (!status.healthy) throw new Error(status.error ?? 'Test the AI connection first.');
+  }
   cache = enabled;
   await persist(enabled);
   await applyAiMode(service);
@@ -78,5 +85,5 @@ export async function setAiModeEnabled(service: ServiceConnection, enabled: bool
 
 /** Synchronous read for hot paths once startup has settled the value. Unknown ⇒ off. */
 export function aiModeEnabledSync(): boolean {
-  return cache === true;
+  return cache === true && isAiConnectionHealthy();
 }

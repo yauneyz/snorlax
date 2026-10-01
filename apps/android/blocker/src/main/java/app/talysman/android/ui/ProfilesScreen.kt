@@ -33,7 +33,7 @@ fun newId(prefix: String) = "$prefix-" + java.util.UUID.randomUUID().toString().
 fun ProfilesScreen(app: TalysmanApp, snapshot: EngineSnapshot, onEdit: (String) -> Unit) {
     val runner = LocalKeyRunner.current
     ScreenColumn("Profiles") {
-        Muted("Each profile is its own set of apps, sites, soft blocks, unlock pools and schedule. Any number can be on.")
+        Muted("Each profile is its own set of apps, sites, soft blocks, unlock groups and schedule. Any number can be on.")
         snapshot.profiles.forEach { status ->
             Panel(Modifier.clickable { onEdit(status.profile.id) }) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {

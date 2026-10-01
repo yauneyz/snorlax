@@ -2,165 +2,171 @@ package app.talysman.android.ui
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
-import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import app.talysman.android.TalysmanApp
 import app.talysman.android.engine.Commands
-import app.talysman.android.engine.ConfigEdits
-import app.talysman.android.engine.EngineRefusal
 import app.talysman.android.engine.EngineSnapshot
-import app.talysman.android.engine.Items
+import app.talysman.android.engine.PoolRef
+import app.talysman.android.engine.PoolStatus
+import app.talysman.android.service.AppSettings
 import app.talysman.android.ui.theme.StreakBadge
 import app.talysman.android.ui.theme.TalysmanPalette
-import kotlinx.serialization.json.JsonElement
+import kotlinx.coroutines.delay
+
+private val PAUSE_PRESETS = listOf(10, 30, 60, 120)
+private const val UNLOCK_COUNTDOWN_SECS = 5
+
+private fun poolKey(p: PoolStatus) = "${p.profileId}/${p.poolId}"
 
 /**
- * The key-gated override paths (spec §3.5): everything off until re-enabled, some profiles /
- * sites / apps off until "Re-enable all", or everything off for a while. Plus the keyless
- * emergency unlock — always "everything off", five per device for life.
+ * What Home's pause/unlock button opens (spec §3.5). Pause everything until a chosen time (needs
+ * the key, breaks the streak), or — without the key — a temporary unlock of one of an active
+ * profile's unlock groups: keyless, limited per day, behind a short countdown, with the group last
+ * unlocked here preselected. There's no way to sense a key on Android, so the sheet starts on
+ * pause when a key is paired and lets you switch. Emergency unlocks live in Settings.
  */
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun OverrideSheet(app: TalysmanApp, snapshot: EngineSnapshot, onClose: () -> Unit) {
-    val runner = LocalKeyRunner.current
-    var path by remember { mutableStateOf("menu") }
-    var emergency by remember { mutableStateOf(false) }
-    val chosenProfiles = remember { mutableStateOf(setOf<String>()) }
-    val chosenItems = remember { mutableStateOf(setOf<String>()) }
-    val active = snapshot.profiles.filter { it.activation.active && it.activation.lockedUntilMs == null }
-    val locked = snapshot.profiles.filter { it.activation.active && it.activation.lockedUntilMs != null }
-    val items: Map<String, JsonElement> = buildMap {
-        active.forEach { status ->
-            val config = status.profile.config
-            ConfigEdits.blockedDomains(config).forEach { put("domain:$it", Items.domain(it)) }
-            ConfigEdits.softRules(config).keys.forEach { put("catalog:$it", Items.catalog(it)) }
-            ConfigEdits.blockedPackages(config).forEach { put("app:$it", Items.app(it, it)) }
-        }
+    val hasKeys = remember { app.keys.hasKeys() }
+    var unlock by remember { mutableStateOf(!hasKeys) }
+    if (unlock) {
+        TemporaryUnlockSheet(app, snapshot, onClose, onPause = if (hasKeys) ({ unlock = false }) else null)
+    } else {
+        PauseSheet(snapshot, onClose, onUnlock = { unlock = true })
     }
-    fun label(key: String, item: JsonElement) = Items.label(item) { app.catalog.app(it)?.label }.let {
-        if (key.startsWith("app:")) runCatching {
-            app.packageManager.getApplicationLabel(app.packageManager.getApplicationInfo(it, 0)).toString()
-        }.getOrDefault(it) else it
-    }
+}
 
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun PauseSheet(snapshot: EngineSnapshot, onClose: () -> Unit, onUnlock: () -> Unit) {
+    val runner = LocalKeyRunner.current
+    var minutes by remember { mutableIntStateOf(30) }
     AlertDialog(
         onDismissRequest = onClose,
-        title = { Text("Turn blocking off") },
+        title = { Text("Pause until…") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 StreakBadge(snapshot.streak.currentDays, snapshot.streak.bestDays)
-                if (locked.isNotEmpty()) {
-                    Muted(
-                        "${locked.joinToString { it.profile.name }} ${if (locked.size == 1) "is" else "are"} locked until " +
-                            "${formatClock(locked.maxOf { it.activation.lockedUntilMs ?: 0 })}. Overrides leave locked profiles alone.",
-                    )
-                }
-                when (path) {
-                    "menu" -> {
-                        Button(onClick = { runner.run(Commands.startOverrideAll(), onClose) }, enabled = active.isNotEmpty(), modifier = Modifier.fillMaxWidth()) {
-                            Text("Turn everything off")
-                        }
-                        OutlinedButton(onClick = { path = "some" }, enabled = active.isNotEmpty(), modifier = Modifier.fillMaxWidth()) {
-                            Text("Turn off some things…")
-                        }
-                        OutlinedButton(onClick = { path = "pause" }, modifier = Modifier.fillMaxWidth()) { Text("Pause everything for…") }
-                        Muted("These need your key and reset your streak.")
-                    }
-                    "some" -> {
-                        Muted("Profiles")
-                        FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                            active.forEach { status ->
-                                val on = status.profile.id in chosenProfiles.value
-                                Toggle(status.profile.name, on) {
-                                    chosenProfiles.value = if (on) chosenProfiles.value - status.profile.id else chosenProfiles.value + status.profile.id
-                                }
-                            }
-                        }
-                        if (items.isNotEmpty()) {
-                            Muted("Sites and apps")
-                            FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                items.forEach { (key, item) ->
-                                    val on = key in chosenItems.value
-                                    Toggle(label(key, item), on) {
-                                        chosenItems.value = if (on) chosenItems.value - key else chosenItems.value + key
-                                    }
-                                }
-                            }
-                        }
-                        Button(
-                            enabled = chosenProfiles.value.isNotEmpty() || chosenItems.value.isNotEmpty(),
-                            onClick = {
-                                runner.run(
-                                    Commands.startOverrideExempt(chosenItems.value.mapNotNull { items[it] }, chosenProfiles.value.toList()),
-                                    onClose,
-                                )
-                            },
-                        ) { Text("Turn off selected") }
-                    }
-                    "pause" -> FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        listOf(10, 30, 60, 120).forEach { minutes ->
-                            OutlinedButton(onClick = { runner.run(Commands.startOverrideTimed(minutes), onClose) }) {
-                                Text(if (minutes < 60) "$minutes min" else "${minutes / 60} h")
-                            }
-                        }
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    PAUSE_PRESETS.forEach { m ->
+                        Toggle(if (m < 60) "$m min" else "${m / 60} h", minutes == m) { minutes = m }
                     }
                 }
-                TextButton(onClick = { emergency = true }, enabled = snapshot.emergencyLeft > 0) {
-                    Text(
-                        if (snapshot.emergencyLeft > 0) "No key? Emergency unlock — turns everything off (${snapshot.emergencyLeft} left)"
-                        else "No emergency unlocks left",
-                        color = TalysmanPalette.ForegroundMuted,
-                    )
+                Muted("Back on at ${formatClock(System.currentTimeMillis() + minutes * 60_000L)}. Needs your key and resets your streak.")
+                TextButton(onClick = onUnlock) {
+                    Text("No key with you? Temporary unlock", color = TalysmanPalette.ForegroundMuted)
                 }
             }
         },
         confirmButton = {
-            if (snapshot.overridden) TextButton(onClick = { runner.run(Commands.reenableAll(), onClose) }) { Text("Re-enable all") }
+            Button(onClick = { runner.run(Commands.startOverrideTimed(minutes), onClose) }) { Text("Pause") }
         },
-        dismissButton = { TextButton(onClick = onClose) { Text("Close") } },
+        dismissButton = { TextButton(onClick = onClose) { Text("Cancel") } },
     )
+}
 
-    if (emergency) {
-        var error by remember { mutableStateOf<String?>(null) }
-        AlertDialog(
-            onDismissRequest = { emergency = false },
-            title = { Text("Emergency unlock") },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(
-                        "Use 1 of your ${snapshot.emergencyLeft} remaining emergency unlocks? Everything turns off — even locked " +
-                            "schedules — until you or a schedule turn it back on. You can never get this unlock back." +
-                            if (snapshot.streak.currentDays > 0) " Your ${snapshot.streak.currentDays}-day streak resets." else "",
-                    )
-                    Muted("Lost your key? Afterwards you can pair a new one on the Keys tab.")
-                    error?.let { Text(it, color = TalysmanPalette.Danger) }
-                }
-            },
-            confirmButton = {
-                Button(onClick = {
-                    try {
-                        app.engine.apply(Commands.emergencyUnlock())
-                        emergency = false
-                        onClose()
-                    } catch (e: EngineRefusal) {
-                        error = e.message
-                    }
-                }) { Text("Use emergency unlock") }
-            },
-            dismissButton = { TextButton(onClick = { emergency = false }) { Text("Cancel") } },
-        )
+@Composable
+private fun TemporaryUnlockSheet(app: TalysmanApp, snapshot: EngineSnapshot, onClose: () -> Unit, onPause: (() -> Unit)?) {
+    val runner = LocalKeyRunner.current
+    val settings = remember { AppSettings(app) }
+    val activeIds = snapshot.profiles.filter { it.activation.active }.map { it.profile.id }.toSet()
+    val pools = snapshot.pools.filter { it.profileId in activeIds }
+    var selected by remember {
+        val last = settings.lastUnlockPool
+        mutableStateOf(pools.firstOrNull { poolKey(it) == last }?.let(::poolKey) ?: pools.firstOrNull()?.let(::poolKey))
     }
+    var countdown by remember { mutableIntStateOf(UNLOCK_COUNTDOWN_SECS) }
+    LaunchedEffect(countdown) {
+        if (countdown > 0) {
+            delay(1000)
+            countdown--
+        }
+    }
+    val pool = pools.firstOrNull { poolKey(it) == selected }
+    val showProfile = pools.map { it.profileId }.toSet().size > 1
+    val now = System.currentTimeMillis()
+
+    AlertDialog(
+        onDismissRequest = onClose,
+        title = { Text("Temporary unlock") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                if (pools.isEmpty()) {
+                    Muted("None of the profiles that are on has an unlock group.")
+                } else {
+                    Muted("Unlock one group for a while, no key needed.")
+                    Column(Modifier.selectableGroup()) {
+                        pools.forEach { p ->
+                            val key = poolKey(p)
+                            val profileName = snapshot.profiles.firstOrNull { it.profile.id == p.profileId }?.profile?.name
+                            val until = p.activeUntilMs?.takeIf { it > now }
+                            Row(
+                                Modifier.fillMaxWidth().selectable(selected = key == selected, role = Role.RadioButton) { selected = key },
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                RadioButton(selected = key == selected, onClick = null)
+                                Column(Modifier.weight(1f)) {
+                                    Text(
+                                        if (showProfile && profileName != null) "${p.name} · $profileName" else p.name,
+                                        color = TalysmanPalette.ForegroundStrong,
+                                    )
+                                    Muted(
+                                        if (until != null) "Unlocked until ${formatClock(until, now)}"
+                                        else "${p.unlockMinutes} min each · ${p.leftToday} of ${p.unlocksPerDay} left today",
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+                if (onPause != null) {
+                    TextButton(onClick = onPause) { Text("Have your key? Pause instead", color = TalysmanPalette.ForegroundMuted) }
+                }
+            }
+        },
+        confirmButton = {
+            if (pools.isNotEmpty()) {
+                Button(
+                    enabled = countdown == 0 && pool != null && pool.leftToday > 0,
+                    onClick = {
+                        val p = pool ?: return@Button
+                        runner.run(Commands.confirmPoolUnlock(listOf(PoolRef(p.profileId, p.poolId)))) {
+                            settings.lastUnlockPool = poolKey(p)
+                            onClose()
+                        }
+                    },
+                ) {
+                    Text(
+                        when {
+                            countdown > 0 -> "Unlock in $countdown…"
+                            pool != null && pool.leftToday == 0 -> "None left today"
+                            else -> "Unlock for ${pool?.unlockMinutes ?: 0} min"
+                        },
+                    )
+                }
+            }
+        },
+        dismissButton = { TextButton(onClick = onClose) { Text("Cancel") } },
+    )
 }
