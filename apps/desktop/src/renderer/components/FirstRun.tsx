@@ -12,6 +12,7 @@ import type { Drive, Policy } from '@talysman/shared';
 import { palette } from '@talysman/shared';
 import { productFeaturesForEnvironment } from '@talysman/product';
 import { devSimulateExtension, openExternal, request } from '../lib/bridge.js';
+import { useIgnoredDrives } from '../lib/ignoredDrives.js';
 import { useFocusStore } from '../store/useFocusStore.js';
 import { saveProfile } from '../lib/engine.js';
 import { cx } from '../lib/utils.js';
@@ -117,7 +118,10 @@ export function FirstRun({ onDone }: { onDone: () => void }) {
   const [step, setStep] = useState(0);
   // First-run profiles start empty, so there's nothing meaningful to derive the preset from yet.
   const [mode, setMode] = useState<ModePreset>('blacklist');
-  const [drives, setDrives] = useState<Drive[]>([]);
+  const [allDrives, setDrives] = useState<Drive[]>([]);
+  const { isIgnored } = useIgnoredDrives();
+  // Drives hidden from the Keys page stay hidden here too.
+  const drives = useMemo(() => allDrives.filter((d) => !isIgnored(d.id)), [allDrives, isIgnored]);
   const [driveId, setDriveId] = useState('');
   const [keyLabel, setKeyLabel] = useState('');
   const [busy, setBusy] = useState(false);
@@ -144,7 +148,6 @@ export function FirstRun({ onDone }: { onDone: () => void }) {
     try {
       const res = await request('listRemovableDrives', undefined);
       setDrives(res.drives);
-      setDriveId((c) => (res.drives.some((d) => d.id === c) ? c : (res.drives[0]?.id ?? '')));
     } catch {
       // A drive scan failure isn't worth blocking setup over; the Keys page reports it properly.
     }
@@ -155,6 +158,10 @@ export function FirstRun({ onDone }: { onDone: () => void }) {
     if (current !== 'key') return;
     void scanDrives();
   }, [current, scanDrives]);
+
+  useEffect(() => {
+    setDriveId((c) => (drives.some((d) => d.id === c) ? c : (drives[0]?.id ?? '')));
+  }, [drives]);
 
   const selectedDrive = drives.find((d) => d.id === driveId);
   const hasKey = pairedKeys.length > 0;

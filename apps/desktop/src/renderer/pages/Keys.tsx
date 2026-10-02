@@ -1,7 +1,8 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import type { Drive } from '@talysman/shared';
 import { ErrorCode } from '@talysman/shared';
 import { request } from '../lib/bridge.js';
+import { useIgnoredDrives } from '../lib/ignoredDrives.js';
 import { useFocusStore } from '../store/useFocusStore.js';
 import { cx, formatTime } from '../lib/utils.js';
 import { Badge, Button, Card, Input, Kicker } from '../components/ui/index.js';
@@ -15,6 +16,9 @@ export function Keys() {
   const [label, setLabel] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [scanning, setScanning] = useState(false);
+  const [showIgnored, setShowIgnored] = useState(false);
+  const { ignored, ignore, unignore, isIgnored } = useIgnoredDrives();
+  const visibleDrives = useMemo(() => drives.filter((d) => !isIgnored(d.id)), [drives, isIgnored]);
 
   const scan = useCallback(async (showProgress = true) => {
     if (showProgress) setScanning(true);
@@ -22,9 +26,6 @@ export function Keys() {
     try {
       const { drives } = await request('listRemovableDrives', undefined);
       setDrives(drives);
-      setSelected((current) =>
-        drives.some((drive) => drive.id === current) ? current : (drives[0]?.id ?? ''),
-      );
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -35,6 +36,13 @@ export function Keys() {
   useEffect(() => {
     void scan();
   }, [scan]);
+
+  // Keep the selection on a drive that's actually listed (after a rescan or an ignore).
+  useEffect(() => {
+    setSelected((current) =>
+      visibleDrives.some((d) => d.id === current) ? current : (visibleDrives[0]?.id ?? ''),
+    );
+  }, [visibleDrives]);
 
   async function pair() {
     if (!selected) return;
@@ -65,7 +73,7 @@ export function Keys() {
     }
   }
 
-  const selectedDrive = drives.find((d) => d.id === selected);
+  const selectedDrive = visibleDrives.find((d) => d.id === selected);
 
   return (
     <div className="flex flex-col gap-3 py-3">
@@ -152,42 +160,52 @@ export function Keys() {
           </div>
 
           <div className="mt-3 flex flex-col gap-1.5">
-            {drives.map((d) => {
+            {visibleDrives.map((d) => {
               const on = d.id === selected;
               return (
-                <button
-                  key={d.id}
-                  onClick={() => setSelected(d.id)}
-                  className={cx(
-                    'flex items-center gap-3 rounded-[10px] border px-3.5 py-3 text-left transition',
-                    on
-                      ? 'border-seal/30 bg-seal/[0.09]'
-                      : 'border-white/[0.07] bg-white/[0.025] hover:border-white/[0.14]',
-                  )}
-                >
-                  <span
+                <div key={d.id} className="group relative">
+                  <button
+                    onClick={() => setSelected(d.id)}
                     className={cx(
-                      'block h-2 w-2 shrink-0 rounded-full border',
+                      'flex w-full items-center gap-3 rounded-[10px] border py-3 pl-3.5 pr-16 text-left transition',
                       on
-                        ? 'border-seal bg-seal shadow-[0_0_7px_1px_rgb(var(--color-signal)/0.6)]'
-                        : 'border-white/25 bg-transparent',
+                        ? 'border-seal/30 bg-seal/[0.09]'
+                        : 'border-white/[0.07] bg-white/[0.025] hover:border-white/[0.14]',
                     )}
-                  />
-                  <span className="min-w-0">
-                    <span className="block truncate text-[12.5px] font-semibold text-slate-150">
-                      {d.label}
-                    </span>
-                    {d.serialAmbiguous && (
-                      <span className="mt-0.5 block font-mono text-[10.5px] text-slate-450">
-                        no stable serial · uses a file marker
+                  >
+                    <span
+                      className={cx(
+                        'block h-2 w-2 shrink-0 rounded-full border',
+                        on
+                          ? 'border-seal bg-seal shadow-[0_0_7px_1px_rgb(var(--color-signal)/0.6)]'
+                          : 'border-white/25 bg-transparent',
+                      )}
+                    />
+                    <span className="min-w-0">
+                      <span className="block truncate text-[12.5px] font-semibold text-slate-150">
+                        {d.label}
                       </span>
-                    )}
-                  </span>
-                </button>
+                      {d.serialAmbiguous && (
+                        <span className="mt-0.5 block font-mono text-[10.5px] text-slate-450">
+                          no stable serial · uses a file marker
+                        </span>
+                      )}
+                    </span>
+                  </button>
+                  <button
+                    onClick={() => ignore(d)}
+                    title="Hide this drive from the list"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-[11px] font-medium text-slate-500 opacity-0 transition hover:text-slate-300 focus-visible:opacity-100 group-hover:opacity-100"
+                  >
+                    ignore
+                  </button>
+                </div>
               );
             })}
-            {drives.length === 0 && (
-              <p className="text-[12px] text-slate-500">No removable drives found.</p>
+            {visibleDrives.length === 0 && (
+              <p className="text-[12px] text-slate-500">
+                {drives.length === 0 ? 'No removable drives found.' : 'Only ignored drives found.'}
+              </p>
             )}
           </div>
 
@@ -212,7 +230,36 @@ export function Keys() {
           <div className="mt-auto flex items-center gap-2 pt-3">
             <span className="block h-1.5 w-1.5 rounded-full bg-seal" />
             <span className="text-[11px] text-slate-500">Use Rescan after inserting a drive.</span>
+            {ignored.length > 0 && (
+              <button
+                onClick={() => setShowIgnored((v) => !v)}
+                aria-expanded={showIgnored}
+                className="ml-auto text-[11px] text-slate-500 transition hover:text-slate-300"
+              >
+                {ignored.length} ignored {showIgnored ? '▴' : '▾'}
+              </button>
+            )}
           </div>
+          {showIgnored && ignored.length > 0 && (
+            <ul className="mt-2 flex flex-col gap-1">
+              {ignored.map((d) => (
+                <li
+                  key={d.id}
+                  className="flex items-center justify-between gap-2 rounded-md px-2 py-1 text-[11.5px] text-slate-450 hover:bg-white/[0.03]"
+                >
+                  <span className="truncate">{d.label}</span>
+                  <button
+                    onClick={() => unignore(d.id)}
+                    title="Stop ignoring this drive"
+                    aria-label={`Stop ignoring ${d.label}`}
+                    className="shrink-0 px-1 text-slate-500 transition hover:text-slate-200"
+                  >
+                    ×
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
         </Card>
       </div>
     </div>

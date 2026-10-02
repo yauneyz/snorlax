@@ -1,8 +1,7 @@
 - get the app to really sing, fully in order
+- do my daily posting
 - landing/pricing copy for soft blocking and AI
-- add soft blocklist and AI to marketing copy, pricing page
-- improve pricing page copy in general
-- create a motion graphic with AI
+- create a motion graphic with AI for home page
 - ship new builds, extension, etc, ship model
 - post in discord/x/indie-hackers sub about the new features
 - send to instagram guy - mention the new soft blocking
@@ -27,7 +26,12 @@
 - reach out to lists to get in them
 
 - stats layer
+
+Marketing App Ideas
 - "GoodPhone" - a marketing app that lets your phone show you all the good things you should be doing. Who to call, leisure checklist, etc.
+- a unique landing page
+- a maze/level with billboards and easter eggs
+- pokemon romhack with easter eggs and advertisements
 
 
 
