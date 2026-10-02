@@ -607,10 +607,10 @@ export function Blocklists({ onUpgrade }: { onUpgrade: () => void }) {
   const pools = selected?.config.pools ?? [];
   const poolsSummary =
     pools.length === 0
-      ? 'None · give yourself a few keyless unlocks a day'
+      ? 'None · allow yourself a couple short breaks per day'
       : pools.length === 1
         ? `${poolSummary(pools[0]!)} · covers ${plural(pools[0]!.items.length, 'item')}`
-        : `${pools.length} pools`;
+        : `${pools.length} groups`;
 
   const proBadge = <Badge tone="neutral">Pro</Badge>;
 
@@ -1084,7 +1084,7 @@ export function Blocklists({ onUpgrade }: { onUpgrade: () => void }) {
             title="Unlock groups"
             help={
               <>
-                Keyless unlocks you allow yourself each day. Unlocking one item in a pool opens
+                Keyless unlocks you allow yourself each day. Unlocking one item in a group opens
                 everything in it for the set time.
               </>
             }

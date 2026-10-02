@@ -78,12 +78,12 @@ fn pool_relaxations(prev: &[Pool], next: &[Pool]) -> Vec<String> {
         match prev.iter().find(|p| p.id == pool.id) {
             None => {
                 if pool.unlocks_per_day > 0 && !pool.items.is_empty() {
-                    out.push(format!("Adds the {} pool", pool.name));
+                    out.push(format!("Adds the {} group", pool.name));
                 }
             }
             Some(before) => {
                 if pool.items.iter().any(|item| !before.items.contains(item)) && pool.unlocks_per_day > 0 {
-                    out.push(format!("Adds items to the {} pool", pool.name));
+                    out.push(format!("Adds items to the {} group", pool.name));
                 }
                 if pool.unlocks_per_day > before.unlocks_per_day {
                     out.push(format!("Raises {} unlocks per day", pool.name));
@@ -179,20 +179,20 @@ pub fn validate(config: &ProfileConfig) -> Result<(), String> {
     let mut seen: Vec<&ItemRef> = Vec::new();
     for pool in &config.pools {
         if pool.name.trim().is_empty() {
-            return Err("Pool names cannot be empty.".into());
+            return Err("Group names cannot be empty.".into());
         }
         if pool.unlocks_per_day > MAX_POOL_UNLOCKS_PER_DAY {
-            return Err(format!("Pools allow at most {MAX_POOL_UNLOCKS_PER_DAY} unlocks a day."));
+            return Err(format!("Groups allow at most {MAX_POOL_UNLOCKS_PER_DAY} unlocks a day."));
         }
         if pool.unlock_minutes == 0 || pool.unlock_minutes > MAX_POOL_UNLOCK_MINUTES {
-            return Err(format!("Pool unlocks last 1–{MAX_POOL_UNLOCK_MINUTES} minutes."));
+            return Err(format!("Group unlocks last 1–{MAX_POOL_UNLOCK_MINUTES} minutes."));
         }
         if pool.friction.secs() > MAX_FRICTION_SECS {
             return Err(format!("Pauses are at most {MAX_FRICTION_SECS} seconds."));
         }
         for item in &pool.items {
             if seen.contains(&item) {
-                return Err(format!("POOL_ITEM_CONFLICT: an item can be in only one pool ({item:?})."));
+                return Err(format!("POOL_ITEM_CONFLICT: an item can be in only one group ({item:?})."));
             }
             if let ItemRef::Catalog { id } = item {
                 if site_catalog::site(id).is_none() {
@@ -209,7 +209,7 @@ pub fn validate(config: &ProfileConfig) -> Result<(), String> {
     ids.sort();
     ids.dedup();
     if ids.len() != count || ids.iter().any(|id| id.is_empty()) {
-        return Err("Pool, schedule and event ids must be unique and non-empty.".into());
+        return Err("Group, schedule and event ids must be unique and non-empty.".into());
     }
     for rule in &config.schedule {
         let times: Vec<&String> = match rule {

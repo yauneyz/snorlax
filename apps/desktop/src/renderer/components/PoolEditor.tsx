@@ -103,7 +103,7 @@ export function PoolEditor({
   const patch = (id: string, fields: Partial<Pool>) => onSave(pools.map((p) => (p.id === id ? { ...p, ...fields } : p)));
 
   function addPool() {
-    const pool: Pool = { id: `pool-${Date.now().toString(36)}`, name: `Pool ${pools.length + 1}`, ...DEFAULT_POOL };
+    const pool: Pool = { id: `pool-${Date.now().toString(36)}`, name: `Group ${pools.length + 1}`, ...DEFAULT_POOL };
     onSave([...pools, pool]);
   }
 
@@ -139,7 +139,7 @@ export function PoolEditor({
                 defaultValue={pool.name}
                 onBlur={(e) => e.target.value.trim() && e.target.value !== pool.name && patch(pool.id, { name: e.target.value.trim() })}
                 onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
-                aria-label="Pool name"
+                aria-label="Group name"
                   className="py-1.5 font-semibold"
                 />
               </div>
@@ -147,7 +147,7 @@ export function PoolEditor({
                 onClick={() => onSave(pools.filter((p) => p.id !== pool.id))}
                 className="ml-auto text-[11px] font-medium text-slate-500 transition hover:text-dangerInk"
               >
-                Delete pool
+                Delete group
               </button>
             </div>
 
@@ -210,7 +210,7 @@ export function PoolEditor({
                     disabled={elsewhere}
                     onClick={() => toggleItem(pool, item)}
                     aria-pressed={mine}
-                    title={elsewhere ? 'Already in another pool' : undefined}
+                    title={elsewhere ? 'Already in another group' : undefined}
                     className={cx(
                       'rounded-full border px-2.5 py-1 text-[11.5px] transition disabled:opacity-40',
                       mine ? 'border-signal/40 bg-signal/[0.12] text-slate-100' : 'border-white/[0.08] text-slate-400 hover:bg-white/[0.05]',
@@ -227,7 +227,7 @@ export function PoolEditor({
       })}
 
       <Button variant="ghost" onClick={addPool} className="self-start px-3.5 py-1.5 text-[11.5px]">
-        + New pool
+        + New group
       </Button>
     </div>
   );

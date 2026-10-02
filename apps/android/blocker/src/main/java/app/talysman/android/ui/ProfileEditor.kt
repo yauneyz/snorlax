@@ -68,7 +68,7 @@ fun ProfileEditor(app: TalysmanApp, snapshot: EngineSnapshot, profileId: String,
     val config = profile.config
     fun save(next: JsonObject, name: String = profile.name) = runner.run(Commands.upsertProfile(profile.id, name, profile.color, next))
     var tab by rememberSaveable { mutableStateOf(0) }
-    val tabs = listOf("Apps", "Websites", "Soft blocks", "Pools", "Schedule", "Profile")
+    val tabs = listOf("Apps", "Websites", "Soft blocks", "Groups", "Schedule", "Profile")
     Column {
         Row(verticalAlignment = Alignment.CenterVertically) {
             TextButton(onClick = onBack) { Text("‹ Profiles") }
@@ -190,7 +190,7 @@ private fun PoolsTab(app: TalysmanApp, config: JsonObject, save: (JsonObject) ->
         ConfigEdits.blockedDomains(config).map { Items.domain(it) } +
         ConfigEdits.softRules(config).keys.map { Items.catalog(it) }
     fun key(item: JsonElement) = item.toString()
-    Muted("A pool lets you unlock its apps and sites without your key a few times a day, with an optional pause first. Pool unlocks don’t reset your streak.")
+    Muted("A group lets you unlock its apps and sites without your key a few times a day, with an optional pause first. Unlocks from a group don’t reset your streak.")
     pools.forEachIndexed { index, pool ->
         fun update(next: JsonObject) = save(ConfigEdits.setPools(config, pools.toMutableList().also { it[index] = next }))
         val items = pool["items"]?.jsonArray ?: JsonArray(emptyList())
@@ -198,7 +198,7 @@ private fun PoolsTab(app: TalysmanApp, config: JsonObject, save: (JsonObject) ->
         val frictionKind = friction?.get("kind")?.jsonPrimitive?.content ?: "none"
         val secs = friction?.get("secs")?.jsonPrimitive?.intOrNull ?: 15
         Panel {
-            var name by remember(pool) { mutableStateOf(pool["name"]?.jsonPrimitive?.content ?: "Pool") }
+            var name by remember(pool) { mutableStateOf(pool["name"]?.jsonPrimitive?.content ?: "Group") }
             OutlinedTextField(name, { name = it }, label = { Text("Name") }, modifier = Modifier.fillMaxWidth())
             if (name != pool["name"]?.jsonPrimitive?.content && name.isNotBlank()) {
                 TextButton(onClick = { update(JsonObject(pool + ("name" to JsonPrimitive(name)))) }) { Text("Save name") }
@@ -227,7 +227,7 @@ private fun PoolsTab(app: TalysmanApp, config: JsonObject, save: (JsonObject) ->
                     })))
                 }
             }
-            Kicker("In this pool")
+            Kicker("In this group")
             val elsewhere = pools.filterIndexed { i, _ -> i != index }.flatMap { it["items"]?.jsonArray ?: JsonArray(emptyList()) }.map(::key).toSet()
             FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 candidates.filter { key(it) !in elsewhere }.forEach { item ->
@@ -239,20 +239,20 @@ private fun PoolsTab(app: TalysmanApp, config: JsonObject, save: (JsonObject) ->
                 }
             }
             TextButton(onClick = { save(ConfigEdits.setPools(config, pools.filterIndexed { i, _ -> i != index })) }) {
-                Text("Delete pool", color = TalysmanPalette.Danger)
+                Text("Delete group", color = TalysmanPalette.Danger)
             }
         }
     }
     OutlinedButton(onClick = {
         save(ConfigEdits.setPools(config, pools + buildJsonObject {
             put("id", newId("pool"))
-            put("name", "Pool ${pools.size + 1}")
+            put("name", "Group ${pools.size + 1}")
             put("items", JsonArray(emptyList()))
             put("unlocksPerDay", 3)
             put("unlockMinutes", 10)
             put("friction", buildJsonObject { put("kind", "none") })
         }))
-    }, enabled = candidates.isNotEmpty()) { Text("New pool") }
+    }, enabled = candidates.isNotEmpty()) { Text("New group") }
 }
 
 @Composable

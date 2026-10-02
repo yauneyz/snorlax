@@ -1,6 +1,4 @@
-- get streaks/pools/etc all under control. Really make the app sing again
-  - better "unlock pool" UI - comes from the block page
-  - ask claude for a UI check and suggestions
+- get the app to really sing, fully in order
 - landing/pricing copy for soft blocking and AI
 - add soft blocklist and AI to marketing copy, pricing page
 - improve pricing page copy in general
@@ -41,6 +39,21 @@
 
 - SEO pages media
 - drive GEO
+
+
+Daily Minimum:
+- 3 tweets
+- 1 linkedin
+- 1 youtube affiliate request
+
+Weekly minimum:
+- 1 blog post
+- 1 piece of "creative software" posted on HN, X, Reddit (with advertisement)
+- 2 listicle requests
+
+
+Think:
+- how can I start building a platform around the message of cognitive firewall and soft blocking?
 
 
 Notes:

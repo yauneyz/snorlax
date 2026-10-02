@@ -567,7 +567,7 @@ impl Engine {
         }
         for r in pools {
             let Some(status) = self.pool_status(r, now) else {
-                return denied(codes::BAD_REQUEST, "Pool not found.");
+                return denied(codes::BAD_REQUEST, "Group not found.");
             };
             if status.left_today == 0 {
                 return denied(codes::POOL_EXHAUSTED, format!("No {} unlocks left today.", status.name));
