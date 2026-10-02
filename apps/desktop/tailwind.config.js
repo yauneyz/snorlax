@@ -14,6 +14,12 @@ const cssColor = (name) => {
 export default {
   content: ['./src/renderer/index.html', './src/renderer/**/*.{ts,tsx}'],
   theme: {
+    fontSize: {
+      caption: ['12px', { lineHeight: '1.5' }],
+      body: ['14px', { lineHeight: '1.5' }],
+      heading: ['18px', { lineHeight: '1.3' }],
+      display: ['28px', { lineHeight: '1.2' }],
+    },
     extend: {
       fontFamily: {
         sans: ['"Space Grotesk Variable"', 'ui-sans-serif', 'system-ui', 'sans-serif'],

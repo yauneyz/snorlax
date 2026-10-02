@@ -88,7 +88,7 @@ const startMinutes = (w: ScheduleWindow) => parseHm(w.start) ?? 0;
 
 
 const INPUT =
-  'rounded-[7px] border border-white/[0.10] bg-white/[0.04] px-2.5 py-1.5 font-mono text-[12.5px] font-medium text-slate-100 outline-none transition focus:border-white/25';
+  'rounded-[7px] border border-white/[0.10] bg-white/[0.04] px-2.5 py-1.5 font-mono text-body font-medium text-slate-100 outline-none transition focus:border-white/25';
 
 /** "2026-09-24T18:30" for a datetime-local input, in local time. */
 function toLocalInput(ms: number): string {
@@ -109,7 +109,7 @@ function DayPicker({ days, onChange }: { days: Weekday[]; onChange: (days: Weekd
             aria-label={DAY_SHORT[d]}
             aria-pressed={has}
             className={cx(
-              'flex-1 rounded-md border py-1.5 font-mono text-[11px] font-semibold transition',
+              'flex-1 rounded-md border py-1.5 font-mono text-caption font-semibold transition',
               has
                 ? 'border-seal/40 bg-seal/[0.16] text-sealInk'
                 : 'border-white/[0.08] bg-white/[0.03] text-slate-500 hover:bg-white/[0.06]',
@@ -139,7 +139,7 @@ function ProfileChooser({ profiles, value, onChange }: { profiles: Profile[]; va
             style={on ? { backgroundColor: `${p.color}29`, borderColor: `${p.color}73` } : undefined}
           >
             <ProfileDot color={p.color} size={7} />
-            <span className="truncate text-[11.5px] font-medium">{p.name}</span>
+            <span className="truncate text-caption font-medium">{p.name}</span>
           </button>
         );
       })}
@@ -271,14 +271,14 @@ export function SchedulePage({ onUpgrade }: { onUpgrade: () => void }) {
   return (
     <div className="flex h-full min-h-0 flex-col pt-3">
       <div className="flex items-center gap-3">
-        <Kicker className="text-[9.5px] tracking-[0.2em]">Recurring blocks · {windows.length}</Kicker>
-        <span className="font-mono text-[10px] tracking-[0.1em] text-slate-600">
+        <h2 className="text-heading font-semibold text-slate-100">Recurring blocks · {windows.length}</h2>
+        <span className="font-mono text-caption tracking-[0.1em] text-slate-600">
           {Math.round(weeklyMinutes / 60)}H BLOCKED PER WEEK
         </span>
         {!scheduleEnabled && <Badge tone="neutral">Pro</Badge>}
         <button
           onClick={addWindow}
-          className="ml-auto rounded-full border border-seal/30 bg-seal/[0.12] px-3.5 py-1.5 text-[11.5px] font-semibold text-sealInk transition hover:border-seal/45 hover:bg-seal/[0.18]"
+          className="ml-auto rounded-full border border-seal/30 bg-seal/[0.12] px-3.5 py-1.5 text-caption font-semibold text-sealInk transition hover:border-seal/45 hover:bg-seal/[0.18]"
         >
           {scheduleEnabled ? '+ New block' : 'Upgrade for scheduling'}
         </button>
@@ -296,10 +296,10 @@ export function SchedulePage({ onUpgrade }: { onUpgrade: () => void }) {
             running ? 'bg-ok shadow-[0_0_9px_2px_rgb(var(--color-success)/0.45)]' : 'bg-slate-450',
           )}
         />
-        <span className="text-[12.5px] font-semibold text-slate-150">
+        <span className="text-body font-semibold text-slate-150">
           {running ? `${running.profile.name} is running` : 'No block running'}
         </span>
-        <span className="ml-auto font-mono text-[10.5px] tracking-[0.06em] text-slate-400">
+        <span className="ml-auto font-mono text-caption tracking-[0.06em] text-slate-400">
           {runningOcc
             ? `ENDS ${formatClock(runningOcc.endMs, now).toUpperCase()}`
             : nextStart
@@ -308,7 +308,7 @@ export function SchedulePage({ onUpgrade }: { onUpgrade: () => void }) {
         </span>
       </div>
 
-      {error && <p className="mt-2 text-[12px] text-dangerInk">{error}</p>}
+      {error && <p className="mt-2 text-caption text-dangerInk">{error}</p>}
 
       <div className="mt-3 flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto pb-2 pr-1">
         {windows.map((w) => {
@@ -331,22 +331,22 @@ export function SchedulePage({ onUpgrade }: { onUpgrade: () => void }) {
                 className="flex w-full items-center gap-[18px] px-3.5 py-3 text-left"
               >
                 <span className="flex w-[250px] shrink-0 flex-col gap-[3px]">
-                  <span className="whitespace-nowrap font-mono text-[20px] font-medium tracking-[-0.02em] text-slate-100">
+                  <span className="whitespace-nowrap font-mono text-heading font-medium tracking-[-0.02em] text-slate-100">
                     {fmt12(w.start)} → {fmt12(w.end)}
                   </span>
-                  <span className="font-mono text-[9.5px] tracking-[0.14em] text-slate-450">{durationLabel(w)}</span>
+                  <span className="font-mono text-caption tracking-[0.14em] text-slate-450">{durationLabel(w)}</span>
                 </span>
                 <span className="flex min-w-0 flex-1 flex-col gap-2">
                   <span className="flex items-center gap-2">
                     <ProfileDot color={color} />
-                    <span className="truncate text-[13px] font-semibold text-slate-150">{nameFor(w.profileId)}</span>
+                    <span className="truncate text-body font-semibold text-slate-150">{nameFor(w.profileId)}</span>
                     {isNow && (
-                      <span className="shrink-0 rounded-full border border-seal/35 bg-seal/[0.13] px-1.5 py-px font-mono text-[9px] font-semibold tracking-[0.14em] text-sealInk">
+                      <span className="shrink-0 rounded-full border border-seal/35 bg-seal/[0.13] px-1.5 py-px font-mono text-caption font-semibold tracking-[0.14em] text-sealInk">
                         ON NOW
                       </span>
                     )}
                     {w.locked && (
-                      <span className="shrink-0 rounded-full border border-locked/30 bg-locked/10 px-1.5 py-px font-mono text-[9px] font-semibold tracking-[0.14em] text-lockedInk">
+                      <span className="shrink-0 rounded-full border border-locked/30 bg-locked/10 px-1.5 py-px font-mono text-caption font-semibold tracking-[0.14em] text-lockedInk">
                         KEY LOCKED
                       </span>
                     )}
@@ -358,7 +358,7 @@ export function SchedulePage({ onUpgrade }: { onUpgrade: () => void }) {
                         <span
                           key={d}
                           className={cx(
-                            'flex h-5 w-[23px] items-center justify-center rounded-[5px] border font-mono text-[9.5px] font-semibold',
+                            'flex h-5 w-[23px] items-center justify-center rounded-[5px] border font-mono text-caption font-semibold',
                             has ? 'text-slate-100' : 'border-white/[0.06] bg-white/[0.03] text-slate-600',
                           )}
                           style={has ? { backgroundColor: `${color}29`, borderColor: `${color}61` } : undefined}
@@ -367,7 +367,7 @@ export function SchedulePage({ onUpgrade }: { onUpgrade: () => void }) {
                         </span>
                       );
                     })}
-                    <span className="ml-2 truncate font-mono text-[10.5px] text-slate-450">{daysLabel(w.days)}</span>
+                    <span className="ml-2 truncate font-mono text-caption text-slate-450">{daysLabel(w.days)}</span>
                   </span>
                 </span>
               </button>
@@ -375,13 +375,13 @@ export function SchedulePage({ onUpgrade }: { onUpgrade: () => void }) {
               {open && (
                 <div className="grid grid-cols-2 gap-x-4 gap-y-3.5 border-t border-white/[0.06] bg-white/[0.022] px-3.5 pb-3.5 pt-3.5">
                   <div>
-                    <Kicker className="text-[9.5px] tracking-[0.16em]">Profile</Kicker>
+                    <Kicker className="text-caption tracking-[0.16em]">Profile</Kicker>
                     <div className="mt-1.5">
                       <ProfileChooser profiles={profiles} value={w.profileId} onChange={(id) => void moveWindow(w, id)} />
                     </div>
                   </div>
                   <div>
-                    <Kicker className="text-[9.5px] tracking-[0.16em]">Time of day</Kicker>
+                    <Kicker className="text-caption tracking-[0.16em]">Time of day</Kicker>
                     <div className="mt-1.5 flex items-center gap-2">
                       <input
                         type="time"
@@ -390,7 +390,7 @@ export function SchedulePage({ onUpgrade }: { onUpgrade: () => void }) {
                         onChange={(e) => void patchWindow(w, { start: e.target.value })}
                         className={cx(INPUT, 'w-full')}
                       />
-                      <span className="font-mono text-[12px] text-slate-450">→</span>
+                      <span className="font-mono text-caption text-slate-450">→</span>
                       <input
                         type="time"
                         aria-label="End time"
@@ -401,7 +401,7 @@ export function SchedulePage({ onUpgrade }: { onUpgrade: () => void }) {
                     </div>
                   </div>
                   <div>
-                    <Kicker className="text-[9.5px] tracking-[0.16em]">Repeat weekly</Kicker>
+                    <Kicker className="text-caption tracking-[0.16em]">Repeat weekly</Kicker>
                     <div className="mt-1.5">
                       <DayPicker days={w.days} onChange={(days) => void patchWindow(w, { days })} />
                     </div>
@@ -419,7 +419,7 @@ export function SchedulePage({ onUpgrade }: { onUpgrade: () => void }) {
                             key={label}
                             onClick={() => void patchWindow(w, { days: [...set] })}
                             className={cx(
-                              'rounded-full border px-2.5 py-1 text-[10.5px] font-medium transition',
+                              'rounded-full border px-2.5 py-1 text-caption font-medium transition',
                               on
                                 ? 'border-white/[0.18] bg-white/[0.08] text-slate-150'
                                 : 'border-white/[0.08] bg-transparent text-slate-400 hover:bg-white/[0.05]',
@@ -435,7 +435,7 @@ export function SchedulePage({ onUpgrade }: { onUpgrade: () => void }) {
                     <button
                       onClick={() => void patchWindow(w, { locked: !w.locked })}
                       className={cx(
-                        'flex-1 rounded-lg border py-2.5 text-[11.5px] font-medium transition',
+                        'flex-1 rounded-lg border py-2.5 text-caption font-medium transition',
                         w.locked
                           ? 'border-locked/35 bg-locked/[0.14] text-lockedInk'
                           : 'border-white/[0.08] bg-white/[0.03] text-slate-400 hover:bg-white/[0.06]',
@@ -448,7 +448,7 @@ export function SchedulePage({ onUpgrade }: { onUpgrade: () => void }) {
                         setOpenId((cur) => (cur === w.id ? null : cur));
                         void replaceRule(w.profileId, w.id, null);
                       }}
-                      className="rounded-lg border border-danger/28 px-3.5 py-2.5 text-[11.5px] font-medium text-dangerInk transition hover:bg-danger/[0.10]"
+                      className="rounded-lg border border-danger/28 px-3.5 py-2.5 text-caption font-medium text-dangerInk transition hover:bg-danger/[0.10]"
                     >
                       Delete
                     </button>
@@ -461,8 +461,8 @@ export function SchedulePage({ onUpgrade }: { onUpgrade: () => void }) {
 
         {windows.length === 0 && (
           <div className="flex shrink-0 flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-white/[0.10] px-6 py-6 text-center">
-            <span className="text-[15px] font-semibold text-slate-250">No blocks yet</span>
-            <span className="max-w-sm text-[12px] leading-relaxed text-slate-400">
+            <span className="text-body font-semibold text-slate-250">No blocks yet</span>
+            <span className="max-w-sm text-caption leading-relaxed text-slate-400">
               A block is a profile plus a time range that repeats every week — like an alarm, but for
               focus. Several profiles can run at once.
             </span>
@@ -471,11 +471,11 @@ export function SchedulePage({ onUpgrade }: { onUpgrade: () => void }) {
 
         {/* "On at" / "Off at" rules. */}
         <div className="mt-3 flex items-center gap-3">
-          <Kicker className="text-[9.5px] tracking-[0.2em]">On at / off at · {atRules.length}</Kicker>
-          <button onClick={() => addAtRule('on')} className="ml-auto text-[11px] font-medium text-slate-400 hover:text-slate-200">
+          <h2 className="text-heading font-semibold text-slate-100">On at / off at · {atRules.length}</h2>
+          <button onClick={() => addAtRule('on')} className="ml-auto text-caption font-medium text-slate-400 hover:text-slate-200">
             + On at…
           </button>
-          <button onClick={() => addAtRule('off')} className="text-[11px] font-medium text-slate-400 hover:text-slate-200">
+          <button onClick={() => addAtRule('off')} className="text-caption font-medium text-slate-400 hover:text-slate-200">
             + Off at…
           </button>
         </div>
@@ -500,7 +500,7 @@ export function SchedulePage({ onUpgrade }: { onUpgrade: () => void }) {
                   </option>
                 ))}
               </Select>
-              <span className={cx('font-mono text-[11px]', rule.action === 'on' ? 'text-okInk' : 'text-dangerInk')}>
+              <span className={cx('font-mono text-caption', rule.action === 'on' ? 'text-okInk' : 'text-dangerInk')}>
                 TURNS {rule.action.toUpperCase()} AT
               </span>
               <input
@@ -515,7 +515,7 @@ export function SchedulePage({ onUpgrade }: { onUpgrade: () => void }) {
               </div>
               <button
                 onClick={() => void replaceRule(profileId, rule.id, null)}
-                className="ml-auto text-[11px] text-slate-500 hover:text-dangerInk"
+                className="ml-auto text-caption text-slate-500 hover:text-dangerInk"
               >
                 Remove
               </button>
@@ -525,7 +525,7 @@ export function SchedulePage({ onUpgrade }: { onUpgrade: () => void }) {
 
         {/* One-time events. */}
         <div className="mt-3 flex items-center gap-3">
-          <Kicker className="text-[9.5px] tracking-[0.2em]">One-time · {oneShots.length}</Kicker>
+          <h2 className="text-heading font-semibold text-slate-100">One-time · {oneShots.length}</h2>
         </div>
         <div className="flex shrink-0 flex-wrap items-center gap-2 rounded-xl border border-dashed border-white/[0.10] px-3.5 py-2.5">
           <Select
@@ -551,20 +551,20 @@ export function SchedulePage({ onUpgrade }: { onUpgrade: () => void }) {
             onChange={(e) => setNewShotAt(e.target.value)}
             className={INPUT}
           />
-          <button onClick={addOneShot} className="ml-auto text-[11.5px] font-semibold text-slate-300 hover:text-white">
+          <button onClick={addOneShot} className="ml-auto text-caption font-semibold text-slate-300 hover:text-white">
             Add
           </button>
         </div>
         {oneShots.map((shot) => (
           <div key={`${shot.profileId}:${shot.id}`} className="flex shrink-0 items-center gap-2 rounded-xl border border-white/[0.06] bg-white/[0.025] px-3.5 py-2.5">
             <ProfileDot color={colorFor(shot.profileId)} />
-            <span className="text-[12.5px] text-slate-200">
+            <span className="text-body text-slate-200">
               {nameFor(shot.profileId)} turns {shot.action} · {formatClock(shot.atMs, now)}
             </span>
             {shot.firedAtMs !== null ? (
               <Badge tone="ok">DONE</Badge>
             ) : (
-              <button onClick={() => removeOneShot(shot.profileId, shot.id)} className="ml-auto text-[11px] text-slate-500 hover:text-dangerInk">
+              <button onClick={() => removeOneShot(shot.profileId, shot.id)} className="ml-auto text-caption text-slate-500 hover:text-dangerInk">
                 Remove
               </button>
             )}

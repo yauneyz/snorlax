@@ -22,7 +22,7 @@ function useNow(intervalMs = 250): number {
 }
 
 export function UnlockPopup({ target }: { target: PopupTarget }) {
-  const [info, setInfo] = useState<PopupInfo | null>(null);
+  const [info, setInfo] = useState<(PopupInfo & { showStreak: boolean }) | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const now = useNow();
@@ -37,7 +37,12 @@ export function UnlockPopup({ target }: { target: PopupTarget }) {
 
   useEffect(() => {
     void load();
-    return onEvent('stateChanged', () => void load());
+    const offState = onEvent('stateChanged', () => void load());
+    const offSettings = onEvent('settingsChanged', () => void load());
+    return () => {
+      offState();
+      offSettings();
+    };
   }, [load]);
 
   if (!info) {
@@ -75,9 +80,9 @@ export function UnlockPopup({ target }: { target: PopupTarget }) {
   return (
     <div className="flex h-full flex-col gap-4 p-5 text-slate-200 [-webkit-app-region:drag]">
       <div>
-        <div className="text-[18px] font-semibold text-slate-100">{info.label}</div>
+        <div className="text-heading font-semibold text-slate-100">{info.label}</div>
         {info.blockingProfiles.length > 0 && (
-          <div className="mt-1 flex flex-wrap items-center gap-2 text-[12px] text-slate-400">
+          <div className="mt-1 flex flex-wrap items-center gap-2 text-caption text-slate-400">
             Blocked by
             {info.blockingProfiles.map((p) => (
               <span key={p.id} className="flex items-center gap-1 text-slate-200">
@@ -89,38 +94,38 @@ export function UnlockPopup({ target }: { target: PopupTarget }) {
         )}
       </div>
 
-      <StreakBadge streak={info.streak} className="self-start" />
+      {info.showStreak && <StreakBadge streak={info.streak} className="self-start" />}
 
       {unblocked ? (
-        <p className="text-[13px] text-okInk">Unlocked — you can open it now.</p>
+        <p className="text-body text-okInk">Unlocked — you can open it now.</p>
       ) : info.pools.length > 0 ? (
         <div className="rounded-[12px] border border-white/[0.08] bg-white/[0.03] px-4 py-3">
-          <div className="text-[13px] font-semibold text-slate-100">
+          <div className="text-body font-semibold text-slate-100">
             {info.pools.map((p) => p.name).join(' + ')} · {left} of {perDay} unlocks left today
           </div>
-          <div className="mt-0.5 text-[12px] text-slate-400">Each unlock: {minutes} minutes</div>
+          <div className="mt-0.5 text-caption text-slate-400">Each unlock: {minutes} minutes</div>
           {info.unpooledProfiles.length > 0 && (
-            <div className="mt-1 text-[12px] text-warn">
+            <div className="mt-1 text-caption text-warn">
               Also blocked by a profile with no unlocks for this.
             </div>
           )}
-          {left === 0 && <div className="mt-1 text-[12px] text-warn">Resets at midnight.</div>}
+          {left === 0 && <div className="mt-1 text-caption text-warn">Resets at midnight.</div>}
         </div>
       ) : (
-        <p className="text-[12.5px] text-slate-400">This isn’t in an unlock group.</p>
+        <p className="text-body text-slate-400">This isn’t in an unlock group.</p>
       )}
 
       {pending && !ready && (
         <div className="flex flex-col items-center gap-2 py-2">
           <div
             className={cx(
-              'flex h-24 w-24 items-center justify-center rounded-full border border-signal/40 bg-signal/[0.08] font-mono text-[22px] text-slate-100',
+              'flex h-24 w-24 items-center justify-center rounded-full border border-signal/40 bg-signal/[0.08] font-mono text-heading text-slate-100',
               breathing && 'animate-[breathe_8s_ease-in-out_infinite]',
             )}
           >
             {secondsLeft}
           </div>
-          <div className="text-[12px] text-slate-400">{breathing ? 'Breathe in… and out.' : 'Take a moment.'}</div>
+          <div className="text-caption text-slate-400">{breathing ? 'Breathe in… and out.' : 'Take a moment.'}</div>
         </div>
       )}
 
@@ -137,11 +142,11 @@ export function UnlockPopup({ target }: { target: PopupTarget }) {
         <Button variant="ghost" onClick={() => void closePopup()}>
           Not now
         </Button>
-        <button onClick={() => void openOverrides()} className="text-[11.5px] text-slate-450 hover:text-slate-300">
+        <button onClick={() => void openOverrides()} className="text-caption text-slate-450 hover:text-slate-300">
           Other options
           {info.lockedUntilMs !== null && ` · locked until ${formatClock(info.lockedUntilMs)}`}
         </button>
-        {error && <p className="text-[12px] text-dangerInk">{error}</p>}
+        {error && <p className="text-caption text-dangerInk">{error}</p>}
       </div>
     </div>
   );

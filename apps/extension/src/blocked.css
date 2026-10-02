@@ -185,11 +185,6 @@ p {
   cursor: not-allowed;
 }
 
-.actions .secondary {
-  color: rgb(var(--color-foreground-muted, var(--color-foreground)));
-  font-size: 13px;
-}
-
 .error {
   color: rgb(var(--color-danger));
 }

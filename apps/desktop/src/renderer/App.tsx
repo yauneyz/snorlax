@@ -117,7 +117,7 @@ export default function App() {
                 key={n.route}
                 onClick={() => setRoute(n.route)}
                 className={cx(
-                  'desktop-nav-item flex items-center gap-2.5 rounded-[10px] px-[11px] py-[9px] text-left text-[13px] font-medium transition',
+                  'desktop-nav-item flex items-center gap-2.5 rounded-[10px] px-[11px] py-[9px] text-left text-body font-medium transition',
                   on
                     ? 'bg-white/[0.065] text-white shadow-[inset_0_1px_rgb(var(--color-white)/0.035)]'
                     : 'text-slate-400 hover:bg-white/[0.04] hover:text-slate-200',
@@ -135,8 +135,8 @@ export default function App() {
             glow={focusActive}
           />
           <div>
-            <div className="font-mono text-[9.5px] tracking-[0.14em] text-slate-450">MODE</div>
-            <div className="mt-0.5 text-[12.5px] font-medium text-slate-200">
+            <div className="font-mono text-caption tracking-[0.14em] text-slate-450">MODE</div>
+            <div className="mt-0.5 text-body font-medium text-slate-200">
               {focusActive ? policyModeLabel(policy, aiMode) : 'Off'}
             </div>
           </div>
@@ -154,7 +154,7 @@ export default function App() {
               <span className="desktop-route-title">{activeRoute?.label}</span>
             </div>
             {usingMock && (
-              <span className="font-mono text-[10px] tracking-[0.14em] text-warn">MOCK SERVICE</span>
+              <span className="font-mono text-caption tracking-[0.14em] text-warn">MOCK SERVICE</span>
             )}
 
             <button
@@ -176,7 +176,7 @@ export default function App() {
               />
               <span
                 className={cx(
-                  'font-mono text-[10.5px] font-medium tracking-[0.12em]',
+                  'font-mono text-caption font-medium tracking-[0.12em]',
                   keyPresent ? 'text-okInk' : 'text-dangerInk',
                 )}
               >
@@ -188,7 +188,7 @@ export default function App() {
 
         {watchdogWarning && (
           <div className="pointer-events-none absolute inset-x-0 top-14 z-50 flex justify-center p-4">
-            <div className="pointer-events-auto flex items-center gap-3 rounded-[10px] border border-warn/40 bg-warn/[0.10] px-4 py-2 text-[12.5px] text-warn backdrop-blur-md">
+            <div className="pointer-events-auto flex items-center gap-3 rounded-[10px] border border-warn/40 bg-warn/[0.10] px-4 py-2 text-body text-warn backdrop-blur-md">
               <span>
                 {watchdogWarning.browser} isn’t proving the Talysman extension is active — it will
                 be closed if it stays unprotected.

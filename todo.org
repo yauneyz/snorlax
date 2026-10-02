@@ -1,4 +1,3 @@
-- get the app to really sing, fully in order
 - do my daily posting
 - landing/pricing copy for soft blocking and AI
 - create a motion graphic with AI for home page
@@ -6,7 +5,7 @@
 - post in discord/x/indie-hackers sub about the new features
 - send to instagram guy - mention the new soft blocking
 
-- post demo video on X, reddit, linkedin, etc
+- post demo video on X, reddit, linkedin, HN, etc
 
 - email 5 outlets that might cover me
 - start working on marketing by creating

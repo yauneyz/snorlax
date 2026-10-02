@@ -1,5 +1,9 @@
 import { defineSite } from '../types.js';
 
+// Threads renders no <main>/[role="main"]; each column's scroll body carries data-column-scrollable
+// (its aria-label, "Column body", is localized). main stays in the list in case the markup changes.
+const COLUMN = 'main, [role="main"], [data-column-scrollable]';
+
 export default defineSite({
   id: 'threads',
   label: 'Threads',
@@ -17,7 +21,7 @@ export default defineSite({
     { id: 'essentials', label: 'Sign-in & settings', default: 'allow', locked: true },
   ],
   routes: [
-    { feature: 'content', path: '^/@[^/]+/post/([-_a-z0-9]+)(?:/.*)?$', judge: { contentSelector: 'main, [role="main"]' } },
+    { feature: 'content', path: '^/@[^/]+/post/([-_a-z0-9]+)(?:/.*)?$', judge: { contentSelector: COLUMN } },
     { feature: 'search', path: '^/search$', query: { q: '^[^&#]+$' } },
     { feature: 'recommendations', path: '^/search$' },
     { feature: 'notifications', path: '^/activity(?:/.*)?$' },
@@ -27,14 +31,14 @@ export default defineSite({
   ],
   fallbackFeature: 'feed',
   elements: [
-    { feature: 'feed', selector: 'main, [role="main"]', on: ['feed'] },
-    { feature: 'recommendations', selector: 'main, [role="main"]', on: ['recommendations'] },
-    { feature: 'content', selector: 'main, [role="main"]', on: ['content'] },
-    { feature: 'search', selector: 'main, [role="main"]', on: ['search'] },
-    { feature: 'notifications', selector: 'main, [role="main"]', on: ['notifications'] },
+    { feature: 'feed', selector: COLUMN, on: ['feed'] },
+    { feature: 'recommendations', selector: COLUMN, on: ['recommendations'] },
+    { feature: 'content', selector: COLUMN, on: ['content'] },
+    { feature: 'search', selector: COLUMN, on: ['search'] },
+    { feature: 'notifications', selector: COLUMN, on: ['notifications'] },
     { feature: 'compose', selector: '[role="dialog"]', on: ['compose'] },
     { feature: 'compose', selector: ':is(a, [role="button"]):has(svg[aria-label="Create"])' },
-    { feature: 'profiles', selector: 'main, [role="main"]', on: ['profiles'] },
+    { feature: 'profiles', selector: COLUMN, on: ['profiles'] },
   ],
   examples: [
     ['https://www.threads.com/', 'feed'],

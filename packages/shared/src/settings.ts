@@ -27,6 +27,11 @@ export interface Settings {
    * unlike the other settings here, toggling it is never key-gated. Default on.
    */
   trayIconEnabled: boolean;
+  /**
+   * Whether the streak badge is shown (home, pause dialog, unlock popup, extension blocked page).
+   * Display-only: the streak keeps being recorded either way. Never key-gated. Default on.
+   */
+  streakBadgeEnabled: boolean;
   /** Build/runtime capability gate. Production sets false and uses classic policy semantics. */
   smartFilteringEnabled: boolean;
 }
@@ -34,5 +39,6 @@ export interface Settings {
 export const DEFAULT_SETTINGS: Settings = {
   browserHandshakeEnabled: false,
   trayIconEnabled: true,
+  streakBadgeEnabled: true,
   smartFilteringEnabled: false,
 };

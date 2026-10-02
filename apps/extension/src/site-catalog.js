@@ -2107,7 +2107,7 @@ export const SITE_CATALOG = {
         "feature": "content",
         "path": "^/@[^/]+/post/([-_a-z0-9]+)(?:/.*)?$",
         "judge": {
-          "contentSelector": "main, [role=\"main\"]"
+          "contentSelector": "main, [role=\"main\"], [data-column-scrollable]"
         }
       },
       {
@@ -2142,35 +2142,35 @@ export const SITE_CATALOG = {
     "elements": [
       {
         "feature": "feed",
-        "selector": "main, [role=\"main\"]",
+        "selector": "main, [role=\"main\"], [data-column-scrollable]",
         "on": [
           "feed"
         ]
       },
       {
         "feature": "recommendations",
-        "selector": "main, [role=\"main\"]",
+        "selector": "main, [role=\"main\"], [data-column-scrollable]",
         "on": [
           "recommendations"
         ]
       },
       {
         "feature": "content",
-        "selector": "main, [role=\"main\"]",
+        "selector": "main, [role=\"main\"], [data-column-scrollable]",
         "on": [
           "content"
         ]
       },
       {
         "feature": "search",
-        "selector": "main, [role=\"main\"]",
+        "selector": "main, [role=\"main\"], [data-column-scrollable]",
         "on": [
           "search"
         ]
       },
       {
         "feature": "notifications",
-        "selector": "main, [role=\"main\"]",
+        "selector": "main, [role=\"main\"], [data-column-scrollable]",
         "on": [
           "notifications"
         ]
@@ -2188,7 +2188,7 @@ export const SITE_CATALOG = {
       },
       {
         "feature": "profiles",
-        "selector": "main, [role=\"main\"]",
+        "selector": "main, [role=\"main\"], [data-column-scrollable]",
         "on": [
           "profiles"
         ]

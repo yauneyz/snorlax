@@ -191,6 +191,29 @@ fn override_all_off_restores_on_reenable_and_schedules_still_fire() {
 }
 
 #[test]
+fn turning_a_profile_on_makes_it_the_default() {
+    let ctx = at(10, 0);
+    let mut e = engine_with(vec![("a", blocks(&["reddit.com"])), ("b", blocks(&["x.com"]))], &ctx);
+    on(&mut e, "a", &ctx);
+    assert_eq!(e.state.default_profile_id.as_deref(), Some("a"));
+    on(&mut e, "b", &ctx);
+    assert_eq!(e.state.default_profile_id.as_deref(), Some("b"));
+}
+
+#[test]
+fn turning_a_profile_on_after_all_off_starts_fresh() {
+    let ctx = at(10, 0);
+    let mut e = engine_with(vec![("a", blocks(&["reddit.com"])), ("b", blocks(&["x.com"]))], &ctx);
+    on(&mut e, "a", &ctx);
+    e.apply(Command::StartOverrideAll, KEY(), &ctx).unwrap();
+    on(&mut e, "b", &ctx);
+    e.apply(Command::ReenableAll, Auth::None, &ctx).unwrap();
+    assert!(hard(&e, "x.com", &ctx));
+    assert!(!hard(&e, "reddit.com", &ctx));
+    assert!(!e.snapshot(&ctx).overridden);
+}
+
+#[test]
 fn override_exempt_items_stays_until_reenable_all() {
     let ctx = at(10, 0);
     let mut e = engine_with(vec![("a", blocks(&["reddit.com", "x.com"])), ("b", blocks(&["reddit.com"]))], &ctx);
@@ -504,4 +527,20 @@ fn direct_confirm_skips_friction() {
     let pools = vec![pool_ref("a", "social")];
     e.apply(Command::ConfirmPoolUnlock { pools: pools.clone() }, Auth::None, &ctx).unwrap();
     assert_eq!(e.decide_app(&instagram(), &ctx).verdict, Verdict::Allow);
+}
+
+#[test]
+fn reenable_all_ends_temporary_unlocks_without_refunding_usage() {
+    let ctx = at(10, 0);
+    let mut e = engine_with(vec![("a", pooled_instagram(3, Friction::None))], &ctx);
+    on(&mut e, "a", &ctx);
+    e.apply(Command::RequestPoolUnlock { pools: vec![pool_ref("a", "social")] }, Auth::None, &ctx).unwrap();
+    assert_eq!(e.decide_app(&instagram(), &ctx).verdict, Verdict::Allow);
+
+    let later = at(10, 1);
+    e.apply(Command::ReenableAll, Auth::None, &later).unwrap();
+    assert_eq!(e.decide_app(&instagram(), &later).verdict, Verdict::Hard);
+    let status = &e.popup_info(&PopupTarget::App { app: instagram() }, &later).pools[0];
+    assert_eq!(status.active_until_ms, None);
+    assert_eq!(status.left_today, 2);
 }

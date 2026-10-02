@@ -1,10 +1,10 @@
 import React, { useEffect, useRef } from 'react';
 import { cx } from '../lib/utils.js';
-import { HelpTip } from './ui/index.js';
+import { HelpTip, StatusLabel } from './ui/index.js';
 
 /**
  * One collapsible block on the Blocklists page. Collapsed it's a single row — title, an optional
- * "?", a one-line summary of what's in effect, and a few preview chips — so the whole page fits on
+ * "?", a summary of what's in effect, and a few preview chips — so the whole page fits on
  * one screen. Expanded it holds that section's editor; opening one scrolls it to the top of the
  * page scroller so the editor gets the full height below it.
  */
@@ -22,7 +22,7 @@ export function BlocklistSection({
   title: string;
   /** Tooltip text for the "?" next to the title; omit when the title explains itself. */
   help?: React.ReactNode;
-  /** Something in this section is doing work — lights the status dot. */
+  /** Something in this section is doing work — shows an On status. */
   active: boolean;
   summary: React.ReactNode;
   /** Short labels previewing the section's contents while collapsed. */
@@ -68,47 +68,38 @@ export function BlocklistSection({
           }
         }}
         className={cx(
-          'flex min-h-[52px] cursor-pointer items-center gap-3 rounded-xl px-4 py-2.5 transition focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-white/25',
+          'flex min-h-[52px] cursor-pointer flex-wrap items-center gap-x-3 gap-y-2 rounded-xl px-4 py-2.5 transition focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-white/25',
           !open && 'hover:bg-white/[0.025]',
         )}
       >
-        <span
-          aria-hidden
-          className={cx(
-            'block h-1.5 w-1.5 shrink-0 rounded-full',
-            active ? 'bg-signal shadow-[0_0_8px_rgb(var(--color-signal)/0.55)]' : 'bg-white/15',
-          )}
-        />
-        <span className="shrink-0 text-[13.5px] font-semibold text-slate-100">{title}</span>
-        {help && <HelpTip label={`About ${title.toLowerCase()}`}>{help}</HelpTip>}
-        <span className="min-w-0 flex-1 truncate text-[11.5px] text-slate-450">{summary}</span>
+        <span className="flex min-w-0 flex-1 items-center gap-2">
+          <span className="text-body font-semibold text-slate-100">{title}</span>
+          {help && <HelpTip label={`About ${title.toLowerCase()}`}>{help}</HelpTip>}
+        </span>
         {!open &&
           (badge ?? (
-            <span className="hidden shrink-0 items-center gap-1 md:flex">
+            <span className="hidden min-w-0 items-center gap-1 xl:flex">
               {chips.slice(0, 3).map((chip) => (
                 <span
                   key={chip}
-                  className="max-w-[150px] truncate rounded-full border border-white/[0.08] bg-white/[0.03] px-2 py-0.5 text-[10.5px] text-slate-300"
+                  className="max-w-[150px] truncate rounded-full border border-white/[0.08] bg-white/[0.03] px-2 py-0.5 text-caption text-slate-300"
                 >
                   {chip}
                 </span>
               ))}
               {chips.length > 3 && (
-                <span className="text-[10.5px] text-slate-500">+{chips.length - 3}</span>
+                <span className="text-caption text-slate-500">+{chips.length - 3}</span>
               )}
             </span>
           ))}
-        <span
-          className={cx(
-            'shrink-0 text-[11.5px] font-medium',
-            open ? 'text-slate-200' : 'text-slate-400',
-          )}
-        >
-          {open ? 'Done' : 'Edit'}
+        {/* Fixed width so the On/Off dot lines up across rows whatever sits to its left. */}
+        <span className="flex w-10 shrink-0">
+          <StatusLabel on={active} />
         </span>
+        <span className="order-last basis-full text-caption leading-relaxed text-slate-450">{summary}</span>
         <span
           aria-hidden
-          className={cx('shrink-0 text-[11px] text-slate-500 transition-transform', open && 'rotate-180')}
+          className={cx('shrink-0 text-caption text-slate-500 transition-transform', open && 'rotate-180')}
         >
           ▾
         </span>

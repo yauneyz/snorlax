@@ -5,7 +5,7 @@ import { request } from '../lib/bridge.js';
 import { useIgnoredDrives } from '../lib/ignoredDrives.js';
 import { useFocusStore } from '../store/useFocusStore.js';
 import { cx, formatTime } from '../lib/utils.js';
-import { Badge, Button, Card, Input, Kicker } from '../components/ui/index.js';
+import { Badge, Button, Card, Input } from '../components/ui/index.js';
 
 export function Keys() {
   const pairedKeys = useFocusStore((s) => s.pairedKeys);
@@ -94,13 +94,13 @@ export function Keys() {
         <div>
           <div
             className={cx(
-              'text-[14px] font-semibold',
+              'text-body font-semibold',
               keyPresent ? 'text-okInk' : 'text-dangerInk',
             )}
           >
             {keyPresent ? 'Key mounted' : 'No key mounted'}
           </div>
-          <div className="mt-0.5 text-[12px] text-slate-400">
+          <div className="mt-0.5 text-caption text-slate-400">
             {keyPresent
               ? 'Controls are unlocked while a paired drive is connected.'
               : 'Insert a paired drive to turn focus off or loosen a profile.'}
@@ -110,7 +110,7 @@ export function Keys() {
 
       <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
         <Card className="flex flex-col">
-          <Kicker>Paired keys · {pairedKeys.length}</Kicker>
+          <h2 className="text-heading font-semibold text-slate-100">Paired keys · {pairedKeys.length}</h2>
           <ul className="mt-3 flex flex-col gap-2">
             {pairedKeys.map((k) => (
               <li
@@ -120,27 +120,27 @@ export function Keys() {
                 <div className="flex items-center justify-between gap-2">
                   <span className="flex items-center gap-2">
                     <span className="block h-1.5 w-1.5 rounded-full bg-white/25" />
-                    <span className="text-[12.5px] font-semibold text-slate-150">{k.label}</span>
+                    <span className="text-body font-semibold text-slate-150">{k.label}</span>
                     {k.serialAmbiguous && <Badge tone="neutral">file fallback</Badge>}
                   </span>
                   <button
                     onClick={() => unpair(k.id)}
                     disabled={pairedKeys.length === 1}
-                    className="text-[11px] font-medium text-slate-500 transition hover:text-dangerInk disabled:cursor-not-allowed disabled:text-slate-600 disabled:hover:text-slate-600"
+                    className="text-caption font-medium text-slate-500 transition hover:text-dangerInk disabled:cursor-not-allowed disabled:text-slate-600 disabled:hover:text-slate-600"
                   >
                     unpair
                   </button>
                 </div>
-                <div className="mt-1.5 font-mono text-[10.5px] text-slate-450">
+                <div className="mt-1.5 font-mono text-caption text-slate-450">
                   paired {formatTime(k.pairedAt)}
                 </div>
               </li>
             ))}
             {pairedKeys.length === 0 && (
-              <p className="text-[12px] text-slate-500">No keys paired yet.</p>
+              <p className="text-caption text-slate-500">No keys paired yet.</p>
             )}
           </ul>
-          <p className="mt-auto pt-3 text-[11px] leading-relaxed text-slate-450">
+          <p className="mt-auto pt-3 text-caption leading-relaxed text-slate-450">
             {pairedKeys.length === 1
               ? 'Pair another key before removing your last key.'
               : 'You can’t unpair your last key — pair a spare first and keep it somewhere inconvenient.'}
@@ -149,11 +149,11 @@ export function Keys() {
 
         <Card className="flex flex-col">
           <div className="flex items-baseline justify-between">
-            <Kicker>Pair a new key</Kicker>
+            <h2 className="text-heading font-semibold text-slate-100">Pair a new key</h2>
             <button
               onClick={() => void scan()}
               disabled={scanning}
-              className="text-[11px] font-medium text-slate-400 transition hover:text-slate-200 disabled:opacity-50"
+              className="text-caption font-medium text-slate-400 transition hover:text-slate-200 disabled:opacity-50"
             >
               {scanning ? 'Scanning…' : 'Rescan'}
             </button>
@@ -182,11 +182,11 @@ export function Keys() {
                       )}
                     />
                     <span className="min-w-0">
-                      <span className="block truncate text-[12.5px] font-semibold text-slate-150">
+                      <span className="block truncate text-body font-semibold text-slate-150">
                         {d.label}
                       </span>
                       {d.serialAmbiguous && (
-                        <span className="mt-0.5 block font-mono text-[10.5px] text-slate-450">
+                        <span className="mt-0.5 block font-mono text-caption text-slate-450">
                           no stable serial · uses a file marker
                         </span>
                       )}
@@ -195,7 +195,7 @@ export function Keys() {
                   <button
                     onClick={() => ignore(d)}
                     title="Hide this drive from the list"
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-[11px] font-medium text-slate-500 opacity-0 transition hover:text-slate-300 focus-visible:opacity-100 group-hover:opacity-100"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-caption font-medium text-slate-500 opacity-0 transition hover:text-slate-300 focus-visible:opacity-100 group-hover:opacity-100"
                   >
                     ignore
                   </button>
@@ -203,14 +203,14 @@ export function Keys() {
               );
             })}
             {visibleDrives.length === 0 && (
-              <p className="text-[12px] text-slate-500">
+              <p className="text-caption text-slate-500">
                 {drives.length === 0 ? 'No removable drives found.' : 'Only ignored drives found.'}
               </p>
             )}
           </div>
 
           {selectedDrive?.serialAmbiguous && (
-            <p className="mt-3 text-[11.5px] text-warn">
+            <p className="mt-3 text-caption text-warn">
               This drive has no stable identifier, so Talysman must store a fallback marker on it.
             </p>
           )}
@@ -225,16 +225,16 @@ export function Keys() {
               Pair this drive
             </Button>
           </div>
-          {error && <p className="mt-3 text-[12.5px] text-dangerInk">{error}</p>}
+          {error && <p className="mt-3 text-body text-dangerInk">{error}</p>}
 
           <div className="mt-auto flex items-center gap-2 pt-3">
             <span className="block h-1.5 w-1.5 rounded-full bg-seal" />
-            <span className="text-[11px] text-slate-500">Use Rescan after inserting a drive.</span>
+            <span className="text-caption text-slate-500">Use Rescan after inserting a drive.</span>
             {ignored.length > 0 && (
               <button
                 onClick={() => setShowIgnored((v) => !v)}
                 aria-expanded={showIgnored}
-                className="ml-auto text-[11px] text-slate-500 transition hover:text-slate-300"
+                className="ml-auto text-caption text-slate-500 transition hover:text-slate-300"
               >
                 {ignored.length} ignored {showIgnored ? '▴' : '▾'}
               </button>
@@ -245,7 +245,7 @@ export function Keys() {
               {ignored.map((d) => (
                 <li
                   key={d.id}
-                  className="flex items-center justify-between gap-2 rounded-md px-2 py-1 text-[11.5px] text-slate-450 hover:bg-white/[0.03]"
+                  className="flex items-center justify-between gap-2 rounded-md px-2 py-1 text-caption text-slate-450 hover:bg-white/[0.03]"
                 >
                   <span className="truncate">{d.label}</span>
                   <button

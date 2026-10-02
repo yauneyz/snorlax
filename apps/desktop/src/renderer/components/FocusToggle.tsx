@@ -3,15 +3,15 @@
  * needs a paired key); "Turn off" turns everything off (key-gated, breaks the streak) and greys out
  * without the key; the round button beside it pauses until a chosen time with the key in, or offers
  * a temporary unlock of one unlock group without it;
- * "Re-enable all" undoes any override. The pill under the seal opens the profile list, where
+ * "Turn on focus" also resumes paused blocking. Temporary unlocks can be ended early. The pill under the seal opens the profile list, where
  * any number of profiles can be switched on. The service re-checks every gate itself.
  */
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { ErrorCode, palette } from '@talysman/shared';
 import { useFocusStore } from '../store/useFocusStore.js';
-import { formatClock, runCommand } from '../lib/engine.js';
+import { formatClock, formatDuration, runCommand } from '../lib/engine.js';
 import { cx, profileSummary } from '../lib/utils.js';
-import { Button, ProfileDot } from './ui/index.js';
+import { Button, Modal, ProfileDot } from './ui/index.js';
 import { TalysmanMark } from './TalysmanMark.js';
 import { ProfileList } from './ProfileList.js';
 import { StreakBadge } from './StreakBadge.js';
@@ -22,6 +22,7 @@ export function FocusToggle() {
   const focusActive = useFocusStore((s) => s.focusActive);
   const pairedKeys = useFocusStore((s) => s.pairedKeys);
   const engine = useFocusStore((s) => s.engine);
+  const showStreak = useFocusStore((s) => s.settings.streakBadgeEnabled);
   const defaultProfileId = useFocusStore((s) => s.defaultProfileId);
   const aiMode = useFocusStore((s) => s.aiMode);
   const setOverridesOpen = useFocusStore((s) => s.setOverridesOpen);
@@ -29,18 +30,33 @@ export function FocusToggle() {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [listOpen, setListOpen] = useState(false);
+  const [confirmEndUnlock, setConfirmEndUnlock] = useState(false);
+  const [now, setNow] = useState(() => Date.now());
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, []);
+
+  const unlocked = engine.pools.filter((p) => p.activeUntilMs !== null && p.activeUntilMs > now);
 
   const active = engine.profiles.filter((p) => p.activation.active);
   const pairedKeyRequired = !focusActive && pairedKeys.length === 0;
   const lockedUntil = Math.max(0, ...active.map((p) => p.activation.lockedUntilMs ?? 0));
   const pausedUntil = engine.overrides.timed?.untilMs;
   const only = active.length === 1 ? active[0]!.profile : undefined;
+  // With nothing on, show the profile "Turn on focus" would start.
+  const next = active.length === 0 ? engine.profiles.find((p) => p.profile.id === defaultProfileId)?.profile : undefined;
 
   async function turnOn() {
     setBusy(true);
     setMessage(null);
     try {
-      await runCommand({ type: 'setLatch', profileId: defaultProfileId, on: true });
+      if (engine.overridden) {
+        await runCommand({ type: 'reenableAll' });
+      } else {
+        await runCommand({ type: 'setLatch', profileId: defaultProfileId, on: true });
+      }
     } catch (e) {
       const code = (e as { code?: string }).code;
       setMessage(code === ErrorCode.NO_PAIRED_KEY ? 'Pair a key before turning on focus.' : (e as Error).message);
@@ -61,11 +77,12 @@ export function FocusToggle() {
     }
   }
 
-  async function reenable() {
+  async function endUnlock() {
     setBusy(true);
     setMessage(null);
     try {
       await runCommand({ type: 'reenableAll' });
+      setConfirmEndUnlock(false);
     } catch (e) {
       setMessage((e as Error).message);
     } finally {
@@ -91,10 +108,10 @@ export function FocusToggle() {
             data-focus-glow
             size={46}
             className={cx(
-              focusActive ? 'drop-shadow-[0_0_16px_rgb(var(--color-success)/0.32)]' : 'opacity-75 grayscale-[0.5]',
+              focusActive ? 'drop-shadow-[0_0_16px_rgb(var(--color-signal)/0.32)]' : 'opacity-75 grayscale-[0.5]',
             )}
           />
-          <div className="mt-2 text-[25px] font-bold tracking-[-0.025em] text-slate-100">
+          <div className="mt-2 text-display font-bold tracking-[-0.025em] text-slate-100">
             {focusActive ? 'FOCUSED' : pausedUntil ? 'PAUSED' : 'UNPROTECTED'}
           </div>
 
@@ -103,17 +120,16 @@ export function FocusToggle() {
             className="flex items-center gap-2 rounded-full border border-white/[0.12] bg-white/[0.05] px-3 py-1 transition hover:bg-white/[0.09]"
           >
             {active.length === 0 ? (
-              <ProfileDot color={palette.colors.foregroundFaint} size={7} />
+              <ProfileDot color={next?.color ?? palette.colors.foregroundFaint} size={7} />
             ) : (
               active.slice(0, 4).map((p) => <ProfileDot key={p.profile.id} color={p.profile.color} size={7} />)
             )}
-            <span className="whitespace-nowrap text-[12.5px] font-semibold text-slate-200">
-              {only ? only.name : active.length > 1 ? `${active.length} profiles on` : 'No profile on'}
+            <span className="whitespace-nowrap text-body font-semibold text-slate-200">
+              {only ? only.name : active.length > 1 ? `${active.length} profiles on` : next ? next.name : 'No profile on'}
             </span>
-            <span className="font-mono text-[9px] tracking-[0.06em] text-slate-400">PROFILES</span>
           </button>
 
-          <div className="text-[12px] text-slate-400">
+          <div className="text-caption text-slate-400">
             {only ? profileSummary(only, aiMode) : focusActive ? 'blocking what any of them blocks' : 'nothing is being blocked'}
           </div>
         </div>
@@ -128,7 +144,7 @@ export function FocusToggle() {
                 disabled={busy || !keyPresent}
                 title={keyPresent ? undefined : 'Insert your key to turn off'}
                 variant="danger"
-                className="rounded-full px-7 py-[11px] text-[13.5px]"
+                className="rounded-full px-7 py-[11px] text-body"
               >
                 Turn off
               </Button>
@@ -147,26 +163,49 @@ export function FocusToggle() {
               onClick={() => void turnOn()}
               disabled={busy || pairedKeyRequired}
               variant={pairedKeyRequired ? 'ghost' : 'hero'}
-              className="rounded-full px-7 py-[11px] text-[13.5px]"
+              className="rounded-full px-7 py-[11px] text-body"
             >
               Turn on focus
             </Button>
           )}
-          {engine.overridden && (
-            <Button onClick={() => void reenable()} disabled={busy} variant="ghost" className="rounded-full px-5 py-[11px] text-[13.5px]">
-              Re-enable all
-            </Button>
-          )}
         </div>
-        <StreakBadge streak={engine.streak} />
-        {pairedKeyRequired && <p className="text-[12px] text-warn">pair a key to turn on focus</p>}
-        {pausedUntil && <p className="text-[12px] text-slate-400">Paused until {formatClock(pausedUntil)}</p>}
-        {lockedUntil > 0 && !message && (
-          <p className="text-[12px] text-warn">A locked window holds blocking until {formatClock(lockedUntil)}.</p>
+        {unlocked.length > 0 && (
+          <div className="flex flex-col items-center gap-1 text-caption text-slate-400">
+            {unlocked.map((pool) => (
+              <p key={`${pool.profileId}:${pool.poolId}`}>
+                Temporary unlock · {pool.name} · {formatDuration((pool.activeUntilMs ?? now) - now)} left
+              </p>
+            ))}
+            <button
+              onClick={() => setConfirmEndUnlock(true)}
+              disabled={busy}
+              className="rounded px-2 py-1 text-caption font-medium text-slate-200 underline underline-offset-4 hover:text-slate-100 disabled:opacity-50"
+            >
+              End {unlocked.length > 1 ? 'unlocks' : 'unlock'} early
+            </button>
+          </div>
         )}
-        {message && <p className="max-w-xs text-center text-[12px] text-warn">{message}</p>}
+        {showStreak && <StreakBadge streak={engine.streak} />}
+        {pairedKeyRequired && <p className="text-caption text-warn">pair a key to turn on focus</p>}
+        {pausedUntil && <p className="text-caption text-slate-400">Paused until {formatClock(pausedUntil)}</p>}
+        {lockedUntil > 0 && !message && (
+          <p className="text-caption text-warn">A locked window holds blocking until {formatClock(lockedUntil)}.</p>
+        )}
+        {message && <p className="max-w-xs text-center text-caption text-warn">{message}</p>}
       </div>
 
+      {confirmEndUnlock && unlocked.length > 0 && (
+        <Modal title="End temporary unlock early?" onClose={() => setConfirmEndUnlock(false)} width={420}>
+          <p className="text-body text-slate-400">
+            Blocking will resume immediately. This won’t restore any unlocks used today.
+          </p>
+          <div className="mt-4 flex justify-end gap-2">
+            <Button variant="ghost" onClick={() => setConfirmEndUnlock(false)} disabled={busy}>Cancel</Button>
+            <Button onClick={() => void endUnlock()} disabled={busy}>End unlock now</Button>
+          </div>
+          {message && <p role="alert" className="mt-3 text-caption text-warn">{message}</p>}
+        </Modal>
+      )}
       {listOpen && <ProfileList onClose={() => setListOpen(false)} />}
     </div>
   );

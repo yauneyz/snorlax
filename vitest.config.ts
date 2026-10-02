@@ -5,6 +5,7 @@ export default defineConfig({
   resolve: {
     alias: {
       '@talysman/shared': resolve(__dirname, 'packages/shared/src/index.ts'),
+      '@talysman/core/browser': resolve(__dirname, 'packages/core/src/browser.ts'),
       '@talysman/core': resolve(__dirname, 'packages/core/src/index.ts'),
       '@talysman/product': resolve(__dirname, 'packages/product/src/index.ts'),
       '@talysman/engine-wasm': resolve(__dirname, 'packages/engine-wasm/src/index.ts'),

@@ -3,8 +3,7 @@
 // Site rules never lead here — they hide parts of a page instead of blocking it.
 //
 // Below the explanation sits the unlock popup (spec §3.10): which profiles block the page, the
-// streak, the page's unlock group with what's left today, the pause before an unlock, and a link
-// to the desktop app's key-gated options. Its data comes from the service through the background
+// streak, the page's unlock group with what's left today, and the pause before an unlock. Its data comes from the service through the background
 // worker and the native host, which only relay popup info and the keyless pool-unlock commands.
 //
 // This lives in its own file rather than an inline <script> in blocked.html because MV3's default
@@ -82,13 +81,12 @@
       by.hidden = false;
     }
     var streak = info.streak;
-    show('streak', '🔥 ' + streak.currentDays + '-day streak' + (streak.bestDays > streak.currentDays ? ' · best ' + streak.bestDays : ''));
+    if (info.showStreak !== false) show('streak', '🔥 ' + streak.currentDays + '-day streak' + (streak.bestDays > streak.currentDays ? ' · best ' + streak.bestDays : ''));
+    else hide('streak');
 
     var button = el('unlock-button');
     if (!info.pools.length) {
-      show('pool');
-      show('pool-title', 'This page isn’t in an unlock group.');
-      show('pool-detail', 'Change that, or turn blocking off, in the Talysman app.');
+      hide('pool');
       button.hidden = true;
     } else {
       var left = Math.min.apply(null, info.pools.map(function (p) { return p.leftToday; }));
@@ -126,7 +124,6 @@
         }, 250);
       }
     }
-    el('other-options').textContent = 'Other options (' + info.emergencyLeft + ' emergency unlocks left)';
   }
 
   function refresh() {
@@ -137,7 +134,6 @@
       } else if (!info) {
         // Without popup info there's no unlock button; say why rather than showing nothing.
         show('unlock');
-        el('other-options').hidden = true;
         show('unlock-error', 'Unlock options unavailable: ' + ((response && response.message) || 'no answer from the Talysman app.'));
       }
       return response;

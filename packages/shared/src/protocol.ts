@@ -95,7 +95,8 @@ export interface RequestMap {
     result: { gate?: Gate; ok?: true; journal?: JournalEntry[] };
   };
   /** What the block/unlock popup shows for a URL or app. */
-  getPopupInfo: { params: { target: PopupTarget }; result: PopupInfo };
+  /** `showStreak` mirrors `settings.streakBadgeEnabled` so the extension's blocked page can honor it. */
+  getPopupInfo: { params: { target: PopupTarget }; result: PopupInfo & { showStreak: boolean } };
   /**
    * Toggle the browser handshake strict mode. Enabling is free; **disabling** is gated
    * exactly like `disableFocus` (the service re-checks USB presence) and may fail KEY_REQUIRED /
@@ -109,6 +110,8 @@ export interface RequestMap {
    * only ever talk to the daemon, never to Electron.
    */
   setTrayIconEnabled: { params: { enabled: boolean }; result: Ok };
+  /** Show/hide the streak badge. Display-only (the streak is still recorded) — never key-gated. */
+  setStreakBadgeEnabled: { params: { enabled: boolean }; result: Ok };
   /**
    * Desktop build capability; false resolves every `judge` action to `JudgePolicy.fallback`
    * without changing the policy contract.

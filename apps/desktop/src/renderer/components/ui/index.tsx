@@ -19,12 +19,12 @@ export function Card({ className, children }: { className?: string; children: Re
   );
 }
 
-/** All-caps monospaced section label — the design's section voice. */
+/** All-caps monospaced label for metadata. */
 export function Kicker({ children, className }: { children: React.ReactNode; className?: string }) {
   return (
     <span
       className={cx(
-        'font-mono text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-400',
+        'font-mono text-caption font-semibold uppercase tracking-[0.16em] text-slate-400',
         className,
       )}
     >
@@ -36,10 +36,10 @@ export function Kicker({ children, className }: { children: React.ReactNode; cla
 export function CardTitle({ children, hint }: { children: React.ReactNode; hint?: string }) {
   return (
     <div className="mb-3">
-      <h2 className="font-mono text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-400">
+      <h2 className="text-heading font-semibold text-slate-400">
         {children}
       </h2>
-      {hint && <p className="mt-2 text-[12.5px] leading-relaxed text-slate-400">{hint}</p>}
+      {hint && <p className="mt-2 text-body leading-relaxed text-slate-400">{hint}</p>}
     </div>
   );
 }
@@ -51,7 +51,7 @@ type ButtonProps = React.ButtonHTMLAttributes<HTMLButtonElement> & {
 
 export function Button({ variant = 'primary', className, ...props }: ButtonProps) {
   const base =
-    'inline-flex items-center justify-center rounded-full px-4 py-2 text-[12.5px] font-semibold transition disabled:cursor-not-allowed disabled:opacity-45';
+    'inline-flex items-center justify-center rounded-full px-4 py-2 text-body font-semibold transition disabled:cursor-not-allowed disabled:opacity-45';
   const variants = {
     primary:
       'border border-signal bg-signal text-signalInk shadow-[0_8px_24px_rgb(var(--color-signal)/0.10)] hover:border-signalHi hover:bg-signalHi',
@@ -82,7 +82,7 @@ export function Badge({
   return (
     <span
       className={cx(
-        'inline-flex items-center rounded-full border px-2.5 py-0.5 font-mono text-[10px] font-medium tracking-[0.08em]',
+        'inline-flex items-center rounded-full border px-2.5 py-0.5 font-mono text-caption font-medium tracking-[0.08em]',
         tones[tone],
       )}
     >
@@ -92,7 +92,7 @@ export function Badge({
 }
 
 const FIELD =
-  'w-full rounded-[9px] border border-white/[0.09] bg-white/[0.035] px-3 py-2 text-[12.5px] text-white outline-none transition placeholder:text-slate-600 focus:border-white/25 focus:bg-white/[0.06] disabled:cursor-not-allowed disabled:opacity-50';
+  'w-full rounded-[9px] border border-white/[0.09] bg-white/[0.035] px-3 py-2 text-body text-white outline-none transition placeholder:text-slate-600 focus:border-white/25 focus:bg-white/[0.06] disabled:cursor-not-allowed disabled:opacity-50';
 
 export function Select(props: React.SelectHTMLAttributes<HTMLSelectElement>) {
   return (
@@ -169,8 +169,8 @@ export function Modal({
         style={{ width }}
       >
         <div className="mb-3 flex items-center">
-          <h2 className="text-[15px] font-semibold text-slate-100">{title}</h2>
-          <button onClick={onClose} className="ml-auto rounded px-2 py-0.5 text-[12px] text-slate-400 hover:text-slate-200">
+          <h2 className="text-heading font-semibold text-slate-100">{title}</h2>
+          <button onClick={onClose} className="ml-auto rounded px-2 py-0.5 text-caption text-slate-400 hover:text-slate-200">
             Close
           </button>
         </div>
@@ -191,13 +191,13 @@ export function HelpTip({ children, label = 'What is this?' }: { children: React
         type="button"
         aria-label={label}
         onClick={(e) => e.stopPropagation()}
-        className="flex h-[15px] w-[15px] items-center justify-center rounded-full border border-white/[0.16] text-[9.5px] font-semibold leading-none text-slate-450 transition hover:border-white/30 hover:text-slate-200 focus-visible:border-white/30 focus-visible:text-slate-200 focus-visible:outline-none"
+        className="flex h-[15px] w-[15px] items-center justify-center rounded-full border border-white/[0.16] text-caption font-semibold leading-none text-slate-450 transition hover:border-white/30 hover:text-slate-200 focus-visible:border-white/30 focus-visible:text-slate-200 focus-visible:outline-none"
       >
         ?
       </button>
       <span
         role="tooltip"
-        className="pointer-events-none absolute left-1/2 top-[calc(100%+7px)] z-30 w-[250px] -translate-x-1/2 rounded-[9px] border border-white/[0.12] bg-[rgb(var(--color-panel)/0.98)] px-3 py-2 text-left text-[11.5px] font-normal normal-case leading-relaxed tracking-normal text-slate-250 opacity-0 shadow-[0_12px_30px_rgb(var(--color-black)/0.55)] transition group-focus-within:opacity-100 group-hover:opacity-100"
+        className="pointer-events-none absolute left-1/2 top-[calc(100%+7px)] z-30 w-[250px] -translate-x-1/2 rounded-[9px] border border-white/[0.12] bg-[rgb(var(--color-panel)/0.98)] px-3 py-2 text-left text-caption font-normal normal-case leading-relaxed tracking-normal text-slate-250 opacity-0 shadow-[0_12px_30px_rgb(var(--color-black)/0.55)] transition group-focus-within:opacity-100 group-hover:opacity-100"
       >
         {children}
       </span>
@@ -222,6 +222,22 @@ export function Switch({ on, className }: { on: boolean; className?: string }) {
           on ? 'left-[18px]' : 'left-0.5',
         )}
       />
+    </span>
+  );
+}
+
+/** Enabled state is always readable without relying on color. */
+export function StatusLabel({ on, tone = 'signal' }: { on: boolean; tone?: 'signal' | 'success' | 'danger' }) {
+  const tones = {
+    signal: { text: 'text-signal', dot: 'bg-signal' },
+    success: { text: 'text-okInk', dot: 'bg-ok' },
+    danger: { text: 'text-dangerInk', dot: 'bg-danger' },
+  };
+  const colors = tones[tone];
+  return (
+    <span className={cx('inline-flex shrink-0 items-center gap-2 text-caption font-medium', on ? colors.text : 'text-slate-450')}>
+      <span aria-hidden="true" className={cx('h-2 w-2 shrink-0 rounded-full', on ? colors.dot : 'bg-white/20')} />
+      {on ? 'On' : 'Off'}
     </span>
   );
 }

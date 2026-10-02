@@ -51,7 +51,7 @@ export function poolSummary(pool: Pool): string {
 
 /** The shared field look, sized to sit inside a line of text rather than fill a row. */
 const INLINE_FIELD =
-  'mx-1 inline-block rounded-[8px] border border-white/[0.09] bg-white/[0.035] px-2 py-1 align-middle text-[12.5px] leading-tight text-white outline-none transition focus:border-white/25 focus:bg-white/[0.06] disabled:opacity-50';
+  'mx-1 inline-block rounded-[8px] border border-white/[0.09] bg-white/[0.035] px-2 py-1 align-middle text-body leading-tight text-white outline-none transition focus:border-white/25 focus:bg-white/[0.06] disabled:opacity-50';
 
 /** A number field sized to sit inside a sentence. */
 function InlineNumber({
@@ -120,7 +120,7 @@ export function PoolEditor({
 
   if (candidates.length === 0 && pools.length === 0) {
     return (
-      <p className="text-[12px] text-slate-450">
+      <p className="text-caption text-slate-450">
         Block some sites or apps first — then you can give yourself a few keyless unlocks for them here.
       </p>
     );
@@ -145,13 +145,13 @@ export function PoolEditor({
               </div>
               <button
                 onClick={() => onSave(pools.filter((p) => p.id !== pool.id))}
-                className="ml-auto text-[11px] font-medium text-slate-500 transition hover:text-dangerInk"
+                className="ml-auto text-caption font-medium text-slate-500 transition hover:text-dangerInk"
               >
                 Delete group
               </button>
             </div>
 
-            <p className="mt-3 text-[12.5px] leading-[2.4] text-slate-300">
+            <p className="mt-3 text-body leading-[2.4] text-slate-300">
               Allow
               <InlineNumber
                 value={pool.unlocksPerDay}
@@ -195,7 +195,7 @@ export function PoolEditor({
               .
             </p>
 
-            <div className="mt-2 text-[11px] text-slate-450">
+            <div className="mt-2 text-caption text-slate-450">
               Covers {pool.items.length === 0 ? '— tap the blocked items to include' : `${pool.items.length}`}
             </div>
             <div className="mt-1.5 flex flex-wrap gap-1.5">
@@ -212,7 +212,7 @@ export function PoolEditor({
                     aria-pressed={mine}
                     title={elsewhere ? 'Already in another group' : undefined}
                     className={cx(
-                      'rounded-full border px-2.5 py-1 text-[11.5px] transition disabled:opacity-40',
+                      'rounded-full border px-2.5 py-1 text-caption transition disabled:opacity-40',
                       mine ? 'border-signal/40 bg-signal/[0.12] text-slate-100' : 'border-white/[0.08] text-slate-400 hover:bg-white/[0.05]',
                     )}
                   >
@@ -226,7 +226,7 @@ export function PoolEditor({
         );
       })}
 
-      <Button variant="ghost" onClick={addPool} className="self-start px-3.5 py-1.5 text-[11.5px]">
+      <Button variant="ghost" onClick={addPool} className="self-start px-3.5 py-1.5 text-caption">
         + New group
       </Button>
     </div>

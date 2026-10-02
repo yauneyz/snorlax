@@ -40,6 +40,8 @@ export function Settings() {
   const setBrowserHandshake = useFocusStore((s) => s.setBrowserHandshake);
   const trayIconEnabled = useFocusStore((s) => s.settings.trayIconEnabled);
   const setTrayIconEnabled = useFocusStore((s) => s.setTrayIconEnabled);
+  const streakBadgeEnabled = useFocusStore((s) => s.settings.streakBadgeEnabled);
+  const setStreakBadgeEnabled = useFocusStore((s) => s.setStreakBadgeEnabled);
   const aiMode = useFocusStore((s) => s.aiMode);
   const setAiMode = useFocusStore((s) => s.setAiMode);
   const replayOnboarding = useFocusStore((s) => s.replayOnboarding);
@@ -57,6 +59,8 @@ export function Settings() {
   const [localEntitlementError, setLocalEntitlementError] = useState<string | null>(null);
   const [handshakeBusy, setHandshakeBusy] = useState(false);
   const [handshakeError, setHandshakeError] = useState<string | null>(null);
+  const [streakBusy, setStreakBusy] = useState(false);
+  const [streakError, setStreakError] = useState<string | null>(null);
   const [trayBusy, setTrayBusy] = useState(false);
   const [trayError, setTrayError] = useState<string | null>(null);
   const [aiModeBusy, setAiModeBusy] = useState(false);
@@ -155,6 +159,18 @@ export function Settings() {
     }
   }
 
+  async function toggleStreakBadge() {
+    setStreakBusy(true);
+    setStreakError(null);
+    try {
+      await setStreakBadgeEnabled(!streakBadgeEnabled);
+    } catch (e) {
+      setStreakError((e as Error).message);
+    } finally {
+      setStreakBusy(false);
+    }
+  }
+
   async function toggleAiMode() {
     if (!aiMode && !aiConnection?.healthy) {
       setConnectionExpanded(true);
@@ -232,7 +248,7 @@ export function Settings() {
     <div className="grid grid-cols-1 gap-3 py-3 lg:grid-cols-2">
       <Card>
         <CardTitle>About</CardTitle>
-        <div className="flex flex-col gap-2 text-sm text-slate-300">
+        <div className="flex flex-col gap-2 text-body text-slate-300">
           <div>
             Environment: <Badge tone="neutral">{appEnv}</Badge>
           </div>
@@ -258,7 +274,7 @@ export function Settings() {
             {updateStatus && (
               <p
                 role="status"
-                className={updateStatus.error ? 'text-[12.5px] text-warn' : 'text-[12.5px] text-slate-400'}
+                className={updateStatus.error ? 'text-body text-warn' : 'text-body text-slate-400'}
               >
                 {updateStatus.message}
               </p>
@@ -272,7 +288,7 @@ export function Settings() {
           <CardTitle hint="Only available in builds produced by pnpm release:local.">
             Local release testing
           </CardTitle>
-          <div className="flex flex-col gap-3 text-sm text-slate-300">
+          <div className="flex flex-col gap-3 text-body text-slate-300">
             <p className="text-slate-400">
               Temporarily bypass the free local Pro entitlement to test the plan your signed-in
               account would normally receive. Local Pro turns back on when Talysman restarts.
@@ -293,28 +309,30 @@ export function Settings() {
               </Button>
             </div>
             {localEntitlementError && (
-              <p className="text-[12.5px] text-warn">{localEntitlementError}</p>
+              <p className="text-body text-warn">{localEntitlementError}</p>
             )}
           </div>
         </Card>
       )}
 
       <Card>
-        <CardTitle hint="Closes browsers that can't prove the blocking extension is alive during a locked session.">
-          Browser handshake
-        </CardTitle>
-        <div className="flex flex-col gap-3 text-sm text-slate-300">
+        <CardTitle>Strict Mode</CardTitle>
+        <div className="flex flex-col gap-3 text-body text-slate-300">
           <p className="text-slate-400">
-            When on, Talysman closes any supported browser whose extension stops responding — and any
-            browser that can’t run the extension — while a locked focus session is active. Turning it
-            off requires your paired USB key.
+            Strict Mode prevents you from just removing/disabling the Talysman extension or using a
+            browser where the extension isn’t supported.
           </p>
+          <p className="text-slate-400">
+            When Strict Mode and focus mode are both turned on, Talysman will automatically close any
+            browser where it doesn’t detect the Talysman browser extension as being enabled.
+          </p>
+          <p className="text-slate-400">You can only turn off Strict Mode using your paired USB key.</p>
           {softBlocksRequireHandshake && (
-            <p className="text-slate-400">Browser handshake stays on while the active profile has site rules.</p>
+            <p className="text-slate-400">Strict Mode stays on while the active profile has site rules.</p>
           )}
           <div className="flex items-center justify-between gap-3">
             <span className="font-medium text-slate-200">
-              Strict mode:{' '}
+              Status:{' '}
               <Badge tone={handshakeEnabled || softBlocksRequireHandshake ? 'ok' : 'neutral'}>
                 {handshakeEnabled || softBlocksRequireHandshake ? 'On' : 'Off'}
               </Badge>
@@ -328,17 +346,17 @@ export function Settings() {
             </Button>
           </div>
           {handshakeEnabled && !keyPresent && (
-            <p className="text-xs text-slate-500">Insert your paired USB key to turn this off.</p>
+            <p className="text-caption text-slate-500">Insert your paired USB key to turn this off.</p>
           )}
-          {handshakeError && <p className="text-[12.5px] text-warn">{handshakeError}</p>}
+          {handshakeError && <p className="text-body text-warn">{handshakeError}</p>}
         </div>
       </Card>
 
       <Card>
         <CardTitle hint="A small standalone helper (not this app) shows blocking status in your system tray.">
-          Tray icon
+          Talysman System Tray Icon
         </CardTitle>
-        <div className="flex flex-col gap-3 text-sm text-slate-300">
+        <div className="flex flex-col gap-3 text-body text-slate-300">
           <div className="flex items-center justify-between gap-3">
             <span className="font-medium text-slate-200">
               Status: <Badge tone={trayIconEnabled ? 'ok' : 'neutral'}>{trayIconEnabled ? 'On' : 'Off'}</Badge>
@@ -351,7 +369,26 @@ export function Settings() {
               {trayIconEnabled ? 'Turn off' : 'Turn on'}
             </Button>
           </div>
-          {trayError && <p className="text-[12.5px] text-warn">{trayError}</p>}
+          {trayError && <p className="text-body text-warn">{trayError}</p>}
+        </div>
+      </Card>
+
+      <Card>
+        <CardTitle hint="Your streak is still recorded while the badge is hidden.">Streak counter</CardTitle>
+        <div className="flex flex-col gap-3 text-body text-slate-300">
+          <div className="flex items-center justify-between gap-3">
+            <span className="font-medium text-slate-100">
+              Status: <Badge tone={streakBadgeEnabled ? 'ok' : 'neutral'}>{streakBadgeEnabled ? 'Shown' : 'Hidden'}</Badge>
+            </span>
+            <Button
+              variant={streakBadgeEnabled ? 'ghost' : 'primary'}
+              disabled={streakBusy}
+              onClick={() => toggleStreakBadge()}
+            >
+              {streakBadgeEnabled ? 'Hide' : 'Show'}
+            </Button>
+          </div>
+          {streakError && <p className="text-body text-warn">{streakError}</p>}
         </div>
       </Card>
 
@@ -360,7 +397,7 @@ export function Settings() {
           <CardTitle hint="Optional. Everything else in Talysman works the same with it off.">
             AI mode
           </CardTitle>
-          <div className="flex flex-col gap-3 text-sm text-slate-300">
+          <div className="flex flex-col gap-3 text-body text-slate-300">
             <p className="text-slate-400">
               Adds AI filtering to your blocklists: pages or site features you set to “AI” are
               checked against what you’re working on. While it’s off, AI rules are hidden and
@@ -381,7 +418,7 @@ export function Settings() {
               </Button>
             </div>
             <div className="flex items-center justify-between gap-3 rounded-lg border border-white/[0.08] bg-white/[0.025] px-3 py-2">
-              <span className="flex items-center gap-2 text-[12.5px]">
+              <span className="flex items-center gap-2 text-body">
                 <span aria-label={aiConnection?.healthy ? 'Connection working' : 'Connection needs attention'}
                   className={cx('h-2.5 w-2.5 rounded-full', aiConnection?.healthy ? 'bg-ok shadow-[0_0_8px_rgb(var(--color-success)/0.6)]' : 'bg-danger shadow-[0_0_8px_rgb(var(--color-danger)/0.55)]')} />
                 {aiConnection?.healthy ? 'AI connection working' : 'AI connection needs a successful test'}
@@ -390,29 +427,29 @@ export function Settings() {
                 {connectionExpanded ? 'Hide setup' : 'Connection setup'}
               </Button>
             </div>
-            {aiConnection?.error && <p className="text-[12.5px] text-dangerInk">{aiConnection.error}</p>}
+            {aiConnection?.error && <p className="text-body text-dangerInk">{aiConnection.error}</p>}
             {connectionExpanded && (
               <div className="flex flex-col gap-3 rounded-lg border border-white/[0.08] p-3">
-                {aiConnection?.localPreset && <p className="text-[12px] text-slate-400">Local preset: llm-serve at 127.0.0.1:11434. Model auto discovers the active target.</p>}
-                <label className="text-[12px] text-slate-300">OpenAI compatible URL
+                {aiConnection?.localPreset && <p className="text-caption text-slate-400">Local preset: llm-serve at 127.0.0.1:11434. Model auto discovers the active target.</p>}
+                <label className="text-caption text-slate-300">OpenAI compatible URL
                   <Input value={aiUrl} onChange={(e) => setAiUrl(e.target.value)} placeholder="https://api.openai.com/v1" className="mt-1" />
                 </label>
-                <label className="text-[12px] text-slate-300">Model ID
+                <label className="text-caption text-slate-300">Model ID
                   <Input value={aiModel} onChange={(e) => setAiModel(e.target.value)} placeholder="Model ID or auto" className="mt-1" />
                 </label>
-                <label className="text-[12px] text-slate-300">API key (optional)
+                <label className="text-caption text-slate-300">API key (optional)
                   <Input type="password" value={aiKey} onChange={(e) => setAiKey(e.target.value)} placeholder={aiConnection?.hasApiKey ? 'Saved key (leave blank to keep)' : 'Bearer token'} className="mt-1" autoComplete="off" />
                 </label>
-                {aiConnection?.hasApiKey && <label className="flex items-center gap-2 text-[12px] text-slate-400"><input type="checkbox" checked={clearAiKey} onChange={(e) => setClearAiKey(e.target.checked)} />Remove saved key</label>}
-                <label className="text-[12px] text-slate-300">Extra headers (optional JSON)
+                {aiConnection?.hasApiKey && <label className="flex items-center gap-2 text-caption text-slate-400"><input type="checkbox" checked={clearAiKey} onChange={(e) => setClearAiKey(e.target.checked)} />Remove saved key</label>}
+                <label className="text-caption text-slate-300">Extra headers (optional JSON)
                   <Input value={aiHeaders} onChange={(e) => setAiHeaders(e.target.value)} placeholder={aiConnection?.hasExtraHeaders ? 'Saved headers (leave blank to keep)' : '{"Header-Name":"value"}'} className="mt-1" autoComplete="off" />
                 </label>
-                {aiConnection?.hasExtraHeaders && <label className="flex items-center gap-2 text-[12px] text-slate-400"><input type="checkbox" checked={clearAiHeaders} onChange={(e) => setClearAiHeaders(e.target.checked)} />Remove saved headers</label>}
-                <p className="text-[12px] text-slate-400">Testing sends a short prompt to this endpoint. Once connected, pages set to AI are sent there for judgment.</p>
+                {aiConnection?.hasExtraHeaders && <label className="flex items-center gap-2 text-caption text-slate-400"><input type="checkbox" checked={clearAiHeaders} onChange={(e) => setClearAiHeaders(e.target.checked)} />Remove saved headers</label>}
+                <p className="text-caption text-slate-400">Testing sends a short prompt to this endpoint. Once connected, pages set to AI are sent there for judgment.</p>
                 <div><Button disabled={connectionBusy || !aiUrl.trim() || !aiModel.trim()} onClick={() => void runAiConnectionTest()}>{connectionBusy ? 'Testing…' : 'Test connection'}</Button></div>
               </div>
             )}
-            {aiModeError && <p className="text-[12.5px] text-warn">{aiModeError}</p>}
+            {aiModeError && <p className="text-body text-warn">{aiModeError}</p>}
           </div>
         </Card>
       )}
@@ -421,7 +458,7 @@ export function Settings() {
         <CardTitle hint="Keyless, five per device for life. Use it when your key is lost or broken.">
           Emergency unlock
         </CardTitle>
-        <div className="flex flex-col gap-3 text-sm text-slate-300">
+        <div className="flex flex-col gap-3 text-body text-slate-300">
           <p className="text-slate-400">
             Turns everything off — even locked windows — until you or a schedule turn it back on. Resets your
             streak. You can never get an emergency unlock back.
@@ -443,7 +480,7 @@ export function Settings() {
           <CardTitle hint="Dragging Talysman to the Trash does not do this — the background service lives outside the app bundle.">
             Uninstall
           </CardTitle>
-          <div className="flex flex-col gap-3 text-sm text-slate-300">
+          <div className="flex flex-col gap-3 text-body text-slate-300">
             {uninstallDone ? (
               <p className="text-slate-300">
                 The background service and its enforcement have been removed. You can now delete
@@ -480,7 +517,7 @@ export function Settings() {
                     </Button>
                   )}
                 </div>
-                {uninstallError && <p className="text-[12.5px] text-warn">{uninstallError}</p>}
+                {uninstallError && <p className="text-body text-warn">{uninstallError}</p>}
               </>
             )}
           </div>
@@ -494,8 +531,8 @@ export function Settings() {
           {appEnv !== 'production' && (
             <div className="mb-5">
               <div className="mb-2 flex items-center justify-between gap-3">
-                <span className="text-sm font-medium text-slate-200">Account plan</span>
-                <span className="text-xs text-slate-500">{entitlementSource}</span>
+                <span className="text-body font-medium text-slate-200">Account plan</span>
+                <span className="text-caption text-slate-500">{entitlementSource}</span>
               </div>
               <div
                 role="group"
@@ -512,7 +549,7 @@ export function Settings() {
                       disabled={planBusy}
                       onClick={() => choosePlan(plan)}
                       className={cx(
-                        'min-w-24 rounded-full px-4 py-1.5 text-[12.5px] font-medium transition disabled:cursor-not-allowed disabled:opacity-60',
+                        'min-w-24 rounded-full px-4 py-1.5 text-body font-medium transition disabled:cursor-not-allowed disabled:opacity-60',
                         selected
                           ? 'bg-white/[0.10] text-white'
                           : 'text-slate-400 hover:bg-white/[0.05] hover:text-slate-200',
@@ -523,13 +560,13 @@ export function Settings() {
                   );
                 })}
               </div>
-              {planError && <p className="mt-2 text-[12.5px] text-warn">{planError}</p>}
+              {planError && <p className="mt-2 text-body text-warn">{planError}</p>}
             </div>
           )}
 
           {usingMock && (
             <div className="mb-5">
-              <p className="mb-3 text-sm text-slate-400">
+              <p className="mb-3 text-body text-slate-400">
                 Simulate plugging/unplugging the paired USB key to test the red/green indicator and
                 the key-required disable gate, or fake one browser-extension heartbeat — the real
                 native-messaging host can’t reach the in-process mock.
@@ -562,7 +599,7 @@ export function Settings() {
           )}
 
           <div>
-            <p className="mb-3 text-sm text-slate-400">
+            <p className="mb-3 text-body text-slate-400">
               Clear the first-run flag and reopen the setup walkthrough. This only affects what the
               app shows you — profiles, keys and enforcement state are left alone.
             </p>
@@ -575,7 +612,7 @@ export function Settings() {
             >
               Replay first run
             </Button>
-            {firstRunError && <p className="mt-2 text-[12.5px] text-warn">{firstRunError}</p>}
+            {firstRunError && <p className="mt-2 text-body text-warn">{firstRunError}</p>}
           </div>
         </Card>
       )}

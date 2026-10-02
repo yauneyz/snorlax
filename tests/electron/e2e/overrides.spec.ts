@@ -26,7 +26,7 @@ test('pausing needs the key, an emergency unlock does not', async () => {
     await dialog.getByRole('button', { name: '10 min' }).click();
     await dialog.getByRole('button', { name: 'Pause', exact: true }).click();
     await expect(win.getByText('PAUSED', { exact: true })).toBeVisible();
-    await win.getByRole('button', { name: 'Re-enable all' }).click();
+    await win.getByRole('button', { name: 'Turn on focus' }).click();
     await expect(win.getByText('FOCUSED')).toBeVisible();
 
     // Emergency: key removed, still possible, and it counts down.
@@ -38,7 +38,8 @@ test('pausing needs the key, an emergency unlock does not', async () => {
     await confirm.getByRole('button', { name: 'Use emergency unlock' }).click();
     await win.getByRole('button', { name: 'Dashboard' }).click();
     await expect(win.getByText('UNPROTECTED', { exact: true })).toBeVisible();
-    await expect(win.getByText('4 left')).toBeVisible();
+    await win.getByRole('button', { name: 'Settings' }).click();
+    await expect(win.getByText('4', { exact: true })).toBeVisible();
   } finally {
     await app.close();
   }
@@ -58,6 +59,40 @@ test('a blocked app opens the unlock popup', async () => {
     const closed = popup.waitForEvent('close');
     await popup.getByRole('button', { name: 'Not now' }).click();
     await closed;
+  } finally {
+    await app.close();
+  }
+});
+
+test('temporary unlock can be kept or ended early from the dashboard', async () => {
+  const app = await launchApp();
+  try {
+    const win = await app.firstWindow();
+    await win.getByText('Connecting…').waitFor({ state: 'detached' });
+    expect((await win.evaluate(() => window.api.appInfo())).usingMock).toBe(true);
+
+    await win.getByRole('button', { name: 'Keys', exact: true }).click();
+    await win.getByRole('button', { name: 'Pair this drive' }).click();
+    await win.getByRole('button', { name: 'Profiles', exact: true }).click();
+    await win.getByRole('button', { name: /^Unlock groups/ }).click();
+    await win.getByRole('button', { name: '+ New group', exact: true }).click();
+    await win.getByRole('button', { name: 'youtube.com', exact: true }).click();
+    await win.getByRole('button', { name: 'Dashboard', exact: true }).click();
+    await win.getByRole('button', { name: 'Turn on focus' }).click();
+    await win.getByRole('button', { name: 'Temporary unlock', exact: true }).click();
+    await win.getByRole('button', { name: 'Unlock for 10 min', exact: true }).click();
+    await expect(win.getByText(/Temporary unlock · Group 1/)).toBeVisible();
+    await expect(win.getByRole('button', { name: 'Re-enable all' })).toBeHidden();
+
+    await win.getByRole('button', { name: 'End unlock early' }).click();
+    const confirm = win.getByRole('dialog', { name: 'End temporary unlock early?' });
+    await confirm.getByRole('button', { name: 'Cancel', exact: true }).click();
+    await expect(win.getByText(/Temporary unlock · Group 1/)).toBeVisible();
+    await win.getByRole('button', { name: 'End unlock early' }).click();
+    await confirm.getByRole('button', { name: 'End unlock now' }).click();
+    await expect(confirm).toBeHidden();
+    await expect(win.getByText(/Temporary unlock · Group 1/)).toBeHidden();
+    await expect(win.getByText('FOCUSED', { exact: true })).toBeVisible();
   } finally {
     await app.close();
   }

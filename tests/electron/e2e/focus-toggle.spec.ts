@@ -36,12 +36,21 @@ test('focus requires a paired key and turning it off requires the key to be conn
     const turnOff = win.getByRole('button', { name: 'Turn off', exact: true });
     await expect(turnOff).toBeDisabled();
 
-    // With the (simulated) key it goes through, and "Re-enable all" brings it back.
+    // With the (simulated) key it goes through, and the main focus button brings it back.
     await win.evaluate(() => window.api.devToggleKey());
     await turnOff.click();
     await expect(win.getByText('UNPROTECTED')).toBeVisible();
-    await win.getByRole('button', { name: 'Re-enable all' }).click();
+    await expect(win.getByRole('button', { name: 'Re-enable all' })).toBeHidden();
+    await enableButton.click();
     await expect(win.getByText('FOCUSED')).toBeVisible();
+
+    await win.getByRole('button', { name: 'Pause until…', exact: true }).click();
+    await win.getByRole('button', { name: 'Pause', exact: true }).click();
+    await expect(win.getByText('PAUSED', { exact: true })).toBeVisible();
+    await expect(win.getByRole('button', { name: 'Re-enable all' })).toBeHidden();
+    await enableButton.click();
+    await expect(win.getByText('FOCUSED')).toBeVisible();
+    await expect(win.getByText(/^Paused until/)).toBeHidden();
   } finally {
     await app.close();
   }

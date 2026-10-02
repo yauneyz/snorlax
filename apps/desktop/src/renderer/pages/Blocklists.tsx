@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import type { AppRef, Policy, PremadeListId, Profile } from '@talysman/shared';
-import { PREMADE_LISTS, palette } from '@talysman/shared';
+import { PREMADE_LISTS } from '@talysman/shared';
 import { productFeaturesForEnvironment } from '@talysman/product';
 import {
   EMPTY_POLICY,
@@ -9,7 +9,8 @@ import {
   newProfileId,
   nextProfileColor,
 } from '@talysman/shared';
-import { siblingsFor } from '@talysman/core/browser';
+import { normalizeDomain, siblingsFor } from '@talysman/core/browser';
+import { prepareDomainPaste } from '../lib/domainPaste.js';
 import { listInstalledApps } from '../lib/bridge.js';
 import { runCommand, saveProfile as saveProfileCommand } from '../lib/engine.js';
 import { PoolEditor, poolSummary } from '../components/PoolEditor.js';
@@ -17,7 +18,16 @@ import { BlocklistSection } from '../components/BlocklistSection.js';
 import { ProfileSwitch } from '../components/ProfileList.js';
 import { desktopPaletteColor } from '../lib/desktopPalette.js';
 import { useFocusStore } from '../store/useFocusStore.js';
-import { Badge, Button, Input, Kicker, ProfileDot, Switch, Textarea } from '../components/ui/index.js';
+import {
+  Badge,
+  Button,
+  Input,
+  Kicker,
+  ProfileDot,
+  Switch,
+  StatusLabel,
+  Textarea,
+} from '../components/ui/index.js';
 import { cx, effectiveAction, profileSummary } from '../lib/utils.js';
 import { SiteRules, siteRuleCounts, useListedSites } from '../components/SiteRules.js';
 import { JudgeSettings } from '../components/JudgeSettings.js';
@@ -39,6 +49,24 @@ const SMART_FILTERING_ENABLED = productFeaturesForEnvironment(
 
 /** Page-level indicators follow the desktop app's signal color; profile colours stay in the switcher. */
 const BLOCKLIST_SIGNAL = desktopPaletteColor('signal');
+
+type FeedbackTarget = SectionId | 'profile' | 'blocked' | 'allowed' | 'picker';
+type Feedback = { message: string; error: boolean };
+
+function InlineFeedback({ feedback }: { feedback?: Feedback }) {
+  if (!feedback) return null;
+  return (
+    <p
+      role={feedback.error ? 'alert' : 'status'}
+      className={cx(
+        'mt-2 text-caption leading-relaxed',
+        feedback.error ? 'text-dangerInk' : 'text-slate-300',
+      )}
+    >
+      {feedback.message}
+    </p>
+  );
+}
 
 type SectionId = 'ai' | 'hard' | 'soft' | 'premade' | 'apps' | 'pools';
 
@@ -64,40 +92,60 @@ function appIdentifiers(app: AppRef): string {
     .join(' · ');
 }
 
-/** One row in a domain list, with the sibling hosts it also covers. */
-function DomainRow({
-  d,
-  accent,
+/** Compact removable entry shared by website and app lists. */
+function EntryChip({
+  label,
+  detail,
+  mono = false,
   onRemove,
 }: {
-  d: string;
-  accent: string;
-  onRemove: (d: string) => void;
+  label: string;
+  detail?: string;
+  mono?: boolean;
+  onRemove: () => void;
 }) {
-  const siblings = siblingsFor(d);
   return (
-    <div className="flex items-center gap-2.5 bg-panel px-3 py-[7px]">
-      <span
-        className="block h-[5px] w-[5px] shrink-0 rounded-full"
-        style={{ backgroundColor: accent }}
-      />
-      <span className="min-w-0 flex-1 truncate font-mono text-[12px] text-slate-200">{d}</span>
-      {siblings.length > 0 && (
-        <span
-          className="max-w-[40%] truncate text-[10.5px] text-slate-500"
-          title={siblings.join(', ')}
-        >
-          also {siblings.join(', ')}
-        </span>
-      )}
+    <span
+      title={detail || undefined}
+      className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-white/[0.08] bg-white/[0.03] py-1 pl-2.5 pr-1 text-caption text-slate-200"
+    >
+      <span className={cx('min-w-0 break-all', mono && 'font-mono')}>{label}</span>
+      {detail && <span className="sr-only">{detail}</span>}
       <button
-        onClick={() => onRemove(d)}
-        aria-label={`Remove ${d}`}
-        className="shrink-0 px-1 text-[13px] leading-none text-slate-500 transition hover:text-dangerInk"
+        type="button"
+        onClick={onRemove}
+        aria-label={`Remove ${label}`}
+        className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-body leading-none text-slate-500 transition hover:bg-white/[0.06] hover:text-dangerInk"
       >
         ×
       </button>
-    </div>
+    </span>
+  );
+}
+
+/** A website chip, with covered sibling hosts available on hover. */
+function DomainChip({ d, onRemove }: { d: string; onRemove: (d: string) => void }) {
+  const siblings = siblingsFor(d);
+  return (
+    <EntryChip
+      label={d}
+      detail={siblings.length > 0 ? `Also covers ${siblings.join(', ')}` : undefined}
+      mono
+      onRemove={() => onRemove(d)}
+    />
+  );
+}
+
+/** Inline "upgrade to Pro" inside a free-limit message; opens the Plans page. */
+function UpgradeLink({ onUpgrade }: { onUpgrade: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onUpgrade}
+      className="font-medium text-slate-100 underline underline-offset-2 transition hover:text-sealInk"
+    >
+      upgrade to Pro
+    </button>
   );
 }
 
@@ -109,29 +157,33 @@ function DomainListEditor({
   title,
   hint,
   placeholder,
-  accent,
   domains,
   onAdd,
   onAddMany,
   onRemove,
   max,
   limitReached,
+  onUpgrade,
+  feedback,
 }: {
   title: string;
   hint: string;
   placeholder: string;
-  accent: string;
   domains: string[];
-  onAdd: (d: string) => void;
-  onAddMany: (domains: string[]) => void;
+  onAdd: (d: string) => Promise<boolean>;
+  onAddMany: (domains: string[]) => Promise<boolean>;
   onRemove: (d: string) => void;
   max: number | null;
   limitReached: boolean;
+  onUpgrade: () => void;
+  feedback?: Feedback;
 }) {
   const [input, setInput] = useState('');
   const [query, setQuery] = useState('');
   const [pasteOpen, setPasteOpen] = useState(false);
   const [pasteText, setPasteText] = useState('');
+  const [pending, setPending] = useState(false);
+  const limitId = React.useId();
   const searchable = domains.length > 8;
 
   const filtered = useMemo(() => {
@@ -140,32 +192,42 @@ function DomainListEditor({
     return domains.filter((d) => d.toLowerCase().includes(q));
   }, [domains, query]);
 
-  function submit() {
+  async function submit() {
     const trimmed = input.trim();
-    if (!trimmed) return;
-    onAdd(trimmed);
-    setInput('');
+    if (!trimmed || pending || limitReached) return;
+    setPending(true);
+    try {
+      if (await onAdd(trimmed)) setInput('');
+    } finally {
+      setPending(false);
+    }
   }
 
-  function submitPaste() {
+  async function submitPaste() {
     const parsed = pasteText
       .split(/[\n,\s]+/)
       .map((s) => s.trim())
       .filter(Boolean);
-    if (parsed.length === 0) return;
-    onAddMany(parsed);
-    setPasteText('');
-    setPasteOpen(false);
+    if (parsed.length === 0 || pending || limitReached) return;
+    setPending(true);
+    try {
+      if (await onAddMany(parsed)) {
+        setPasteText('');
+        setPasteOpen(false);
+      }
+    } finally {
+      setPending(false);
+    }
   }
 
   return (
     <div className="min-w-0">
-      <div className="flex items-baseline gap-2">
-        <span className="text-[12.5px] font-semibold text-slate-200">{title}</span>
-        <span className="font-mono text-[10.5px] text-slate-500">
+      <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+        <span className="text-body font-semibold text-slate-200">{title}</span>
+        <span className="font-mono text-caption text-slate-500">
           {max === null ? domains.length : `${domains.length}/${max}`}
         </span>
-        <span className="ml-auto truncate text-[10.5px] text-slate-500">{hint}</span>
+        <span className="basis-full text-caption leading-relaxed text-slate-500">{hint}</span>
       </div>
 
       <div className="mt-2 flex gap-2">
@@ -173,14 +235,27 @@ function DomainListEditor({
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && submit()}
+          aria-describedby={limitReached ? limitId : undefined}
           placeholder={placeholder}
-          disabled={limitReached}
+          disabled={limitReached || pending}
           className="py-1.5 font-mono"
         />
-        <Button onClick={submit} disabled={limitReached} className="shrink-0 px-4 py-1.5">
+        <Button
+          onClick={submit}
+          disabled={limitReached || pending}
+          className="shrink-0 px-4 py-1.5"
+        >
           Add
         </Button>
       </div>
+
+      {limitReached && (
+        <p id={limitId} className="mt-2 text-caption text-slate-400">
+          Free limit reached ({max} websites). Remove an entry or{' '}
+          <UpgradeLink onUpgrade={onUpgrade} /> to add more.
+        </p>
+      )}
+      <InlineFeedback feedback={feedback} />
 
       {pasteOpen && (
         <div className="mt-2">
@@ -189,15 +264,23 @@ function DomainListEditor({
             value={pasteText}
             onChange={(e) => setPasteText(e.target.value)}
             placeholder={'One per line, or comma-separated\nreddit.com\nyoutube.com'}
-            disabled={limitReached}
+            disabled={limitReached || pending}
             autoFocus
             className="font-mono"
           />
           <div className="mt-1.5 flex justify-end gap-2">
-            <Button variant="ghost" onClick={() => setPasteOpen(false)} className="px-3 py-1 text-[11.5px]">
+            <Button
+              variant="ghost"
+              onClick={() => setPasteOpen(false)}
+              className="px-3 py-1 text-caption"
+            >
               Cancel
             </Button>
-            <Button onClick={submitPaste} disabled={limitReached || !pasteText.trim()} className="px-3 py-1 text-[11.5px]">
+            <Button
+              onClick={submitPaste}
+              disabled={limitReached || pending || !pasteText.trim()}
+              className="px-3 py-1 text-caption"
+            >
               Add all
             </Button>
           </div>
@@ -210,31 +293,29 @@ function DomainListEditor({
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder={`Search ${domains.length} sites`}
-            className="py-1 text-[11.5px]"
+            className="py-1 text-caption"
           />
         )}
         {!pasteOpen && (
           <button
             onClick={() => setPasteOpen(true)}
-            disabled={limitReached}
-            className="shrink-0 text-[11px] font-medium text-slate-450 transition hover:text-slate-200 disabled:opacity-45"
+            disabled={limitReached || pending}
+            className="shrink-0 text-caption font-medium text-slate-450 transition hover:text-slate-200 disabled:opacity-45"
           >
             Paste many
           </button>
         )}
       </div>
 
-      <div className="mt-2 max-h-[280px] overflow-y-auto rounded-[10px] border border-white/[0.06] bg-white/[0.05]">
-        <div className="flex flex-col gap-px">
-          {filtered.map((d) => (
-            <DomainRow key={d} d={d} accent={accent} onRemove={onRemove} />
-          ))}
-          {filtered.length === 0 && (
-            <p className="bg-panel px-3 py-2.5 text-[11.5px] text-slate-500">
-              {domains.length === 0 ? 'No sites yet.' : 'No matches.'}
-            </p>
-          )}
-        </div>
+      <div className="mt-3 flex max-h-[280px] flex-wrap items-start gap-1.5 overflow-y-auto">
+        {filtered.map((d) => (
+          <DomainChip key={d} d={d} onRemove={onRemove} />
+        ))}
+        {filtered.length === 0 && (
+          <p className="py-1 text-caption text-slate-500">
+            {domains.length === 0 ? 'No sites yet.' : 'No matches.'}
+          </p>
+        )}
       </div>
     </div>
   );
@@ -252,6 +333,7 @@ export function Blocklists({ onUpgrade }: { onUpgrade: () => void }) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const [openSection, setOpenSection] = useState<SectionId | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState(false);
   // "Block everything" empties the allow list, so with sites on it the button asks once first.
   const [confirmBlockAll, setConfirmBlockAll] = useState(false);
   const [appName, setAppName] = useState('');
@@ -261,14 +343,20 @@ export function Blocklists({ onUpgrade }: { onUpgrade: () => void }) {
   const [pickerItems, setPickerItems] = useState<AppPickerItem[]>([]);
   const [pickerQuery, setPickerQuery] = useState('');
   const [selectedApps, setSelectedApps] = useState<Set<string>>(() => new Set());
-  const [error, setError] = useState<string | null>(null);
+  const [feedbackByProfile, setFeedbackByProfile] = useState<
+    Record<string, Partial<Record<FeedbackTarget, Feedback>>>
+  >({});
 
   const selected =
-    profiles.find((p) => p.id === selectedId) ?? profiles.find((p) => p.id === defaultProfileId) ?? profiles[0];
+    profiles.find((p) => p.id === selectedId) ??
+    profiles.find((p) => p.id === defaultProfileId) ??
+    profiles[0];
   const policy = selected?.config.policy ?? EMPTY_POLICY;
   const sitesSupported = true;
   const isOn = (id: string | undefined) =>
-    engine.profiles.some((p) => p.profile.id === id && (p.activation.active || p.activation.paused));
+    engine.profiles.some(
+      (p) => p.profile.id === id && (p.activation.active || p.activation.paused),
+    );
   const isActive = isOn(selected?.id);
   const accent = BLOCKLIST_SIGNAL;
   const profileLimit = maxProfiles(productLimits);
@@ -317,26 +405,40 @@ export function Blocklists({ onUpgrade }: { onUpgrade: () => void }) {
     });
   }, [pickerItems, pickerQuery]);
 
+  const feedback = feedbackByProfile[selected?.id ?? 'new'] ?? {};
+  function setFeedback(
+    target: FeedbackTarget,
+    message: string | null,
+    error = true,
+    profileId = selected?.id ?? 'new',
+  ) {
+    setFeedbackByProfile((current) => ({
+      ...current,
+      [profileId]: { ...current[profileId], [target]: message ? { message, error } : undefined },
+    }));
+  }
+
   /** Every edit on this page writes one whole profile; the service gates any loosening. */
-  async function saveProfile(next: Profile): Promise<boolean> {
-    setError(null);
+  async function saveProfile(next: Profile, target: FeedbackTarget = 'profile'): Promise<boolean> {
+    const feedbackProfileId = selected?.id ?? 'new';
+    setFeedback(target, null, true, feedbackProfileId);
     try {
       await saveProfileCommand(next);
       return true;
     } catch (e) {
-      setError((e as Error).message);
+      setFeedback(target, (e as Error).message, true, feedbackProfileId);
       return false;
     }
   }
 
-  async function save(next: Policy) {
-    if (!selected) return;
-    await saveProfile({ ...selected, config: { ...selected.config, policy: next } });
+  async function save(next: Policy, target: FeedbackTarget = 'hard'): Promise<boolean> {
+    if (!selected) return false;
+    return saveProfile({ ...selected, config: { ...selected.config, policy: next } }, target);
   }
 
   async function savePools(pools: Profile['config']['pools']) {
     if (!selected) return;
-    await saveProfile({ ...selected, config: { ...selected.config, pools } });
+    await saveProfile({ ...selected, config: { ...selected.config, pools } }, 'pools');
   }
 
   async function addProfile() {
@@ -359,7 +461,12 @@ export function Blocklists({ onUpgrade }: { onUpgrade: () => void }) {
     if (profileLimitReached) return onUpgrade();
     const newId = newProfileId();
     await runProfileRequest(async () => {
-      await runCommand({ type: 'duplicateProfile', profileId: selected.id, newId, color: nextProfileColor(profiles) });
+      await runCommand({
+        type: 'duplicateProfile',
+        profileId: selected.id,
+        newId,
+        color: nextProfileColor(profiles),
+      });
       setSelectedId(newId);
     });
   }
@@ -371,11 +478,12 @@ export function Blocklists({ onUpgrade }: { onUpgrade: () => void }) {
   }
 
   async function runProfileRequest(run: () => Promise<unknown>) {
-    setError(null);
+    const feedbackProfileId = selected?.id ?? 'new';
+    setFeedback('profile', null, true, feedbackProfileId);
     try {
       await run();
     } catch (e) {
-      setError((e as Error).message);
+      setFeedback('profile', (e as Error).message, true, feedbackProfileId);
     }
   }
 
@@ -385,10 +493,13 @@ export function Blocklists({ onUpgrade }: { onUpgrade: () => void }) {
       if (selectedId === profileId) setSelectedId(null);
     });
 
-  const turnOn = (profileId: string) => runProfileRequest(() => runCommand({ type: 'setLatch', profileId, on: true }));
+  const turnOn = (profileId: string) =>
+    runProfileRequest(() => runCommand({ type: 'setLatch', profileId, on: true }));
   // Turning one profile off is a key-gated override scoped to that profile.
   const turnOff = (profileId: string) =>
-    runProfileRequest(() => runCommand({ type: 'startOverrideExempt', profiles: [profileId], items: [] }));
+    runProfileRequest(() =>
+      runCommand({ type: 'startOverrideExempt', profiles: [profileId], items: [] }),
+    );
 
   const makeDefault = (profileId: string) =>
     runProfileRequest(() => runCommand({ type: 'setDefaultProfile', profileId }));
@@ -403,11 +514,11 @@ export function Blocklists({ onUpgrade }: { onUpgrade: () => void }) {
     if (action === 'judge') {
       if (!smartAllowed) return onUpgrade();
       // Without a task the judge has nothing to judge against; send them to the AI filter.
-      if (!policy.judge) {
+      if (!policy.judge?.tasks.length) {
         setOpenSection('ai');
-        return setError('Add what you’re working on to the AI filter first.');
+        return setFeedback('ai', 'Add what you’re working on to the AI filter first.');
       }
-      return save({ ...policy, defaultAction: 'judge' });
+      return save({ ...policy, defaultAction: 'judge' }, 'ai');
     }
     if (SMART_FILTERING_ENABLED) return save({ ...policy, defaultAction: action });
     // Classic builds keep one list: it moves between block and allow as the mode flips.
@@ -419,8 +530,8 @@ export function Blocklists({ onUpgrade }: { onUpgrade: () => void }) {
   }
 
   /** The whole internet, off. Keeps the block list (it's moot, and useful again later). */
-  function blockEverything() {
-    if (policy.allowedDomains.length > 0 && !confirmBlockAll) return setConfirmBlockAll(true);
+  function blockEverything(confirmed = false) {
+    if (policy.allowedDomains.length > 0 && !confirmed) return setConfirmBlockAll(true);
     setConfirmBlockAll(false);
     return save({
       ...policy,
@@ -430,95 +541,119 @@ export function Blocklists({ onUpgrade }: { onUpgrade: () => void }) {
     });
   }
 
-  const addBlockedDomain = (domain: string) => {
-    if (blockedLimitReached) {
-      return setError(`Free supports up to ${maxBlocked} blocked websites.`);
+  async function addDomain(domain: string, target: 'blocked' | 'allowed') {
+    const blocked = target === 'blocked';
+    const domains = blocked ? policy.blockedDomains : policy.allowedDomains;
+    const max = blocked ? maxBlocked : maxAllowed;
+    if (blocked ? blockedLimitReached : allowedLimitReached) {
+      setFeedback(target, `Free supports up to ${max} ${target} websites.`);
+      return false;
     }
-    void save({
-      ...policy,
-      blockedDomains: [...policy.blockedDomains, domain],
-      allowedDomains: SMART_FILTERING_ENABLED ? policy.allowedDomains : [],
-    });
-  };
-  const removeBlockedDomain = (d: string) =>
-    save({
-      ...policy,
-      blockedDomains: policy.blockedDomains.filter((x) => x !== d),
-      allowedDomains: SMART_FILTERING_ENABLED ? policy.allowedDomains : [],
-    });
-  /** Pasting a big list into the edit modal — dedupes against what's already there and stops at the plan limit. */
-  const addManyBlockedDomains = (raw: string[]) => {
-    const room = maxBlocked === null ? Infinity : maxBlocked - blockedEntryCount;
-    const existing = new Set(policy.blockedDomains);
-    const additions = [...new Set(raw)].filter((d) => d && !existing.has(d)).slice(0, room);
-    if (additions.length === 0) return;
-    void save({
-      ...policy,
-      blockedDomains: [...policy.blockedDomains, ...additions],
-      allowedDomains: SMART_FILTERING_ENABLED ? policy.allowedDomains : [],
-    });
-  };
+    const normalized = normalizeDomain(domain);
+    if ('error' in normalized) {
+      setFeedback(target, `Cannot add “${domain}”: ${normalized.error}.`);
+      return false;
+    }
+    if (domains.includes(normalized.domain)) {
+      setFeedback(target, 'Already listed.', false);
+      return true;
+    }
+    return saveDomainList([...domains, normalized.domain], target);
+  }
 
-  const addAllowedDomain = (domain: string) => {
-    if (allowedLimitReached) {
-      return setError(`Free supports up to ${maxAllowed} allowed websites.`);
-    }
-    void save({
-      ...policy,
-      blockedDomains: SMART_FILTERING_ENABLED ? policy.blockedDomains : [],
-      allowedDomains: [...policy.allowedDomains, domain],
-    });
-    setConfirmBlockAll(false);
-  };
-  const removeAllowedDomain = (d: string) =>
-    save({
-      ...policy,
-      blockedDomains: SMART_FILTERING_ENABLED ? policy.blockedDomains : [],
-      allowedDomains: policy.allowedDomains.filter((x) => x !== d),
-    });
-  const addManyAllowedDomains = (raw: string[]) => {
-    const room = maxAllowed === null ? Infinity : maxAllowed - policy.allowedDomains.length;
-    const existing = new Set(policy.allowedDomains);
-    const additions = [...new Set(raw)].filter((d) => d && !existing.has(d)).slice(0, room);
-    if (additions.length === 0) return;
-    void save({
-      ...policy,
-      blockedDomains: SMART_FILTERING_ENABLED ? policy.blockedDomains : [],
-      allowedDomains: [...policy.allowedDomains, ...additions],
-    });
-  };
+  function saveDomainList(domains: string[], target: 'blocked' | 'allowed') {
+    return save(
+      {
+        ...policy,
+        blockedDomains:
+          target === 'blocked' ? domains : SMART_FILTERING_ENABLED ? policy.blockedDomains : [],
+        allowedDomains:
+          target === 'allowed' ? domains : SMART_FILTERING_ENABLED ? policy.allowedDomains : [],
+      },
+      target,
+    );
+  }
+
+  async function addManyDomains(raw: string[], target: 'blocked' | 'allowed') {
+    const blocked = target === 'blocked';
+    const domains = blocked ? policy.blockedDomains : policy.allowedDomains;
+    const max = blocked ? maxBlocked : maxAllowed;
+    const count = blocked ? blockedEntryCount : domains.length;
+    const room = max === null ? Infinity : Math.max(0, max - count);
+    const { additions, duplicates, overLimit, invalid } = prepareDomainPaste(raw, domains, room);
+    setFeedback(target, null);
+    if (additions.length > 0 && !(await saveDomainList([...domains, ...additions], target)))
+      return false;
+    setFeedback(
+      target,
+      [
+        `Added ${additions.length}`,
+        duplicates > 0 && `${duplicates} already listed or repeated`,
+        overLimit > 0 && `${overLimit} over the Free limit`,
+        invalid > 0 && `${invalid} invalid`,
+      ]
+        .filter(Boolean)
+        .join(' · '),
+      false,
+    );
+    return true;
+  }
+
+  const addBlockedDomain = (domain: string) => addDomain(domain, 'blocked');
+  const addAllowedDomain = (domain: string) => addDomain(domain, 'allowed');
+  const removeBlockedDomain = (domain: string) =>
+    saveDomainList(
+      policy.blockedDomains.filter((d) => d !== domain),
+      'blocked',
+    );
+  const removeAllowedDomain = (domain: string) =>
+    saveDomainList(
+      policy.allowedDomains.filter((d) => d !== domain),
+      'allowed',
+    );
+  const addManyBlockedDomains = (raw: string[]) => addManyDomains(raw, 'blocked');
+  const addManyAllowedDomains = (raw: string[]) => addManyDomains(raw, 'allowed');
 
   const togglePremadeList = (id: PremadeListId) => {
     if (premadeListsLocked) return onUpgrade();
     const enabled = policy.enabledPremadeLists.includes(id);
-    void save({
-      ...policy,
-      enabledPremadeLists: enabled
-        ? policy.enabledPremadeLists.filter((x) => x !== id)
-        : [...policy.enabledPremadeLists, id],
-    });
+    void save(
+      {
+        ...policy,
+        enabledPremadeLists: enabled
+          ? policy.enabledPremadeLists.filter((x) => x !== id)
+          : [...policy.enabledPremadeLists, id],
+      },
+      'premade',
+    );
   };
 
-  const addApp = () => {
+  const addApp = async () => {
     if (!appName.trim()) return;
     if (maxApps !== null && policy.apps.length >= maxApps) {
-      return setError('Free does not include app blocking.');
+      return setFeedback('apps', `Free supports up to ${maxApps} blocked apps.`);
     }
     const name = appName.trim();
-    void save({
-      ...policy,
-      apps: [...policy.apps, { windowsImageName: name, linuxProcessName: name, label: name }],
-    });
-    setAppName('');
+    if (
+      await save(
+        {
+          ...policy,
+          apps: [...policy.apps, { windowsImageName: name, linuxProcessName: name, label: name }],
+        },
+        'apps',
+      )
+    )
+      setAppName('');
   };
   const removeApp = (target: AppRef) =>
-    save({ ...policy, apps: policy.apps.filter((a) => appKey(a) !== appKey(target)) });
+    save({ ...policy, apps: policy.apps.filter((a) => appKey(a) !== appKey(target)) }, 'apps');
 
   async function openAppPicker() {
     setPickerOpen(true);
     setPickerQuery('');
     setSelectedApps(new Set());
     setPickerError(null);
+    setFeedback('picker', null);
     setPickerLoading(true);
     try {
       setPickerItems(await listInstalledApps());
@@ -550,7 +685,7 @@ export function Blocklists({ onUpgrade }: { onUpgrade: () => void }) {
       .filter((item) => selectedApps.has(appKey(item.app)))
       .map((item) => item.app);
     if (picked.length === 0) return;
-    await save({ ...policy, apps: [...policy.apps, ...picked] });
+    if (!(await save({ ...policy, apps: [...policy.apps, ...picked] }, 'picker'))) return;
     setPickerOpen(false);
     setSelectedApps(new Set());
   }
@@ -558,27 +693,30 @@ export function Blocklists({ onUpgrade }: { onUpgrade: () => void }) {
   // ── Collapsed-row summaries ──────────────────────────────────────────────────────────────
   const unlisted = effectiveAction(policy.defaultAction, policy, aiMode);
   const blockingEverything = unlisted === 'block' && policy.allowedDomains.length === 0;
-  const unlistedLabel = { allow: 'allowed', block: 'blocked', judge: 'checked by AI' }[unlisted];
+  const hardModeLabel = {
+    allow: 'Block these sites',
+    block: 'Allow only these sites',
+    judge: 'Everything else checked by AI',
+  }[unlisted];
   const hardSummary = SMART_FILTERING_ENABLED
     ? blockingEverything
       ? 'Blocking the whole internet'
-      : `Everything else ${unlistedLabel} · ${policy.blockedDomains.length} blocked · ${policy.allowedDomains.length} allowed`
+      : `${hardModeLabel} · ${unlisted === 'block' ? policy.allowedDomains.length + ' allowed' : policy.blockedDomains.length + ' blocked'}`
     : classicMode === 'blacklist'
       ? `Blocking ${plural(classicDomains.length, 'site')}`
       : blockingEverything
         ? 'Blocking the whole internet'
         : `Allowing only ${plural(classicDomains.length, 'site')}`;
-  const hardChips = unlisted === 'allow' ? policy.blockedDomains : policy.allowedDomains;
+  const hardChips = unlisted === 'block' ? policy.allowedDomains : policy.blockedDomains;
 
   const listedSites = useListedSites(policy);
   const softOn = listedSites.filter((site) => policy.sites?.[site.id]);
   const softCounts = softOn.map((site) => siteRuleCounts(site, policy, aiMode));
   const softHidden = softCounts.reduce((sum, c) => sum + c.hidden, 0);
   const softJudged = softCounts.reduce((sum, c) => sum + c.judged, 0);
-  const softSummary =
-    policy.universalSoftBlock
-      ? `Universal ${aiMode ? 'on' : 'paused · AI mode off'}${softOn.length ? ` · ${softOn.length} site rules` : ''}`
-      : softOn.length === 0
+  const softSummary = policy.universalSoftBlock
+    ? `Universal ${aiMode ? 'on' : 'paused · AI mode off'}${softOn.length ? ` · ${softOn.length} site rules` : ''}`
+    : softOn.length === 0
       ? `Off · ${listedSites.length} sites available`
       : `${softOn.length} of ${listedSites.length} sites · ${softHidden} features hidden${softJudged ? ` · ${softJudged} AI` : ''}`;
 
@@ -620,7 +758,11 @@ export function Blocklists({ onUpgrade }: { onUpgrade: () => void }) {
         {/* The profile is the page's subject, so it doubles as the heading and the switcher. */}
         <div className="relative">
           <button
-            onClick={() => setMenuOpen((v) => !v)}
+            onClick={() => {
+              setMenuOpen((v) => !v);
+              setConfirmDelete(false);
+            }}
+            aria-label="Choose profile"
             aria-expanded={menuOpen}
             className={cx(
               'flex items-center gap-3 rounded-[11px] border py-2 pl-3 pr-3.5 transition',
@@ -629,26 +771,13 @@ export function Blocklists({ onUpgrade }: { onUpgrade: () => void }) {
                 : 'border-white/[0.09] bg-white/[0.03] hover:border-white/[0.14] hover:bg-white/[0.05]',
             )}
           >
-            <ProfileDot color={accent} size={10} glow className="rounded-[3px]" />
-            <span className="flex min-w-0 flex-col items-start gap-0.5">
-              <span className="max-w-[190px] truncate text-[17px] font-bold leading-none text-slate-100">
-                {selected?.name ?? 'No profile'}
-              </span>
-              <span className="font-mono text-[10.5px] uppercase tracking-[0.08em] text-slate-500">
-                {selected ? profileSummary(selected, aiMode) : '—'}
-              </span>
-            </span>
-            <span className="flex flex-col items-start gap-[3px] border-l border-white/[0.10] pl-[7px] pt-px">
-              <span className="font-mono text-[9px] font-medium tracking-[0.14em] text-slate-450">
-                PROFILE
-              </span>
-              <span className="text-[11px] text-slate-400">
-                {profiles.length} to switch between
-              </span>
+            <ProfileDot color={selected?.color ?? accent} size={10} glow />
+            <span className="max-w-[190px] truncate text-heading font-bold leading-none text-slate-100">
+              {selected?.name ?? 'No profile'}
             </span>
             <span
               className={cx(
-                'ml-0.5 text-[11px] text-slate-400 transition-transform',
+                'ml-0.5 text-caption text-slate-400 transition-transform',
                 menuOpen && 'rotate-180',
               )}
             >
@@ -660,7 +789,7 @@ export function Blocklists({ onUpgrade }: { onUpgrade: () => void }) {
             <>
               <div className="fixed inset-0 z-40" onClick={() => setMenuOpen(false)} />
               <div className="absolute left-0 top-[calc(100%+7px)] z-50 w-[322px] animate-rise rounded-xl border border-white/[0.12] bg-[rgb(var(--color-panel)/0.97)] p-[7px] shadow-[0_18px_46px_rgb(var(--color-black)/0.6)] backdrop-blur-xl">
-                <div className="px-2 pb-[7px] pt-1.5 font-mono text-[9.5px] font-medium tracking-[0.18em] text-slate-450">
+                <div className="px-2 pb-[7px] pt-1.5 font-mono text-caption font-medium tracking-[0.18em] text-slate-450">
                   SWITCH PROFILE ·{' '}
                   {profileLimit === null ? profiles.length : `${profiles.length}/${profileLimit}`}
                 </div>
@@ -671,6 +800,8 @@ export function Blocklists({ onUpgrade }: { onUpgrade: () => void }) {
                       key={p.id}
                       onClick={() => {
                         setSelectedId(p.id);
+                        setConfirmDelete(false);
+                        setConfirmBlockAll(false);
                         setMenuOpen(false);
                       }}
                       className={cx(
@@ -684,13 +815,13 @@ export function Blocklists({ onUpgrade }: { onUpgrade: () => void }) {
                       <span className="min-w-0 flex-1">
                         <span
                           className={cx(
-                            'block truncate text-[12.5px] font-semibold',
+                            'block truncate text-body font-semibold',
                             p.id === selected?.id ? 'text-slate-100' : 'text-slate-250',
                           )}
                         >
                           {p.name}
                         </span>
-                        <span className="mt-0.5 block truncate font-mono text-[10.5px] text-slate-450">
+                        <span className="mt-0.5 block break-words font-mono text-caption text-slate-450">
                           {profileSummary(p, aiMode)}
                         </span>
                       </span>
@@ -698,7 +829,7 @@ export function Blocklists({ onUpgrade }: { onUpgrade: () => void }) {
                         <Badge tone="ok">ON</Badge>
                       ) : (
                         p.id === selected?.id && (
-                          <span className="text-[11px] text-slate-400">editing</span>
+                          <span className="text-caption text-slate-400">editing</span>
                         )
                       )}
                     </button>
@@ -711,9 +842,9 @@ export function Blocklists({ onUpgrade }: { onUpgrade: () => void }) {
                       setMenuOpen(false);
                       void addProfile();
                     }}
-                    className="flex items-center gap-2.5 rounded-[9px] px-2.5 py-2 text-left text-[12px] font-medium text-slate-200 transition hover:bg-white/[0.05]"
+                    className="flex items-center gap-2.5 rounded-[9px] px-2.5 py-2 text-left text-caption font-medium text-slate-200 transition hover:bg-white/[0.05]"
                   >
-                    <span className="font-mono text-[13px] text-slate-500">+</span>
+                    <span className="font-mono text-body text-slate-500">+</span>
                     {profileLimitReached ? 'Upgrade for more profiles' : 'New profile'}
                   </button>
                   <button
@@ -722,9 +853,9 @@ export function Blocklists({ onUpgrade }: { onUpgrade: () => void }) {
                       void duplicateProfile();
                     }}
                     disabled={!selected}
-                    className="flex items-center gap-2.5 rounded-[9px] px-2.5 py-2 text-left text-[12px] font-medium text-slate-400 transition hover:bg-white/[0.05] hover:text-slate-200 disabled:opacity-45"
+                    className="flex items-center gap-2.5 rounded-[9px] px-2.5 py-2 text-left text-caption font-medium text-slate-400 transition hover:bg-white/[0.05] hover:text-slate-200 disabled:opacity-45"
                   >
-                    <span className="font-mono text-[13px] text-slate-500">⧉</span>
+                    <span className="font-mono text-body text-slate-500">⧉</span>
                     Duplicate {selected?.name}
                   </button>
                   {selected && selected.id !== defaultProfileId && (
@@ -733,28 +864,17 @@ export function Blocklists({ onUpgrade }: { onUpgrade: () => void }) {
                         setMenuOpen(false);
                         void makeDefault(selected.id);
                       }}
-                      className="flex items-center gap-2.5 rounded-[9px] px-2.5 py-2 text-left text-[12px] font-medium text-slate-400 transition hover:bg-white/[0.05] hover:text-slate-200"
+                      className="flex items-center gap-2.5 rounded-[9px] px-2.5 py-2 text-left text-caption font-medium text-slate-400 transition hover:bg-white/[0.05] hover:text-slate-200"
                     >
-                      <span className="font-mono text-[13px] text-slate-500">★</span>
-                      Use {selected.name} for “Turn on focus”
+                      <span className="font-mono text-body text-slate-500">★</span>
+                      Make default
                     </button>
                   )}
                 </div>
 
                 <div className="mt-1.5 border-t border-white/[0.07] px-1.5 pb-1 pt-2">
                   <div className="flex items-baseline justify-between">
-                    <Kicker className="text-[9.5px] tracking-[0.18em]">Rename</Kicker>
-                    {profiles.length > 1 && (
-                      <button
-                        onClick={() => {
-                          setMenuOpen(false);
-                          if (selected) void deleteProfile(selected.id);
-                        }}
-                        className="text-[11px] font-medium text-slate-500 transition hover:text-dangerInk"
-                      >
-                        delete profile
-                      </button>
-                    )}
+                    <Kicker className="text-caption tracking-[0.18em]">Rename</Kicker>
                   </div>
                   <Input
                     key={selected?.id}
@@ -766,9 +886,48 @@ export function Blocklists({ onUpgrade }: { onUpgrade: () => void }) {
                     placeholder="Profile name"
                     aria-label="Profile name"
                   />
+                  {profiles.length > 1 && selected && (
+                    <div className="mt-3 border-t border-white/[0.07] pt-2">
+                      {confirmDelete ? (
+                        <>
+                          <p className="text-caption text-slate-300">
+                            Delete “{selected.name}” and its rules?
+                          </p>
+                          <div className="mt-2 flex gap-2">
+                            <Button
+                              variant="ghost"
+                              onClick={() => setConfirmDelete(false)}
+                              className="px-3 py-1.5"
+                            >
+                              Cancel
+                            </Button>
+                            <Button
+                              variant="danger"
+                              onClick={() => {
+                                setMenuOpen(false);
+                                setConfirmDelete(false);
+                                void deleteProfile(selected.id);
+                              }}
+                              className="px-3 py-1.5"
+                            >
+                              Delete profile
+                            </Button>
+                          </div>
+                        </>
+                      ) : (
+                        <button
+                          onClick={() => setConfirmDelete(true)}
+                          className="text-caption font-medium text-dangerInk"
+                        >
+                          Delete profile…
+                        </button>
+                      )}
+                    </div>
+                  )}
+                  <InlineFeedback feedback={feedback.profile} />
                   {/* Only worth saying while the key is out — with it in, nothing here is gated. */}
                   {!keyPresent && (
-                    <p className="mt-2 text-[11px] leading-relaxed text-slate-450">
+                    <p className="mt-2 text-caption leading-relaxed text-slate-450">
                       Loosening a profile needs your key.
                     </p>
                   )}
@@ -780,9 +939,7 @@ export function Blocklists({ onUpgrade }: { onUpgrade: () => void }) {
 
         {selected && (
           <div className="ml-auto flex items-center gap-2">
-            <span className={cx('font-mono text-[10px] tracking-[0.12em]', isActive ? 'text-okInk' : 'text-slate-450')}>
-              {isActive ? 'ON' : 'OFF'}
-            </span>
+            <StatusLabel on={isActive} tone="success" />
             <ProfileSwitch
               label={`${selected.name} ${isActive ? 'on' : 'off'}`}
               on={isActive}
@@ -793,11 +950,7 @@ export function Blocklists({ onUpgrade }: { onUpgrade: () => void }) {
         )}
       </div>
 
-      {error && (
-        <p className="mt-3 rounded-[9px] border border-danger/30 bg-danger/[0.08] px-3 py-2 text-[12px] text-dangerInk">
-          {error}
-        </p>
-      )}
+      {!menuOpen && <InlineFeedback feedback={feedback.profile} />}
 
       <section className="mt-4 flex min-w-0 flex-col gap-2 pb-6">
         {aiMode && (
@@ -817,13 +970,41 @@ export function Blocklists({ onUpgrade }: { onUpgrade: () => void }) {
             open={openSection === 'ai'}
             onToggle={() => toggleSection('ai')}
           >
+            <label className="mb-3 flex items-center gap-2 text-caption text-slate-300">
+              <input
+                type="checkbox"
+                checked={unlisted === 'judge'}
+                onChange={() => {
+                  if (unlisted === 'judge') void save({ ...policy, defaultAction: 'allow' }, 'ai');
+                  else void setUnlisted('judge');
+                }}
+              />
+              Check unlisted sites with AI
+            </label>
+            <InlineFeedback feedback={feedback.ai} />
             <JudgeSettings
               key={selected?.id}
               policy={policy}
               allowed={smartAllowed}
-              onSave={(next) => void save(next)}
+              onSave={(next) => void save(next, 'ai')}
               onUpgrade={onUpgrade}
             />
+            <div className="mt-5">
+              <DomainListEditor
+                key={selected?.id}
+                title="Always allow"
+                hint="never blocked, never judged by AI"
+                placeholder="mail.google.com"
+                domains={policy.allowedDomains}
+                onAdd={addAllowedDomain}
+                onAddMany={addManyAllowedDomains}
+                onRemove={removeAllowedDomain}
+                max={maxAllowed}
+                feedback={feedback.allowed}
+                limitReached={allowedLimitReached}
+                onUpgrade={onUpgrade}
+              />
+            </div>
           </BlocklistSection>
         )}
 
@@ -831,8 +1012,8 @@ export function Blocklists({ onUpgrade }: { onUpgrade: () => void }) {
           title="Hard blocks"
           help={
             <>
-              Blocked sites never load; allowed sites always do. The switch at the top decides what
-              happens to every site on neither list.
+              Choose whether to block listed sites, allow only listed sites, or block the whole
+              internet. These rules apply while this profile is on.
             </>
           }
           active={unlisted !== 'allow' || policy.blockedDomains.length > 0}
@@ -841,90 +1022,105 @@ export function Blocklists({ onUpgrade }: { onUpgrade: () => void }) {
           open={openSection === 'hard'}
           onToggle={() => toggleSection('hard')}
         >
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-            <span className="text-[12.5px] text-slate-300">Sites on neither list are</span>
-            <span role="radiogroup" className="flex overflow-hidden rounded-full border border-white/[0.10]">
-              {(
-                [
-                  ['allow', 'Allowed'],
-                  ['block', 'Blocked'],
-                  ...(SMART_FILTERING_ENABLED && aiMode ? [['judge', 'Checked by AI']] : []),
-                ] as ['allow' | 'block' | 'judge', string][]
-              ).map(([action, label]) => {
-                const on = unlisted === action;
-                return (
-                  <button
-                    key={action}
-                    role="radio"
-                    aria-checked={on}
-                    onClick={() => !on && void setUnlisted(action)}
-                    className={cx(
-                      'px-3 py-1 text-[11.5px] font-semibold transition',
-                      on ? 'bg-white/[0.12] text-slate-100' : 'text-slate-450 hover:text-slate-200',
-                    )}
-                  >
-                    {label}
-                    {action === 'judge' && !smartAllowed && (
-                      <span className="ml-1 font-mono text-[9px] tracking-[0.08em] text-slate-450">PRO</span>
-                    )}
-                  </button>
-                );
-              })}
-            </span>
-
-            <Button
-              variant={blockingEverything ? 'ghost' : 'danger'}
-              onClick={() => void blockEverything()}
-              disabled={blockingEverything}
-              className="ml-auto px-3.5 py-1.5 text-[11.5px]"
-            >
-              {blockingEverything
-                ? 'Whole internet blocked'
-                : confirmBlockAll
-                  ? `Clear ${plural(policy.allowedDomains.length, 'allowed site')} and block everything?`
-                  : 'Block everything'}
-            </Button>
+          <div role="radiogroup" aria-label="Hard block mode" className="flex flex-wrap gap-2">
+            {(
+              [
+                ['allow', 'Block these sites'],
+                ['block', 'Allow only these sites'],
+                ['internet', 'Block the internet'],
+              ] as const
+            ).map(([mode, label]) => {
+              const on =
+                mode === 'internet'
+                  ? blockingEverything
+                  : mode === 'block'
+                    ? unlisted === 'block' && !blockingEverything
+                    : unlisted !== 'block';
+              return (
+                <button
+                  key={mode}
+                  role="radio"
+                  aria-checked={on}
+                  onClick={() => {
+                    if (on && !(mode === 'allow' && unlisted === 'judge')) return;
+                    setConfirmBlockAll(false);
+                    if (mode === 'internet') void blockEverything();
+                    else void setUnlisted(mode);
+                  }}
+                  className={cx(
+                    'rounded-lg border px-3 py-2 text-caption font-medium transition',
+                    on
+                      ? 'border-white/20 bg-white/[0.12] text-slate-100'
+                      : 'border-white/[0.10] text-slate-400 hover:text-slate-200',
+                  )}
+                >
+                  {label}
+                </button>
+              );
+            })}
           </div>
-
-          {blockingEverything && (
-            <p className="mt-2.5 text-[11.5px] text-slate-400">
-              Nothing loads while this profile is on. Add sites to “Always allow” to let them through.
-            </p>
+          <p className="mt-2 text-caption text-slate-400">
+            {blockingEverything
+              ? 'Nothing loads while this profile is on. Add allowed sites to let them through.'
+              : unlisted === 'block'
+                ? 'Only sites on the allow list can load.'
+                : unlisted === 'judge'
+                  ? 'Listed sites are blocked. The AI filter checks everything else.'
+                  : 'Listed sites are blocked. Everything else is allowed.'}
+          </p>
+          {confirmBlockAll && (
+            <div className="mt-3 rounded-lg border border-white/[0.10] p-3">
+              <p className="text-caption text-slate-300">
+                Block the internet and clear {plural(policy.allowedDomains.length, 'allowed site')}?
+              </p>
+              <div className="mt-2 flex gap-2">
+                <Button
+                  variant="ghost"
+                  onClick={() => setConfirmBlockAll(false)}
+                  className="px-3 py-1.5"
+                >
+                  Cancel
+                </Button>
+                <Button onClick={() => void blockEverything(true)} className="px-3 py-1.5">
+                  Confirm
+                </Button>
+              </div>
+            </div>
           )}
 
-          <div className={cx('mt-4 grid gap-5', SMART_FILTERING_ENABLED && 'grid-cols-2')}>
-            {(SMART_FILTERING_ENABLED || classicMode === 'blacklist') && (
+          <InlineFeedback feedback={feedback.hard} />
+
+          <div className="mt-4 grid gap-5">
+            {unlisted !== 'block' && (
               <DomainListEditor
+                key={selected?.id}
                 title={SMART_FILTERING_ENABLED ? 'Always block' : 'Block list'}
                 hint="*.example.com covers subdomains"
                 placeholder="reddit.com"
-                accent={palette.colors.danger}
                 domains={policy.blockedDomains}
                 onAdd={addBlockedDomain}
                 onAddMany={addManyBlockedDomains}
                 onRemove={removeBlockedDomain}
                 max={maxBlocked}
+                feedback={feedback.blocked}
                 limitReached={blockedLimitReached}
+                onUpgrade={onUpgrade}
               />
             )}
-            {(SMART_FILTERING_ENABLED || classicMode === 'whitelist') && (
+            {unlisted === 'block' && (
               <DomainListEditor
-                title={SMART_FILTERING_ENABLED ? 'Always allow' : 'Allow list'}
-                hint={
-                  !SMART_FILTERING_ENABLED
-                    ? 'everything else is blocked'
-                    : aiMode
-                      ? 'never blocked, never judged'
-                      : 'never blocked'
-                }
+                key={selected?.id}
+                title="Always allow"
+                hint="everything else is blocked"
                 placeholder="mail.google.com"
-                accent={palette.colors.success}
                 domains={policy.allowedDomains}
                 onAdd={addAllowedDomain}
                 onAddMany={addManyAllowedDomains}
                 onRemove={removeAllowedDomain}
                 max={maxAllowed}
+                feedback={feedback.allowed}
                 limitReached={allowedLimitReached}
+                onUpgrade={onUpgrade}
               />
             )}
           </div>
@@ -940,10 +1136,20 @@ export function Blocklists({ onUpgrade }: { onUpgrade: () => void }) {
           }
           active={softOn.length > 0 || Boolean(policy.universalSoftBlock)}
           summary={softSummary}
-          chips={[...(policy.universalSoftBlock ? ['Universal'] : []), ...softOn.map((site) => site.label)]}
+          chips={[
+            ...(policy.universalSoftBlock ? ['Universal'] : []),
+            ...softOn.map((site) => site.label),
+          ]}
           open={openSection === 'soft'}
           onToggle={() => toggleSection('soft')}
         >
+          <InlineFeedback feedback={feedback.soft} />
+          {blockedLimitReached && (
+            <p className="mb-2 text-caption text-slate-400">
+              Free limit reached ({maxBlocked} blocked websites, including soft blocks). Remove an
+              entry or <UpgradeLink onUpgrade={onUpgrade} /> to add more.
+            </p>
+          )}
           <SiteRules
             key={selected?.id}
             policy={policy}
@@ -951,8 +1157,8 @@ export function Blocklists({ onUpgrade }: { onUpgrade: () => void }) {
             aiMode={aiMode}
             smartAllowed={smartAllowed}
             limitReached={blockedLimitReached}
-            onSave={(next) => void save(next)}
-            onError={setError}
+            onSave={(next) => void save(next, 'soft')}
+            onError={(message) => setFeedback('soft', message)}
             onUpgrade={onUpgrade}
           />
         </BlocklistSection>
@@ -966,12 +1172,13 @@ export function Blocklists({ onUpgrade }: { onUpgrade: () => void }) {
           open={openSection === 'premade'}
           onToggle={() => toggleSection('premade')}
         >
-          <p className="text-[11.5px] leading-snug text-slate-450">
+          <p className="text-caption leading-snug text-slate-450">
             {premadeListsLocked
               ? 'Categories with too many sites to list by hand. Premade lists are a Pro feature.'
               : 'Categories with too many sites to list by hand. They block alongside your own lists.'}
           </p>
-          <div className="mt-3 grid grid-cols-2 gap-2">
+          <InlineFeedback feedback={feedback.premade} />
+          <div className="premade-list-columns mt-3 grid gap-2">
             {PREMADE_LISTS.map((list) => {
               const enabled = !premadeListsLocked && policy.enabledPremadeLists.includes(list.id);
               return (
@@ -990,11 +1197,11 @@ export function Blocklists({ onUpgrade }: { onUpgrade: () => void }) {
                   )}
                 >
                   <span className="min-w-0 flex-1">
-                    <span className="text-[12.5px] font-semibold text-slate-250">{list.label}</span>
-                    <span className="ml-2 font-mono text-[10.5px] text-slate-500">
+                    <span className="text-body font-semibold text-slate-250">{list.label}</span>
+                    <span className="ml-2 font-mono text-caption text-slate-500">
                       {list.domainCount.toLocaleString()}
                     </span>
-                    <span className="mt-0.5 block text-[11px] leading-snug text-slate-500">
+                    <span className="mt-0.5 block text-caption leading-snug text-slate-500">
                       {list.description}
                     </span>
                   </span>
@@ -1004,7 +1211,7 @@ export function Blocklists({ onUpgrade }: { onUpgrade: () => void }) {
             })}
           </div>
           {premadeListsLocked && (
-            <Button onClick={onUpgrade} className="mt-3 px-4 py-1.5 text-[11.5px]">
+            <Button onClick={onUpgrade} className="mt-3 px-4 py-1.5 text-caption">
               Upgrade to Pro
             </Button>
           )}
@@ -1029,15 +1236,19 @@ export function Blocklists({ onUpgrade }: { onUpgrade: () => void }) {
         >
           {appBlockingLocked ? (
             <div className="flex items-center gap-3">
-              <p className="text-[12px] text-slate-400">App blocking is a Pro feature.</p>
-              <Button onClick={onUpgrade} className="px-4 py-1.5 text-[11.5px]">
+              <p className="text-caption text-slate-400">App blocking is a Pro feature.</p>
+              <Button onClick={onUpgrade} className="px-4 py-1.5 text-caption">
                 Upgrade to Pro
               </Button>
             </div>
           ) : (
             <>
               <div className="flex gap-2">
-                <Button onClick={openAppPicker} disabled={appLimitReached} className="shrink-0 px-4 py-1.5">
+                <Button
+                  onClick={openAppPicker}
+                  disabled={appLimitReached}
+                  className="shrink-0 px-4 py-1.5"
+                >
                   Choose apps
                 </Button>
                 <Input
@@ -1048,29 +1259,33 @@ export function Blocklists({ onUpgrade }: { onUpgrade: () => void }) {
                   disabled={appLimitReached}
                   className="py-1.5 font-mono"
                 />
-                <Button variant="ghost" onClick={addApp} disabled={appLimitReached} className="shrink-0 px-4 py-1.5">
+                <Button
+                  variant="ghost"
+                  onClick={addApp}
+                  disabled={appLimitReached}
+                  className="shrink-0 px-4 py-1.5"
+                >
                   Add
                 </Button>
               </div>
+              {appLimitReached && (
+                <p className="mt-2 text-caption text-slate-400">
+                  Free limit reached ({maxApps} blocked apps). Remove an app or{' '}
+                  <UpgradeLink onUpgrade={onUpgrade} /> to add more.
+                </p>
+              )}
+              <InlineFeedback feedback={feedback.apps} />
               <div className="mt-3 flex flex-wrap gap-1.5">
                 {policy.apps.map((a) => (
-                  <span
+                  <EntryChip
                     key={appKey(a)}
-                    className="inline-flex items-center gap-2 rounded-lg border border-white/[0.08] bg-white/[0.03] py-1.5 pl-2.5 pr-1.5 text-[11.5px] font-medium text-slate-200"
-                  >
-                    {a.label}
-                    <span className="font-mono text-[10px] text-slate-450">{appIdentifiers(a)}</span>
-                    <button
-                      onClick={() => removeApp(a)}
-                      aria-label={`Remove ${a.label}`}
-                      className="rounded px-1 text-slate-500 transition hover:text-dangerInk"
-                    >
-                      ×
-                    </button>
-                  </span>
+                    label={a.label}
+                    detail={appIdentifiers(a)}
+                    onRemove={() => removeApp(a)}
+                  />
                 ))}
                 {policy.apps.length === 0 && (
-                  <p className="text-[12px] text-slate-500">
+                  <p className="text-caption text-slate-500">
                     These programs get closed whenever this profile is on.
                   </p>
                 )}
@@ -1094,6 +1309,7 @@ export function Blocklists({ onUpgrade }: { onUpgrade: () => void }) {
             open={openSection === 'pools'}
             onToggle={() => toggleSection('pools')}
           >
+            <InlineFeedback feedback={feedback.pools} />
             <PoolEditor pools={pools} policy={policy} onSave={(next) => void savePools(next)} />
           </BlocklistSection>
         )}
@@ -1112,18 +1328,18 @@ export function Blocklists({ onUpgrade }: { onUpgrade: () => void }) {
                 <div>
                   <h2
                     id="app-picker-title"
-                    className="font-mono text-[10px] font-medium uppercase tracking-[0.2em] text-slate-500"
+                    className="text-heading font-semibold text-slate-500"
                   >
                     Choose apps
                   </h2>
-                  <p className="mt-2 text-[12.5px] text-slate-400">
+                  <p className="mt-2 text-body text-slate-400">
                     {selectedApps.size} selected
                     {maxApps !== null ? ` · ${remainingAppSlots} slots available` : ''}
                   </p>
                 </div>
                 <button
                   onClick={() => setPickerOpen(false)}
-                  className="rounded-lg px-2 py-1 text-[12px] text-slate-400 hover:bg-white/[0.06] hover:text-white"
+                  className="rounded-lg px-2 py-1 text-caption text-slate-400 hover:bg-white/[0.06] hover:text-white"
                   aria-label="Close app picker"
                 >
                   Close
@@ -1139,10 +1355,10 @@ export function Blocklists({ onUpgrade }: { onUpgrade: () => void }) {
             </div>
 
             <div className="min-h-0 flex-1 overflow-y-auto p-3">
-              {pickerLoading && <p className="p-3 text-[12.5px] text-slate-500">Loading apps...</p>}
-              {pickerError && <p className="p-3 text-[12.5px] text-dangerInk">{pickerError}</p>}
+              {pickerLoading && <p className="p-3 text-body text-slate-500">Loading apps...</p>}
+              {pickerError && <p className="p-3 text-body text-dangerInk">{pickerError}</p>}
               {!pickerLoading && !pickerError && filteredPickerItems.length === 0 && (
-                <p className="p-3 text-[12.5px] text-slate-500">No installed apps found.</p>
+                <p className="p-3 text-body text-slate-500">No installed apps found.</p>
               )}
               {!pickerLoading && !pickerError && (
                 <ul className="flex flex-col gap-1">
@@ -1168,10 +1384,10 @@ export function Blocklists({ onUpgrade }: { onUpgrade: () => void }) {
                             onChange={() => togglePickerItem(item)}
                           />
                           <span className="min-w-0 flex-1">
-                            <span className="block truncate text-[12.5px] font-semibold text-slate-100">
+                            <span className="block truncate text-body font-semibold text-slate-100">
                               {item.label}
                             </span>
-                            <span className="mt-0.5 block truncate font-mono text-[10px] text-slate-450">
+                            <span className="mt-0.5 block break-words font-mono text-caption text-slate-450">
                               {appIdentifiers(item.app)}
                             </span>
                           </span>
@@ -1184,6 +1400,14 @@ export function Blocklists({ onUpgrade }: { onUpgrade: () => void }) {
               )}
             </div>
 
+            <div className="px-4 pb-2">
+              <InlineFeedback feedback={feedback.picker} />
+              {selectedApps.size >= remainingAppSlots && (
+                <p className="mt-2 text-caption text-slate-400">
+                  All available app slots are selected. Deselect an app to choose another.
+                </p>
+              )}
+            </div>
             <div className="flex justify-end gap-2 border-t border-white/[0.07] p-4">
               <Button variant="ghost" onClick={() => setPickerOpen(false)}>
                 Cancel

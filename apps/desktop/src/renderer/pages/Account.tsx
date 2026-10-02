@@ -31,7 +31,7 @@ function AuthLink({ onClick, children }: { onClick: () => void; children: React.
     <button
       type="button"
       onClick={onClick}
-      className="text-xs text-slate-400 underline underline-offset-2 hover:text-slate-200"
+      className="text-caption text-slate-400 underline underline-offset-2 hover:text-slate-200"
     >
       {children}
     </button>
@@ -200,7 +200,7 @@ export function Account({ onUpgrade }: { onUpgrade: () => void }) {
               Save new password
             </Button>
           </form>
-          {message && <p className="mt-3 text-[12.5px] text-warn">{message}</p>}
+          {message && <p className="mt-3 text-body text-warn">{message}</p>}
         </Card>
       </div>
     );
@@ -212,7 +212,7 @@ export function Account({ onUpgrade }: { onUpgrade: () => void }) {
     <div className="grid grid-cols-1 gap-3 py-3">
       <Card>
         <CardTitle>Account</CardTitle>
-        <div className="flex flex-col gap-2 text-sm text-slate-300">
+        <div className="flex flex-col gap-2 text-body text-slate-300">
           <div className="flex items-center gap-2">
             Status:{' '}
             <Badge tone={signedIn ? 'ok' : 'neutral'}>
@@ -254,7 +254,7 @@ export function Account({ onUpgrade }: { onUpgrade: () => void }) {
             </div>
           )}
           {signedIn && detail?.status === 'past_due' && (
-            <div className="text-[12.5px] text-warn">
+            <div className="text-body text-warn">
               Your last payment failed — use Manage billing to update your payment method.
             </div>
           )}
@@ -330,7 +330,7 @@ export function Account({ onUpgrade }: { onUpgrade: () => void }) {
                   Cancel
                 </Button>
               </div>
-              {redeemMessage && <p className="text-sm text-slate-300">{redeemMessage}</p>}
+              {redeemMessage && <p className="text-body text-slate-300">{redeemMessage}</p>}
             </form>
           ) : (
             <div className="mt-4">
@@ -339,7 +339,7 @@ export function Account({ onUpgrade }: { onUpgrade: () => void }) {
           )}
           </>
         ) : view === 'checkEmail' ? (
-          <div className="mt-4 flex flex-col gap-3 text-sm text-slate-300">
+          <div className="mt-4 flex flex-col gap-3 text-body text-slate-300">
             <p>
               We sent a confirmation link to <span className="text-slate-100">{formEmail}</span>.
               Open it on this computer to finish creating your account.
@@ -355,7 +355,7 @@ export function Account({ onUpgrade }: { onUpgrade: () => void }) {
                 <Button disabled={busy} onClick={() => run(() => signInGoogle())}>
                   Sign up with Google
                 </Button>
-                <div className="text-center text-xs uppercase tracking-wide text-slate-500">or</div>
+                <div className="text-center text-caption uppercase tracking-wide text-slate-500">or</div>
               </>
             )}
             <form className="flex flex-col gap-2" onSubmit={emailSignUp}>
@@ -396,7 +396,7 @@ export function Account({ onUpgrade }: { onUpgrade: () => void }) {
         ) : view === 'forgot' ? (
           <div className="mt-4 flex max-w-sm flex-col gap-4">
             {notice ? (
-              <p className="text-sm text-slate-300">{notice}</p>
+              <p className="text-body text-slate-300">{notice}</p>
             ) : (
               <form className="flex flex-col gap-2" onSubmit={requestReset}>
                 <Input
@@ -423,7 +423,7 @@ export function Account({ onUpgrade }: { onUpgrade: () => void }) {
                 <Button disabled={busy} onClick={() => run(() => signInGoogle())}>
                   Continue with Google
                 </Button>
-                <div className="text-center text-xs uppercase tracking-wide text-slate-500">or</div>
+                <div className="text-center text-caption uppercase tracking-wide text-slate-500">or</div>
               </>
             )}
             <form className="flex flex-col gap-2" onSubmit={emailSignIn}>
@@ -455,7 +455,7 @@ export function Account({ onUpgrade }: { onUpgrade: () => void }) {
         )}
 
         {(message ?? authError) && (
-          <p className="mt-3 text-[12.5px] text-warn">{message ?? authError}</p>
+          <p className="mt-3 text-body text-warn">{message ?? authError}</p>
         )}
       </Card>
     </div>

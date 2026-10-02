@@ -76,7 +76,7 @@ export function JudgeSettings({
   return (
     <div className="grid grid-cols-2 gap-5">
         <div>
-          <label className="mb-1 block text-[11px] text-slate-450">What are you working on?</label>
+          <label className="mb-1 block text-caption text-slate-450">What are you working on?</label>
           <ul className="flex flex-col gap-1.5">
             {judge.tasks.map((task) => (
               <li key={task.id} className="flex items-center gap-2">
@@ -94,7 +94,7 @@ export function JudgeSettings({
                 <button
                   onClick={() => removeTask(task.id)}
                   aria-label={`Remove task ${task.title}`}
-                  className="text-[13px] text-slate-500 transition hover:text-dangerInk"
+                  className="text-body text-slate-500 transition hover:text-dangerInk"
                 >
                   ×
                 </button>
@@ -113,13 +113,13 @@ export function JudgeSettings({
         </div>
 
         <div>
-          <label className="mb-1 block text-[11px] text-slate-450">Help me avoid</label>
+          <label className="mb-1 block text-caption text-slate-450">Help me avoid</label>
           {judge.avoid.length > 0 && (
             <div className="mb-1.5 flex flex-wrap gap-1.5">
               {judge.avoid.map((item) => (
                 <span
                   key={item}
-                  className="inline-flex items-center gap-1.5 rounded-full border border-white/[0.10] bg-white/[0.04] px-2.5 py-0.5 text-[11px] text-slate-250"
+                  className="inline-flex items-center gap-1.5 rounded-full border border-white/[0.10] bg-white/[0.04] px-2.5 py-0.5 text-caption text-slate-250"
                 >
                   {item}
                   <button
@@ -142,7 +142,7 @@ export function JudgeSettings({
             disabled={!allowed || !policy.judge}
           />
           {policy.judge && (
-            <label className="mt-3 flex items-center gap-2 text-[11px] text-slate-400">
+            <label className="mt-3 flex items-center gap-2 text-caption text-slate-400">
               If the AI can’t answer
               <Select
                 value={judge.fallback}
@@ -160,19 +160,19 @@ export function JudgeSettings({
           {!allowed ? (
             <button
               onClick={onUpgrade}
-              className="text-[11px] font-medium text-slate-400 transition hover:text-slate-200"
+              className="text-caption font-medium text-slate-400 transition hover:text-slate-200"
             >
               Upgrade to enable the AI filter →
             </button>
           ) : (
-            <p className="text-[11px] leading-relaxed text-slate-450">
+            <p className="text-caption leading-relaxed text-slate-450">
               Judged pages load, then get checked — usually within a few seconds.
             </p>
           )}
           {policy.judge && (
             <button
               onClick={() => saveJudge({ ...judge, tasks: [] })}
-              className="ml-auto shrink-0 text-[11px] font-medium text-slate-500 transition hover:text-dangerInk"
+              className="ml-auto shrink-0 text-caption font-medium text-slate-500 transition hover:text-dangerInk"
             >
               Turn off AI filter
             </button>

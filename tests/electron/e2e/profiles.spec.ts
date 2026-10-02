@@ -10,7 +10,7 @@ import { launchApp } from './launch.js';
 
 /** The Profiles page heading doubles as the profile switcher; it names the profile being edited. */
 function switcher(win: Page) {
-  return win.locator('button[aria-expanded]').filter({ hasText: 'to switch between' });
+  return win.getByRole('button', { name: 'Choose profile', exact: true });
 }
 
 test('Pro gets unlimited blocking profiles that run side by side, Free gets one', async () => {
@@ -48,8 +48,14 @@ test('Pro gets unlimited blocking profiles that run side by side, Free gets one'
     await nameField.fill('Evening');
     await nameField.press('Enter');
     await expect(switcher(win)).toContainText('Evening');
+    // Deletion is separate from rename and requires confirmation.
+    await win.getByRole('button', { name: 'Delete profile…', exact: true }).click();
+    await expect(win.getByText('Delete “Evening” and its rules?')).toBeVisible();
+    await win.getByRole('button', { name: 'Cancel', exact: true }).click();
+    await expect(switcher(win)).toContainText('Evening');
+
     // Make it the profile "Turn on focus" uses.
-    await win.getByRole('button', { name: 'Use Evening for “Turn on focus”' }).click();
+    await win.getByRole('button', { name: 'Make default' }).click();
 
     // Switching it on is free and leaves other profiles alone.
     await win.getByRole('switch', { name: 'Evening off' }).click();

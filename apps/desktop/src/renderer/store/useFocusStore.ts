@@ -115,6 +115,7 @@ interface FocusStore {
   setLocalEntitlementEnabled: (enabled: boolean) => Promise<void>;
   setBrowserHandshake: (enabled: boolean) => Promise<void>;
   setTrayIconEnabled: (enabled: boolean) => Promise<void>;
+  setStreakBadgeEnabled: (enabled: boolean) => Promise<void>;
   clearWatchdogWarning: () => void;
   setError: (e?: { code: string; message: string }) => void;
   applySnapshot: (s: ServiceState) => void;
@@ -277,6 +278,11 @@ export const useFocusStore = create<FocusStore>((set, get) => ({
   setTrayIconEnabled: async (enabled) => {
     await request('setTrayIconEnabled', { enabled });
     set((s) => ({ settings: { ...s.settings, trayIconEnabled: enabled } }));
+  },
+
+  setStreakBadgeEnabled: async (enabled) => {
+    await request('setStreakBadgeEnabled', { enabled });
+    set((s) => ({ settings: { ...s.settings, streakBadgeEnabled: enabled } }));
   },
 
   refresh: async () => {

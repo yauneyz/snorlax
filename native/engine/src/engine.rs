@@ -718,9 +718,17 @@ impl Engine {
             Command::SetLatch { profile_id, on } => {
                 if on {
                     let Some(p) = self.state.profile_mut(&profile_id) else { return };
-                    if p.latch.is_on() {
+                    let was_on = p.latch.is_on();
+                    // The profile last turned on is the one "Turn on focus" starts next time. Picking
+                    // one after "Turn off" is a fresh start, so re-enabling won't bring the old ones back.
+                    self.state.default_profile_id = Some(profile_id.clone());
+                    if let Some(a) = &mut self.state.overrides.all_off {
+                        a.prior_latches.clear();
+                    }
+                    if was_on {
                         return;
                     }
+                    let Some(p) = self.state.profile_mut(&profile_id) else { return };
                     p.latch = Latch::On { since_ms: now.epoch_ms, source: LatchSource::User };
                     self.push_journal(now, false, JournalKind::ProfileOn { profile_id, source: ChangeSource::User });
                 } else {
@@ -798,7 +806,12 @@ impl Engine {
             }
             Command::ReenableAll => {
                 let o = std::mem::take(&mut self.state.overrides);
-                let had = o.any() || !o.suppressed.is_empty() || !o.locked_bypass.is_empty();
+                let had_unlocks = self.state.pool_usage.iter().any(|u| u.active_until_ms.is_some());
+                for usage in &mut self.state.pool_usage {
+                    usage.active_until_ms = None;
+                }
+                self.state.pending_unlocks.clear();
+                let had = o.any() || !o.suppressed.is_empty() || !o.locked_bypass.is_empty() || had_unlocks;
                 let priors = o.all_off.into_iter().flat_map(|a| a.prior_latches).chain(o.exempt.into_iter().flat_map(|e| e.prior_latches));
                 for prior in priors {
                     if let Some(p) = self.state.profile_mut(&prior.profile_id) {

@@ -136,7 +136,7 @@ export function SiteRules({
   }
 
   if (!supported) {
-    return <p className="text-[12px] text-slate-450">Update the Talysman desktop service to use soft blocks.</p>;
+    return <p className="text-caption text-slate-450">Update the Talysman desktop service to use soft blocks.</p>;
   }
 
   const rule = selected ? sites[selected.id] : undefined;
@@ -148,9 +148,9 @@ export function SiteRules({
       {universalOffered && (
         <div className="mb-4 flex items-center gap-4 rounded-[10px] border border-white/[0.10] p-4">
           <div className="min-w-0 flex-1">
-            <p className="text-[14px] font-semibold text-slate-100">Universal soft block <span className="text-[11px] text-slate-450">Experimental</span></p>
-            <p className="mt-1 text-[12px] text-slate-400">After pages load, use AI to hide feeds, recommendations, and other distractions on sites without an enabled soft block. Learns each site independently.</p>
-            <p className="mt-1 text-[11px] text-slate-450">Sends a compact page structure and short labels to your AI connection. Requires AI mode in Settings.{policy.universalSoftBlock && !aiMode ? ' Paused while AI mode is off.' : ''}</p>
+            <p className="text-body font-semibold text-slate-100">Universal soft block <span className="text-caption text-slate-450">Experimental</span></p>
+            <p className="mt-1 text-caption text-slate-400">After pages load, use AI to hide feeds, recommendations, and other distractions on sites without an enabled soft block. Learns each site independently.</p>
+            <p className="mt-1 text-caption text-slate-450">Sends a compact page structure and short labels to your AI connection. Requires AI mode in Settings.{policy.universalSoftBlock && !aiMode ? ' Paused while AI mode is off.' : ''}</p>
           </div>
           <button
             type="button"
@@ -182,10 +182,10 @@ export function SiteRules({
                   onClick={() => setSelectedId(site.id)}
                   className="flex min-w-0 flex-1 items-baseline gap-2 text-left"
                 >
-                  <span className={cx('truncate text-[12.5px] font-semibold', on ? 'text-slate-100' : 'text-slate-400')}>
+                  <span className={cx('truncate text-body font-semibold', on ? 'text-slate-100' : 'text-slate-400')}>
                     {site.label}
                   </span>
-                  {on && <span className="shrink-0 text-[10.5px] text-slate-500">{hidden} hidden</span>}
+                  {on && <span className="shrink-0 text-caption text-slate-500">{hidden} hidden</span>}
                 </button>
                 <button
                   type="button"
@@ -205,13 +205,13 @@ export function SiteRules({
       {selected && (
         <div className="min-w-0">
           <div className="flex items-baseline gap-2.5">
-            <span className="text-[14px] font-semibold text-slate-100">{selected.label}</span>
-            <span className="font-mono text-[10.5px] text-slate-500">{selected.hosts[0]}</span>
+            <span className="text-body font-semibold text-slate-100">{selected.label}</span>
+            <span className="font-mono text-caption text-slate-500">{selected.hosts[0]}</span>
             {customized && (
               <button
                 type="button"
                 onClick={() => onSave({ ...policy, sites: { ...sites, [selected.id]: { features: {} } } })}
-                className="ml-auto text-[11px] font-medium text-slate-450 transition hover:text-slate-200"
+                className="ml-auto text-caption font-medium text-slate-450 transition hover:text-slate-200"
               >
                 Reset to recommended
               </button>
@@ -220,13 +220,13 @@ export function SiteRules({
 
           {!rule ? (
             <div className="mt-3 rounded-[10px] border border-dashed border-white/[0.10] px-4 py-5 text-center">
-              <p className="text-[12px] text-slate-400">
+              <p className="text-caption text-slate-400">
                 Turn this on to keep using {selected.label} with its distracting parts hidden.
               </p>
               <button
                 type="button"
                 onClick={() => toggleSite(selected)}
-                className="mt-2.5 text-[12px] font-semibold text-slate-100 transition hover:text-white"
+                className="mt-2.5 text-caption font-semibold text-slate-100 transition hover:text-white"
               >
                 {limitReached ? 'Upgrade to add more →' : `Soft block ${selected.label} →`}
               </button>
@@ -238,9 +238,9 @@ export function SiteRules({
                 .map((feature) => (
                   <li key={feature.id} className="flex items-center gap-3 border-b border-white/[0.05] py-2 last:border-b-0">
                     <span className="min-w-0 flex-1">
-                      <span className="block text-[12.5px] text-slate-250">{feature.label}</span>
+                      <span className="block text-body text-slate-250">{feature.label}</span>
                       {feature.description && (
-                        <span className="block text-[10.5px] leading-snug text-slate-450">{feature.description}</span>
+                        <span className="block text-caption leading-snug text-slate-450">{feature.description}</span>
                       )}
                     </span>
                     <ActionPicker
@@ -285,13 +285,13 @@ function ActionPicker({
             title={action === 'judge' ? 'Let the AI decide based on your tasks' : action === 'block' ? 'Hide this wherever it appears on the site' : undefined}
             onClick={() => value !== action && onChange(action)}
             className={cx(
-              'px-2.5 py-1 text-[10.5px] font-semibold transition',
+              'px-2.5 py-1 text-caption font-semibold transition',
               value === action ? 'bg-white/[0.12] text-slate-100' : 'text-slate-450 hover:text-slate-200',
               locked && 'opacity-60',
             )}
           >
             {ACTION_LABELS[action]}
-            {locked && <span className="ml-1 font-mono text-[9px] tracking-[0.08em] text-slate-450">PRO</span>}
+            {locked && <span className="ml-1 font-mono text-caption tracking-[0.08em] text-slate-450">PRO</span>}
           </button>
         );
       })}

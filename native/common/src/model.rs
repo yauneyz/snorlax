@@ -83,6 +83,10 @@ pub struct Settings {
     /// Whether the tray helper should show its icon. Purely cosmetic — never key-gated. Default on.
     #[serde(default = "default_true")]
     pub tray_icon_enabled: bool,
+    /// Whether UIs show the streak badge. Display-only (the streak is still recorded) — never
+    /// key-gated. Default on.
+    #[serde(default = "default_true")]
+    pub streak_badge_enabled: bool,
     /// Runtime/product capability. Production keeps this false and uses classic filtering.
     #[serde(default)]
     pub smart_filtering_enabled: bool,
@@ -97,6 +101,7 @@ impl Default for Settings {
         Settings {
             browser_handshake_enabled: false,
             tray_icon_enabled: true,
+            streak_badge_enabled: true,
             smart_filtering_enabled: false,
         }
     }

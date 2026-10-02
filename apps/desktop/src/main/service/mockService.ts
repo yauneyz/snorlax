@@ -261,7 +261,7 @@ export class MockServiceConnection implements ServiceConnection {
 
       case 'getPopupInfo': {
         const { target } = params as Params<'getPopupInfo'>;
-        return this.engine.popupInfo(target, this.ctx());
+        return { ...this.engine.popupInfo(target, this.ctx()), showStreak: this.settings.streakBadgeEnabled };
       }
 
       case 'enableFocus': {
@@ -301,6 +301,14 @@ export class MockServiceConnection implements ServiceConnection {
         // Purely cosmetic — never gated, unlike the settings above.
         const enabled = (params as Params<'setTrayIconEnabled'>).enabled;
         this.settings = { ...this.settings, trayIconEnabled: enabled };
+        this.emit('settingsChanged', { settings: this.settings });
+        return OK;
+      }
+
+      case 'setStreakBadgeEnabled': {
+        // Display-only — the streak is still recorded; never gated.
+        const enabled = (params as Params<'setStreakBadgeEnabled'>).enabled;
+        this.settings = { ...this.settings, streakBadgeEnabled: enabled };
         this.emit('settingsChanged', { settings: this.settings });
         return OK;
       }

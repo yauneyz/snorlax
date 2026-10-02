@@ -32,20 +32,20 @@ export function EmergencyConfirm({ onClose, onDone }: { onClose: () => void; onD
   return (
     <Modal title="Emergency unlock" onClose={onClose} width={420}>
       {left === 0 ? (
-        <p className="text-[13px] text-slate-300">
+        <p className="text-body text-slate-300">
           You’ve used all {EMERGENCY_LIFETIME_LIMIT} emergency unlocks on this device.
         </p>
       ) : (
         <>
-          <p className="text-[13px] leading-relaxed text-slate-300">
+          <p className="text-body leading-relaxed text-slate-300">
             Use 1 of your {left} remaining emergency unlocks? Everything will turn off — even locked
             windows — until you (or a schedule) turn it back on. You can never get this unlock back.
             {streak > 0 && ` Your ${streak}-day streak will reset.`}
           </p>
-          <p className="mt-2 text-[12px] text-slate-450">
+          <p className="mt-2 text-caption text-slate-450">
             Lost your key? After this you can pair a new one from the Keys page.
           </p>
-          {error && <p className="mt-3 text-[12px] text-dangerInk">{error}</p>}
+          {error && <p className="mt-3 text-caption text-dangerInk">{error}</p>}
           <div className="mt-4 flex justify-end gap-2">
             <Button variant="ghost" onClick={onClose}>
               Cancel

@@ -8,7 +8,7 @@ export function StreakBadge({ streak, className }: { streak: Streak; className?:
   return (
     <span
       className={cx(
-        'inline-flex items-center gap-1.5 rounded-full border border-warn/25 bg-warn/[0.08] px-3 py-1 text-[12px] font-semibold text-warn',
+        'inline-flex items-center gap-1.5 rounded-full border border-warn/25 bg-warn/[0.08] px-3 py-1 text-caption font-semibold text-warn',
         className,
       )}
       title="Days without turning blocking off or loosening it. Unlocks from a group don't count against it."

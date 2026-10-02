@@ -243,13 +243,13 @@ export function FirstRun({ onDone }: { onDone: () => void }) {
             )}
           />
         ))}
-        <span className="ml-1.5 font-mono text-[10px] font-medium tracking-[0.16em] text-slate-450">
+        <span className="ml-1.5 font-mono text-caption font-medium tracking-[0.16em] text-slate-450">
           {step + 1} / {STEPS.length}
         </span>
         <button
           onClick={() => void finish(false)}
           disabled={busy}
-          className="ml-auto text-[11.5px] font-medium text-slate-450 transition hover:text-slate-300 disabled:opacity-50"
+          className="ml-auto text-caption font-medium text-slate-450 transition hover:text-slate-300 disabled:opacity-50"
         >
           Skip setup
         </button>
@@ -262,10 +262,10 @@ export function FirstRun({ onDone }: { onDone: () => void }) {
               size={64}
               className="[filter:drop-shadow(0_0_20px_rgb(var(--color-brand)/0.3))]"
             />
-            <h1 className="mt-[22px] text-[34px] font-bold leading-[1.15] tracking-[-0.02em] text-slate-100">
+            <h1 className="mt-[22px] text-display font-bold leading-[1.15] tracking-[-0.02em] text-slate-100">
               The shield stays up.
             </h1>
-            <p className="mt-3 max-w-[460px] text-[14px] leading-relaxed text-slate-400">
+            <p className="mt-3 max-w-[460px] text-body leading-relaxed text-slate-400">
               Talysman isn’t a timer you start. You set your rules once, and a privileged service
               holds the line — even if you quit the app, kill the process, or reboot. A physical USB
               key is the only way back out.
@@ -308,14 +308,14 @@ export function FirstRun({ onDone }: { onDone: () => void }) {
                       />
                       <span
                         className={cx(
-                          'text-[14px] font-semibold',
+                          'text-body font-semibold',
                           on ? 'text-slate-100' : 'text-slate-250',
                         )}
                       >
                         {m.label}
                       </span>
                     </div>
-                    <div className="mt-[7px] text-[12px] leading-relaxed text-slate-400">
+                    <div className="mt-[7px] text-caption leading-relaxed text-slate-400">
                       {m.blurb}
                     </div>
                   </button>
@@ -346,12 +346,12 @@ export function FirstRun({ onDone }: { onDone: () => void }) {
             <div className="mt-6 flex w-[420px] flex-col gap-2">
               {hasKey ? (
                 <div className="rounded-[11px] border border-seal/30 bg-seal/[0.09] px-4 py-3.5 text-left">
-                  <div className="text-[13px] font-semibold text-sealInk">
+                  <div className="text-body font-semibold text-sealInk">
                     {pairedKeys.length === 1
                       ? `“${pairedKeys[0]?.label}” is paired`
                       : `${pairedKeys.length} keys paired`}
                   </div>
-                  <div className="mt-0.5 font-mono text-[11px] text-slate-450">
+                  <div className="mt-0.5 font-mono text-caption text-slate-450">
                     pair spares later from the Keys page
                   </div>
                 </div>
@@ -379,11 +379,11 @@ export function FirstRun({ onDone }: { onDone: () => void }) {
                           )}
                         />
                         <span className="min-w-0 flex-1">
-                          <span className="block truncate text-[13px] font-semibold text-slate-150">
+                          <span className="block truncate text-body font-semibold text-slate-150">
                             {d.label}
                           </span>
                           {d.serialAmbiguous && (
-                            <span className="mt-0.5 block font-mono text-[11px] text-slate-450">
+                            <span className="mt-0.5 block font-mono text-caption text-slate-450">
                               no stable serial · uses a file marker
                             </span>
                           )}
@@ -393,7 +393,7 @@ export function FirstRun({ onDone }: { onDone: () => void }) {
                   })}
 
                   {drives.length === 0 && (
-                    <div className="rounded-[11px] border border-dashed border-white/[0.10] px-4 py-5 text-[12.5px] text-slate-500">
+                    <div className="rounded-[11px] border border-dashed border-white/[0.10] px-4 py-5 text-body text-slate-500">
                       No removable drives found. Plug one in, then rescan.
                       <button
                         onClick={() => void scanDrives()}
@@ -409,7 +409,7 @@ export function FirstRun({ onDone }: { onDone: () => void }) {
                       value={keyLabel}
                       onChange={(e) => setKeyLabel(e.target.value)}
                       placeholder="Label · e.g. Desk key"
-                      className="rounded-[9px] border border-white/[0.09] bg-white/[0.035] px-3 py-2 text-[12.5px] text-white outline-none transition placeholder:text-slate-600 focus:border-white/25"
+                      className="rounded-[9px] border border-white/[0.09] bg-white/[0.035] px-3 py-2 text-body text-white outline-none transition placeholder:text-slate-600 focus:border-white/25"
                     />
                   )}
                 </>
@@ -417,7 +417,7 @@ export function FirstRun({ onDone }: { onDone: () => void }) {
 
               <div className="flex items-center gap-2 px-0.5 py-1">
                 <span className="block h-1.5 w-1.5 rounded-full bg-seal" />
-                <span className="text-[11.5px] text-slate-500">Drive scans run only when requested.</span>
+                <span className="text-caption text-slate-500">Drive scans run only when requested.</span>
               </div>
             </div>
           </div>
@@ -435,15 +435,15 @@ export function FirstRun({ onDone }: { onDone: () => void }) {
                   background: 'radial-gradient(circle, rgb(var(--color-signal)/0.14), transparent 72%)',
                 }}
               />
-              <div className="relative text-[15px] font-bold tracking-[0.14em] text-sealInk">
+              <div className="relative text-body font-bold tracking-[0.14em] text-sealInk">
                 READY
               </div>
             </div>
-            <h1 className="mt-[18px] text-[28px] font-bold leading-[1.15] tracking-[-0.02em] text-slate-100">
+            <h1 className="mt-[18px] text-display font-bold leading-[1.15] tracking-[-0.02em] text-slate-100">
               {profile?.name ?? 'Default'} · {MODE_LABELS[mode]} ·{' '}
               {hasKey ? (pairedKeys[0]?.label ?? 'Key paired') : 'No key'}
             </h1>
-            <p className="mt-2.5 max-w-[440px] text-[13.5px] leading-relaxed text-slate-400">
+            <p className="mt-2.5 max-w-[440px] text-body leading-relaxed text-slate-400">
               {canRaise
                 ? 'Raising the shield starts enforcement immediately and keeps it on across restarts. You can add more profiles and schedule them later.'
                 : !hasKey
@@ -453,14 +453,14 @@ export function FirstRun({ onDone }: { onDone: () => void }) {
           </div>
         )}
 
-        {error && <p className="mt-5 text-[12.5px] text-dangerInk">{error}</p>}
+        {error && <p className="mt-5 text-body text-dangerInk">{error}</p>}
       </div>
 
       <div className="relative flex items-center justify-between px-6 pb-6">
         <button
           onClick={() => setStep((s) => Math.max(0, s - 1))}
           disabled={step === 0 || busy}
-          className="rounded-full border border-white/[0.10] bg-white/[0.04] px-[22px] py-2.5 text-[13px] font-medium text-slate-200 transition hover:bg-white/[0.08] disabled:text-slate-600 disabled:hover:bg-white/[0.04]"
+          className="rounded-full border border-white/[0.10] bg-white/[0.04] px-[22px] py-2.5 text-body font-medium text-slate-200 transition hover:bg-white/[0.08] disabled:text-slate-600 disabled:hover:bg-white/[0.04]"
         >
           Back
         </button>
@@ -470,7 +470,7 @@ export function FirstRun({ onDone }: { onDone: () => void }) {
             onClick={() => void finish(canRaise)}
             disabled={busy}
             className={cx(
-              'rounded-full px-7 py-2.5 text-[13px] font-semibold transition disabled:opacity-50',
+              'rounded-full px-7 py-2.5 text-body font-semibold transition disabled:opacity-50',
               canRaise
                 ? 'border border-seal/[0.38] bg-seal/[0.16] text-sealInk shadow-[0_0_22px_rgb(var(--color-signal)/0.18)] hover:bg-seal/[0.22]'
                 : 'border border-signal bg-signal text-signalInk shadow-[0_8px_28px_rgb(var(--color-signal)/0.13)] hover:bg-signalHi',
@@ -482,7 +482,7 @@ export function FirstRun({ onDone }: { onDone: () => void }) {
           <button
             onClick={() => void next()}
             disabled={busy}
-            className="rounded-full border border-signal bg-signal px-7 py-2.5 text-[13px] font-semibold text-signalInk shadow-[0_8px_28px_rgb(var(--color-signal)/0.13)] transition hover:bg-signalHi disabled:opacity-50"
+            className="rounded-full border border-signal bg-signal px-7 py-2.5 text-body font-semibold text-signalInk shadow-[0_8px_28px_rgb(var(--color-signal)/0.13)] transition hover:bg-signalHi disabled:opacity-50"
           >
             {busy ? 'Working…' : nextLabel}
           </button>
@@ -529,15 +529,15 @@ function ExtensionStep({
             onClick={() => void openExternal(s.url)}
             className="w-[190px] rounded-[11px] border border-white/[0.07] bg-white/[0.025] px-4 py-3 text-left transition hover:border-white/[0.16] hover:bg-white/[0.05]"
           >
-            <span className="block text-[13px] font-semibold text-slate-150">Install for {s.name}</span>
-            <span className="mt-0.5 block font-mono text-[10.5px] text-slate-450">{s.note}</span>
+            <span className="block text-body font-semibold text-slate-150">Install for {s.name}</span>
+            <span className="mt-0.5 block font-mono text-caption text-slate-450">{s.note}</span>
           </button>
         ))}
       </div>
 
       <button
         onClick={() => void openExternal(DOWNLOAD_PAGE)}
-        className="mt-2.5 text-[11.5px] font-medium text-slate-450 transition hover:text-slate-300"
+        className="mt-2.5 text-caption font-medium text-slate-450 transition hover:text-slate-300"
       >
         Other browsers →
       </button>
@@ -562,7 +562,7 @@ function ExtensionStep({
 
         <span
           className={cx(
-            'flex h-9 w-9 shrink-0 items-center justify-center rounded-full border text-[13px]',
+            'flex h-9 w-9 shrink-0 items-center justify-center rounded-full border text-body',
             state === 'ok'
               ? 'border-ok/40 bg-ok/[0.12] text-okInk'
               : state === 'degraded'
@@ -583,20 +583,20 @@ function ExtensionStep({
         {state === 'waiting' && (
           <>
             <span className="block h-1.5 w-1.5 rounded-full bg-seal" />
-            <span className="text-[12px] text-slate-400">
+            <span className="text-caption text-slate-400">
               Listening for the extension… install it and this turns green on its own.
             </span>
           </>
         )}
         {state === 'ok' && (
-          <span className="text-[12px] text-okInk">
+          <span className="text-caption text-okInk">
             {browserName(contact?.browser)} extension connected
             {contact?.extensionVersion ? ` · v${contact.extensionVersion}` : ''}
             {live ? '' : ' · browser now closed'}
           </span>
         )}
         {state === 'degraded' && (
-          <span className="text-[12px] text-warn">
+          <span className="text-caption text-warn">
             {browserName(contact?.browser)} extension is talking to Talysman but can’t block yet —
             open it and allow its site permissions.
           </span>
@@ -606,7 +606,7 @@ function ExtensionStep({
       {showMockHelper && (
         <button
           onClick={() => void devSimulateExtension()}
-          className="mt-4 rounded-[9px] border border-white/[0.10] bg-white/[0.04] px-3 py-1.5 text-[11px] font-medium text-slate-400 transition hover:bg-white/[0.08]"
+          className="mt-4 rounded-[9px] border border-white/[0.10] bg-white/[0.04] px-3 py-1.5 text-caption font-medium text-slate-400 transition hover:bg-white/[0.08]"
         >
           Dev · simulate a heartbeat
         </button>
@@ -647,7 +647,7 @@ function HandshakeChannel({ state, live }: { state: 'waiting' | 'ok' | 'degraded
       )}
       <span
         className={cx(
-          'absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full border px-2 py-0.5 font-mono text-[8.5px] tracking-[0.14em]',
+          'absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full border px-2 py-0.5 font-mono text-caption tracking-[0.14em]',
           connected
             ? state === 'ok'
               ? 'border-ok/40 bg-bg text-okInk'
@@ -663,7 +663,7 @@ function HandshakeChannel({ state, live }: { state: 'waiting' | 'ok' | 'degraded
 
 function StepKicker({ children }: { children: React.ReactNode }) {
   return (
-    <div className="font-mono text-[10px] font-medium uppercase tracking-[0.2em] text-seal">
+    <div className="font-mono text-caption font-medium uppercase tracking-[0.2em] text-seal">
       {children}
     </div>
   );
@@ -671,7 +671,7 @@ function StepKicker({ children }: { children: React.ReactNode }) {
 
 function StepTitle({ children }: { children: React.ReactNode }) {
   return (
-    <h1 className="mt-3.5 text-[30px] font-bold leading-[1.15] tracking-[-0.02em] text-slate-100">
+    <h1 className="mt-3.5 text-display font-bold leading-[1.15] tracking-[-0.02em] text-slate-100">
       {children}
     </h1>
   );
@@ -679,6 +679,6 @@ function StepTitle({ children }: { children: React.ReactNode }) {
 
 function StepBlurb({ children }: { children: React.ReactNode }) {
   return (
-    <p className="mt-2.5 max-w-[470px] text-[13.5px] leading-[1.55] text-slate-400">{children}</p>
+    <p className="mt-2.5 max-w-[470px] text-body leading-[1.55] text-slate-400">{children}</p>
   );
 }

@@ -14,8 +14,8 @@ import { startCheckout, type CheckoutPrice } from '../lib/bridge.js';
 /** Feature line with the silver tick the design uses for anything "included". */
 function Feature({ children }: { children: React.ReactNode }) {
   return (
-    <div className="flex items-baseline gap-2.5 text-[12.5px] text-slate-250">
-      <span className="font-mono text-[10px] text-sealInk">✓</span>
+    <div className="flex items-baseline gap-2.5 text-body text-slate-250">
+      <span className="font-mono text-caption text-sealInk">✓</span>
       {children}
     </div>
   );
@@ -107,7 +107,7 @@ export function Plans() {
           </Button>
         </div>
         {subscriptionPlan !== 'pro' && (
-          <p className="mt-3 text-xs text-slate-500">
+          <p className="mt-3 text-caption text-slate-500">
             Early adopter price — usually {formatPriceUsd(PRO_LIST_PRICE_CENTS.monthly)}/mo or{' '}
             {formatPriceUsd(PRO_LIST_PRICE_CENTS.yearly)}/yr. Annual bills{' '}
             {formatPriceUsd(PRO_PRICE_CENTS.yearly)} once a year and saves{' '}
@@ -116,7 +116,7 @@ export function Plans() {
           </p>
         )}
         {!signedIn && (
-          <p className="mt-3 text-sm text-slate-400">Sign in on the Account page to upgrade.</p>
+          <p className="mt-3 text-body text-slate-400">Sign in on the Account page to upgrade.</p>
         )}
         {/* Dev builds keep the real checkout above so the payment rails and signup flow stay
             exercisable; this shortcut is the escape hatch for when you just need Pro on. */}
@@ -129,12 +129,12 @@ export function Plans() {
             >
               Force Pro (dev)
             </Button>
-            <p className="mt-2 text-xs text-slate-500">
+            <p className="mt-2 text-caption text-slate-500">
               Flips the local entitlement without touching Stripe.
             </p>
           </div>
         )}
-        {message && <p className="mt-3 text-sm text-slate-400">{message}</p>}
+        {message && <p className="mt-3 text-body text-slate-400">{message}</p>}
       </Card>
     </div>
   );

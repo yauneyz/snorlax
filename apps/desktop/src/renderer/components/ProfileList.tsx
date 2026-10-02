@@ -8,7 +8,7 @@ import { ErrorCode } from '@talysman/shared';
 import { useFocusStore } from '../store/useFocusStore.js';
 import { activationLabel, runCommand } from '../lib/engine.js';
 import { cx, profileSummary } from '../lib/utils.js';
-import { Modal, ProfileDot } from './ui/index.js';
+import { Modal, ProfileDot, StatusLabel } from './ui/index.js';
 
 export function ProfileSwitch({ on, disabled, onChange, label }: { on: boolean; disabled?: boolean; onChange: () => void; label: string }) {
   return (
@@ -61,7 +61,7 @@ export function ProfileList({ onClose }: { onClose: () => void }) {
   return (
     <>
       <Modal title="Profiles" onClose={onClose} width={520}>
-        <p className="text-[12px] text-slate-400">
+        <p className="text-caption text-slate-400">
           Turn on as many as you like — everything any of them blocks is blocked.
         </p>
         <div className="mt-3 flex flex-col gap-1.5">
@@ -79,15 +79,16 @@ export function ProfileList({ onClose }: { onClose: () => void }) {
                 <ProfileDot color={profile.color} size={10} glow={activation.active} />
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
-                    <span className="truncate text-[13px] font-semibold text-slate-100">{profile.name}</span>
+                    <span className="truncate text-body font-semibold text-slate-100">{profile.name}</span>
                     {engine.defaultProfileId === profile.id && (
-                      <span className="font-mono text-[9px] tracking-[0.12em] text-slate-450">DEFAULT</span>
+                      <span className="font-mono text-caption tracking-[0.12em] text-slate-450">DEFAULT</span>
                     )}
                   </div>
-                  <div className="truncate text-[11.5px] text-slate-400">
+                  <div className="text-caption text-slate-400">
                     {activationLabel(status)} · {profileSummary(profile, aiMode)}
                   </div>
                 </div>
+                <StatusLabel on={on} tone="success" />
                 <ProfileSwitch
                   label={`${profile.name} ${on ? 'on' : 'off'}`}
                   on={on}
@@ -98,8 +99,8 @@ export function ProfileList({ onClose }: { onClose: () => void }) {
             );
           })}
         </div>
-        {pairedKeys.length === 0 && <p className="mt-3 text-[12px] text-warn">Pair a key to turn profiles on.</p>}
-        {error && <p className="mt-3 text-[12px] text-dangerInk">{error}</p>}
+        {pairedKeys.length === 0 && <p className="mt-3 text-caption text-warn">Pair a key to turn profiles on.</p>}
+        {error && <p className="mt-3 text-caption text-dangerInk">{error}</p>}
       </Modal>
     </>
   );

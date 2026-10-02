@@ -34,6 +34,8 @@ body,
 body {
   background: rgb(var(--color-background));
   color: rgb(var(--color-foreground));
+  font-size: 14px;
+  line-height: 1.5;
   font-family: 'Space Grotesk Variable', ui-sans-serif, system-ui, 'Segoe UI', Roboto, sans-serif;
   -webkit-font-smoothing: antialiased;
   overflow: hidden;
@@ -74,7 +76,7 @@ body {
 
 .desktop-route-title {
   color: rgb(var(--color-foreground-strong));
-  font-size: 13px;
+  font-size: 18px;
   font-weight: 600;
   letter-spacing: -0.01em;
 }
@@ -132,7 +134,7 @@ body {
     inset 0 0 5px rgb(var(--color-development)/0.18),
     0 0 7px rgb(var(--color-development)/0.24);
   font-family: 'JetBrains Mono Variable', ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 9px;
+  font-size: 12px;
   font-weight: 700;
   line-height: 14px;
   letter-spacing: 0.08em;
@@ -151,11 +153,11 @@ body {
   margin-block: auto;
 }
 
-/* Numbers, hostnames, and the all-caps section kickers are monospaced — they're the
+/* Numbers, hostnames, and metadata kickers are monospaced — they're the
    instrument-panel voice of the design and want to line up column-wise. */
 .kicker {
   font-family: 'JetBrains Mono Variable', ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 500;
   letter-spacing: 0.2em;
   text-transform: uppercase;
@@ -267,5 +269,18 @@ input[type='time']::-webkit-calendar-picker-indicator {
   }
   50% {
     transform: scale(1.12);
+  }
+}
+
+/* Editor columns follow available content width after the sidebar is accounted for. */
+.domain-list-columns,
+.premade-list-columns {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+@media (min-width: 1000px) {
+  .domain-list-columns,
+  .premade-list-columns {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }

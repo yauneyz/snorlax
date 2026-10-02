@@ -18,7 +18,7 @@ export function UsbIndicator({ showLabel = true }: { showLabel?: boolean }) {
       {showLabel && (
         <span
           className={cx(
-            'font-mono text-[10.5px] font-medium tracking-[0.12em]',
+            'font-mono text-caption font-medium tracking-[0.12em]',
             keyPresent ? 'text-okInk' : 'text-dangerInk',
           )}
         >

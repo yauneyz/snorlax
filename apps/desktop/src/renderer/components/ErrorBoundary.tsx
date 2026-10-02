@@ -37,7 +37,7 @@ export class ErrorBoundary extends React.Component<Props, State> {
             height: '100vh',
           }}
         >
-          <h2>Something went wrong.</h2>
+          <h2 className="text-heading font-semibold">Something went wrong.</h2>
           <p style={{ color: palette.colors.foregroundMuted }}>
             Please restart Talysman. This has been reported.
           </p>

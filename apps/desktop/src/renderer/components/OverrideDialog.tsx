@@ -36,7 +36,7 @@ function writeLastPool(key: string) {
 
 function chipClass(on: boolean) {
   return cx(
-    'rounded-full border px-3 py-1 text-[12px] transition',
+    'rounded-full border px-3 py-1 text-caption transition',
     on ? 'border-white/25 bg-white/[0.10] text-slate-100' : 'border-white/[0.08] text-slate-400 hover:bg-white/[0.05]',
   );
 }
@@ -67,6 +67,7 @@ function useRun(onClose: () => void) {
 
 function PauseUntil({ onClose }: { onClose: () => void }) {
   const streak = useFocusStore((s) => s.engine.streak);
+  const showStreak = useFocusStore((s) => s.settings.streakBadgeEnabled);
   const [minutes, setMinutes] = useState(30);
   const [custom, setCustom] = useState('');
   const { busy, error, run } = useRun(onClose);
@@ -76,7 +77,7 @@ function PauseUntil({ onClose }: { onClose: () => void }) {
 
   return (
     <Modal title="Pause until…" onClose={onClose} width={420}>
-      <StreakBadge streak={streak} />
+      {showStreak && <StreakBadge streak={streak} />}
       <div className="mt-4 flex flex-wrap items-center gap-1.5">
         {PAUSE_PRESETS.map((m) => (
           <button
@@ -99,11 +100,11 @@ function PauseUntil({ onClose }: { onClose: () => void }) {
           aria-label="Custom minutes"
           value={custom}
           onChange={(e) => setCustom(e.target.value)}
-          className="w-28 rounded-full border border-white/[0.10] bg-white/[0.04] px-3 py-1 text-[12px] text-slate-100 outline-none"
+          className="w-28 rounded-full border border-white/[0.10] bg-white/[0.04] px-3 py-1 text-caption text-slate-100 outline-none"
         />
       </div>
       <div className="mt-4 flex items-center justify-between gap-3">
-        <span className="text-[12.5px] text-slate-400">
+        <span className="text-body text-slate-400">
           {valid ? (
             <>
               Back on at <span className="font-mono text-slate-100">{formatClock(Date.now() + pauseMinutes * 60_000)}</span>
@@ -120,8 +121,8 @@ function PauseUntil({ onClose }: { onClose: () => void }) {
           Pause
         </Button>
       </div>
-      <p className="mt-3 text-[12px] text-slate-450">Uses your key and resets your streak.</p>
-      {error && <p className="mt-3 text-[12px] text-dangerInk">{error}</p>}
+      <p className="mt-3 text-caption text-slate-450">Uses your key and resets your streak.</p>
+      {error && <p className="mt-3 text-caption text-dangerInk">{error}</p>}
     </Modal>
   );
 }
@@ -149,10 +150,10 @@ function TemporaryUnlock({ onClose }: { onClose: () => void }) {
 
   return (
     <Modal title="Temporary unlock" onClose={onClose} width={440}>
-      <p className="text-[12.5px] text-slate-400">No key plugged in. Unlock one group for a while instead.</p>
+      <p className="text-body text-slate-400">No key plugged in. Unlock one group for a while instead.</p>
 
       {pools.length === 0 ? (
-        <p className="mt-4 text-[13px] text-slate-300">
+        <p className="mt-4 text-body text-slate-300">
           None of the profiles that are on has an unlock group. Insert your key to pause.
         </p>
       ) : (
@@ -174,11 +175,11 @@ function TemporaryUnlock({ onClose }: { onClose: () => void }) {
                   )}
                 >
                   <span className="min-w-0 flex-1">
-                    <span className="block truncate text-[13px] font-semibold text-slate-100">
+                    <span className="block truncate text-body font-semibold text-slate-100">
                       {p.name}
                       {showProfile && <span className="font-normal text-slate-400"> · {profileName(p.profileId)}</span>}
                     </span>
-                    <span className="block text-[12px] text-slate-400">
+                    <span className="block text-caption text-slate-400">
                       {unlockedUntil
                         ? `Unlocked until ${formatClock(unlockedUntil)}`
                         : `${p.unlockMinutes} min each · ${p.leftToday} of ${p.unlocksPerDay} left today`}
@@ -210,7 +211,7 @@ function TemporaryUnlock({ onClose }: { onClose: () => void }) {
           </div>
         </>
       )}
-      {error && <p className="mt-3 text-[12px] text-dangerInk">{error}</p>}
+      {error && <p className="mt-3 text-caption text-dangerInk">{error}</p>}
     </Modal>
   );
 }

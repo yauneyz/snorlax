@@ -415,6 +415,19 @@ impl Core {
         );
     }
 
+    /// Show/hide the streak badge. Display-only — the streak is recorded regardless — never gated.
+    fn set_streak_badge_enabled(&mut self, enabled: bool) {
+        if self.state.settings.streak_badge_enabled == enabled {
+            return;
+        }
+        self.state.settings.streak_badge_enabled = enabled;
+        self.persist_state();
+        self.emit(
+            "settingsChanged",
+            json!({ "settings": self.state.settings.clone() }),
+        );
+    }
+
     fn set_smart_filtering_enabled(&mut self, enabled: bool) {
         if self.state.settings.smart_filtering_enabled == enabled {
             return;
@@ -730,7 +743,9 @@ impl Core {
             "getPopupInfo" => {
                 let target: PopupTarget = parse_field(params, "target")?;
                 let info = self.engine.popup_info(&target, &self.ctx());
-                Ok(serde_json::to_value(info).unwrap())
+                let mut value = serde_json::to_value(info).unwrap();
+                value["showStreak"] = json!(self.state.settings.streak_badge_enabled);
+                Ok(value)
             }
             "setBrowserHandshake" => {
                 let enabled = params
@@ -746,6 +761,14 @@ impl Core {
                     .and_then(|v| v.as_bool())
                     .ok_or_else(|| RpcError::new(err::BAD_REQUEST, "Missing field: enabled"))?;
                 self.set_tray_icon_enabled(enabled);
+                Ok(ok())
+            }
+            "setStreakBadgeEnabled" => {
+                let enabled = params
+                    .get("enabled")
+                    .and_then(|v| v.as_bool())
+                    .ok_or_else(|| RpcError::new(err::BAD_REQUEST, "Missing field: enabled"))?;
+                self.set_streak_badge_enabled(enabled);
                 Ok(ok())
             }
             "setSmartFilteringEnabled" => {
@@ -1063,6 +1086,22 @@ mod dispatch_tests {
         assert_eq!(info["verdict"]["kind"], "hard");
         assert_eq!(info["blockingProfiles"][0]["id"], "p");
         assert_eq!(info["unlockAvailable"], false);
+    }
+
+    #[test]
+    fn hiding_the_streak_badge_is_ungated_and_reaches_popup_info() {
+        let (mut core, _rx) = core_with(blocks(&["reddit.com"]), true);
+        let target = json!({ "target": { "kind": "url", "url": "https://www.reddit.com/" } });
+        let info = core.dispatch("getPopupInfo", &target).unwrap_or_else(|_| panic!());
+        assert_eq!(info["showStreak"], true);
+
+        core.dispatch("setStreakBadgeEnabled", &json!({ "enabled": false }))
+            .unwrap_or_else(|_| panic!());
+        assert!(!core.state.settings.streak_badge_enabled);
+        let info = core.dispatch("getPopupInfo", &target).unwrap_or_else(|_| panic!());
+        assert_eq!(info["showStreak"], false);
+        // Display-only: the streak itself is still reported.
+        assert!(info["streak"]["currentDays"].is_number());
     }
 }
 

@@ -78,6 +78,7 @@
     "Settings": {
       "browserHandshakeEnabled": "boolean",
       "trayIconEnabled": "boolean",
+      "streakBadgeEnabled": "boolean",
       "smartFilteringEnabled": "boolean"
     },
     "BrowserHealth": {
@@ -170,6 +171,14 @@
       ]
     },
     "setTrayIconEnabled": {
+      "params": {
+        "enabled": "boolean"
+      },
+      "result": {
+        "ok": true
+      }
+    },
+    "setStreakBadgeEnabled": {
       "params": {
         "enabled": "boolean"
       },
