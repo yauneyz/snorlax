@@ -652,7 +652,7 @@ dependencies = [
 
 [[package]]
 name = "talysman"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "anyhow",
  "chrono",
@@ -673,7 +673,7 @@ dependencies = [
 
 [[package]]
 name = "talysman_common"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "hex",
  "rand",
@@ -687,7 +687,7 @@ dependencies = [
 
 [[package]]
 name = "talysman_engine"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "hex",
  "regex-lite",
