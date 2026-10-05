@@ -63,6 +63,8 @@ export interface EntitlementInfo {
   active: boolean;
   plan: SubscriptionPlan;
   source: string;
+  /** e.g. DEVICE_LIMIT_STATUS when the account has Pro but this computer is over the limit. */
+  status?: string;
 }
 
 export interface AuthStatusInfo {
@@ -168,8 +170,8 @@ const api = {
   ): Promise<ActionResult & { transition?: UsageTransition }> =>
     ipcRenderer.invoke(Channels.devPushUsageTransition, kind),
 
-  entitlement: (): Promise<EntitlementInfo> =>
-    ipcRenderer.invoke(Channels.entitlement),
+  entitlement: (opts?: { fresh?: boolean }): Promise<EntitlementInfo> =>
+    ipcRenderer.invoke(Channels.entitlement, opts),
 
   /** Dev-only: override the simulated subscription plan. */
   devSetEntitlementPlan: (

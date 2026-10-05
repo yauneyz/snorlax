@@ -24,13 +24,10 @@ export const VARIANTS = {
     eyebrow: "",
     headline: (
       <>
-        <span className="nowrap">A distraction</span> blocker
-        <br />
-        you need a <span>physical key</span>
-        <br className="brk brk--mobile" /> to turn off.
+        A website and app blocker you need a <span>physical key</span> to turn off.
       </>
     ),
-    sub: "Talysman is a distraction blocker you can only turn off when a physical usb key is inserted. Pair any USB drive you own and then you can only turn off focus mode when that key is inserted.",
+    sub: "Talysman is a desktop website and app blocker you can only turn off when a physical usb key is inserted. Pair any USB drive you own and then you can only turn off focus mode when that key is inserted.",
     cta: "Start focusing in under 5 minutes - free",
   },
   // Added 2026-09-02.
@@ -43,7 +40,7 @@ export const VARIANTS = {
         to you can <span>focus</span> on your work.
       </>
     ),
-    sub: "Talysman is a distraction blocker you can only turn off when a physical usb key is inserted. Pair any USB drive you own and then you can only turn off focus mode when that key is inserted.",
+    sub: "Talysman is a desktop website and app blocker you can only turn off when a physical usb key is inserted. Pair any USB drive you own and then you can only turn off focus mode when that key is inserted.",
     cta: "Start focusing in under 5 minutes - free",
   },
 } as const;

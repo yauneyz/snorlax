@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { PRO_DEVICE_LIMIT } from "@talysman/product";
 import { config } from "@/lib/config";
 import type { IntentPage } from "./types";
 
@@ -203,8 +204,9 @@ export const freedomAlternativeForDesktop: IntentPage = {
           q: "Does one subscription cover all my computers?",
           a: (
             <p>
-              Yes. Pro is tied to your account with no device limit. Pair the same USB drive on each
-              machine — every computer keeps its own list of paired keys.
+              Yes. Pro is tied to your account and covers up to {PRO_DEVICE_LIMIT} computers at once.
+              Pair the same USB drive on each machine — every computer keeps its own list of paired
+              keys.
             </p>
           ),
         },

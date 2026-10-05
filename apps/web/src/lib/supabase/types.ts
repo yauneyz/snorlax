@@ -185,6 +185,16 @@ export type AnalyticsUsageDailyRow = {
   reported_at: string;
 };
 
+/** `entitled_devices`: a computer holding one of a Pro account's device slots. */
+export type EntitledDeviceRow = {
+  user_id: string;
+  device_id: string;
+  name: string | null;
+  platform: string | null;
+  first_seen_at: string;
+  last_seen_at: string;
+};
+
 export type InsightsPushDeviceRow = {
   token: string;
   platform: "android";

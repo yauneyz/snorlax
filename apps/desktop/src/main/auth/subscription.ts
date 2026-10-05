@@ -14,14 +14,16 @@
 import { app } from 'electron';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { homedir } from 'node:os';
+import { homedir, hostname } from 'node:os';
 import {
+  DEVICE_HEADERS,
   type Entitlement,
   type SubscriptionPlan,
   entitlementForPlan,
   entitlementSchema,
 } from '@talysman/product';
 import { config } from '../config.js';
+import { loadDeviceIdentity } from '../deviceIdentity.js';
 import { logger } from '../logging.js';
 import {
   LOCAL_ENTITLEMENT_FILE,
@@ -108,9 +110,24 @@ async function writeCache(entitlement: Entitlement): Promise<void> {
   }
 }
 
+/**
+ * Identifies this computer to the server, which counts it against the Pro device limit
+ * (PRO_DEVICE_LIMIT). The name is what the account page lists it as.
+ */
+async function deviceHeaders(): Promise<Record<string, string>> {
+  const { identity } = await loadDeviceIdentity();
+  return {
+    [DEVICE_HEADERS.id]: identity.deviceId,
+    [DEVICE_HEADERS.name]: hostname(),
+    [DEVICE_HEADERS.platform]: process.platform,
+  };
+}
+
 async function fetchServerEntitlement(token: string): Promise<Entitlement | undefined> {
   const url = `${config.apiBaseUrl}/api/desktop/entitlement`;
-  const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+  const res = await fetch(url, {
+    headers: { Authorization: `Bearer ${token}`, ...(await deviceHeaders()) },
+  });
   if (res.status === 401) return undefined; // signed out / invalid token
   if (!res.ok) throw new Error(`Entitlement request failed: ${res.status}`);
   return entitlementSchema.parse(await res.json());

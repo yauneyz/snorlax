@@ -64,6 +64,7 @@
     "capture:build": "cross-env APP_ENV=development TALYSMAN_PIPE=talysman-capture TALYSMAN_USE_MOCK_SERVICE=true pnpm --filter @talysman/desktop exec electron-vite build --mode development",
     "capture:marketing": "node scripts/capture-marketing.mjs",
     "capture:demo": "node scripts/record-demo.mjs",
+    "capture:browser": "pnpm build:extension && tsx scripts/capture-browser.ts",
     "test:watch": "vitest",
     "lint": "node scripts/check-palette.mjs && eslint . && pnpm --filter @talysman/web lint",
     "lint:fix": "eslint . --fix && pnpm --filter @talysman/web lint --fix"

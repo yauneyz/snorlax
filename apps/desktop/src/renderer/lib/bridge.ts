@@ -64,7 +64,7 @@ export const devPushUsageTransition = (kind: TransitionKind) =>
 export const devSimulateAppBlocked = (app: AppRef) => window.api.devSimulateAppBlocked(app);
 export const closePopup = () => window.api.closePopup();
 export const openOverrides = () => window.api.openOverrides();
-export const entitlement = () => window.api.entitlement();
+export const entitlement = (opts?: { fresh?: boolean }) => window.api.entitlement(opts);
 export const devSetEntitlementPlan = (plan: SubscriptionPlan) =>
   window.api.devSetEntitlementPlan(plan);
 export const setLocalEntitlementEnabled = (enabled: boolean) =>

@@ -757,29 +757,9 @@ input:-webkit-autofill:focus {
   text-wrap: balance;
 }
 
-/* Only accent spans get the signal color — `.nowrap` is a layout-only wrapper (as is any
-   other utility span added here), so it must stay the base headline color. */
-.hero__headline span:not(.nowrap):not(.brk) {
+/* Accent spans in the headline take the signal color. */
+.hero__headline span {
   color: var(--signal);
-}
-
-/* Belt-and-suspenders: the lead phrase must never split across a line, at any width. */
-.hero__headline .nowrap {
-  white-space: nowrap;
-}
-
-/* Explicit, hand-authored line break for the mobile tier — not left to the browser's
-   `text-wrap: balance` heuristic, which produces awkward breaks at some widths. Matches the
-   hero layout's own mobile breakpoint (globals.css:3677, where the headline also gets a
-   dedicated font-size override). */
-.hero__headline .brk {
-  display: none;
-}
-
-@media (max-width: 640px) {
-  .hero__headline .brk--mobile {
-    display: block;
-  }
 }
 
 .hero__sub {
@@ -915,6 +895,13 @@ input:-webkit-autofill:focus {
   display: block;
   width: 100%;
   height: auto;
+}
+
+.app-shot__caption {
+  padding: 0.6rem 0.9rem;
+  border-top: 1px solid var(--border);
+  font-size: 0.82rem;
+  color: var(--fg-3);
 }
 
 /* ── Media placeholders ──
@@ -1207,6 +1194,21 @@ input:-webkit-autofill:focus {
 
 .diagnosis__media {
   border-radius: var(--r-lg);
+}
+
+/* Two sites in focus mode, stacked. */
+.feeds__media {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+/* Media on the left, so consecutive copy-and-shot sections alternate sides. Desktop only: the
+ * stacked mobile layout keeps copy first. */
+@media (min-width: 62.01rem) {
+  .diagnosis__lead--flip > .diagnosis__copy {
+    order: 2;
+  }
 }
 
 /* Two routes out of the same impulse. The middle beat is the whole argument, so the cards
@@ -2075,17 +2077,6 @@ input:-webkit-autofill:focus {
   max-width: 34ch;
 }
 
-/* The banner above the price that explains why list and current price differ. */
-.plan__price-early-adopter {
-  margin: 0.9rem 0 0;
-  font-family: var(--font-mono);
-  font-size: 0.68rem;
-  font-weight: 500;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--signal);
-}
-
 .plan__price {
   margin: 0.35rem 0 0;
   font-size: 2.15rem;
@@ -2093,14 +2084,6 @@ input:-webkit-autofill:focus {
   color: var(--fg-0);
   letter-spacing: -0.02em;
   line-height: 1.1;
-}
-
-.plan__price-list {
-  font-size: 1.1rem;
-  font-weight: 500;
-  color: var(--fg-4);
-  text-decoration: line-through;
-  letter-spacing: 0;
 }
 
 .plan__price-unit {
@@ -2192,6 +2175,13 @@ input:-webkit-autofill:focus {
   letter-spacing: 0.14em;
   text-transform: uppercase;
   color: var(--fg-4);
+}
+
+/* Lifetime is Pro paid once, so a line stands in for the feature list — and takes over its
+ * spacing, so the CTA still lines up with the other cards. */
+.plan--lifetime .plan__pitch {
+  margin: 1.35rem 0 1.6rem;
+  flex: 1;
 }
 
 .plan__features {
@@ -3117,6 +3107,85 @@ input:-webkit-autofill:focus {
 
 .manage-billing__error {
   margin: 0.6rem 0 0;
+  font-size: 0.82rem;
+  color: rgb(var(--color-danger-ink));
+}
+
+/* Computers holding the account's Pro slots. Same surface as the survey card below it. */
+.account__devices {
+  margin-top: 1.15rem;
+  padding: 1.6rem 1.5rem;
+  background: var(--bg-1);
+  border: 1px solid var(--border);
+  border-radius: var(--r-xl);
+}
+
+.account__devices-title {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: 0.66rem;
+  font-weight: 500;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--fg-4);
+}
+
+.account__devices-hint,
+.account__devices-empty {
+  margin: 0.6rem 0 0;
+  font-size: 0.85rem;
+  color: var(--fg-3);
+  max-width: 60ch;
+}
+
+.account__devices-list {
+  list-style: none;
+  margin: 1rem 0 0;
+  padding: 0;
+}
+
+.account__device {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.85rem 0;
+  border-top: 1px solid var(--border);
+}
+
+.account__device-name {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--fg-0);
+}
+
+.account__device-meta {
+  margin: 0.15rem 0 0;
+  font-size: 0.8rem;
+  color: var(--fg-3);
+}
+
+.account__device-remove {
+  padding: 0.45rem 0.9rem;
+  font-size: 0.8rem;
+  color: var(--fg-2);
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: var(--r-pill);
+  transition: background var(--t-base) var(--ease);
+}
+
+.account__device-remove:hover:not(:disabled) {
+  background: rgb(var(--color-white)/0.05);
+}
+
+.account__device-remove:disabled {
+  opacity: 0.6;
+}
+
+.account__devices-error {
+  margin: 0.75rem 0 0;
   font-size: 0.82rem;
   color: rgb(var(--color-danger-ink));
 }

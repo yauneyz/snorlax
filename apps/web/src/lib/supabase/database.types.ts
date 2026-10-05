@@ -31,6 +31,7 @@ import type {
   SmartFilterJudgeUsageRow,
   StripeEventRow,
   SubscriptionRow,
+  EntitledDeviceRow,
   InsightsPushDeviceRow,
 } from "./types";
 
@@ -79,6 +80,12 @@ export type Database = {
         Insert: Omit<StripeEventRow, "processed_at"> &
           Partial<Pick<StripeEventRow, "processed_at">>;
         Update: Partial<StripeEventRow>;
+        Relationships: [];
+      };
+      entitled_devices: {
+        Row: EntitledDeviceRow;
+        Insert: Pick<EntitledDeviceRow, "user_id" | "device_id"> & Partial<EntitledDeviceRow>;
+        Update: Partial<EntitledDeviceRow>;
         Relationships: [];
       };
       insights_push_devices: {
@@ -261,6 +268,17 @@ export type Database = {
       };
     };
     Functions: {
+      claim_entitled_device: {
+        Args: {
+          p_user_id: string;
+          p_device_id: string;
+          p_name: string | null;
+          p_platform: string | null;
+          p_limit: number;
+          p_stale_after: string;
+        };
+        Returns: boolean;
+      };
       redeem_comp_code: {
         Args: { p_code_hash: string; p_user_id: string };
         Returns: string;

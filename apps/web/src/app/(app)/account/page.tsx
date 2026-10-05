@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { cookies } from "next/headers";
+import { PRO_DEVICE_LIMIT, PRO_DEVICE_STALE_AFTER_DAYS } from "@talysman/product";
+import { DeviceList } from "@/components/app/DeviceList";
 import { ManageBillingButton } from "@/components/app/ManageBillingButton";
 import { PmfSurvey } from "@/components/app/PmfSurvey";
 import {
@@ -10,7 +12,7 @@ import {
 import { requireUser } from "@/lib/auth/require-user";
 import { getSubscriptionDetailForUser } from "@/lib/stripe/subscription";
 import { supabaseServer } from "@/lib/supabase/server";
-import type { ProfileRow } from "@/lib/supabase/types";
+import type { EntitledDeviceRow, ProfileRow } from "@/lib/supabase/types";
 import { shouldShowPmfSurvey } from "@/server/analytics/pmf-survey";
 
 export const metadata: Metadata = {
@@ -21,7 +23,10 @@ export const metadata: Metadata = {
 export default async function AccountPage() {
   const user = await requireUser();
   const supabase = await supabaseServer();
-  const [{ data: profile }, detailResult, showPmfSurvey] = await Promise.all([
+  const staleBefore = new Date(
+    Date.now() - PRO_DEVICE_STALE_AFTER_DAYS * 24 * 60 * 60 * 1000,
+  ).toISOString();
+  const [{ data: profile }, detailResult, showPmfSurvey, { data: devices }] = await Promise.all([
     supabase
       .from("profiles")
       .select("full_name,email,avatar_url")
@@ -31,8 +36,18 @@ export default async function AccountPage() {
       .then((detail) => ({ detail, unavailable: false as const }))
       .catch(() => ({ detail: undefined, unavailable: true as const })),
     shouldShowPmfSurvey(user.id, user.created_at),
+    // Only devices still holding a slot: stale rows don't count against the limit.
+    supabase
+      .from("entitled_devices")
+      .select("device_id,name,platform,last_seen_at")
+      .eq("user_id", user.id)
+      .gt("last_seen_at", staleBefore)
+      .order("last_seen_at", { ascending: false })
+      .returns<Pick<EntitledDeviceRow, "device_id" | "name" | "platform" | "last_seen_at">[]>(),
   ]);
   const detail = detailResult.detail;
+  const hasPro =
+    detail?.plan === "pro" || ["comped", "lifetime"].includes(detail?.status ?? "");
   const graceCookie = detailResult.unavailable
     ? (await cookies()).get(ENTITLEMENT_GRACE_COOKIE)?.value
     : undefined;
@@ -103,6 +118,17 @@ export default async function AccountPage() {
           )}
         </aside>
       </div>
+      {hasPro || (devices?.length ?? 0) > 0 ? (
+        <DeviceList
+          limit={PRO_DEVICE_LIMIT}
+          devices={(devices ?? []).map((d) => ({
+            deviceId: d.device_id,
+            name: d.name,
+            platform: d.platform,
+            lastSeenAt: d.last_seen_at,
+          }))}
+        />
+      ) : null}
       {showPmfSurvey ? <PmfSurvey /> : null}
     </section>
   );

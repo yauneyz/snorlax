@@ -4,6 +4,9 @@ import {
   ENTITLEMENT_GRACE_PERIOD_MS,
   entitlementForPlan,
   isWithinEntitlementGracePeriod,
+  DEVICE_LIMIT_STATUS,
+  PRO_DEVICE_LIMIT,
+  PRO_DEVICE_STALE_AFTER_DAYS,
   PRO_TRIAL_DAYS,
   type CheckoutPrice,
   type Entitlement,
@@ -349,6 +352,50 @@ export async function getUserEntitlement(args: {
     // Omitted entirely for a lifetime grant — there is no period to end.
     ...(entitled.current_period_end ? { currentPeriodEnd: entitled.current_period_end } : {}),
     ...timing,
+  });
+}
+
+export interface SupabaseRpcClient {
+  rpc(fn: string, args: any): any;
+}
+
+/** The computer asking for its entitlement, as the desktop app identifies itself. */
+export interface EntitledDevice {
+  deviceId: string;
+  name?: string;
+  platform?: string;
+}
+
+/**
+ * Applies the Pro device limit to an entitlement. Free passes through untouched (and the device
+ * is never recorded); Pro registers this device, and if the account already has
+ * {@link PRO_DEVICE_LIMIT} other recently-seen computers, comes back as Free with
+ * {@link DEVICE_LIMIT_STATUS} so the app can say why.
+ */
+export async function applyDeviceLimit(args: {
+  db: SupabaseRpcClient;
+  userId: string;
+  entitlement: Entitlement;
+  device: EntitledDevice;
+}): Promise<Entitlement> {
+  const { db, userId, entitlement, device } = args;
+  if (!entitlement.active) return entitlement;
+
+  const { data, error } = await db.rpc('claim_entitled_device', {
+    p_user_id: userId,
+    p_device_id: device.deviceId,
+    p_name: device.name ?? null,
+    p_platform: device.platform ?? null,
+    p_limit: PRO_DEVICE_LIMIT,
+    p_stale_after: `${PRO_DEVICE_STALE_AFTER_DAYS} days`,
+  });
+  if (error) throw new Error(`Failed to claim device: ${error.message}`);
+  if (data === true) return entitlement;
+
+  return entitlementForPlan('free', 'server', {
+    status: DEVICE_LIMIT_STATUS,
+    fetchedAt: entitlement.fetchedAt,
+    cacheUntil: entitlement.cacheUntil,
   });
 }
 

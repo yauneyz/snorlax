@@ -3,11 +3,11 @@ import {
   formatPriceUsd,
   FREE_BLOCKED_SITE_LIMIT,
   PRO_ANNUAL_SAVINGS_CENTS,
-  PRO_LIST_PRICE_CENTS,
   PRO_PRICE_CENTS,
   PRO_TRIAL_DAYS,
 } from '@talysman/product';
 import { Badge, Button, Card, CardTitle } from '../components/ui/index.js';
+import { DeviceLimitNotice } from '../components/DeviceLimitNotice.js';
 import { useFocusStore } from '../store/useFocusStore.js';
 import { startCheckout, type CheckoutPrice } from '../lib/bridge.js';
 
@@ -61,6 +61,9 @@ export function Plans() {
 
   return (
     <div className="grid grid-cols-1 gap-3 py-3 xl:grid-cols-2">
+      <div className="xl:col-span-2 empty:hidden">
+        <DeviceLimitNotice />
+      </div>
       <Card>
         <div className="mb-4 flex items-center justify-between gap-3">
           <CardTitle hint="Manual blocking with USB-key unlock protection.">Free</CardTitle>
@@ -108,8 +111,7 @@ export function Plans() {
         </div>
         {subscriptionPlan !== 'pro' && (
           <p className="mt-3 text-caption text-slate-500">
-            Early adopter price — usually {formatPriceUsd(PRO_LIST_PRICE_CENTS.monthly)}/mo or{' '}
-            {formatPriceUsd(PRO_LIST_PRICE_CENTS.yearly)}/yr. Annual bills{' '}
+            Annual bills{' '}
             {formatPriceUsd(PRO_PRICE_CENTS.yearly)} once a year and saves{' '}
             {formatPriceUsd(PRO_ANNUAL_SAVINGS_CENTS)} versus monthly. First-time subscribers
             start with a {PRO_TRIAL_DAYS}-day free trial — nothing is charged until it ends.

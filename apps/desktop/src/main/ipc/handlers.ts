@@ -417,7 +417,11 @@ export async function registerIpcHandlers(ctx: HandlerContext): Promise<void> {
     return { ok: true, transition: mock.devPushUsageTransition(kind) };
   });
 
-  ipcHandle(Channels.entitlement, () => getEntitlement());
+  ipcHandle(Channels.entitlement, (_e, opts?: { fresh?: boolean }) => {
+    // `fresh` skips the in-memory cache, for an explicit "check again" from the UI.
+    if (opts?.fresh) invalidateEntitlementCache();
+    return getEntitlement();
+  });
 
   ipcHandle(Channels.devSetEntitlementPlan, async (_e, plan: SubscriptionPlan) => {
     if (config.appEnv === 'production') {

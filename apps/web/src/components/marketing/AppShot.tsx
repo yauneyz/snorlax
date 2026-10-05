@@ -21,6 +21,8 @@ type AppShotProps = {
   /** Set on above-the-fold shots so Next preloads rather than lazy-loads them. */
   priority?: boolean;
   sizes?: string;
+  /** A short visible label under the image, for shots that need telling apart. */
+  caption?: string;
 };
 
 export function AppShot({
@@ -31,6 +33,7 @@ export function AppShot({
   className,
   priority = false,
   sizes = "(max-width: 900px) 100vw, 33vw",
+  caption,
 }: AppShotProps) {
   return (
     <figure className={className ? `app-shot ${className}` : "app-shot"}>
@@ -43,6 +46,7 @@ export function AppShot({
         priority={priority}
         className="app-shot__image"
       />
+      {caption ? <figcaption className="app-shot__caption">{caption}</figcaption> : null}
     </figure>
   );
 }

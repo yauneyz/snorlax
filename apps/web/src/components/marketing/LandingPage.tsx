@@ -2,7 +2,7 @@ import Link from "next/link";
 import {
   formatPriceUsd,
   FREE_BLOCKED_SITE_LIMIT,
-  PRO_LIST_PRICE_CENTS,
+  LIFETIME_PRICE_CENTS,
   PRO_PRICE_CENTS,
   PRO_TRIAL_DAYS,
 } from "@talysman/product";
@@ -114,12 +114,10 @@ const faqs = [
       <p>
         Free covers {FREE_BLOCKED_SITE_LIMIT} blocked websites and unlimited manual focus sessions,
         with no card and no time limit. Pro is {formatPriceUsd(PRO_PRICE_CENTS.monthly)}/month or{" "}
-        {formatPriceUsd(PRO_PRICE_CENTS.yearly)}/year at the early adopter price (usually{" "}
-        {formatPriceUsd(PRO_LIST_PRICE_CENTS.monthly)}/mo or{" "}
-        {formatPriceUsd(PRO_LIST_PRICE_CENTS.yearly)}
-        /year), and adds app blocking, recurring schedules, unlimited sites and unlimited profiles.
-        New accounts get {PRO_TRIAL_DAYS} days of Pro free — see{" "}
-        <Link href="/pricing">pricing</Link>.
+        {formatPriceUsd(PRO_PRICE_CENTS.yearly)}/year, and adds app blocking, recurring schedules,
+        unlimited sites and unlimited profiles. Prefer to pay once? Lifetime is a single{" "}
+        {formatPriceUsd(LIFETIME_PRICE_CENTS)} payment for Pro forever. New accounts get{" "}
+        {PRO_TRIAL_DAYS} days of Pro free — see <Link href="/pricing">pricing</Link>.
       </p>
     ),
   },
@@ -223,6 +221,43 @@ export function LandingPage({ variantOverride }: { variantOverride?: VariantKey 
         </ul>
       </section>
 
+      {/* Site rules: the soft-block side of the product, shot in a real browser with the
+          extension applying focus mode (scripts/capture-browser.ts). */}
+      <section className="section feeds">
+        <div className="diagnosis__lead diagnosis__lead--flip">
+          <div className="diagnosis__copy">
+            <p className="section__eyebrow">Stop companies from stealing your attention</p>
+            <h2 className="section__title">Use Social Media Without Doomscrolling</h2>
+            <ul className="point-list">
+              <li>View posts you specifically navigate to</li>
+              <li>Hide all algorithmic and recommended feeds</li>
+              <li>Use social media as a library without getting sucked in for an hour</li>
+              <li>Keep access to DMs, posting, and notifications without everything else</li>
+            </ul>
+          </div>
+          <div className="feeds__media">
+            <AppShot
+              src="/media/browser-reddit-no-feed.png"
+              alt="Reddit's home page in focus mode: the header, search, chat, notifications and community navigation are still there, but the feed of posts is gone."
+              width={3836}
+              height={1963}
+              caption="Reddit"
+              className="diagnosis__media"
+              sizes="(max-width: 62rem) 100vw, 44vw"
+            />
+            <AppShot
+              src="/media/browser-instagram-no-feed.png"
+              alt="Instagram's home page in focus mode: the sidebar with search, notifications, posting and Messages is still there, but the feed and stories are gone."
+              width={3825}
+              height={2150}
+              caption="Instagram"
+              className="diagnosis__media"
+              sizes="(max-width: 62rem) 100vw, 44vw"
+            />
+          </div>
+        </div>
+      </section>
+
       {/*<section className="section promise">
         <div className="promise__lead">
           <div className="promise__copy">
@@ -269,9 +304,7 @@ export function LandingPage({ variantOverride }: { variantOverride?: VariantKey 
           <div className="split__col split__col--pro">
             <span className="split__label">UNLEASH YOUR POTENTIAL</span>
             <h3>Pro</h3>
-            <p>
-              Unlimited sites, pre-made blocklists, recurring schedules, and unlimited profiles
-            </p>
+            <p>Unlimited sites, pre-made blocklists, recurring schedules, and unlimited profiles</p>
           </div>
         </div>
         <p className="split__cta">

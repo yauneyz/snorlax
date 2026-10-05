@@ -1,6 +1,11 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { FREE_BLOCKED_SITE_LIMIT, PRO_TRIAL_DAYS } from "@talysman/product";
+import {
+  FREE_BLOCKED_SITE_LIMIT,
+  PRO_DEVICE_LIMIT,
+  PRO_DEVICE_STALE_AFTER_DAYS,
+  PRO_TRIAL_DAYS,
+} from "@talysman/product";
 import { PricingPlans } from "@/components/marketing/PricingPlans";
 import { config } from "@/lib/config";
 import { supabaseServer } from "@/lib/supabase/server";
@@ -20,6 +25,7 @@ export const metadata: Metadata = {
 const freeFeatures = [
   "Turn any USB drive into your physical key",
   `Block up to ${FREE_BLOCKED_SITE_LIMIT} distracting websites`,
+  "Filter out algorithmic and recommended content",
   "Allow-only and block-all-internet modes",
   "Run unlimited manual focus sessions",
   "Your paired key is required to end a session early",
@@ -60,9 +66,12 @@ const faqs = [
     q: "Does one subscription cover all my computers?",
     a: (
       <p>
-        Yes. Pro is tied to your account, not to a machine, and there is no device limit. Install{" "}
-        {config.app.name} on your laptop and your desktop, sign in with the same account on each,
-        and pair the same USB drive on both — each computer keeps its own list of paired keys.
+        Yes. Pro is tied to your account, not to a machine, and covers up to {PRO_DEVICE_LIMIT}{" "}
+        computers at once. Install {config.app.name} on your laptop and your desktop, sign in with
+        the same account on each, and pair the same USB drive on both — each computer keeps its own
+        list of paired keys. Replacing a computer? Remove the old one from your account page, or it
+        frees its spot by itself after {PRO_DEVICE_STALE_AFTER_DAYS} days unused. Free works on
+        any number of computers.
       </p>
     ),
   },
@@ -127,12 +136,13 @@ export default async function PricingPage() {
           Pay for the system.
         </h1>
         <p className="pricing__lede">
-          Free proves that a physical off switch changes your behavior. Pro turns that one good
-          session into a repeatable week with schedules, app blocking, and unlimited profiles.
+          Try the free version to block your most distracting sites. Reddit, YouTube, Instagram,
+          whatever gets you. When you have proven that it works for you, upgrade to Pro to get
+          unlimited sites, app blocking, pre-made lists, and schedules.
         </p>
         <ul className="pricing__promises" aria-label="Pricing assurances">
           <li>No hardware to buy</li>
-          <li>No device limits</li>
+          <li>Pro on up to {PRO_DEVICE_LIMIT} computers</li>
           <li>Cancel online</li>
         </ul>
       </section>

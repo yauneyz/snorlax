@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Badge, Button, Card, CardTitle, Input } from '../components/ui/index.js';
+import { DeviceLimitNotice } from '../components/DeviceLimitNotice.js';
 import { useFocusStore } from '../store/useFocusStore.js';
 import {
   cancelSubscription,
@@ -210,6 +211,7 @@ export function Account({ onUpgrade }: { onUpgrade: () => void }) {
 
   return (
     <div className="grid grid-cols-1 gap-3 py-3">
+      <DeviceLimitNotice />
       <Card>
         <CardTitle>Account</CardTitle>
         <div className="flex flex-col gap-2 text-body text-slate-300">

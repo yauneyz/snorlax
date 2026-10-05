@@ -6,11 +6,11 @@ import {
   formatPriceUsd,
   LIFETIME_PRICE_CENTS,
   PRO_ANNUAL_SAVINGS_CENTS,
+  PRO_ANNUAL_SAVINGS_PERCENT,
   PRO_ANNUAL_WEEKLY_CENTS,
-  PRO_LIST_PRICE_CENTS,
+  PRO_DEVICE_LIMIT,
   PRO_PRICE_CENTS,
   PRO_TRIAL_DAYS,
-  proDiscountPercent,
   type CheckoutPrice,
 } from "@talysman/product";
 import { supabaseBrowser } from "@/lib/supabase/browser";
@@ -110,7 +110,6 @@ export function PricingPlans({ freeFeatures, proFeatures, trialAvailable, alread
   }, [requestedPrice, alreadyPro, alreadyLifetime, startCheckout]);
 
   const isAnnual = cycle === "yearly";
-  const discountPercent = proDiscountPercent(cycle);
 
   const proCta = alreadyPro
     ? "You're on Pro"
@@ -158,20 +157,14 @@ export function PricingPlans({ freeFeatures, proFeatures, trialAvailable, alread
                 onClick={() => setCycle(price)}
               >
                 {label}
-                <span className="cycle__save">{proDiscountPercent(price)}% off</span>
+                {price === "yearly" ? (
+                  <span className="cycle__save">Save {PRO_ANNUAL_SAVINGS_PERCENT}%</span>
+                ) : null}
               </button>
             ))}
           </div>
 
-          <p className="plan__price-early-adopter">
-            Early adopter price · usually {formatPriceUsd(PRO_LIST_PRICE_CENTS.monthly)}/mo or{" "}
-            {formatPriceUsd(PRO_LIST_PRICE_CENTS.yearly)}/year
-          </p>
-
           <p className="plan__price">
-            <span className="plan__price-list">
-              {formatPriceUsd(PRO_LIST_PRICE_CENTS[cycle])}
-            </span>{" "}
             {formatPriceUsd(PRO_PRICE_CENTS[cycle])}
             <span className="plan__price-unit">{isAnnual ? "/year" : "/month"}</span>
           </p>
@@ -179,14 +172,11 @@ export function PricingPlans({ freeFeatures, proFeatures, trialAvailable, alread
             {isAnnual ? (
               <>
                 Billed annually ·{" "}
-                <strong>
-                  {discountPercent}% off, save {formatPriceUsd(PRO_ANNUAL_SAVINGS_CENTS)} a year
-                  versus monthly
-                </strong>
+                <strong>save {formatPriceUsd(PRO_ANNUAL_SAVINGS_CENTS)} a year versus monthly</strong>
               </>
             ) : (
               <>
-                Billed monthly · <strong>{discountPercent}% off list · cancel anytime</strong>
+                Billed monthly · <strong>cancel anytime</strong>
               </>
             )}
           </p>
@@ -235,13 +225,13 @@ export function PricingPlans({ freeFeatures, proFeatures, trialAvailable, alread
             {formatPriceUsd(LIFETIME_PRICE_CENTS)}
             <span className="plan__price-unit"> once</span>
           </p>
-          <p className="plan__price-detail">Everything in Pro · no renewal, ever</p>
+          <p className="plan__price-detail">
+            <strong>Everything in Pro, forever</strong> · one payment, no subscription
+          </p>
         </header>
-        <ul className="plan__features">
-          {proFeatures.map((f) => (
-            <li key={f}>{f}</li>
-          ))}
-        </ul>
+        <p className="plan__pitch">
+          Every Pro feature, including the ones we add later, on up to {PRO_DEVICE_LIMIT} computers.
+        </p>
         <button
           type="button"
           className="plan__cta"
@@ -251,7 +241,7 @@ export function PricingPlans({ freeFeatures, proFeatures, trialAvailable, alread
           {pending ? "Loading…" : alreadyLifetime ? "Lifetime access active" : "Get lifetime access"}
         </button>
         <p className="plan__footnote">
-          {alreadyLifetime ? <>Your lifetime access is active.</> : <>One payment · yours forever</>}
+          {alreadyLifetime ? <>Your lifetime access is active.</> : <>Pay once · yours forever</>}
         </p>
         {error?.price === "lifetime" ? <p className="plan__error">{error.message}</p> : null}
       </article>

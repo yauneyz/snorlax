@@ -51,6 +51,8 @@ interface FocusStore {
   subscriptionPlan: SubscriptionPlan;
   entitlementActive: boolean;
   entitlementSource: string;
+  /** The entitlement's status, e.g. DEVICE_LIMIT_STATUS when this computer is over the limit. */
+  entitlementStatus?: string;
   productLimits: ProductLimits | null;
   /** Display-only subscription snapshot from the web API; undefined when signed out/offline. */
   subscriptionDetail?: SubscriptionDetailInfo;
@@ -109,7 +111,8 @@ interface FocusStore {
   init: () => Promise<void>;
   refresh: () => Promise<void>;
   refreshAuth: () => Promise<void>;
-  refreshEntitlement: () => Promise<void>;
+  /** `fresh` bypasses main's short entitlement cache, for an explicit re-check. */
+  refreshEntitlement: (opts?: { fresh?: boolean }) => Promise<void>;
   refreshSubscriptionDetail: () => Promise<void>;
   setDevSubscriptionPlan: (plan: SubscriptionPlan) => Promise<void>;
   setLocalEntitlementEnabled: (enabled: boolean) => Promise<void>;
@@ -222,13 +225,14 @@ export const useFocusStore = create<FocusStore>((set, get) => ({
     if (res.ok && res.detail) set({ subscriptionDetail: res.detail });
   },
 
-  refreshEntitlement: async () => {
-    const current = await entitlement();
+  refreshEntitlement: async (opts) => {
+    const current = await entitlement(opts);
     set({
       entitlementLoaded: true,
       subscriptionPlan: current.plan,
       entitlementActive: current.active,
       entitlementSource: current.source,
+      entitlementStatus: current.status,
       productLimits: limitsForPlan(current.plan),
     });
   },
@@ -243,6 +247,7 @@ export const useFocusStore = create<FocusStore>((set, get) => ({
       subscriptionPlan: res.entitlement.plan,
       entitlementActive: res.entitlement.active,
       entitlementSource: res.entitlement.source,
+      entitlementStatus: res.entitlement.status,
       productLimits: limitsForPlan(res.entitlement.plan),
     });
     await get().refresh();
@@ -259,6 +264,7 @@ export const useFocusStore = create<FocusStore>((set, get) => ({
       subscriptionPlan: res.entitlement.plan,
       entitlementActive: res.entitlement.active,
       entitlementSource: res.entitlement.source,
+      entitlementStatus: res.entitlement.status,
       productLimits: limitsForPlan(res.entitlement.plan),
     });
     await get().refresh();
