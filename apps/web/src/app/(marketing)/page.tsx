@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { LandingPage } from "@/components/marketing/LandingPage";
+import { heroVideoJsonLd, JsonLd, softwareApplicationJsonLd } from "@/components/seo/JsonLd";
 import { config } from "@/lib/config";
 
 export const metadata: Metadata = {
@@ -12,5 +13,11 @@ export const metadata: Metadata = {
 };
 
 export default function Page() {
-  return <LandingPage />;
+  return (
+    <>
+      <JsonLd data={softwareApplicationJsonLd()} />
+      <JsonLd data={heroVideoJsonLd()} />
+      <LandingPage />
+    </>
+  );
 }

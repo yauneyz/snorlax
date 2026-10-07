@@ -1,3 +1,5 @@
+> **Superseded by [`seo-layout.md`](seo-layout.md)** (2026-10-07). URLs, page list and remaining work below are out of date.
+
 # High-intent search pages — status
 
 Nine landing pages, one per search intent, live at the site root. Text-only: every page carries a

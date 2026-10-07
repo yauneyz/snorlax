@@ -17,7 +17,7 @@ import { ProfileDot } from './components/ui/index.js';
 import { OverrideDialog } from './components/OverrideDialog.js';
 import { cx, effectiveAction } from './lib/utils.js';
 
-type Route = 'dashboard' | 'blocklists' | 'schedule' | 'keys' | 'account' | 'plans' | 'settings';
+export type Route = 'dashboard' | 'blocklists' | 'schedule' | 'keys' | 'account' | 'plans' | 'settings';
 
 const NAV: { route: Route; label: string }[] = [
   { route: 'dashboard', label: 'Dashboard' },
@@ -49,7 +49,8 @@ const SMART_FILTERING_ENABLED = productFeaturesForEnvironment(
   __APP_CONFIG__.APP_ENV,
 ).smartFiltering;
 
-export default function App() {
+/** `initialRoute` lets the marketing motion graphics (apps/motion) open a page other than the dashboard. */
+export default function App({ initialRoute = 'dashboard' }: { initialRoute?: Route } = {}) {
   const init = useFocusStore((s) => s.init);
   const ready = useFocusStore((s) => s.ready);
   const usingMock = useFocusStore((s) => s.usingMock);
@@ -63,7 +64,7 @@ export default function App() {
   const onboardingComplete = useFocusStore((s) => s.onboardingComplete);
   const overridesOpen = useFocusStore((s) => s.overridesOpen);
   const setOverridesOpen = useFocusStore((s) => s.setOverridesOpen);
-  const [route, setRoute] = useState<Route>('dashboard');
+  const [route, setRoute] = useState<Route>(initialRoute);
 
   useEffect(() => {
     void init();

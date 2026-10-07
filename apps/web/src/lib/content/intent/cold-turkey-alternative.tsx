@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { FREE_BLOCKED_SITE_LIMIT } from "@talysman/product";
 import { config } from "@/lib/config";
 import type { IntentPage } from "./types";
 
@@ -11,12 +12,17 @@ import type { IntentPage } from "./types";
  */
 export const coldTurkeyAlternative: IntentPage = {
   slug: "cold-turkey-alternative",
-  intent: "cold turkey alternative with a physical key",
+  group: "compare",
+  summary: "A Cold Turkey alternative with a physical key and a limited emergency exit.",
+  lastReviewed: "2026-10-07",
+  showLastReviewed: true,
+  intent:
+    "cold turkey alternative / cold turkey alternative with an emergency exit / cold turkey vs talysman for deep work",
   eyebrow: "Cold Turkey alternative",
-  title: "A Cold Turkey alternative where the lock is a physical key",
-  metaTitle: `Cold Turkey Alternative With a Physical Key | ${config.app.name}`,
+  title: "Cold Turkey alternative: Talysman vs Cold Turkey",
+  metaTitle: "Cold Turkey Alternative: Talysman vs Cold Turkey",
   metaDescription:
-    "Cold Turkey's locks are conditions you endure at the keyboard — a timer, a restart, a string to retype. Talysman's lock is a USB drive in another room. Here's the honest comparison.",
+    "Compare Talysman and Cold Turkey on enforcement, early exits, platforms, schedules and distraction blocking.",
   lede: (
     <>
       Cold Turkey&apos;s locks are real locks. They&apos;re also all things you can outlast without
@@ -26,13 +32,19 @@ export const coldTurkeyAlternative: IntentPage = {
   answer: (
     <>
       <p>
-        Cold Turkey Blocker is a serious desktop blocker and its lock methods are stronger than most
-        — conditions you can&apos;t just click past. But every one of them resolves at the keyboard:
-        wait out a timer, sit through a restart, retype a long string, enter a password you chose.
-        The escape is always available to you where you sit; it just costs you patience.
+        If you want a Cold Turkey alternative that still has an emergency exit, {config.app.name}{" "}
+        is one: sessions end early only with a physical USB key, and if the key is lost you get
+        five keyless emergency unlocks per computer, for life.
       </p>
       <p>
-        {config.app.name} makes the escape cost distance instead. Ending a session early requires a
+        Cold Turkey Blocker is a serious desktop blocker and its locks are stronger than most. It
+        offers a timer lock, a random-text lock you retype to unlock, a restart lock, time-range
+        and schedule locks, a password lock on Pro, and Frozen Turkey, which locks you out of the
+        whole computer. They resolve one of two ways: at the keyboard (wait, retype, restart), or
+        not at all until the lock expires. Its user guide documents no emergency override.
+      </p>
+      <p>
+        {config.app.name} sits between those. The escape costs distance instead of patience. Ending a session early requires a
         paired USB drive to be physically plugged into the machine, and the drive is in whatever
         room you left it in. Patience is something a frustrated person has plenty of at 2pm. A walk
         to the kitchen is the thing the impulse doesn&apos;t survive.
@@ -68,7 +80,7 @@ export const coldTurkeyAlternative: IntentPage = {
       rows: [
         [
           "What ends a block early",
-          "A condition you satisfy: waiting, restarting, retyping, a password",
+          "A condition you satisfy: a timer, a restart, retyping random text, a password",
           "A physical object plugged into the computer",
         ],
         [
@@ -88,22 +100,52 @@ export const coldTurkeyAlternative: IntentPage = {
         ],
         [
           "The absolute setting",
-          "Locks that run until they expire",
+          "Locks that run until they expire, and Frozen Turkey for the whole computer",
           "Locked scheduled windows that even the key won't end early",
         ],
         [
+          "Emergency exit",
+          "None documented — a lock runs until it expires",
+          "Five keyless emergency unlocks per computer, for life",
+        ],
+        ["Platforms", "Windows and macOS", "Windows, macOS, and Debian/Ubuntu Linux"],
+        [
           "What you buy",
-          "Software",
-          "Software. The key is a USB drive you already own",
+          "A one-time Pro license; the basic blocker is free",
+          "Free for the core mechanism; Pro by subscription or a one-time lifetime payment. The key is a USB drive you already own",
         ],
       ],
       highlightLast: true,
       footnote: (
         <>
-          {config.app.name} isn&apos;t affiliated with Cold Turkey, and this compares mechanisms
-          rather than feature lists — their site is the authority on what their product does and
-          costs today. If a one-time license matters more to you than a physical lock, that&apos;s a
-          real reason to stay where you are: {config.app.name} is a subscription.
+          {config.app.name} isn&apos;t affiliated with Cold Turkey. Cold Turkey&apos;s lock types and
+          platforms are from its{" "}
+          <a href="https://getcoldturkey.com/support/user-guide/" rel="nofollow noopener">
+            user guide
+          </a>
+          , which is the authority on what it does and costs today.
+        </>
+      ),
+    },
+    {
+      kind: "prose",
+      id: "emergency-exit",
+      title: "If you don't want a completely irreversible lock",
+      lede: "Most people who leave Cold Turkey aren't leaving because it's too weak. They leave because an unbreakable lock is scary to start.",
+      body: (
+        <>
+          <p>
+            A lock with no way out works until the day something real happens mid-session. Then you
+            learn to set shorter blocks, or to skip them on days that might go sideways. That&apos;s
+            how a strict blocker ends up protecting fewer hours than a lenient one.
+          </p>
+          <p>
+            {config.app.name} keeps two exits, neither of them on your desk. The everyday one is the
+            key: walk to wherever you left it, plug it in, end the session. The emergency one is for
+            a lost or broken key: five keyless emergency unlocks per computer, for life. Using one
+            turns everything off, even locked windows, resets your streak, and can never be undone.
+            Five is enough for a real emergency and too few to spend on a bad afternoon.
+          </p>
         </>
       ),
     },
@@ -122,7 +164,7 @@ export const coldTurkeyAlternative: IntentPage = {
         },
         {
           label: "The lock",
-          body: "In a timer-or-typing lock, there's something you can do right now: wait, retype, restart. In Talysman, the dialog says “Insert your key to end early” and the key indicator is red. There is nothing to do at the desk.",
+          body: "In a timer-or-typing lock, there's something you can do right now: wait, retype, restart. In Talysman, the greyed-out Turn off button says “Insert your key to turn off the blocker” and the key indicator is red. There is nothing to do at the desk.",
         },
         {
           label: "The walk",
@@ -206,7 +248,8 @@ export const coldTurkeyAlternative: IntentPage = {
           a: (
             <p>
               Yes: mark a scheduled window <em>locked</em> and even a paired key won&apos;t end
-              focus early during it. It releases on its own when the window closes. It&apos;s
+              focus early during it. It releases on its own when the window closes, and the only way
+              out before then is spending one of your five lifetime emergency unlocks. It&apos;s
               opt-in, and it&apos;s the setting to use for hours you know you&apos;ll try to
               negotiate with.
             </p>
@@ -216,7 +259,8 @@ export const coldTurkeyAlternative: IntentPage = {
           q: "What does it cost?",
           a: (
             <p>
-              Free covers the entire mechanism — pair a key, block five sites, run locked sessions —
+              Free covers the entire mechanism — pair a key, block {FREE_BLOCKED_SITE_LIMIT} sites, run
+              locked sessions —
               with no card. Pro adds unlimited sites, desktop app blocking, schedules and unlimited
               profiles. <Link href="/pricing">See pricing</Link>.
             </p>
@@ -229,8 +273,23 @@ export const coldTurkeyAlternative: IntentPage = {
     heading: "Try the lock you can't satisfy from your chair",
     body: "Pair a drive, start a free session, and put the key somewhere that costs you a walk.",
   },
+  graphic: {
+    kind: "compare",
+    title: "Cold Turkey vs Talysman: how a block ends early",
+    caption: "How a Cold Turkey lock and a Talysman session each end early, what that costs you, and where each runs.",
+    fromTable: "Where the two differ",
+    rows: [
+      "What ends a block early",
+      "Where you are when you do it",
+      "What it costs you",
+      "Emergency exit",
+      "Platforms",
+    ],
+  },
   related: [
-    "freedom-alternative-for-desktop",
+    "cold-turkey-vs-freedom-vs-focusme",
+    "digital-lock-vs-physical-friction",
+    "freedom-alternative",
     "blocker-for-people-who-bypass-blockers",
     "physical-website-blocker",
   ],

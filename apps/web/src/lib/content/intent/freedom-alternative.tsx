@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { PRO_DEVICE_LIMIT } from "@talysman/product";
+import { FREE_BLOCKED_SITE_LIMIT, PRO_DEVICE_LIMIT } from "@talysman/product";
 import { config } from "@/lib/config";
 import type { IntentPage } from "./types";
 
@@ -8,14 +8,18 @@ import type { IntentPage } from "./types";
  * section of its own is not modesty; it's the reason the rest of the page is believable, and it
  * sends the wrong-fit visitor away before they pay for something that won't solve their problem.
  */
-export const freedomAlternativeForDesktop: IntentPage = {
-  slug: "freedom-alternative-for-desktop",
-  intent: "freedom alternative for desktop",
+export const freedomAlternative: IntentPage = {
+  slug: "freedom-alternative",
+  group: "compare",
+  summary: "Freedom’s Locked Mode against a session only a physical key can end.",
+  lastReviewed: "2026-10-07",
+  showLastReviewed: true,
+  intent: "freedom alternative / freedom vs talysman for a remote worker",
   eyebrow: "Freedom alternative",
-  title: "A Freedom alternative for the desktop, with a key you can walk away from",
-  metaTitle: `Freedom Alternative for Desktop — Locked Sessions With a Physical Key | ${config.app.name}`,
+  title: "Freedom alternative for desktop focus: Talysman vs Freedom",
+  metaTitle: "Freedom Alternative for Desktop Focus: Talysman vs Freedom",
   metaDescription:
-    "Freedom syncs blocking across all your devices. Talysman does one thing instead: locks down the computer you work on, with a USB key that has to be plugged in to end a session early.",
+    "Compare Freedom's cross-device blocking with Talysman's physical-key approach to focused desktop work.",
   lede: (
     <>
       Freedom is broad — every device, one list. {config.app.name} is narrow: the machine where
@@ -26,8 +30,9 @@ export const freedomAlternativeForDesktop: IntentPage = {
     <>
       <p>
         Freedom blocks distractions across your phone, tablet and computer from one account, and its
-        Locked Mode is designed to stop you ending a session early. The lock is enforced in
-        software: the app declines, and the way out is whatever the app decides the way out is.
+        Locked Mode stops you quitting the app or ending a session early. The way out is in
+        software: Freedom lets you end a locked session from its web dashboard once every seven
+        days.
       </p>
       <p>
         {config.app.name} trades that breadth for a different kind of certainty. It only covers
@@ -51,7 +56,7 @@ export const freedomAlternativeForDesktop: IntentPage = {
         ],
         [
           "What ends a session early",
-          "A software decision inside the app",
+          "Locked Mode: a session can be ended from the web dashboard once every 7 days",
           "A paired USB drive plugged into the computer",
         ],
         [
@@ -66,7 +71,7 @@ export const freedomAlternativeForDesktop: IntentPage = {
         ],
         [
           "Uninstalling mid-session",
-          "Usually the last resort that works",
+          "Uninstall prevention is available on Windows",
           "The uninstaller refuses without a paired key present",
         ],
         [
@@ -74,13 +79,20 @@ export const freedomAlternativeForDesktop: IntentPage = {
           "Varies by plan and platform",
           "Yes — apps go on the list alongside domains",
         ],
-        ["What you have to buy", "A subscription", "A subscription. The key is a drive you own"],
+        [
+          "What you have to buy",
+          "A subscription",
+          "Free for the core mechanism; Pro by subscription or one lifetime payment. The key is a drive you own",
+        ],
       ],
       highlightLast: true,
       footnote: (
         <>
-          {config.app.name} isn&apos;t affiliated with Freedom, and this compares approaches rather
-          than feature lists — their site is the authority on what Freedom does today.
+          {config.app.name} isn&apos;t affiliated with Freedom. Locked Mode details are from{" "}
+          <a href="https://support.freedom.to/en/articles/1802927-locked-mode" rel="nofollow noopener">
+            Freedom&apos;s help center
+          </a>
+          , which is the authority on what Freedom does today.
         </>
       ),
     },
@@ -99,11 +111,11 @@ export const freedomAlternativeForDesktop: IntentPage = {
         },
         {
           label: "The refusal",
-          body: "“Insert your key to end early.” The indicator is red. The service checked the machine for a paired drive and didn't find one.",
+          body: "“Insert your key to turn off the blocker.” The indicator is red. The service checked the machine for a paired drive and didn't find one.",
         },
         {
           label: "The workarounds",
-          body: "Quitting the app does nothing. Killing the service restarts it. Rebooting brings the session back. The uninstaller refuses. A browser without the extension gets closed rather than left open.",
+          body: "Quitting the app does nothing. Killing the service restarts it. Rebooting brings the session back. The uninstaller refuses. With Strict Mode on, a browser without the extension gets closed rather than left open.",
         },
         {
           label: "The only door",
@@ -156,7 +168,7 @@ export const freedomAlternativeForDesktop: IntentPage = {
         },
         {
           title: "Locked scheduled windows",
-          body: "Opt in and even the key won't end focus early during the window. It releases on its own when the window is over.",
+          body: "Opt in and even the key won't end focus early during the window. It releases on its own when the window is over — or with one of five lifetime emergency unlocks.",
         },
         {
           title: "Sessions that survive a reboot",
@@ -175,7 +187,7 @@ export const freedomAlternativeForDesktop: IntentPage = {
         <>
           <p>
             No phone blocking, no tablet blocking, no household sync. Chrome and Firefox have
-            extensions; other browsers get closed during a locked session rather than covered.
+            extensions; other browsers are covered by the network-level block, and with Strict Mode on they are closed during focus rather than left open.
             Blocking is domain-level, so &ldquo;this YouTube video but not that one&rdquo;
             isn&apos;t a thing that exists here.
           </p>
@@ -215,7 +227,8 @@ export const freedomAlternativeForDesktop: IntentPage = {
           a: (
             <p>
               Pair spares. Any paired drive unlocks and you can pair as many as you like, so keep
-              one somewhere safe before you need it.
+              one somewhere safe before you need it. If every key is gone, each computer has five
+              keyless emergency unlocks for life, and after one you can pair a new drive.
             </p>
           ),
         },
@@ -223,7 +236,7 @@ export const freedomAlternativeForDesktop: IntentPage = {
           q: "Can I try it first?",
           a: (
             <p>
-              Free covers the whole mechanism with no card: pair a key, block five sites, run
+              Free covers the whole mechanism with no card: pair a key, block {FREE_BLOCKED_SITE_LIMIT} sites, run
               sessions you can&apos;t click your way out of.{" "}
               <Link href="/download">Download it</Link> and test it against a real workday.
             </p>
@@ -236,9 +249,23 @@ export const freedomAlternativeForDesktop: IntentPage = {
     heading: "Lock down the machine that matters most",
     body: "Pair a drive you already own, start a session, and leave the key in another room.",
   },
+  graphic: {
+    kind: "compare",
+    title: "Freedom vs Talysman: where the way out lives",
+    caption: "Freedom's Locked Mode and Talysman's USB key compared: devices, how a session ends early, and where blocking is enforced.",
+    fromTable: "Two different bets",
+    rows: [
+      "Devices covered",
+      "What ends a session early",
+      "Where the block is enforced",
+      "Uninstalling mid-session",
+    ],
+  },
   related: [
+    "focus-app-remote-work",
+    "cold-turkey-vs-freedom-vs-focusme",
     "cold-turkey-alternative",
-    "brick-for-desktop",
-    "website-blocker-you-cant-disable",
+    "brick-for-computer",
+    "website-blocker-you-cant-turn-off",
   ],
 };

@@ -2,6 +2,7 @@ import type { NextConfig } from "next";
 import path from "node:path";
 import { withSentryConfig } from "@sentry/nextjs";
 import { withBotId } from "botid/next/config";
+import { LEGACY_INTENT_REDIRECTS } from "./src/lib/content/intent/legacy-redirects";
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
@@ -15,6 +16,15 @@ const nextConfig: NextConfig = {
   ],
   images: {
     remotePatterns: [],
+  },
+  // Search pages whose slug was changed to match its query. Permanent (308) so links and
+  // rankings earned at the old URL follow.
+  async redirects() {
+    return Object.entries(LEGACY_INTENT_REDIRECTS).map(([from, to]) => ({
+      source: `/${from}`,
+      destination: `/${to}`,
+      permanent: true,
+    }));
   },
   webpack(config, { dev }) {
     // Workspace packages use Node-compatible `.js` specifiers in their

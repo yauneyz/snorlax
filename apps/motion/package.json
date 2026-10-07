@@ -1,0 +1,40 @@
+{
+  "name": "@talysman/motion",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Remotion motion graphics for the search pages, built from the real desktop UI.",
+  "scripts": {
+    "fixtures": "tsx scripts/fixtures.ts",
+    "assets": "tsx scripts/assets.ts",
+    "studio": "tsx scripts/assets.ts && remotion studio src/index.ts",
+    "render": "tsx scripts/render.ts",
+    "typecheck": "tsc --noEmit",
+    "stills": "tsx scripts/stills.ts"
+  },
+  "dependencies": {
+    "@fontsource-variable/jetbrains-mono": "^5.3.0",
+    "@fontsource-variable/space-grotesk": "^5.3.0",
+    "@talysman/product": "workspace:*",
+    "@talysman/shared": "workspace:*",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "remotion": "4.0.534",
+    "zustand": "^4.5.5"
+  },
+  "devDependencies": {
+    "@remotion/bundler": "4.0.534",
+    "@remotion/cli": "4.0.534",
+    "@remotion/renderer": "4.0.534",
+    "@remotion/tailwind": "4.0.534",
+    "@talysman/engine-wasm": "workspace:*",
+    "@types/node": "^24.9.0",
+    "@types/react": "^18.3.5",
+    "@types/react-dom": "^18.3.0",
+    "autoprefixer": "^10.4.20",
+    "postcss": "^8.4.45",
+    "tailwindcss": "^3.4.10",
+    "tsx": "^4.19.2",
+    "typescript": "^5.5.4"
+  }
+}

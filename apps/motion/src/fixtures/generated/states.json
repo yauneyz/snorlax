@@ -1,0 +1,1620 @@
+{
+  "states": {
+    "unpaired": {
+      "protocolVersion": 6,
+      "serviceVersion": "0.1.0-mock",
+      "focusActive": false,
+      "focusSource": "boot",
+      "policy": {
+        "blockedDomains": [],
+        "allowedDomains": [],
+        "defaultAction": "allow",
+        "judge": null,
+        "apps": [],
+        "enabledPremadeLists": [],
+        "sites": {}
+      },
+      "engine": {
+        "nowMs": 1791295200000,
+        "generation": 0,
+        "profiles": [
+          {
+            "profile": {
+              "id": "profile-default",
+              "name": "Deep work",
+              "color": "#4fd6c0",
+              "createdAtMs": 1791295200000,
+              "config": {
+                "policy": {
+                  "blockedDomains": [
+                    "x.com",
+                    "instagram.com",
+                    "tiktok.com",
+                    "news.ycombinator.com",
+                    "netflix.com",
+                    "twitch.tv"
+                  ],
+                  "allowedDomains": [],
+                  "defaultAction": "allow",
+                  "judge": null,
+                  "apps": [
+                    {
+                      "windowsImageName": "Discord.exe",
+                      "linuxProcessName": "discord",
+                      "macBundleId": "com.hnc.Discord",
+                      "label": "Discord"
+                    },
+                    {
+                      "windowsImageName": "steam.exe",
+                      "linuxProcessName": "steam",
+                      "macBundleId": "com.valvesoftware.steam",
+                      "label": "Steam"
+                    },
+                    {
+                      "windowsImageName": "slack.exe",
+                      "linuxProcessName": "slack",
+                      "macBundleId": "com.tinyspeck.slackmacgap",
+                      "label": "Slack"
+                    }
+                  ],
+                  "enabledPremadeLists": [],
+                  "sites": {
+                    "linkedin": {
+                      "features": {}
+                    },
+                    "reddit": {
+                      "features": {}
+                    },
+                    "youtube": {
+                      "features": {}
+                    }
+                  }
+                },
+                "appMode": "blacklist",
+                "allowedApps": [],
+                "pools": [],
+                "schedule": [],
+                "oneShots": []
+              },
+              "latch": {
+                "state": "off"
+              }
+            },
+            "activation": {
+              "profileId": "profile-default",
+              "active": false,
+              "latched": false,
+              "windows": [],
+              "lockedUntilMs": null,
+              "paused": false
+            },
+            "committed": false
+          }
+        ],
+        "defaultProfileId": "profile-default",
+        "anyActive": false,
+        "overrides": {
+          "allOff": null,
+          "exempt": null,
+          "timed": null,
+          "suppressed": [],
+          "lockedBypass": []
+        },
+        "overridden": false,
+        "pools": [],
+        "pendingUnlocks": [],
+        "streak": {
+          "currentDays": 0,
+          "bestDays": 0,
+          "lastBreakLocalDate": null
+        },
+        "emergencyLeft": 5,
+        "nextEvents": []
+      },
+      "settings": {
+        "browserHandshakeEnabled": false,
+        "trayIconEnabled": true,
+        "streakBadgeEnabled": true,
+        "smartFilteringEnabled": false
+      },
+      "pairedKeys": [],
+      "keyPresent": false,
+      "scheduleLocked": false
+    },
+    "idle": {
+      "protocolVersion": 6,
+      "serviceVersion": "0.1.0-mock",
+      "focusActive": false,
+      "focusSource": "boot",
+      "policy": {
+        "blockedDomains": [],
+        "allowedDomains": [],
+        "defaultAction": "allow",
+        "judge": null,
+        "apps": [],
+        "enabledPremadeLists": [],
+        "sites": {}
+      },
+      "engine": {
+        "nowMs": 1791295200000,
+        "generation": 0,
+        "profiles": [
+          {
+            "profile": {
+              "id": "profile-default",
+              "name": "Deep work",
+              "color": "#4fd6c0",
+              "createdAtMs": 1791295200000,
+              "config": {
+                "policy": {
+                  "blockedDomains": [
+                    "x.com",
+                    "instagram.com",
+                    "tiktok.com",
+                    "news.ycombinator.com",
+                    "netflix.com",
+                    "twitch.tv"
+                  ],
+                  "allowedDomains": [],
+                  "defaultAction": "allow",
+                  "judge": null,
+                  "apps": [
+                    {
+                      "windowsImageName": "Discord.exe",
+                      "linuxProcessName": "discord",
+                      "macBundleId": "com.hnc.Discord",
+                      "label": "Discord"
+                    },
+                    {
+                      "windowsImageName": "steam.exe",
+                      "linuxProcessName": "steam",
+                      "macBundleId": "com.valvesoftware.steam",
+                      "label": "Steam"
+                    },
+                    {
+                      "windowsImageName": "slack.exe",
+                      "linuxProcessName": "slack",
+                      "macBundleId": "com.tinyspeck.slackmacgap",
+                      "label": "Slack"
+                    }
+                  ],
+                  "enabledPremadeLists": [],
+                  "sites": {
+                    "linkedin": {
+                      "features": {}
+                    },
+                    "reddit": {
+                      "features": {}
+                    },
+                    "youtube": {
+                      "features": {}
+                    }
+                  }
+                },
+                "appMode": "blacklist",
+                "allowedApps": [],
+                "pools": [],
+                "schedule": [],
+                "oneShots": []
+              },
+              "latch": {
+                "state": "off"
+              }
+            },
+            "activation": {
+              "profileId": "profile-default",
+              "active": false,
+              "latched": false,
+              "windows": [],
+              "lockedUntilMs": null,
+              "paused": false
+            },
+            "committed": false
+          }
+        ],
+        "defaultProfileId": "profile-default",
+        "anyActive": false,
+        "overrides": {
+          "allOff": null,
+          "exempt": null,
+          "timed": null,
+          "suppressed": [],
+          "lockedBypass": []
+        },
+        "overridden": false,
+        "pools": [],
+        "pendingUnlocks": [],
+        "streak": {
+          "currentDays": 0,
+          "bestDays": 0,
+          "lastBreakLocalDate": null
+        },
+        "emergencyLeft": 5,
+        "nextEvents": []
+      },
+      "settings": {
+        "browserHandshakeEnabled": false,
+        "trayIconEnabled": true,
+        "streakBadgeEnabled": true,
+        "smartFilteringEnabled": false
+      },
+      "pairedKeys": [
+        {
+          "id": "key-1",
+          "label": "Kitchen key",
+          "serialAmbiguous": false,
+          "pairedAt": 1791295200000
+        }
+      ],
+      "keyPresent": true,
+      "presentKeyId": "key-1",
+      "scheduleLocked": false
+    },
+    "focused": {
+      "protocolVersion": 6,
+      "serviceVersion": "0.1.0-mock",
+      "focusActive": true,
+      "focusSource": "user",
+      "policy": {
+        "blockedDomains": [
+          "x.com",
+          "instagram.com",
+          "tiktok.com",
+          "news.ycombinator.com",
+          "netflix.com",
+          "twitch.tv"
+        ],
+        "allowedDomains": [],
+        "defaultAction": "allow",
+        "judge": null,
+        "apps": [
+          {
+            "windowsImageName": "Discord.exe",
+            "linuxProcessName": "discord",
+            "macBundleId": "com.hnc.Discord",
+            "label": "Discord"
+          },
+          {
+            "windowsImageName": "steam.exe",
+            "linuxProcessName": "steam",
+            "macBundleId": "com.valvesoftware.steam",
+            "label": "Steam"
+          },
+          {
+            "windowsImageName": "slack.exe",
+            "linuxProcessName": "slack",
+            "macBundleId": "com.tinyspeck.slackmacgap",
+            "label": "Slack"
+          }
+        ],
+        "enabledPremadeLists": [],
+        "sites": {
+          "linkedin": {
+            "features": {}
+          },
+          "reddit": {
+            "features": {}
+          },
+          "youtube": {
+            "features": {}
+          }
+        }
+      },
+      "engine": {
+        "nowMs": 1791295260000,
+        "generation": 1,
+        "profiles": [
+          {
+            "profile": {
+              "id": "profile-default",
+              "name": "Deep work",
+              "color": "#4fd6c0",
+              "createdAtMs": 1791295200000,
+              "config": {
+                "policy": {
+                  "blockedDomains": [
+                    "x.com",
+                    "instagram.com",
+                    "tiktok.com",
+                    "news.ycombinator.com",
+                    "netflix.com",
+                    "twitch.tv"
+                  ],
+                  "allowedDomains": [],
+                  "defaultAction": "allow",
+                  "judge": null,
+                  "apps": [
+                    {
+                      "windowsImageName": "Discord.exe",
+                      "linuxProcessName": "discord",
+                      "macBundleId": "com.hnc.Discord",
+                      "label": "Discord"
+                    },
+                    {
+                      "windowsImageName": "steam.exe",
+                      "linuxProcessName": "steam",
+                      "macBundleId": "com.valvesoftware.steam",
+                      "label": "Steam"
+                    },
+                    {
+                      "windowsImageName": "slack.exe",
+                      "linuxProcessName": "slack",
+                      "macBundleId": "com.tinyspeck.slackmacgap",
+                      "label": "Slack"
+                    }
+                  ],
+                  "enabledPremadeLists": [],
+                  "sites": {
+                    "linkedin": {
+                      "features": {}
+                    },
+                    "reddit": {
+                      "features": {}
+                    },
+                    "youtube": {
+                      "features": {}
+                    }
+                  }
+                },
+                "appMode": "blacklist",
+                "allowedApps": [],
+                "pools": [],
+                "schedule": [],
+                "oneShots": []
+              },
+              "latch": {
+                "state": "on",
+                "sinceMs": 1791295200000,
+                "source": "user"
+              }
+            },
+            "activation": {
+              "profileId": "profile-default",
+              "active": true,
+              "latched": true,
+              "windows": [],
+              "lockedUntilMs": null,
+              "paused": false
+            },
+            "committed": true
+          }
+        ],
+        "defaultProfileId": "profile-default",
+        "anyActive": true,
+        "overrides": {
+          "allOff": null,
+          "exempt": null,
+          "timed": null,
+          "suppressed": [],
+          "lockedBypass": []
+        },
+        "overridden": false,
+        "pools": [],
+        "pendingUnlocks": [],
+        "streak": {
+          "currentDays": 0,
+          "bestDays": 0,
+          "lastBreakLocalDate": null
+        },
+        "emergencyLeft": 5,
+        "nextEvents": []
+      },
+      "settings": {
+        "browserHandshakeEnabled": false,
+        "trayIconEnabled": true,
+        "streakBadgeEnabled": true,
+        "smartFilteringEnabled": false
+      },
+      "pairedKeys": [
+        {
+          "id": "key-1",
+          "label": "Kitchen key",
+          "serialAmbiguous": false,
+          "pairedAt": 1791295200000
+        }
+      ],
+      "keyPresent": true,
+      "presentKeyId": "key-1",
+      "scheduleLocked": false
+    },
+    "focusedNoKey": {
+      "protocolVersion": 6,
+      "serviceVersion": "0.1.0-mock",
+      "focusActive": true,
+      "focusSource": "user",
+      "policy": {
+        "blockedDomains": [
+          "x.com",
+          "instagram.com",
+          "tiktok.com",
+          "news.ycombinator.com",
+          "netflix.com",
+          "twitch.tv"
+        ],
+        "allowedDomains": [],
+        "defaultAction": "allow",
+        "judge": null,
+        "apps": [
+          {
+            "windowsImageName": "Discord.exe",
+            "linuxProcessName": "discord",
+            "macBundleId": "com.hnc.Discord",
+            "label": "Discord"
+          },
+          {
+            "windowsImageName": "steam.exe",
+            "linuxProcessName": "steam",
+            "macBundleId": "com.valvesoftware.steam",
+            "label": "Steam"
+          },
+          {
+            "windowsImageName": "slack.exe",
+            "linuxProcessName": "slack",
+            "macBundleId": "com.tinyspeck.slackmacgap",
+            "label": "Slack"
+          }
+        ],
+        "enabledPremadeLists": [],
+        "sites": {
+          "linkedin": {
+            "features": {}
+          },
+          "reddit": {
+            "features": {}
+          },
+          "youtube": {
+            "features": {}
+          }
+        }
+      },
+      "engine": {
+        "nowMs": 1791297660000,
+        "generation": 1,
+        "profiles": [
+          {
+            "profile": {
+              "id": "profile-default",
+              "name": "Deep work",
+              "color": "#4fd6c0",
+              "createdAtMs": 1791295200000,
+              "config": {
+                "policy": {
+                  "blockedDomains": [
+                    "x.com",
+                    "instagram.com",
+                    "tiktok.com",
+                    "news.ycombinator.com",
+                    "netflix.com",
+                    "twitch.tv"
+                  ],
+                  "allowedDomains": [],
+                  "defaultAction": "allow",
+                  "judge": null,
+                  "apps": [
+                    {
+                      "windowsImageName": "Discord.exe",
+                      "linuxProcessName": "discord",
+                      "macBundleId": "com.hnc.Discord",
+                      "label": "Discord"
+                    },
+                    {
+                      "windowsImageName": "steam.exe",
+                      "linuxProcessName": "steam",
+                      "macBundleId": "com.valvesoftware.steam",
+                      "label": "Steam"
+                    },
+                    {
+                      "windowsImageName": "slack.exe",
+                      "linuxProcessName": "slack",
+                      "macBundleId": "com.tinyspeck.slackmacgap",
+                      "label": "Slack"
+                    }
+                  ],
+                  "enabledPremadeLists": [],
+                  "sites": {
+                    "linkedin": {
+                      "features": {}
+                    },
+                    "reddit": {
+                      "features": {}
+                    },
+                    "youtube": {
+                      "features": {}
+                    }
+                  }
+                },
+                "appMode": "blacklist",
+                "allowedApps": [],
+                "pools": [],
+                "schedule": [],
+                "oneShots": []
+              },
+              "latch": {
+                "state": "on",
+                "sinceMs": 1791295200000,
+                "source": "user"
+              }
+            },
+            "activation": {
+              "profileId": "profile-default",
+              "active": true,
+              "latched": true,
+              "windows": [],
+              "lockedUntilMs": null,
+              "paused": false
+            },
+            "committed": true
+          }
+        ],
+        "defaultProfileId": "profile-default",
+        "anyActive": true,
+        "overrides": {
+          "allOff": null,
+          "exempt": null,
+          "timed": null,
+          "suppressed": [],
+          "lockedBypass": []
+        },
+        "overridden": false,
+        "pools": [],
+        "pendingUnlocks": [],
+        "streak": {
+          "currentDays": 0,
+          "bestDays": 0,
+          "lastBreakLocalDate": null
+        },
+        "emergencyLeft": 5,
+        "nextEvents": []
+      },
+      "settings": {
+        "browserHandshakeEnabled": false,
+        "trayIconEnabled": true,
+        "streakBadgeEnabled": true,
+        "smartFilteringEnabled": false
+      },
+      "pairedKeys": [
+        {
+          "id": "key-1",
+          "label": "Kitchen key",
+          "serialAmbiguous": false,
+          "pairedAt": 1791295200000
+        }
+      ],
+      "keyPresent": false,
+      "scheduleLocked": false
+    },
+    "focusedKeyBack": {
+      "protocolVersion": 6,
+      "serviceVersion": "0.1.0-mock",
+      "focusActive": true,
+      "focusSource": "user",
+      "policy": {
+        "blockedDomains": [
+          "x.com",
+          "instagram.com",
+          "tiktok.com",
+          "news.ycombinator.com",
+          "netflix.com",
+          "twitch.tv"
+        ],
+        "allowedDomains": [],
+        "defaultAction": "allow",
+        "judge": null,
+        "apps": [
+          {
+            "windowsImageName": "Discord.exe",
+            "linuxProcessName": "discord",
+            "macBundleId": "com.hnc.Discord",
+            "label": "Discord"
+          },
+          {
+            "windowsImageName": "steam.exe",
+            "linuxProcessName": "steam",
+            "macBundleId": "com.valvesoftware.steam",
+            "label": "Steam"
+          },
+          {
+            "windowsImageName": "slack.exe",
+            "linuxProcessName": "slack",
+            "macBundleId": "com.tinyspeck.slackmacgap",
+            "label": "Slack"
+          }
+        ],
+        "enabledPremadeLists": [],
+        "sites": {
+          "linkedin": {
+            "features": {}
+          },
+          "reddit": {
+            "features": {}
+          },
+          "youtube": {
+            "features": {}
+          }
+        }
+      },
+      "engine": {
+        "nowMs": 1791307800000,
+        "generation": 1,
+        "profiles": [
+          {
+            "profile": {
+              "id": "profile-default",
+              "name": "Deep work",
+              "color": "#4fd6c0",
+              "createdAtMs": 1791295200000,
+              "config": {
+                "policy": {
+                  "blockedDomains": [
+                    "x.com",
+                    "instagram.com",
+                    "tiktok.com",
+                    "news.ycombinator.com",
+                    "netflix.com",
+                    "twitch.tv"
+                  ],
+                  "allowedDomains": [],
+                  "defaultAction": "allow",
+                  "judge": null,
+                  "apps": [
+                    {
+                      "windowsImageName": "Discord.exe",
+                      "linuxProcessName": "discord",
+                      "macBundleId": "com.hnc.Discord",
+                      "label": "Discord"
+                    },
+                    {
+                      "windowsImageName": "steam.exe",
+                      "linuxProcessName": "steam",
+                      "macBundleId": "com.valvesoftware.steam",
+                      "label": "Steam"
+                    },
+                    {
+                      "windowsImageName": "slack.exe",
+                      "linuxProcessName": "slack",
+                      "macBundleId": "com.tinyspeck.slackmacgap",
+                      "label": "Slack"
+                    }
+                  ],
+                  "enabledPremadeLists": [],
+                  "sites": {
+                    "linkedin": {
+                      "features": {}
+                    },
+                    "reddit": {
+                      "features": {}
+                    },
+                    "youtube": {
+                      "features": {}
+                    }
+                  }
+                },
+                "appMode": "blacklist",
+                "allowedApps": [],
+                "pools": [],
+                "schedule": [],
+                "oneShots": []
+              },
+              "latch": {
+                "state": "on",
+                "sinceMs": 1791295200000,
+                "source": "user"
+              }
+            },
+            "activation": {
+              "profileId": "profile-default",
+              "active": true,
+              "latched": true,
+              "windows": [],
+              "lockedUntilMs": null,
+              "paused": false
+            },
+            "committed": true
+          }
+        ],
+        "defaultProfileId": "profile-default",
+        "anyActive": true,
+        "overrides": {
+          "allOff": null,
+          "exempt": null,
+          "timed": null,
+          "suppressed": [],
+          "lockedBypass": []
+        },
+        "overridden": false,
+        "pools": [],
+        "pendingUnlocks": [],
+        "streak": {
+          "currentDays": 0,
+          "bestDays": 0,
+          "lastBreakLocalDate": null
+        },
+        "emergencyLeft": 5,
+        "nextEvents": []
+      },
+      "settings": {
+        "browserHandshakeEnabled": false,
+        "trayIconEnabled": true,
+        "streakBadgeEnabled": true,
+        "smartFilteringEnabled": false
+      },
+      "pairedKeys": [
+        {
+          "id": "key-1",
+          "label": "Kitchen key",
+          "serialAmbiguous": false,
+          "pairedAt": 1791295200000
+        }
+      ],
+      "keyPresent": true,
+      "presentKeyId": "key-1",
+      "scheduleLocked": false
+    },
+    "scheduledBefore": {
+      "protocolVersion": 6,
+      "serviceVersion": "0.1.0-mock",
+      "focusActive": false,
+      "focusSource": "boot",
+      "policy": {
+        "blockedDomains": [],
+        "allowedDomains": [],
+        "defaultAction": "allow",
+        "judge": null,
+        "apps": [],
+        "enabledPremadeLists": [],
+        "sites": {}
+      },
+      "engine": {
+        "nowMs": 1791277080000,
+        "generation": 0,
+        "profiles": [
+          {
+            "profile": {
+              "id": "profile-default",
+              "name": "Deep work",
+              "color": "#4fd6c0",
+              "createdAtMs": 1791277080000,
+              "config": {
+                "policy": {
+                  "blockedDomains": [
+                    "x.com",
+                    "instagram.com",
+                    "tiktok.com",
+                    "news.ycombinator.com",
+                    "netflix.com",
+                    "twitch.tv"
+                  ],
+                  "allowedDomains": [],
+                  "defaultAction": "allow",
+                  "judge": null,
+                  "apps": [
+                    {
+                      "windowsImageName": "Discord.exe",
+                      "linuxProcessName": "discord",
+                      "macBundleId": "com.hnc.Discord",
+                      "label": "Discord"
+                    },
+                    {
+                      "windowsImageName": "steam.exe",
+                      "linuxProcessName": "steam",
+                      "macBundleId": "com.valvesoftware.steam",
+                      "label": "Steam"
+                    },
+                    {
+                      "windowsImageName": "slack.exe",
+                      "linuxProcessName": "slack",
+                      "macBundleId": "com.tinyspeck.slackmacgap",
+                      "label": "Slack"
+                    }
+                  ],
+                  "enabledPremadeLists": [],
+                  "sites": {
+                    "linkedin": {
+                      "features": {}
+                    },
+                    "reddit": {
+                      "features": {}
+                    },
+                    "youtube": {
+                      "features": {}
+                    }
+                  }
+                },
+                "appMode": "blacklist",
+                "allowedApps": [],
+                "pools": [],
+                "schedule": [
+                  {
+                    "kind": "window",
+                    "id": "window-mornings",
+                    "days": [
+                      "mon",
+                      "tue",
+                      "wed",
+                      "thu",
+                      "fri"
+                    ],
+                    "start": "09:00",
+                    "end": "11:00",
+                    "locked": false
+                  }
+                ],
+                "oneShots": []
+              },
+              "latch": {
+                "state": "off"
+              }
+            },
+            "activation": {
+              "profileId": "profile-default",
+              "active": false,
+              "latched": false,
+              "windows": [],
+              "lockedUntilMs": null,
+              "paused": false
+            },
+            "committed": true
+          }
+        ],
+        "defaultProfileId": "profile-default",
+        "anyActive": false,
+        "overrides": {
+          "allOff": null,
+          "exempt": null,
+          "timed": null,
+          "suppressed": [],
+          "lockedBypass": []
+        },
+        "overridden": false,
+        "pools": [],
+        "pendingUnlocks": [],
+        "streak": {
+          "currentDays": 0,
+          "bestDays": 0,
+          "lastBreakLocalDate": null
+        },
+        "emergencyLeft": 5,
+        "nextEvents": [
+          {
+            "atMs": 1791277200000,
+            "profileId": "profile-default",
+            "kind": "windowStart"
+          },
+          {
+            "atMs": 1791284400000,
+            "profileId": "profile-default",
+            "kind": "windowEnd"
+          },
+          {
+            "atMs": 1791363600000,
+            "profileId": "profile-default",
+            "kind": "windowStart"
+          },
+          {
+            "atMs": 1791370800000,
+            "profileId": "profile-default",
+            "kind": "windowEnd"
+          },
+          {
+            "atMs": 1791450000000,
+            "profileId": "profile-default",
+            "kind": "windowStart"
+          },
+          {
+            "atMs": 1791457200000,
+            "profileId": "profile-default",
+            "kind": "windowEnd"
+          },
+          {
+            "atMs": 1791536400000,
+            "profileId": "profile-default",
+            "kind": "windowStart"
+          },
+          {
+            "atMs": 1791543600000,
+            "profileId": "profile-default",
+            "kind": "windowEnd"
+          }
+        ]
+      },
+      "settings": {
+        "browserHandshakeEnabled": false,
+        "trayIconEnabled": true,
+        "streakBadgeEnabled": true,
+        "smartFilteringEnabled": false
+      },
+      "pairedKeys": [
+        {
+          "id": "key-1",
+          "label": "Kitchen key",
+          "serialAmbiguous": false,
+          "pairedAt": 1791277080000
+        }
+      ],
+      "keyPresent": false,
+      "scheduleLocked": false
+    },
+    "scheduledArmed": {
+      "protocolVersion": 6,
+      "serviceVersion": "0.1.0-mock",
+      "focusActive": true,
+      "focusSource": "schedule",
+      "policy": {
+        "blockedDomains": [
+          "x.com",
+          "instagram.com",
+          "tiktok.com",
+          "news.ycombinator.com",
+          "netflix.com",
+          "twitch.tv"
+        ],
+        "allowedDomains": [],
+        "defaultAction": "allow",
+        "judge": null,
+        "apps": [
+          {
+            "windowsImageName": "Discord.exe",
+            "linuxProcessName": "discord",
+            "macBundleId": "com.hnc.Discord",
+            "label": "Discord"
+          },
+          {
+            "windowsImageName": "steam.exe",
+            "linuxProcessName": "steam",
+            "macBundleId": "com.valvesoftware.steam",
+            "label": "Steam"
+          },
+          {
+            "windowsImageName": "slack.exe",
+            "linuxProcessName": "slack",
+            "macBundleId": "com.tinyspeck.slackmacgap",
+            "label": "Slack"
+          }
+        ],
+        "enabledPremadeLists": [],
+        "sites": {
+          "linkedin": {
+            "features": {}
+          },
+          "reddit": {
+            "features": {}
+          },
+          "youtube": {
+            "features": {}
+          }
+        }
+      },
+      "engine": {
+        "nowMs": 1791277200000,
+        "generation": 1,
+        "profiles": [
+          {
+            "profile": {
+              "id": "profile-default",
+              "name": "Deep work",
+              "color": "#4fd6c0",
+              "createdAtMs": 1791277080000,
+              "config": {
+                "policy": {
+                  "blockedDomains": [
+                    "x.com",
+                    "instagram.com",
+                    "tiktok.com",
+                    "news.ycombinator.com",
+                    "netflix.com",
+                    "twitch.tv"
+                  ],
+                  "allowedDomains": [],
+                  "defaultAction": "allow",
+                  "judge": null,
+                  "apps": [
+                    {
+                      "windowsImageName": "Discord.exe",
+                      "linuxProcessName": "discord",
+                      "macBundleId": "com.hnc.Discord",
+                      "label": "Discord"
+                    },
+                    {
+                      "windowsImageName": "steam.exe",
+                      "linuxProcessName": "steam",
+                      "macBundleId": "com.valvesoftware.steam",
+                      "label": "Steam"
+                    },
+                    {
+                      "windowsImageName": "slack.exe",
+                      "linuxProcessName": "slack",
+                      "macBundleId": "com.tinyspeck.slackmacgap",
+                      "label": "Slack"
+                    }
+                  ],
+                  "enabledPremadeLists": [],
+                  "sites": {
+                    "linkedin": {
+                      "features": {}
+                    },
+                    "reddit": {
+                      "features": {}
+                    },
+                    "youtube": {
+                      "features": {}
+                    }
+                  }
+                },
+                "appMode": "blacklist",
+                "allowedApps": [],
+                "pools": [],
+                "schedule": [
+                  {
+                    "kind": "window",
+                    "id": "window-mornings",
+                    "days": [
+                      "mon",
+                      "tue",
+                      "wed",
+                      "thu",
+                      "fri"
+                    ],
+                    "start": "09:00",
+                    "end": "11:00",
+                    "locked": false
+                  }
+                ],
+                "oneShots": []
+              },
+              "latch": {
+                "state": "off"
+              }
+            },
+            "activation": {
+              "profileId": "profile-default",
+              "active": true,
+              "latched": false,
+              "windows": [
+                {
+                  "profileId": "profile-default",
+                  "windowId": "window-mornings",
+                  "startMs": 1791277200000,
+                  "endMs": 1791284400000,
+                  "locked": false
+                }
+              ],
+              "lockedUntilMs": null,
+              "paused": false
+            },
+            "committed": true
+          }
+        ],
+        "defaultProfileId": "profile-default",
+        "anyActive": true,
+        "overrides": {
+          "allOff": null,
+          "exempt": null,
+          "timed": null,
+          "suppressed": [],
+          "lockedBypass": []
+        },
+        "overridden": false,
+        "pools": [],
+        "pendingUnlocks": [],
+        "streak": {
+          "currentDays": 0,
+          "bestDays": 0,
+          "lastBreakLocalDate": null
+        },
+        "emergencyLeft": 5,
+        "nextEvents": [
+          {
+            "atMs": 1791284400000,
+            "profileId": "profile-default",
+            "kind": "windowEnd"
+          },
+          {
+            "atMs": 1791363600000,
+            "profileId": "profile-default",
+            "kind": "windowStart"
+          },
+          {
+            "atMs": 1791370800000,
+            "profileId": "profile-default",
+            "kind": "windowEnd"
+          },
+          {
+            "atMs": 1791450000000,
+            "profileId": "profile-default",
+            "kind": "windowStart"
+          },
+          {
+            "atMs": 1791457200000,
+            "profileId": "profile-default",
+            "kind": "windowEnd"
+          },
+          {
+            "atMs": 1791536400000,
+            "profileId": "profile-default",
+            "kind": "windowStart"
+          },
+          {
+            "atMs": 1791543600000,
+            "profileId": "profile-default",
+            "kind": "windowEnd"
+          },
+          {
+            "atMs": 1791795600000,
+            "profileId": "profile-default",
+            "kind": "windowStart"
+          }
+        ]
+      },
+      "settings": {
+        "browserHandshakeEnabled": false,
+        "trayIconEnabled": true,
+        "streakBadgeEnabled": true,
+        "smartFilteringEnabled": false
+      },
+      "pairedKeys": [
+        {
+          "id": "key-1",
+          "label": "Kitchen key",
+          "serialAmbiguous": false,
+          "pairedAt": 1791277080000
+        }
+      ],
+      "keyPresent": false,
+      "scheduleLocked": false
+    },
+    "scheduledNoKey": {
+      "protocolVersion": 6,
+      "serviceVersion": "0.1.0-mock",
+      "focusActive": true,
+      "focusSource": "schedule",
+      "policy": {
+        "blockedDomains": [
+          "x.com",
+          "instagram.com",
+          "tiktok.com",
+          "news.ycombinator.com",
+          "netflix.com",
+          "twitch.tv"
+        ],
+        "allowedDomains": [],
+        "defaultAction": "allow",
+        "judge": null,
+        "apps": [
+          {
+            "windowsImageName": "Discord.exe",
+            "linuxProcessName": "discord",
+            "macBundleId": "com.hnc.Discord",
+            "label": "Discord"
+          },
+          {
+            "windowsImageName": "steam.exe",
+            "linuxProcessName": "steam",
+            "macBundleId": "com.valvesoftware.steam",
+            "label": "Steam"
+          },
+          {
+            "windowsImageName": "slack.exe",
+            "linuxProcessName": "slack",
+            "macBundleId": "com.tinyspeck.slackmacgap",
+            "label": "Slack"
+          }
+        ],
+        "enabledPremadeLists": [],
+        "sites": {
+          "linkedin": {
+            "features": {}
+          },
+          "reddit": {
+            "features": {}
+          },
+          "youtube": {
+            "features": {}
+          }
+        }
+      },
+      "engine": {
+        "nowMs": 1791279720000,
+        "generation": 1,
+        "profiles": [
+          {
+            "profile": {
+              "id": "profile-default",
+              "name": "Deep work",
+              "color": "#4fd6c0",
+              "createdAtMs": 1791277080000,
+              "config": {
+                "policy": {
+                  "blockedDomains": [
+                    "x.com",
+                    "instagram.com",
+                    "tiktok.com",
+                    "news.ycombinator.com",
+                    "netflix.com",
+                    "twitch.tv"
+                  ],
+                  "allowedDomains": [],
+                  "defaultAction": "allow",
+                  "judge": null,
+                  "apps": [
+                    {
+                      "windowsImageName": "Discord.exe",
+                      "linuxProcessName": "discord",
+                      "macBundleId": "com.hnc.Discord",
+                      "label": "Discord"
+                    },
+                    {
+                      "windowsImageName": "steam.exe",
+                      "linuxProcessName": "steam",
+                      "macBundleId": "com.valvesoftware.steam",
+                      "label": "Steam"
+                    },
+                    {
+                      "windowsImageName": "slack.exe",
+                      "linuxProcessName": "slack",
+                      "macBundleId": "com.tinyspeck.slackmacgap",
+                      "label": "Slack"
+                    }
+                  ],
+                  "enabledPremadeLists": [],
+                  "sites": {
+                    "linkedin": {
+                      "features": {}
+                    },
+                    "reddit": {
+                      "features": {}
+                    },
+                    "youtube": {
+                      "features": {}
+                    }
+                  }
+                },
+                "appMode": "blacklist",
+                "allowedApps": [],
+                "pools": [],
+                "schedule": [
+                  {
+                    "kind": "window",
+                    "id": "window-mornings",
+                    "days": [
+                      "mon",
+                      "tue",
+                      "wed",
+                      "thu",
+                      "fri"
+                    ],
+                    "start": "09:00",
+                    "end": "11:00",
+                    "locked": false
+                  }
+                ],
+                "oneShots": []
+              },
+              "latch": {
+                "state": "off"
+              }
+            },
+            "activation": {
+              "profileId": "profile-default",
+              "active": true,
+              "latched": false,
+              "windows": [
+                {
+                  "profileId": "profile-default",
+                  "windowId": "window-mornings",
+                  "startMs": 1791277200000,
+                  "endMs": 1791284400000,
+                  "locked": false
+                }
+              ],
+              "lockedUntilMs": null,
+              "paused": false
+            },
+            "committed": true
+          }
+        ],
+        "defaultProfileId": "profile-default",
+        "anyActive": true,
+        "overrides": {
+          "allOff": null,
+          "exempt": null,
+          "timed": null,
+          "suppressed": [],
+          "lockedBypass": []
+        },
+        "overridden": false,
+        "pools": [],
+        "pendingUnlocks": [],
+        "streak": {
+          "currentDays": 0,
+          "bestDays": 0,
+          "lastBreakLocalDate": null
+        },
+        "emergencyLeft": 5,
+        "nextEvents": [
+          {
+            "atMs": 1791284400000,
+            "profileId": "profile-default",
+            "kind": "windowEnd"
+          },
+          {
+            "atMs": 1791363600000,
+            "profileId": "profile-default",
+            "kind": "windowStart"
+          },
+          {
+            "atMs": 1791370800000,
+            "profileId": "profile-default",
+            "kind": "windowEnd"
+          },
+          {
+            "atMs": 1791450000000,
+            "profileId": "profile-default",
+            "kind": "windowStart"
+          },
+          {
+            "atMs": 1791457200000,
+            "profileId": "profile-default",
+            "kind": "windowEnd"
+          },
+          {
+            "atMs": 1791536400000,
+            "profileId": "profile-default",
+            "kind": "windowStart"
+          },
+          {
+            "atMs": 1791543600000,
+            "profileId": "profile-default",
+            "kind": "windowEnd"
+          },
+          {
+            "atMs": 1791795600000,
+            "profileId": "profile-default",
+            "kind": "windowStart"
+          }
+        ]
+      },
+      "settings": {
+        "browserHandshakeEnabled": false,
+        "trayIconEnabled": true,
+        "streakBadgeEnabled": true,
+        "smartFilteringEnabled": false
+      },
+      "pairedKeys": [
+        {
+          "id": "key-1",
+          "label": "Kitchen key",
+          "serialAmbiguous": false,
+          "pairedAt": 1791277080000
+        }
+      ],
+      "keyPresent": false,
+      "scheduleLocked": false
+    },
+    "scheduledEnded": {
+      "protocolVersion": 6,
+      "serviceVersion": "0.1.0-mock",
+      "focusActive": false,
+      "focusSource": "schedule",
+      "policy": {
+        "blockedDomains": [],
+        "allowedDomains": [],
+        "defaultAction": "allow",
+        "judge": null,
+        "apps": [],
+        "enabledPremadeLists": [],
+        "sites": {}
+      },
+      "engine": {
+        "nowMs": 1791284400000,
+        "generation": 2,
+        "profiles": [
+          {
+            "profile": {
+              "id": "profile-default",
+              "name": "Deep work",
+              "color": "#4fd6c0",
+              "createdAtMs": 1791277080000,
+              "config": {
+                "policy": {
+                  "blockedDomains": [
+                    "x.com",
+                    "instagram.com",
+                    "tiktok.com",
+                    "news.ycombinator.com",
+                    "netflix.com",
+                    "twitch.tv"
+                  ],
+                  "allowedDomains": [],
+                  "defaultAction": "allow",
+                  "judge": null,
+                  "apps": [
+                    {
+                      "windowsImageName": "Discord.exe",
+                      "linuxProcessName": "discord",
+                      "macBundleId": "com.hnc.Discord",
+                      "label": "Discord"
+                    },
+                    {
+                      "windowsImageName": "steam.exe",
+                      "linuxProcessName": "steam",
+                      "macBundleId": "com.valvesoftware.steam",
+                      "label": "Steam"
+                    },
+                    {
+                      "windowsImageName": "slack.exe",
+                      "linuxProcessName": "slack",
+                      "macBundleId": "com.tinyspeck.slackmacgap",
+                      "label": "Slack"
+                    }
+                  ],
+                  "enabledPremadeLists": [],
+                  "sites": {
+                    "linkedin": {
+                      "features": {}
+                    },
+                    "reddit": {
+                      "features": {}
+                    },
+                    "youtube": {
+                      "features": {}
+                    }
+                  }
+                },
+                "appMode": "blacklist",
+                "allowedApps": [],
+                "pools": [],
+                "schedule": [
+                  {
+                    "kind": "window",
+                    "id": "window-mornings",
+                    "days": [
+                      "mon",
+                      "tue",
+                      "wed",
+                      "thu",
+                      "fri"
+                    ],
+                    "start": "09:00",
+                    "end": "11:00",
+                    "locked": false
+                  }
+                ],
+                "oneShots": []
+              },
+              "latch": {
+                "state": "off"
+              }
+            },
+            "activation": {
+              "profileId": "profile-default",
+              "active": false,
+              "latched": false,
+              "windows": [],
+              "lockedUntilMs": null,
+              "paused": false
+            },
+            "committed": true
+          }
+        ],
+        "defaultProfileId": "profile-default",
+        "anyActive": false,
+        "overrides": {
+          "allOff": null,
+          "exempt": null,
+          "timed": null,
+          "suppressed": [],
+          "lockedBypass": []
+        },
+        "overridden": false,
+        "pools": [],
+        "pendingUnlocks": [],
+        "streak": {
+          "currentDays": 0,
+          "bestDays": 0,
+          "lastBreakLocalDate": null
+        },
+        "emergencyLeft": 5,
+        "nextEvents": [
+          {
+            "atMs": 1791363600000,
+            "profileId": "profile-default",
+            "kind": "windowStart"
+          },
+          {
+            "atMs": 1791370800000,
+            "profileId": "profile-default",
+            "kind": "windowEnd"
+          },
+          {
+            "atMs": 1791450000000,
+            "profileId": "profile-default",
+            "kind": "windowStart"
+          },
+          {
+            "atMs": 1791457200000,
+            "profileId": "profile-default",
+            "kind": "windowEnd"
+          },
+          {
+            "atMs": 1791536400000,
+            "profileId": "profile-default",
+            "kind": "windowStart"
+          },
+          {
+            "atMs": 1791543600000,
+            "profileId": "profile-default",
+            "kind": "windowEnd"
+          },
+          {
+            "atMs": 1791795600000,
+            "profileId": "profile-default",
+            "kind": "windowStart"
+          },
+          {
+            "atMs": 1791802800000,
+            "profileId": "profile-default",
+            "kind": "windowEnd"
+          }
+        ]
+      },
+      "settings": {
+        "browserHandshakeEnabled": false,
+        "trayIconEnabled": true,
+        "streakBadgeEnabled": true,
+        "smartFilteringEnabled": false
+      },
+      "pairedKeys": [
+        {
+          "id": "key-1",
+          "label": "Kitchen key",
+          "serialAmbiguous": false,
+          "pairedAt": 1791277080000
+        }
+      ],
+      "keyPresent": false,
+      "scheduleLocked": false
+    }
+  },
+  "popups": {
+    "discord": {
+      "item": {
+        "kind": "app",
+        "app": {
+          "windowsImageName": "Discord.exe",
+          "linuxProcessName": "discord",
+          "macBundleId": "com.hnc.Discord",
+          "label": "Discord"
+        }
+      },
+      "label": "Discord",
+      "verdict": {
+        "kind": "hard"
+      },
+      "blockingProfiles": [
+        {
+          "id": "profile-default",
+          "name": "Deep work",
+          "color": "#4fd6c0",
+          "lockedUntilMs": null
+        }
+      ],
+      "pools": [],
+      "unpooledProfiles": [
+        "profile-default"
+      ],
+      "unlockAvailable": false,
+      "friction": {
+        "kind": "none"
+      },
+      "pending": null,
+      "streak": {
+        "currentDays": 0,
+        "bestDays": 0,
+        "lastBreakLocalDate": null
+      },
+      "emergencyLeft": 5,
+      "lockedUntilMs": null,
+      "showStreak": true
+    }
+  }
+}

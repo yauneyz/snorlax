@@ -1,12 +1,14 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import {
+  formatPriceUsd,
   FREE_BLOCKED_SITE_LIMIT,
+  LIFETIME_PRICE_CENTS,
   PRO_DEVICE_LIMIT,
   PRO_DEVICE_STALE_AFTER_DAYS,
   PRO_TRIAL_DAYS,
 } from "@talysman/product";
 import { PricingPlans } from "@/components/marketing/PricingPlans";
+import { JsonLd, softwareApplicationJsonLd } from "@/components/seo/JsonLd";
 import { config } from "@/lib/config";
 import { supabaseServer } from "@/lib/supabase/server";
 import { getSubscriptionDetailForUser, isTrialAvailableForUser } from "@/lib/stripe/subscription";
@@ -97,10 +99,9 @@ const faqs = [
     q: "Do you offer a lifetime plan?",
     a: (
       <p>
-        Not today. {config.app.name} is a subscription because the desktop service, the browser
-        extensions, and the signing and notarization behind them are ongoing work, and a lifetime
-        price that ignores that is a promise we would rather not make badly. If a founder lifetime
-        offer happens, it will be announced on the <Link href="/blog">blog</Link> first.
+        Yes. Lifetime is a single {formatPriceUsd(LIFETIME_PRICE_CENTS)} payment for Pro on your
+        account, with no renewal. Monthly and annual plans are there if you&apos;d rather not pay up
+        front.
       </p>
     ),
   },
@@ -108,7 +109,7 @@ const faqs = [
     q: "What do I actually need to buy?",
     a: (
       <p>
-        Nothing but the subscription. The physical key is a USB drive you already own — any one will
+        Nothing but the plan. The physical key is a USB drive you already own — any one will
         do, and you can pair several so a lost drive isn&apos;t a lockout. There is no hardware to
         ship and nothing to wait for.
       </p>
@@ -128,6 +129,7 @@ export default async function PricingPage() {
 
   return (
     <div className="pricing">
+      <JsonLd data={softwareApplicationJsonLd()} />
       <section className="pricing__intro">
         <p className="section__eyebrow">Simple, honest pricing</p>
         <h1>

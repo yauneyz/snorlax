@@ -1,33 +1,72 @@
+import { appBlockerPc } from "./app-blocker-pc";
+import { blockRedditWhileWorking } from "./block-reddit-while-working";
+import { blockSocialMediaOnComputer } from "./block-social-media-on-computer";
+import { blockYoutubeWhileWorking } from "./block-youtube-while-working";
 import { blockerForPeopleWhoBypassBlockers } from "./blocker-for-people-who-bypass-blockers";
-import { brickForDesktop } from "./brick-for-desktop";
+import { brickForComputer } from "./brick-for-computer";
 import { coldTurkeyAlternative } from "./cold-turkey-alternative";
-import { freedomAlternativeForDesktop } from "./freedom-alternative-for-desktop";
-import { howToStopDisablingWebsiteBlockers } from "./how-to-stop-disabling-website-blockers";
+import { coldTurkeyVsFreedomVsFocusme } from "./cold-turkey-vs-freedom-vs-focusme";
+import { deepWorkBlocker } from "./deep-work-blocker";
+import { digitalLockVsPhysicalFriction } from "./digital-lock-vs-physical-friction";
+import { focusAppDevelopers } from "./focus-app-developers";
+import { focusAppRemoteWork } from "./focus-app-remote-work";
+import { focusAppWriters } from "./focus-app-writers";
+import { focusmeAlternative } from "./focusme-alternative";
+import { freedomAlternative } from "./freedom-alternative";
 import { physicalWebsiteBlocker } from "./physical-website-blocker";
+import { stopDisablingWebsiteBlocker } from "./stop-disabling-website-blocker";
 import { turnAUsbDriveIntoADistractionBlocker } from "./turn-a-usb-drive-into-a-distraction-blocker";
-import { websiteBlockerYouCantDisable } from "./website-blocker-you-cant-disable";
-import { youtubeBlockerForDesktop } from "./youtube-blocker-for-desktop";
-import type { IntentPage } from "./types";
+import { websiteBlockerLinux } from "./website-blocker-linux";
+import { websiteBlockerMac } from "./website-blocker-mac";
+import { websiteBlockerWindows } from "./website-blocker-windows";
+import { websiteBlockerYouCantTurnOff } from "./website-blocker-you-cant-turn-off";
+import type { IntentGroup, IntentPage } from "./types";
 
-export type { IntentPage, IntentSection } from "./types";
+export type { IntentGroup, IntentPage, IntentSection } from "./types";
 
 /**
  * The high-intent search pages, served at the site root (`/physical-website-blocker`).
  *
- * Order is the order they appear in the sitemap and in each other's "related" fallbacks —
- * roughly broadest intent first.
+ * Order is the order they appear in the sitemap and the footer — roughly publication priority
+ * within each group.
  */
 export const intentPages: IntentPage[] = [
-  physicalWebsiteBlocker,
-  websiteBlockerYouCantDisable,
-  blockerForPeopleWhoBypassBlockers,
-  youtubeBlockerForDesktop,
-  brickForDesktop,
+  // compare
   coldTurkeyAlternative,
-  freedomAlternativeForDesktop,
-  howToStopDisablingWebsiteBlockers,
+  brickForComputer,
+  freedomAlternative,
+  focusmeAlternative,
+  coldTurkeyVsFreedomVsFocusme,
+  digitalLockVsPhysicalFriction,
+  // guides
+  physicalWebsiteBlocker,
+  stopDisablingWebsiteBlocker,
+  blockRedditWhileWorking,
+  blockYoutubeWhileWorking,
+  blockSocialMediaOnComputer,
   turnAUsbDriveIntoADistractionBlocker,
+  // use cases
+  websiteBlockerYouCantTurnOff,
+  websiteBlockerWindows,
+  websiteBlockerMac,
+  websiteBlockerLinux,
+  appBlockerPc,
+  deepWorkBlocker,
+  blockerForPeopleWhoBypassBlockers,
+  focusAppDevelopers,
+  focusAppWriters,
+  focusAppRemoteWork,
 ];
+
+export const GROUP_LABELS: Record<IntentGroup, string> = {
+  compare: "Compare",
+  guides: "Guides",
+  "use-cases": "Use cases",
+};
+
+export function pagesInGroup(group: IntentGroup): IntentPage[] {
+  return intentPages.filter((page) => page.group === group);
+}
 
 const bySlug = new Map(intentPages.map((page) => [page.slug, page]));
 

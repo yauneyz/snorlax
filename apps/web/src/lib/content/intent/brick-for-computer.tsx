@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { FREE_BLOCKED_SITE_LIMIT } from "@talysman/product";
 import { config } from "@/lib/config";
 import type { IntentPage } from "./types";
 
@@ -8,14 +9,19 @@ import type { IntentPage } from "./types";
  * already knows. Feature-list claims about someone else's roadmap go stale and get us called
  * liars, so the table compares approaches and the footnote points at their site.
  */
-export const brickForDesktop: IntentPage = {
-  slug: "brick-for-desktop",
-  intent: "brick for desktop",
-  eyebrow: "Brick for desktop",
-  title: "You want a Brick for your computer",
-  metaTitle: `Brick for Desktop — A Physical Blocker for Windows, macOS and Linux | ${config.app.name}`,
+export const brickForComputer: IntentPage = {
+  slug: "brick-for-computer",
+  group: "compare",
+  summary: "Brick only works on phones. The closest thing for Windows, Mac and Linux.",
+  lastReviewed: "2026-10-07",
+  showLastReviewed: true,
+  intent:
+    "brick for computer / is there anything like Brick for Windows or Mac / app like Brick but for desktop",
+  eyebrow: "Brick for computer",
+  title: "Brick for computer? Physical distraction blocking on desktop",
+  metaTitle: "Brick for Computer? Physical Distraction Blocking on Desktop",
   metaDescription:
-    "Brick made the case that a physical object beats a button. Talysman is that idea for the computer you work on: block websites and desktop apps, and end a session early only with a USB key you left in another room.",
+    "Looking for Brick-style physical friction on your work computer? Compare phone-focused Brick with Talysman's USB-key desktop approach.",
   lede: (
     <>
       Brick proved the point on phones: when unblocking means walking to a physical object, you
@@ -25,6 +31,11 @@ export const brickForDesktop: IntentPage = {
   ),
   answer: (
     <>
+      <p>
+        Brick doesn&apos;t make a desktop or laptop version — it works with iPhones and Android
+        phones only. The closest thing to Brick for a Windows PC, Mac or Linux computer is{" "}
+        {config.app.name}, which uses a USB drive as the physical object instead of an NFC puck.
+      </p>
       <p>
         Brick is a physical NFC tag. You tap your phone against it to block apps, and you have to
         tap it again to unblock them — so the off switch lives on a piece of plastic instead of in
@@ -75,7 +86,7 @@ export const brickForDesktop: IntentPage = {
       ),
       media: {
         label: "30-second demo: clicking End session with the key in another room",
-        note: "Screen recording. Session running → user clicks End session → “Insert your key to end early” with the red key indicator → cut to the USB drive on a shelf in the next room → cut back to the editor.",
+        note: "Screen recording. Session running → user clicks End session → “Insert your key to turn off the blocker” with the red key indicator → cut to the USB drive on a shelf in the next room → cut back to the editor.",
         ratio: "16 / 9",
         kind: "video",
       },
@@ -95,13 +106,22 @@ export const brickForDesktop: IntentPage = {
           "Websites and desktop applications, including the browsers you didn't install the extension in",
         ],
         ["If you left it behind", "Blocked until you go get it", "Blocked until you go get it"],
-        ["Cost to start", "Buy the tag, wait for delivery", "Free for 5 blocked sites, no card"],
+        [
+          "If the object is lost",
+          "Five emergency unBricks, refreshed through support",
+          "Five keyless emergency unlocks per computer, for life — and spare drives",
+        ],
+        ["Cost to start", "Buy the tag, wait for delivery", `Free for ${FREE_BLOCKED_SITE_LIMIT} blocked sites, no card`],
       ],
       highlightLast: true,
       footnote: (
         <>
           {config.app.name} isn&apos;t affiliated with Brick, and this compares the two mechanisms
-          rather than two feature lists — check their site for what Brick does today. The two also
+          rather than two feature lists. Brick&apos;s platforms (iOS 17+ and Android 12+) are from{" "}
+          <a href="https://getbrick.com/pages/apple" rel="nofollow noopener">
+            its compatibility page
+          </a>
+          ; check their site for what Brick does today. The two also
           aren&apos;t mutually exclusive. If your phone is the problem <em>and</em> your computer
           is the problem, they solve different halves of it.
         </>
@@ -126,7 +146,7 @@ export const brickForDesktop: IntentPage = {
         },
         {
           title: "A second browser isn't a loophole",
-          body: "Chrome and Firefox get the extension. During a locked session, browsers without it are closed rather than left standing open as the obvious way around.",
+          body: "Blocking also runs at the network level, below any browser. Turn on Strict Mode and browsers without the Chrome or Firefox extension are closed during focus — and Strict Mode only turns off with the key.",
         },
         {
           title: "Desktop apps count as distractions",
@@ -148,8 +168,8 @@ export const brickForDesktop: IntentPage = {
           </p>
           <p>
             If you want the version that even the key can&apos;t end, mark a scheduled window{" "}
-            <em>locked</em>. It releases on its own when the window is over, and nothing else ends
-            it early. That&apos;s opt-in, and you should mean it.
+            <em>locked</em>. It releases on its own when the window is over, and the only other way out
+            is one of five emergency unlocks you get per computer, for life. That&apos;s opt-in, and you should mean it.
           </p>
         </>
       ),
@@ -181,7 +201,9 @@ export const brickForDesktop: IntentPage = {
           a: (
             <p>
               Pair a spare now and keep it somewhere safe — any paired drive unlocks, so losing one
-              isn&apos;t a lockout. You can pair as many as you like.
+              isn&apos;t a lockout. You can pair as many as you like. If every drive is gone, each
+              computer has five keyless emergency unlocks for life — the same idea as Brick&apos;s
+              emergency unBricks — and after one you can pair a new drive.
             </p>
           ),
         },
@@ -203,9 +225,22 @@ export const brickForDesktop: IntentPage = {
     heading: "Put the off switch in another room",
     body: "Pair a drive you already own, start a session, and find out what happens when you try to quit.",
   },
+  graphic: {
+    kind: "compare",
+    title: "Brick for your phone, Talysman for your computer",
+    caption: "Brick's NFC tag and Talysman's USB key side by side: what each blocks and how each unblocks.",
+    fromTable: "Phone tag versus desktop key",
+    rows: [
+      "Where it blocks",
+      "The physical object",
+      "How you unblock",
+      "If the object is lost",
+      "Cost to start",
+    ],
+  },
   related: [
     "physical-website-blocker",
     "turn-a-usb-drive-into-a-distraction-blocker",
-    "website-blocker-you-cant-disable",
+    "website-blocker-you-cant-turn-off",
   ],
 };

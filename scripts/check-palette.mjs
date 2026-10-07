@@ -8,6 +8,8 @@ import { PALETTE_PATH, REPO_ROOT, readPalette } from './lib/palette.mjs';
 
 const SOURCE_ROOTS = [
   'apps/desktop/src',
+  'apps/motion/src',
+  'apps/motion/scripts',
   'apps/web/src',
   'apps/extension/src',
   'apps/android/app/src',

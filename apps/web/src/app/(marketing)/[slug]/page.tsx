@@ -2,6 +2,9 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { FREE_BLOCKED_SITE_LIMIT, PRO_TRIAL_DAYS } from "@talysman/product";
+import { AppShot } from "@/components/marketing/AppShot";
+import { DemoVideo } from "@/components/marketing/DemoVideo";
+import { demoVideoJsonLd, JsonLd } from "@/components/seo/JsonLd";
 import {
   MediaPlaceholder,
   showMediaPlaceholders,
@@ -12,6 +15,8 @@ import {
   relatedIntentPages,
   type IntentSection,
 } from "@/lib/content/intent";
+import { demoVideo } from "@/lib/content/intent/videos";
+import { graphicSize } from "@/lib/og/intentGraphic";
 import { config } from "@/lib/config";
 import { LandingPage } from "@/components/marketing/LandingPage";
 import { isVariantKey, VARIANT_KEYS } from "@/components/marketing/heroVariants";
@@ -56,12 +61,20 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
       title: page.metaTitle,
       description: page.metaDescription,
       url,
-      images: ["/og-default.png"],
+      // The per-page card comes from opengraph-image.tsx in this segment.
     },
   };
 }
 
-function Section({ section }: { section: IntentSection }) {
+function formatReviewed(iso: string) {
+  return new Date(`${iso}T00:00:00Z`).toLocaleDateString("en-US", {
+    month: "long",
+    year: "numeric",
+    timeZone: "UTC",
+  });
+}
+
+function Section({ section, slug }: { section: IntentSection; slug: string }) {
   switch (section.kind) {
     case "prose":
       return (
@@ -73,44 +86,65 @@ function Section({ section }: { section: IntentSection }) {
       );
 
     case "demo": {
-      // Until the footage exists the beats are the demonstration, so production drops the
-      // second column entirely rather than leaving a gap beside them.
+      // The motion demo is the centerpiece: full width, with the beats written out beneath it
+      // so the page reads the same with the video paused. Without a rendered video, production
+      // shows the real refusal state beside the beats and dev shows the shot list.
+      const video = demoVideo(slug);
       const outcome = section.outcome ? (
         <div className="intent-demo__outcome">{section.outcome}</div>
       ) : null;
+      const beats = (
+        <ol className="beats">
+          {section.beats.map((beat) => (
+            <li key={beat.label} className="beat">
+              <span className="beat__label">{beat.label}</span>
+              <p className="beat__body">{beat.body}</p>
+            </li>
+          ))}
+        </ol>
+      );
+
+      if (video) {
+        return (
+          <section className="section intent-demo intent-demo--video" id={section.id ?? "demo"}>
+            <h2 className="section__title">{section.title}</h2>
+            {section.lede ? <p className="section__lede">{section.lede}</p> : null}
+            <figure className="intent-demo__media">
+              <DemoVideo slug={slug} label={video.description} />
+            </figure>
+            <div className="intent-demo__below">
+              {beats}
+              {outcome}
+            </div>
+          </section>
+        );
+      }
 
       return (
         <section className="section intent-demo" id={section.id ?? "demo"}>
           <h2 className="section__title">{section.title}</h2>
           {section.lede ? <p className="section__lede">{section.lede}</p> : null}
-          <div
-            className={
-              showMediaPlaceholders
-                ? "intent-demo__grid"
-                : "intent-demo__grid intent-demo__grid--flat"
-            }
-          >
-            <ol className="beats">
-              {section.beats.map((beat) => (
-                <li key={beat.label} className="beat">
-                  <span className="beat__label">{beat.label}</span>
-                  <p className="beat__body">{beat.body}</p>
-                </li>
-              ))}
-            </ol>
-            {showMediaPlaceholders ? (
-              <div className="intent-demo__aside">
+          <div className="intent-demo__grid">
+            {beats}
+            <div className="intent-demo__aside">
+              {showMediaPlaceholders ? (
                 <MediaPlaceholder
                   ratio={section.media.ratio}
                   kind={section.media.kind}
                   label={section.media.label}
                   note={section.media.note}
                 />
-                {outcome}
-              </div>
-            ) : (
-              outcome
-            )}
+              ) : (
+                <AppShot
+                  src="/media/app-key-required.png"
+                  alt="Talysman mid-session: the seal reads FOCUSED, “Turn off focus” is greyed out, and a red line reads “insert key to turn off focus”."
+                  width={1410}
+                  height={940}
+                  sizes="(max-width: 900px) 100vw, 40vw"
+                />
+              )}
+              {outcome}
+            </div>
           </div>
         </section>
       );
@@ -244,11 +278,18 @@ export default async function IntentLandingPage({ params }: PageProps) {
   if (!page) notFound();
 
   const related = relatedIntentPages(page);
+  const video = demoVideo(page.slug);
+  const graphic = graphicSize(page);
+  // The demo is the centerpiece, so it comes straight after the answer wherever the page
+  // file lists it; everything else keeps its written order.
+  const demo = page.sections.find((section) => section.kind === "demo");
+  const rest = page.sections.filter((section) => section !== demo);
 
   // A plain <div>, not an <article>: `.marketing-main article` carries the rendered-markdown
   // typography for the blog, and inheriting it here would restyle the CTAs and cards.
   return (
     <div className="intent">
+      {video ? <JsonLd data={demoVideoJsonLd(page.slug, page.title, video)} /> : null}
       <header className="intent__hero">
         <p className="intent__eyebrow">{page.eyebrow}</p>
         <h1 className="intent__title">{page.title}</h1>
@@ -265,6 +306,12 @@ export default async function IntentLandingPage({ params }: PageProps) {
           Free forever for {FREE_BLOCKED_SITE_LIMIT} sites · or try{" "}
           <Link href="/pricing">Pro free for {PRO_TRIAL_DAYS} days</Link>
         </p>
+        {page.showLastReviewed ? (
+          <p className="intent__reviewed">
+            Last checked{" "}
+            <time dateTime={page.lastReviewed}>{formatReviewed(page.lastReviewed)}</time>
+          </p>
+        ) : null}
       </header>
 
       {/* The intent, answered before anything is sold. Someone who leaves after ten
@@ -274,8 +321,25 @@ export default async function IntentLandingPage({ params }: PageProps) {
         <div className="intent__answer-body">{page.answer}</div>
       </section>
 
-      {page.sections.map((section, index) => (
-        <Section key={`${section.kind}-${index}`} section={section} />
+      {demo ? <Section section={demo} slug={page.slug} /> : null}
+
+      {/* The answer drawn: src/lib/og/intentGraphic.tsx, prerendered by Satori at build. */}
+      <figure className="intent-graphic">
+        {/* eslint-disable-next-line @next/next/no-img-element -- a prerendered PNG with fixed
+            dimensions; the image optimizer would only re-encode it. */}
+        <img
+          src={`/${page.slug}/graphic.png`}
+          alt={`${page.graphic.title}. ${page.graphic.caption}`}
+          width={graphic.width}
+          height={graphic.height}
+          loading="lazy"
+          decoding="async"
+        />
+        <figcaption>{page.graphic.caption}</figcaption>
+      </figure>
+
+      {rest.map((section, index) => (
+        <Section key={`${section.kind}-${index}`} section={section} slug={page.slug} />
       ))}
 
       <section className="cta-band">
@@ -300,8 +364,9 @@ export default async function IntentLandingPage({ params }: PageProps) {
             {related.map((other) => (
               <li key={other.slug}>
                 <Link href={`/${other.slug}`}>
-                  <span className="intent__related-name">{other.title}</span>
                   <span className="intent__related-hint">{other.eyebrow}</span>
+                  <span className="intent__related-name">{other.title}</span>
+                  <span className="intent__related-summary">{other.summary}</span>
                 </Link>
               </li>
             ))}

@@ -10,12 +10,15 @@ import type { IntentPage } from "./types";
  */
 export const physicalWebsiteBlocker: IntentPage = {
   slug: "physical-website-blocker",
-  intent: "physical website blocker",
+  group: "guides",
+  summary: "What a physical-key distraction blocker is, and how the lock types compare.",
+  lastReviewed: "2026-10-07",
+  intent: "physical website blocker / distraction blocker that requires a physical key",
   eyebrow: "Physical website blocker",
-  title: "A website blocker with a physical key",
-  metaTitle: `Physical Website Blocker for Desktop — Unlock With a USB Key | ${config.app.name}`,
+  title: "Physical website blocker for desktop: how USB-key focus works",
+  metaTitle: "Physical Website Blocker for Desktop: How USB-Key Focus Works",
   metaDescription:
-    "A physical website blocker puts the off switch on an object instead of in a menu. Talysman blocks sites and desktop apps on Windows, macOS and Linux, and only unlocks when your paired USB key is plugged in.",
+    "Move your distraction blocker's off-switch into the physical world using an ordinary USB drive.",
   lede: (
     <>
       Every software lock ends in a decision you make at the keyboard, in the worst possible
@@ -25,7 +28,8 @@ export const physicalWebsiteBlocker: IntentPage = {
   answer: (
     <>
       <p>
-        A physical website blocker is one where the thing that ends the block is an object, not a
+        Yes, there is a distraction blocker that requires a physical key: {config.app.name}. A
+        physical website blocker is one where the thing that ends the block is an object, not a
         button, a password, or a timer you can wait out. If the object isn&apos;t in the room,
         neither is the option.
       </p>
@@ -110,7 +114,7 @@ export const physicalWebsiteBlocker: IntentPage = {
         },
       ],
       media: {
-        label: "The refusal: “Insert your key to end early”",
+        label: "The refusal: “Insert your key to turn off the blocker”",
         note: "Screen recording of the End session dialog with the red key indicator, then a cut to the paired drive sitting on a kitchen counter.",
         ratio: "16 / 9",
         kind: "video",
@@ -131,7 +135,7 @@ export const physicalWebsiteBlocker: IntentPage = {
         },
         {
           title: "Other browsers aren't a side door",
-          body: "Chrome and Firefox get the extension. During a locked session, browsers without it get closed instead of left open as the obvious workaround.",
+          body: "Chrome and Firefox get the extension, and blocking also runs at the network level. With Strict Mode on, browsers without the extension get closed during focus instead of left open as the obvious workaround.",
         },
         {
           title: "Apps are blocked, not just tabs",
@@ -204,7 +208,8 @@ export const physicalWebsiteBlocker: IntentPage = {
           a: (
             <p>
               You go get the key, plug it in, and turn focus off. It&apos;s meant to be a walk, not
-              a wall. And a session only blocks what you put on the list — everything else on the
+              a wall. If the key is truly out of reach, each computer has five keyless emergency
+              unlocks for life — a real exit, deliberately too scarce to use on a whim. And a session only blocks what you put on the list — everything else on the
               computer keeps working the whole time.
             </p>
           ),
@@ -213,8 +218,9 @@ export const physicalWebsiteBlocker: IntentPage = {
           q: "Is there a version where even the key doesn't work?",
           a: (
             <p>
-              Yes, and it&apos;s opt-in. Mark a scheduled window <em>locked</em> and nothing ends
-              focus early, key included. The window releases on its own when it&apos;s over.
+              Yes, and it&apos;s opt-in. Mark a scheduled window <em>locked</em> and the key won&apos;t
+              end focus early. The window releases on its own when it&apos;s over; the only way
+              out before then is one of five emergency unlocks per computer, for life.
             </p>
           ),
         },
@@ -236,9 +242,23 @@ export const physicalWebsiteBlocker: IntentPage = {
     heading: "Try the version of this that doesn't depend on willpower",
     body: "Pair a drive, block the sites that take your afternoons, and leave the key in the kitchen.",
   },
+  graphic: {
+    kind: "ladder",
+    title: "What each kind of lock costs to undo",
+    caption: "Six ways to lock a blocker, from a button in the app to a physical key in another room, with what each costs to undo.",
+    fromTable: "Why the other kinds of lock come off",
+    rows: {
+      "A button in the app": "blocked",
+      "A password you set": "blocked",
+      "A password a friend holds": "cost",
+      "A random string to retype": "cost",
+      "A timer you wait out": "cost",
+      "A physical key in another room": "open",
+    },
+  },
   related: [
-    "website-blocker-you-cant-disable",
+    "website-blocker-you-cant-turn-off",
     "turn-a-usb-drive-into-a-distraction-blocker",
-    "brick-for-desktop",
+    "brick-for-computer",
   ],
 };

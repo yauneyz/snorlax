@@ -17,7 +17,8 @@ export async function Header() {
         <DevBadge />
       </div>
       <nav className="site-nav">
-        <Link href="/#how">How it works</Link>
+        <Link href="/physical-website-blocker">How it works</Link>
+        <Link href="/cold-turkey-vs-freedom-vs-focusme">Compare</Link>
         <Link href="/pricing">Pricing</Link>
         {user ? (
           <>

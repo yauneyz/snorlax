@@ -1,3 +1,4 @@
+import { EMERGENCY_LIFETIME_LIMIT } from "@talysman/shared";
 import Link from "next/link";
 import { FREE_BLOCKED_SITE_LIMIT, PRO_TRIAL_DAYS } from "@talysman/product";
 import { config } from "@/lib/config";
@@ -11,6 +12,9 @@ import type { IntentPage } from "./types";
  */
 export const turnAUsbDriveIntoADistractionBlocker: IntentPage = {
   slug: "turn-a-usb-drive-into-a-distraction-blocker",
+  group: "guides",
+  summary: "Pair a USB drive you already own as the only way to end a focus session.",
+  lastReviewed: "2026-10-07",
   intent: "turn a USB drive into a distraction blocker",
   eyebrow: "USB drive as a focus key",
   title: "Turn a USB drive into a distraction blocker",
@@ -166,7 +170,7 @@ export const turnAUsbDriveIntoADistractionBlocker: IntentPage = {
             outlive your attempts to end it: a privileged service that restarts when killed, comes
             back after a reboot with the session intact, an uninstaller that refuses to run
             mid-session without a key, browser extensions that turn your list into browser-native
-            rules, and browsers without one getting closed instead of left standing open. That&apos;s
+            rules, and with Strict Mode on, browsers without one getting closed instead of left standing open. That&apos;s
             the part that takes a product rather than an afternoon.
           </p>
         </>
@@ -217,7 +221,8 @@ export const turnAUsbDriveIntoADistractionBlocker: IntentPage = {
             <p>
               Any other paired drive unlocks, which is the argument for pairing a spare today. If
               you have no spare, the session still ends on its own at the time you set — a session
-              is a session, not a permanent state.
+              is a session, not a permanent state. And if you can&apos;t wait, each computer has five
+              keyless emergency unlocks for life.
             </p>
           ),
         },
@@ -250,9 +255,25 @@ export const turnAUsbDriveIntoADistractionBlocker: IntentPage = {
     heading: "Go find a drive you're not using",
     body: "Pair it, block the sites that take your afternoons, and leave it in the kitchen.",
   },
+  graphic: {
+    kind: "states",
+    title: "What the drive does, from plugged in to plugged back in",
+    caption: "The five states of a Talysman USB key during a session: plugged in, session started, unplugged, ending early refused, and plugged back in.",
+    states: [
+      { label: "Plugged in", text: "Green indicator. Start sessions, change lists, end focus whenever you like.", tone: "open" },
+      { label: "Session starts", text: "Blocking moves to a privileged background service that outranks the app.", tone: "plain" },
+      { label: "Unplugged", text: "Red indicator. Blocked stays blocked — the drive holds no state.", tone: "blocked" },
+      { label: "End early?", text: "The service looks for a paired drive. None plugged in, so no.", tone: "blocked" },
+      { label: "Plugged back in", text: "Green again. You can end the session. Checked live, every time.", tone: "open" },
+    ],
+    notes: [
+      "Any USB drive works. It's identified by the serial or volume ID it already reports — normally nothing is written to it.",
+      `Pair a spare. If every key is lost, each computer has ${EMERGENCY_LIFETIME_LIMIT} keyless emergency unlocks, for life.`,
+    ],
+  },
   related: [
     "physical-website-blocker",
-    "brick-for-desktop",
-    "how-to-stop-disabling-website-blockers",
+    "brick-for-computer",
+    "stop-disabling-website-blocker",
   ],
 };

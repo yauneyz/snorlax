@@ -1,21 +1,20 @@
-- landing/pricing copy for soft blocking and AI
-- do my daily posting
-- create a motion graphic with AI for home page
 - post in discord/x/indie-hackers sub about the new features
-- send to instagram guy - mention the new soft blocking
+- do my daily schedule
 
+
+- write an SEO blog post
+  - humor is the ultimate purple cow. My blog actually being a humor column will get Talysman infinitely more likes than anything else
+  - comedy is S-tier marketing
+- send to instagram guy - mention the new soft blocking
 - post demo video on X, reddit, linkedin, HN, etc
 
 - email 5 outlets that might cover me
-- start working on marketing by creating
 
 
-
-- read "learn creator outreach" materials
-- Message 15 people
-
-
+- create a motion graphic with AI for home page
 - fix the app
+- build a viral loop
+  - multiplayer
 
 - "How I" content
 - show hn
@@ -25,82 +24,66 @@
 
 - stats layer
 
-Marketing App Ideas
-- "GoodPhone" - a marketing app that lets your phone show you all the good things you should be doing. Who to call, leisure checklist, etc.
-- a unique landing page
-- a maze/level with billboards and easter eggs
-- pokemon romhack with easter eggs and advertisements
+
+======================================================
+# SEO plan:
+- each page has its own 15-30 second vertical version of its core demonstration, they should be youtube shorts
+  - motion graphics
+  - images where meaningful
+  - answer capsules near the top
 
 
-
-- drive more traffic - post on X, linkedIn, Reddit
-- look at heatmaps and session replays
-- repeat
-- only one key
-
-
-- SEO pages media
-- drive GEO
-
+======================================================
+# Daily plan
 
 Daily Minimum:
+- f5 bot
 - 3 tweets
 - 1 linkedin
+- view posthog session replays
+- 1 seo post
+- 1 reddit post
 - 1 youtube affiliate request
+- 1 random outreach
+- 5 creative software ideas
+
 
 Weekly minimum:
-- 1 blog post
 - 1 piece of "creative software" posted on HN, X, Reddit (with advertisement)
-- 2 listicle requests
-
-
-Think:
-- how can I start building a platform around the message of cognitive firewall and soft blocking?
-
-
-Notes:
-- everyone skips the part right under the main
-- The "how to use" is the part they actually look at
-- Let's try to build the "$100M Offer"
-- We have way too much text
 
 ======================================================
-Daily Routing:
-f5bot
-post on x/linkedin
-view session replays
-======================================================
-The Marketing Plan:
-- X, LinkedIn, Reddit reply guy
-- subreddit promotion
-- all the other group-user-ish channels
-- youtube creators
-- short form video
-
-Soon:
-- indie hackers
-- hacker news
-- product hunt
-
-Eventually:
-- the verge (installer?)
-- cal newport
-
-
+# Marketing plan
+* The foundation
 Viral loops, natural spread
 f5, X metnions, linkedin mentions
 X account
 SEO - long tail, 50 pages with 100 visitors/month gets you a lot of traffic
 GEO - get other people to cover me, add me to lists etc
-YouTube/Blog affiliate
-- study creators
-Podcast appearances, etc (cooler after you go viral on X for cool software)
-Cool software markting
+Be on all the "directories"
+Indie hackers, Product hunt, etc
+* The Big Drivers
+** Cool software markting
 - claude controls the ai adversary and writes code to program them on the fly and make them smarter
-Paid Ads
-
-Flood the world with interesting content that all links back to me. Just start putting excellent stuff out there into the world. Funnel attention to my persona or my site
+** SEO - humor
+** YouTube/Blog affiliate
+- study creators
+** Paid Ads
+* Flood the world with interesting content that all links back to me. Just start putting excellent stuff out there into the world. Funnel attention to my persona or my site
+Eventually:
+- the verge (installer?)
+- cal newport
 ======================================================
+# Ideas
+
+* Marketing App Ideas
+- "GoodPhone" - a marketing app that lets your phone show you all the good things you should be doing. Who to call, leisure checklist, etc.
+- a unique landing page
+- a maze/level with billboards and easter eggs
+- pokemon romhack with easter eggs and advertisements
+
+======================================================
+
+
 - get a basic video runnign
 *
 

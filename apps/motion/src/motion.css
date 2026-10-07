@@ -1,0 +1,21 @@
+/*
+ * Remotion captures frames from a clock it controls; CSS animations and transitions run on the
+ * wall clock instead and would land at random points between frames. Every movement in a
+ * composition is driven from the frame number, so the app's own ones are switched off.
+ */
+.motion-desktop *,
+.motion-desktop *::before,
+.motion-desktop *::after {
+  animation: none !important;
+  transition: none !important;
+}
+
+/* The desktop's globals.css sizes html/body/#root for a full window; a composition is a stage. */
+body {
+  overflow: hidden;
+}
+
+/* The desktop centers its sidebar for tall compositor windows using 100vh; a stage is not a window. */
+.motion-desktop .desktop-sidebar {
+  padding-block: 0;
+}

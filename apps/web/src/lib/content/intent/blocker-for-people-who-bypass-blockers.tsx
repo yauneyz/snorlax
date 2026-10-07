@@ -10,10 +10,13 @@ import type { IntentPage } from "./types";
  */
 export const blockerForPeopleWhoBypassBlockers: IntentPage = {
   slug: "blocker-for-people-who-bypass-blockers",
-  intent: "best blocker for people who bypass blockers",
+  group: "use-cases",
+  summary: "The best website blocker if you keep turning your blocker off.",
+  lastReviewed: "2026-10-07",
+  intent: "best website blocker if I keep turning my blocker off",
   eyebrow: "For people who bypass blockers",
-  title: "The blocker for people who always end up bypassing the blocker",
-  metaTitle: `The Best Blocker for People Who Bypass Blockers | ${config.app.name}`,
+  title: "The best website blocker if you keep turning your blocker off",
+  metaTitle: `Best Website Blocker If You Keep Turning Your Blocker Off | ${config.app.name}`,
   metaDescription:
     "If you've uninstalled every blocker you've installed, the problem isn't discipline — the off switch was always within reach. Talysman moves it onto a USB key you leave in another room.",
   lede: (
@@ -26,7 +29,8 @@ export const blockerForPeopleWhoBypassBlockers: IntentPage = {
   answer: (
     <>
       <p>
-        Every blocker you&apos;ve bypassed had the same flaw: the thing that ends the block was
+        If you keep turning your blocker off, the best blocker is one whose off switch isn&apos;t
+        on the computer. Every blocker you&apos;ve bypassed had the same flaw: the thing that ends the block was
         within arm&apos;s reach of the person who wanted to end it. A button, a password you chose,
         a timer, an uninstaller. At 2pm on a hard task, all of those are the same distance away —
         about five seconds.
@@ -99,7 +103,7 @@ export const blockerForPeopleWhoBypassBlockers: IntentPage = {
         ],
         [
           "Disable the extension, or open a different browser",
-          "A browser that can't enforce the list gets closed during a locked session rather than left standing open.",
+          "Blocking runs below the browser too, and with Strict Mode on a browser that can't enforce the list gets closed during focus rather than left standing open.",
         ],
         [
           "Go get the drive",
@@ -118,7 +122,7 @@ export const blockerForPeopleWhoBypassBlockers: IntentPage = {
         },
         {
           label: "The click",
-          body: "End session. A dialog: “Insert your key to end early.” The key indicator is red.",
+          body: "End session. “Insert your key to turn off the blocker.” The key indicator is red.",
         },
         {
           label: "The math",
@@ -154,7 +158,7 @@ export const blockerForPeopleWhoBypassBlockers: IntentPage = {
         },
         {
           title: "Locked windows",
-          body: "Mark a scheduled window locked and even the key won't end it early. It releases on its own. Opt-in, for the hours you know you'll try to negotiate with.",
+          body: "Mark a scheduled window locked and even the key won't end it early — only one of five lifetime emergency unlocks can. It releases on its own. Opt-in, for the hours you know you'll try to negotiate with.",
         },
         {
           title: "Apps, not just tabs",
@@ -229,9 +233,24 @@ export const blockerForPeopleWhoBypassBlockers: IntentPage = {
     heading: "Try to bypass it. That's the demo.",
     body: "Start a free session, unplug the key, and run through your whole list of workarounds.",
   },
+  graphic: {
+    kind: "ladder",
+    title: "Your usual way out, and where it lands",
+    caption: "The usual ways of getting out of a blocker and what each does during a Talysman session: only fetching the drive works.",
+    fromTable: "Your usual move, and where it lands here",
+    rows: {
+      "Click the off switch": "blocked",
+      "Add a temporary exception “just for one thing”": "blocked",
+      "Quit the app": "blocked",
+      "End the process in Task Manager": "blocked",
+      "Reboot": "blocked",
+      "Uninstall it": "blocked",
+      "Go get the drive": "open",
+    },
+  },
   related: [
-    "website-blocker-you-cant-disable",
-    "how-to-stop-disabling-website-blockers",
+    "website-blocker-you-cant-turn-off",
+    "stop-disabling-website-blocker",
     "cold-turkey-alternative",
   ],
 };

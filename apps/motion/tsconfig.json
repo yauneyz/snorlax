@@ -1,0 +1,11 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "jsx": "react-jsx",
+    "types": ["node"],
+    "composite": false,
+    "noEmit": true,
+    "baseUrl": "../.."
+  },
+  "include": ["src/**/*", "scripts/**/*", "remotion.config.ts", "../desktop/src/renderer/global.d.ts", "../desktop/src/main/env.d.ts"]
+}

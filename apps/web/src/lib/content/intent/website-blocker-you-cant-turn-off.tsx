@@ -8,14 +8,17 @@ import type { IntentPage } from "./types";
  * has been burned by a blocker that oversold itself is reading for the catch, and finding it
  * volunteered is more persuasive than any claim we could make instead.
  */
-export const websiteBlockerYouCantDisable: IntentPage = {
-  slug: "website-blocker-you-cant-disable",
-  intent: "website blocker you can't disable",
-  eyebrow: "Website blocker you can't disable",
-  title: "A website blocker you can't disable on impulse",
-  metaTitle: `Website Blocker You Can't Disable — Every Exit, and What It Costs | ${config.app.name}`,
+export const websiteBlockerYouCantTurnOff: IntentPage = {
+  slug: "website-blocker-you-cant-turn-off",
+  group: "use-cases",
+  summary: "Every way out of a focus session, and what happens when you try each one.",
+  lastReviewed: "2026-10-07",
+  intent: "website blocker you can't turn off",
+  eyebrow: "Website blocker you can't turn off",
+  title: "A website blocker you can't turn off on impulse",
+  metaTitle: `Website Blocker You Can't Turn Off on Impulse | ${config.app.name}`,
   metaDescription:
-    "Closing the app, killing the service, rebooting and uninstalling all fail during a Talysman session. Ending focus early needs a paired USB key plugged in — here is every route out and exactly what happens.",
+    "Block distracting sites on your computer and require a paired USB key to end a protected focus session early.",
   lede: (
     <>
       Not &ldquo;impossible&rdquo; — we won&apos;t sell you that. Expensive: every route out of a
@@ -25,7 +28,9 @@ export const websiteBlockerYouCantDisable: IntentPage = {
   answer: (
     <>
       <p>
-        {config.app.name} blocks websites and desktop apps from a privileged background service, so
+        Yes: {config.app.name} is a website blocker you can&apos;t turn off on impulse, because
+        ending a session early needs a physical USB key you left somewhere else. It blocks websites
+        and desktop apps from a privileged background service, so
         the usual exits don&apos;t work. Closing the app doesn&apos;t lift the block. Killing the
         service starts it again. Rebooting brings the session back intact. The uninstaller refuses
         to run during an active session. Ending focus early asks the service to physically verify a
@@ -68,11 +73,11 @@ export const websiteBlockerYouCantDisable: IntentPage = {
         ],
         [
           "Disable the browser extension",
-          "Blocking is enforced below the browser as well, and a browser that can't enforce the list gets closed rather than left open.",
+          "Blocking is enforced below the browser as well, and with Strict Mode on a browser that can't enforce the list gets closed rather than left open.",
         ],
         [
           "Open a different browser",
-          "Browsers without the extension are closed during a locked session, so “just use Edge” isn't the door it usually is.",
+          "With Strict Mode on, browsers without the extension are closed during focus, so “just use Edge” isn't the door it usually is.",
         ],
         [
           "Wait for the app to forget",
@@ -100,7 +105,7 @@ export const websiteBlockerYouCantDisable: IntentPage = {
         },
         {
           label: "0:41",
-          body: "You click End session. A dialog: “Insert your key to end early.” The key indicator is red. There is no second button.",
+          body: "You click End session. “Insert your key to turn off the blocker.” The key indicator is red. There is no second button.",
         },
         {
           label: "0:44",
@@ -143,7 +148,7 @@ export const websiteBlockerYouCantDisable: IntentPage = {
         },
         {
           title: "Locked windows go further",
-          body: "Mark a scheduled window locked and even a paired key won't end focus early. It releases on its own when the window is over. Opt-in, and you should mean it.",
+          body: "Mark a scheduled window locked and even a paired key won't end focus early — only one of five lifetime emergency unlocks can. It releases on its own when the window is over. Opt-in, and you should mean it.",
         },
       ],
     },
@@ -175,7 +180,9 @@ export const websiteBlockerYouCantDisable: IntentPage = {
           q: "What if there's a real emergency?",
           a: (
             <p>
-              You go get the key, plug it in, and turn focus off. Also worth knowing: a session only
+              You go get the key, plug it in, and turn focus off. If you can&apos;t get to it, each
+              computer has five keyless emergency unlocks for life — they turn everything off, even
+              locked windows, and you never get one back. Also worth knowing: a session only
               blocks what you put on the list, so everything else on your computer — email, phone
               calls, your work tools — keeps working the entire time.
             </p>
@@ -186,7 +193,9 @@ export const websiteBlockerYouCantDisable: IntentPage = {
           a: (
             <p>
               Pair spares. Any paired drive unlocks, and you can pair as many as you like, so keep
-              one somewhere safe today rather than finding out the hard way.
+              one somewhere safe today rather than finding out the hard way. If every key is gone,
+              each computer has five keyless emergency unlocks for life, and after one you can pair
+              a new drive.
             </p>
           ),
         },
@@ -217,9 +226,25 @@ export const websiteBlockerYouCantDisable: IntentPage = {
     heading: "Test it against your own best workaround",
     body: "Start a free session, unplug the key, and try every trick you were going to try anyway.",
   },
+  graphic: {
+    kind: "ladder",
+    title: "Every way out, and where it lands",
+    caption: "Nine ways to get out of a Talysman focus session and what happens with each: only fetching the USB key ends it.",
+    fromTable: "Every way out, and what actually happens",
+    rows: {
+      "Click “End session”": "blocked",
+      "Close the Talysman window": "blocked",
+      "Kill the background service": "blocked",
+      "Restart or crash the computer": "blocked",
+      "Uninstall the app": "blocked",
+      "Disable the browser extension": "blocked",
+      "Open a different browser": "blocked",
+      "Go get the key": "open",
+    },
+  },
   related: [
     "blocker-for-people-who-bypass-blockers",
     "physical-website-blocker",
-    "how-to-stop-disabling-website-blockers",
+    "stop-disabling-website-blocker",
   ],
 };

@@ -78,9 +78,75 @@ export type IntentSection =
   | { kind: "honesty"; id?: string; title: string; body: React.ReactNode }
   | { kind: "faq"; id?: string; title?: string; items: { q: string; a: React.ReactNode }[] };
 
+/**
+ * The page's infographic (rendered by Satori at build time, served at `/<slug>/graphic.png`):
+ * the answer drawn as something you can take in at a glance. Facts that the page already states
+ * in a table are referenced by row label (`fromTable`) rather than restated, so the picture can't
+ * drift from the copy.
+ */
+export type GraphicTone = "blocked" | "open" | "cost" | "plain";
+
+export type IntentGraphic = {
+  /** The headline drawn on the image. */
+  title: string;
+  /** Shown under the image, and the start of its alt text. */
+  caption: string;
+} & (
+  | {
+      /** Every way out and where it lands — the page table's rows, each marked. */
+      kind: "ladder";
+      fromTable: string;
+      rows: Record<string, GraphicTone>;
+    }
+  | {
+      /** Products side by side: chosen rows of the page's comparison table. */
+      kind: "compare";
+      fromTable: string;
+      rows: string[];
+    }
+  | {
+      /** Per site: what a site rule hides and what keeps working (site | hidden | works rows). */
+      kind: "rules";
+      fromTable: string;
+      rows: string[];
+    }
+  | {
+      /** A day, hour by hour: the protected window and what happens in it. */
+      kind: "timeline";
+      /** Hours, 24h. */
+      from: number;
+      to: number;
+      window: { from: number; to: number; label: string };
+      events: { at: number; label: string; tone: GraphicTone }[];
+    }
+  | {
+      /** A sequence of states, left to right — the key's lifecycle, say. */
+      kind: "states";
+      states: { label: string; text: string; tone: GraphicTone }[];
+      notes?: string[];
+    }
+);
+
+/**
+ * Which footer column a page is listed under. Grouping only — every page is served at the site
+ * root (`/cold-turkey-alternative`), because the query is the URL.
+ */
+export type IntentGroup = "compare" | "guides" | "use-cases";
+
 export type IntentPage = {
-  /** URL segment, served at the site root: `/website-blocker-you-cant-disable`. */
+  /** URL segment, served at the site root: `/website-blocker-you-cant-turn-off`. */
   slug: string;
+  group: IntentGroup;
+  /** One line for related-page cards. Says what the page answers, not what it sells. */
+  summary: string;
+  /**
+   * ISO date the page's claims were last checked. Feeds the sitemap's lastModified, and on
+   * pages that describe other products it is shown as "Last checked" so a reader (or a model)
+   * can judge how fresh the comparison is.
+   */
+  lastReviewed: string;
+  /** Show `lastReviewed` on the page. Set on anything that makes claims about competitors. */
+  showLastReviewed?: boolean;
   /** The query this page exists to answer. Documentation, not rendered. */
   intent: string;
   eyebrow: string;
@@ -94,6 +160,7 @@ export type IntentPage = {
   answer: React.ReactNode;
   sections: IntentSection[];
   cta?: { heading: string; body: string };
+  graphic: IntentGraphic;
   /** Slugs of sibling pages. Keeps the set crawlable from any one of its members. */
   related: string[];
 };

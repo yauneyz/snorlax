@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { FREE_BLOCKED_SITE_LIMIT } from "@talysman/product";
 import { config } from "@/lib/config";
 import type { IntentPage } from "./types";
 
@@ -8,14 +9,17 @@ import type { IntentPage } from "./types";
  * pitch comes last, framed as the durable version of the same idea, because a how-to that turns
  * out to be an ad in the second paragraph is worth nothing to anyone.
  */
-export const howToStopDisablingWebsiteBlockers: IntentPage = {
-  slug: "how-to-stop-disabling-website-blockers",
-  intent: "how to stop disabling website blockers",
+export const stopDisablingWebsiteBlocker: IntentPage = {
+  slug: "stop-disabling-website-blocker",
+  group: "guides",
+  summary: "Five tactics that stop you switching your blocker off, four of them free.",
+  lastReviewed: "2026-10-07",
+  intent: "how to stop disabling website blocker / how can a remote worker stop bypassing their own blocker",
   eyebrow: "How to stop disabling your blocker",
-  title: "How to stop disabling your website blocker",
-  metaTitle: `How to Stop Disabling Your Website Blocker — 5 Things That Work | ${config.app.name}`,
+  title: "How to stop yourself from disabling your website blocker",
+  metaTitle: "How to Stop Yourself From Disabling Your Website Blocker",
   metaDescription:
-    "Five practical ways to stop turning off your own website blocker, from removing one-click exceptions to moving the off switch onto a physical object you have to go and fetch.",
+    "If you keep turning off your own blocker, the problem may be the override itself. Compare locks, delays and physical friction.",
   lede: (
     <>
       The fix isn&apos;t more resolve. It&apos;s making the off switch expensive enough that a
@@ -142,7 +146,7 @@ export const howToStopDisablingWebsiteBlockers: IntentPage = {
         },
         {
           label: "Try to quit",
-          body: "Forty minutes in you click End session. “Insert your key to end early.” The indicator is red. Quitting the app, killing the service, rebooting and uninstalling all leave the session running.",
+          body: "Forty minutes in you click End session. “Insert your key to turn off the blocker.” The indicator is red. Quitting the app, killing the service, rebooting and uninstalling all leave the session running.",
         },
         {
           label: "Go back to work",
@@ -216,8 +220,9 @@ export const howToStopDisablingWebsiteBlockers: IntentPage = {
           q: "Is there a setting where even the key won't work?",
           a: (
             <p>
-              Yes — a scheduled window marked <em>locked</em>. Nothing ends focus early during it,
-              and it releases on its own when the window closes. It&apos;s opt-in, and it&apos;s
+              Yes — a scheduled window marked <em>locked</em>. The key won&apos;t end focus early
+              during it — only one of five lifetime emergency unlocks will — and it releases on its
+              own when the window closes. It&apos;s opt-in, and it&apos;s
               worth choosing while you&apos;re calm.
             </p>
           ),
@@ -226,7 +231,7 @@ export const howToStopDisablingWebsiteBlockers: IntentPage = {
           q: "Can I test this without paying?",
           a: (
             <p>
-              Yes. The mechanism is free — pair a key, block five sites, run a session and try to
+              Yes. The mechanism is free — pair a key, block {FREE_BLOCKED_SITE_LIMIT} sites, run a session and try to
               end it early with the drive in another room. No card.{" "}
               <Link href="/download">Downloads are here</Link>.
             </p>
@@ -239,9 +244,24 @@ export const howToStopDisablingWebsiteBlockers: IntentPage = {
     heading: "Stop relying on being strong at 2pm",
     body: "Set the rules while you're calm, then put the off switch in another room.",
   },
+  graphic: {
+    kind: "ladder",
+    title: "What unblocking costs, fix by fix",
+    caption: "Seven ways people stop themselves disabling a blocker, from an extension toggle to a physical key in another room, and what each costs to undo.",
+    fromTable: "How much each fix actually costs you",
+    rows: {
+      "Extension with a disable toggle": "blocked",
+      "Password you chose yourself": "blocked",
+      "Password held by a friend": "cost",
+      "Random string to retype": "cost",
+      "Timer you wait out": "cost",
+      "Separate admin account": "cost",
+      "Physical key in another room": "open",
+    },
+  },
   related: [
     "blocker-for-people-who-bypass-blockers",
-    "website-blocker-you-cant-disable",
+    "website-blocker-you-cant-turn-off",
     "turn-a-usb-drive-into-a-distraction-blocker",
   ],
 };

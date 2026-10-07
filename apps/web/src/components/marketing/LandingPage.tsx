@@ -42,20 +42,39 @@ const steps = [
 ];
 
 /**
- * The diagnosis, drawn as two routes out of the same impulse. The point is the middle rung:
- * one path has a click there, the other has a walk.
+ * The diagnosis, drawn as three routes out of the same impulse. Not "every other blocker": Cold
+ * Turkey, Freedom and FocusMe all have strict modes, and saying otherwise is the fastest way to
+ * lose the people who've used them. Their failure is different — all-or-nothing locks get set
+ * short or skipped — and the middle path says so.
  */
 const paths = [
   {
-    label: "Every other blocker",
+    label: "Most blockers",
     tone: "loss",
-    beats: ["The urge hits", "Click “End session”", "The afternoon is gone"],
+    beats: ["The urge hits", "Click “End session” or disable the extension", "The afternoon is gone"],
+  },
+  {
+    label: "Strict lock modes",
+    tone: "loss",
+    beats: ["Strong, but all-or-nothing", "So you set them short, or skip them", "Or satisfy the unlock from your chair"],
+    href: "/cold-turkey-vs-freedom-vs-focusme",
+    linkLabel: "Cold Turkey, Freedom and FocusMe compared",
   },
   {
     label: config.app.name,
     tone: "ours",
     beats: ["The urge hits", "Get up and go get the key", "Decide whether you meant it"],
+    href: "/physical-website-blocker",
+    linkLabel: "How the key works",
   },
+];
+
+/** Where people arrive from. Each links to the comparison written for them. */
+const switchingFrom = [
+  { name: "Cold Turkey", href: "/cold-turkey-alternative" },
+  { name: "Freedom", href: "/freedom-alternative" },
+  { name: "FocusMe", href: "/focusme-alternative" },
+  { name: "Brick", href: "/brick-for-computer" },
 ];
 
 const faqs = [
@@ -77,8 +96,9 @@ const faqs = [
       <>
         <p>
           No. Closing the app changes nothing. The service restarts itself if it is killed, comes
-          back after a reboot with the session intact, and the uninstaller refuses to remove it
-          while focus is active unless a paired key is present.
+          back after a reboot with the session intact, and on Windows and Linux the uninstaller
+          refuses to remove it while focus is active unless a paired key is present.{" "}
+          <Link href="/website-blocker-you-cant-turn-off">Every exit, and what happens</Link>.
         </p>
       </>
     ),
@@ -125,8 +145,10 @@ const faqs = [
     q: "Which computers and browsers are supported?",
     a: (
       <p>
-        Windows 10 and 11, macOS on Apple Silicon and Intel, and Debian/Ubuntu Linux, with
-        extensions for Chrome and Firefox. <Link href="/download">See the downloads</Link>.
+        <Link href="/website-blocker-windows">Windows 10 and 11</Link>,{" "}
+        <Link href="/website-blocker-mac">macOS on Apple Silicon and Intel</Link>, and{" "}
+        <Link href="/website-blocker-linux">Debian/Ubuntu Linux</Link>, with extensions for Chrome
+        and Firefox. <Link href="/download">See the downloads</Link>.
       </p>
     ),
   },
@@ -196,6 +218,9 @@ export function LandingPage({ variantOverride }: { variantOverride?: VariantKey 
               </li>
               <li>This really does make a difference. Try it</li>
             </ul>
+            <p className="diagnosis__more">
+              <Link href="/physical-website-blocker">How USB-key focus works →</Link>
+            </p>
           </div>
           <AppShot
             src="/media/app-key-required.png"
@@ -216,9 +241,23 @@ export function LandingPage({ variantOverride }: { variantOverride?: VariantKey 
                   <li key={beat}>{beat}</li>
                 ))}
               </ol>
+              {path.href ? (
+                <Link href={path.href} className="path__link">
+                  {path.linkLabel} →
+                </Link>
+              ) : null}
             </li>
           ))}
         </ul>
+
+        <p className="switching">
+          <span className="switching__label">Coming from</span>
+          {switchingFrom.map((from) => (
+            <Link key={from.href} href={from.href} className="switching__link">
+              {from.name}
+            </Link>
+          ))}
+        </p>
       </section>
 
       {/* Site rules: the soft-block side of the product, shot in a real browser with the
@@ -268,7 +307,7 @@ export function LandingPage({ variantOverride }: { variantOverride?: VariantKey 
               YouTube was open before you had consciously decided to stop.
             </p>
             <p>
-              Every normal blocker is controlled from the computer it is supposed to protect. The
+              Most blockers are controlled from the computer they are supposed to protect. The
               distracted version of you can undo the focused version&apos;s decision with the same
               mouse, in the same few clicks.
             </p>

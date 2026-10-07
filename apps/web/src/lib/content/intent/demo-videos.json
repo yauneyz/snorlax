@@ -1,0 +1,178 @@
+{
+  "app-blocker-pc": {
+    "description": "Talysman’s blocklist with Discord, Steam and Slack, Discord closing each time it’s opened during focus with the app’s blocked popup, discord.com blocked in the browser, and turning focus off refused without the USB key.",
+    "duration": "PT34S",
+    "seconds": 34.2,
+    "uploadDate": "2026-10-07",
+    "width": 1920,
+    "height": 1080
+  },
+  "block-reddit-while-working": {
+    "description": "Reddit’s front page loading with its feed removed by Talysman’s site rule, then turning focus off being refused while the USB key is in a bag in the hall.",
+    "duration": "PT30S",
+    "seconds": 30,
+    "uploadDate": "2026-10-07",
+    "width": 1920,
+    "height": 1080
+  },
+  "block-social-media-on-computer": {
+    "description": "A scheduled Talysman session: X blocked, Instagram with its feed removed, LinkedIn messages still working without the feed, and turning focus off refused while the USB key is in the car.",
+    "duration": "PT36S",
+    "seconds": 36.2,
+    "uploadDate": "2026-10-07",
+    "width": 1920,
+    "height": 1080
+  },
+  "block-youtube-while-working": {
+    "description": "A schematic of YouTube under Talysman’s site rules: search and the video work, the sidebar, end-screen wall and home feed are hidden, and loosening the rule is refused without the USB key.",
+    "duration": "PT35S",
+    "seconds": 35.2,
+    "uploadDate": "2026-10-07",
+    "width": 1920,
+    "height": 1080
+  },
+  "blocker-for-people-who-bypass-blockers": {
+    "description": "Mid-task, a distracting site hits Talysman’s block page, turning focus off is refused with the USB key in the kitchen, and work resumes in the editor.",
+    "duration": "PT32S",
+    "seconds": 32.2,
+    "uploadDate": "2026-10-07",
+    "width": 1920,
+    "height": 1080
+  },
+  "brick-for-computer": {
+    "description": "A USB drive is paired as the key, focus is turned on and the drive is unplugged; after a blocked site, turning focus off is refused until the drive is plugged back in.",
+    "duration": "PT37S",
+    "seconds": 37,
+    "uploadDate": "2026-10-07",
+    "width": 1920,
+    "height": 1080
+  },
+  "cold-turkey-alternative": {
+    "description": "Cold Turkey’s random-text and timer locks side by side with Talysman’s USB key, then the key leaving the room, turning focus off refused without it, and the emergency exits Talysman keeps.",
+    "duration": "PT41S",
+    "seconds": 41,
+    "uploadDate": "2026-10-07",
+    "width": 1920,
+    "height": 1080
+  },
+  "cold-turkey-vs-freedom-vs-focusme": {
+    "description": "Cold Turkey’s random-text lock, Freedom’s Locked Mode, FocusMe’s Force Mode and Talysman’s USB key meeting the same urge side by side, then which to pick and Talysman’s refusal without the key.",
+    "duration": "PT39S",
+    "seconds": 39,
+    "uploadDate": "2026-10-07",
+    "width": 1920,
+    "height": 1080
+  },
+  "deep-work-blocker": {
+    "description": "A scheduled 9–11 deep-work window in Talysman: the schedule arms focus, a distracting site is blocked, turning focus off is refused while the USB key is upstairs, and the window ends on its own at 11.",
+    "duration": "PT34S",
+    "seconds": 34.2,
+    "uploadDate": "2026-10-07",
+    "width": 1920,
+    "height": 1080
+  },
+  "digital-lock-vs-physical-friction": {
+    "description": "A type-to-unlock delay lock, a hard timer lock and Talysman’s physical USB key meeting the same urge, then Talysman refusing to turn off while the key is downstairs.",
+    "duration": "PT32S",
+    "seconds": 32,
+    "uploadDate": "2026-10-07",
+    "width": 1920,
+    "height": 1080
+  },
+  "focus-app-developers": {
+    "description": "A coding session with Talysman’s site rules: a YouTube tutorial plays without the sidebar, the YouTube home and Reddit front page have no feed, and turning focus off is refused without the USB key.",
+    "duration": "PT35S",
+    "seconds": 34.6,
+    "uploadDate": "2026-10-07",
+    "width": 1920,
+    "height": 1080
+  },
+  "focus-app-remote-work": {
+    "description": "Working from home: a news site is blocked, turning focus off is refused while the USB key hangs by the front door, and at 17:30 the key is fetched and the session ends.",
+    "duration": "PT28S",
+    "seconds": 28.2,
+    "uploadDate": "2026-10-07",
+    "width": 1920,
+    "height": 1080
+  },
+  "focus-app-writers": {
+    "description": "A stuck writing session: a distracting tab shows Talysman’s block page, turning focus off is refused with the USB key in the kitchen, and the paragraph gets written.",
+    "duration": "PT32S",
+    "seconds": 31.6,
+    "uploadDate": "2026-10-07",
+    "width": 1920,
+    "height": 1080
+  },
+  "focusme-alternative": {
+    "description": "FocusMe’s Force Mode beside Talysman’s USB key, then a Talysman session that can’t be turned off while the key sits on a hallway shelf.",
+    "duration": "PT34S",
+    "seconds": 34.2,
+    "uploadDate": "2026-10-07",
+    "width": 1920,
+    "height": 1080
+  },
+  "freedom-alternative": {
+    "description": "Freedom’s Locked Mode beside Talysman’s USB key, then a Talysman session refusing to turn off without the key, the usual workarounds each leaving the session running, and the key two rooms away.",
+    "duration": "PT41S",
+    "seconds": 41.2,
+    "uploadDate": "2026-10-07",
+    "width": 1920,
+    "height": 1080
+  },
+  "physical-website-blocker": {
+    "description": "A USB drive is paired as a key in Talysman, focus is turned on, the key is unplugged, a blocked site shows the block page, turning focus off is refused without the key, and it works again once the key is back.",
+    "duration": "PT46S",
+    "seconds": 45.5,
+    "uploadDate": "2026-10-07",
+    "width": 1920,
+    "height": 1080
+  },
+  "stop-disabling-website-blocker": {
+    "description": "Where a blocker’s off switch usually sits, then pairing a USB drive as Talysman’s key, unplugging it during a session, and turning focus off being refused until it’s back.",
+    "duration": "PT37S",
+    "seconds": 37,
+    "uploadDate": "2026-10-07",
+    "width": 1920,
+    "height": 1080
+  },
+  "turn-a-usb-drive-into-a-distraction-blocker": {
+    "description": "Pairing an ordinary USB drive as a Talysman key, what the drive is and isn’t, then a session that can’t be turned off while it’s unplugged and can once it’s plugged back in.",
+    "duration": "PT39S",
+    "seconds": 39.4,
+    "uploadDate": "2026-10-07",
+    "width": 1920,
+    "height": 1080
+  },
+  "website-blocker-linux": {
+    "description": "On Linux: killing the Talysman service gets it restarted by systemd, apt remove is aborted by the pre-removal hook during focus without the key, and turning focus off needs the USB key.",
+    "duration": "PT36S",
+    "seconds": 36,
+    "uploadDate": "2026-10-07",
+    "width": 1920,
+    "height": 1080
+  },
+  "website-blocker-mac": {
+    "description": "On macOS: quitting Talysman leaves sites blocked, another browser hits the same block, and turning focus off needs the USB key on the hallway shelf.",
+    "duration": "PT30S",
+    "seconds": 30.4,
+    "uploadDate": "2026-10-07",
+    "width": 1920,
+    "height": 1080
+  },
+  "website-blocker-windows": {
+    "description": "On Windows: ending Talysman in Task Manager leaves its enforcement service running, a restart brings focus back, the uninstaller refuses without the key, and turning focus off needs the USB key.",
+    "duration": "PT39S",
+    "seconds": 39.2,
+    "uploadDate": "2026-10-07",
+    "width": 1920,
+    "height": 1080
+  },
+  "website-blocker-you-cant-turn-off": {
+    "description": "A focus session runs in Talysman, the USB key is unplugged and left in the kitchen, a distracting site shows the block page, and turning focus off is unavailable until the key is back.",
+    "duration": "PT31S",
+    "seconds": 31,
+    "uploadDate": "2026-10-07",
+    "width": 1920,
+    "height": 1080
+  }
+}

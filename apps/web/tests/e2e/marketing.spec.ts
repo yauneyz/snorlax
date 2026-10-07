@@ -1,4 +1,5 @@
 import { test, expect } from "@playwright/test";
+import { LEGACY_INTENT_REDIRECTS } from "../../src/lib/content/intent/legacy-redirects";
 
 test.describe("marketing surface", () => {
   test("/ renders landing and is indexable", async ({ page }) => {
@@ -53,5 +54,42 @@ test.describe("marketing surface", () => {
     const r = await page.goto("/sitemap.xml");
     const body = await r!.text();
     expect(body).toMatch(/<loc>.*\/<\/loc>/);
+  });
+
+  // Every indexable URL in the sitemap: 200, self-canonical, indexable, one h1, a unique title,
+  // and its main copy in the server-rendered HTML (fetched without running any JS).
+  test("every sitemap URL is indexable and server-rendered", async ({ page, request }) => {
+    const sitemap = await (await request.get("/sitemap.xml")).text();
+    const urls = [...sitemap.matchAll(/<loc>(.*?)<\/loc>/g)].map((m) => new URL(m[1]!).pathname);
+    expect(urls.length).toBeGreaterThan(20);
+
+    const titles = new Set<string>();
+    for (const path of urls) {
+      const raw = await request.get(path, { maxRedirects: 0 });
+      expect(raw.status(), path).toBe(200);
+      const html = await raw.text();
+      expect(html.match(/<h1[\s>]/g)?.length ?? 0, `${path} h1 count`).toBe(1);
+      expect(html, path).not.toMatch(/<meta name="robots" content="[^"]*noindex/);
+
+      await page.goto(path);
+      const canonical = await page.locator('link[rel="canonical"]').getAttribute("href");
+      expect(new URL(canonical!).pathname.replace(/\/$/, "") || "/", path).toBe(
+        path.replace(/\/$/, "") || "/",
+      );
+      const title = await page.title();
+      expect(titles.has(title), `duplicate title: ${title}`).toBe(false);
+      titles.add(title);
+
+      // Search pages lead with "The short answer"; it must be in the HTML, not added by JS.
+      if (html.includes("intent__answer")) expect(html).toContain("The short answer");
+    }
+  });
+
+  test("renamed search pages permanently redirect", async ({ request }) => {
+    for (const [from, to] of Object.entries(LEGACY_INTENT_REDIRECTS)) {
+      const r = await request.get(`/${from}`, { maxRedirects: 0 });
+      expect(r.status(), from).toBe(308);
+      expect(new URL(r.headers().location!, "http://x").pathname).toBe(`/${to}`);
+    }
   });
 });

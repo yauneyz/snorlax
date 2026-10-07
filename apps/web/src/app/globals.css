@@ -650,10 +650,8 @@ input:-webkit-autofill:focus {
   margin-top: auto;
   padding: 1.6rem 2rem;
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-  flex-wrap: wrap;
+  flex-direction: column;
+  gap: 1.6rem;
   width: 100%;
   max-width: var(--container);
   margin-left: auto;
@@ -661,6 +659,50 @@ input:-webkit-autofill:focus {
   border-top: 1px solid var(--border);
   color: var(--fg-5);
   font-size: 0.82rem;
+}
+
+.site-footer__directory {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+  gap: 1.25rem 2rem;
+}
+
+.site-footer__heading {
+  margin: 0 0 0.6rem;
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--fg-5);
+}
+
+.site-footer__column ul {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.site-footer__column a {
+  color: var(--fg-3);
+  transition: color var(--t-fast) var(--ease);
+}
+
+.site-footer__column a:hover {
+  color: var(--fg-1);
+}
+
+.site-footer__base {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--border);
 }
 
 .site-footer__brand {
@@ -1211,11 +1253,11 @@ input:-webkit-autofill:focus {
   }
 }
 
-/* Two routes out of the same impulse. The middle beat is the whole argument, so the cards
- * are deliberately identical apart from it — ours lit, theirs dimmed. */
+/* Three routes out of the same impulse. The middle beat is the whole argument, so the cards
+ * are deliberately parallel apart from it — ours lit, the others dimmed. */
 .paths {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr));
   gap: 1.15rem;
   list-style: none;
   margin: 2.5rem 0 0;
@@ -1223,6 +1265,8 @@ input:-webkit-autofill:focus {
 }
 
 .path {
+  display: flex;
+  flex-direction: column;
   padding: 1.35rem 1.4rem 1.45rem;
   border: 1px solid var(--border);
   border-radius: var(--r-xl);
@@ -1276,6 +1320,64 @@ input:-webkit-autofill:focus {
   content: "→";
   margin-right: 0.6rem;
   color: var(--fg-5);
+}
+
+.path__link {
+  margin-top: auto;
+  padding-top: 1rem;
+  font-size: 0.85rem;
+  color: var(--accent-lo);
+}
+
+.path__link:hover {
+  color: var(--accent-hi);
+}
+
+.diagnosis__more {
+  margin: 1.25rem 0 0;
+}
+
+.diagnosis__more a {
+  color: var(--accent-lo);
+  font-weight: 500;
+}
+
+.diagnosis__more a:hover {
+  color: var(--accent-hi);
+}
+
+/* "Coming from Cold Turkey / Freedom / …" — one row of pills into the comparison pages. */
+.switching {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 0.6rem;
+  margin: 1.75rem 0 0;
+}
+
+.switching__label {
+  margin-right: 0.25rem;
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--fg-5);
+}
+
+.switching__link {
+  padding: 0.35rem 0.85rem;
+  font-size: 0.88rem;
+  color: var(--fg-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-pill);
+  transition:
+    color var(--t-fast) var(--ease),
+    border-color var(--t-fast) var(--ease);
+}
+
+.switching__link:hover {
+  color: var(--fg-0);
+  border-color: var(--border-strong);
 }
 
 /* ── Situations, before capabilities ──
@@ -3527,13 +3629,6 @@ input:-webkit-autofill:focus {
   margin-top: 1.85rem;
 }
 
-/* No media yet: the beats carry the section alone, at a reading measure. */
-.intent-demo__grid--flat {
-  grid-template-columns: minmax(0, 1fr);
-  gap: 1.5rem;
-  max-width: var(--container-narrow);
-}
-
 .beats {
   list-style: none;
   margin: 0;
@@ -3577,6 +3672,70 @@ input:-webkit-autofill:focus {
   margin: 0;
   font-size: 0.94rem;
   line-height: 1.62;
+  color: var(--fg-3);
+  text-wrap: pretty;
+}
+
+/* With a rendered demo, the video leads at full width and the beats run beneath it in columns,
+ * so the page still reads as a demo with the video paused. */
+.intent-demo__media {
+  margin: 1.85rem 0 0;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--r-xl);
+  background: var(--bg-1);
+  box-shadow: var(--shadow-card);
+}
+
+.intent-demo__video {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.intent-demo__below {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  margin-top: 1.75rem;
+}
+
+.intent-demo--video .beats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
+  gap: 1.1rem 1.5rem;
+}
+
+.intent-demo--video .beat {
+  padding: 0.9rem 0 0;
+  border-left: 0;
+  border-top: 1px solid var(--border-strong);
+}
+
+.intent-demo--video .beat::before {
+  left: 0;
+  top: -4.5px;
+}
+
+/* ── The answer drawn ──
+ * The page's Satori infographic. Text-heavy at 1600px wide, so it is allowed the full
+ * container rather than a narrow column. */
+.intent-graphic {
+  margin: 3rem 0 0;
+}
+
+.intent-graphic img {
+  display: block;
+  width: 100%;
+  height: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--r-xl);
+}
+
+.intent-graphic figcaption {
+  margin-top: 0.7rem;
+  font-size: 0.85rem;
+  line-height: 1.55;
   color: var(--fg-3);
   text-wrap: pretty;
 }
@@ -3739,7 +3898,7 @@ input:-webkit-autofill:focus {
 
 .intent__related a {
   display: flex;
-  flex-direction: column-reverse;
+  flex-direction: column;
   gap: 0.4rem;
   height: 100%;
   padding: 1.1rem 1.25rem;
@@ -3760,6 +3919,22 @@ input:-webkit-autofill:focus {
   line-height: 1.4;
   color: var(--fg-1);
   text-wrap: balance;
+}
+
+.intent__related-summary {
+  font-size: 0.85rem;
+  line-height: 1.5;
+  color: var(--fg-4);
+  text-wrap: pretty;
+}
+
+.intent__reviewed {
+  margin: 0.4rem 0 0;
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--fg-5);
 }
 
 .intent__related-hint {

@@ -142,7 +142,7 @@ export function FocusToggle() {
               <Button
                 onClick={() => void turnOff()}
                 disabled={busy || !keyPresent}
-                title={keyPresent ? undefined : 'Insert your key to turn off'}
+                title={keyPresent ? undefined : 'Insert your key to turn off the blocker'}
                 variant="danger"
                 className="rounded-full px-7 py-[11px] text-body"
               >
