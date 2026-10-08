@@ -9,6 +9,7 @@ import { resolve } from "node:path";
 import { softwareApplicationJsonLd } from "@/components/seo/JsonLd";
 import { demoVideo } from "@/lib/content/intent/videos";
 import { graphicSize } from "@/lib/og/intentGraphic";
+import IntentLandingPage from "@/app/(marketing)/[slug]/page";
 
 // Static segments under (marketing) that a root-level slug must never shadow or collide with.
 const RESERVED = ["about", "blog", "download", "pricing", "privacy", "terms", "login", "signup", "app", "account", "api"];
@@ -28,6 +29,19 @@ describe("intent pages", () => {
   it("only link to pages that exist", () => {
     for (const page of intentPages) {
       expect(relatedIntentPages(page).length, page.slug).toBe(page.related.length);
+    }
+  });
+
+  // Untagged or mis-tagged CTAs would file a page's downloads under another page (or none) in
+  // analytics_landing_funnel.
+  it("tag every download link with the page it's on", async () => {
+    for (const page of intentPages) {
+      const html = renderToStaticMarkup(
+        await IntentLandingPage({ params: Promise.resolve({ slug: page.slug }) }),
+      );
+      const links = [...html.matchAll(/href="(\/download[^"]*)"/g)].map((m) => m[1]);
+      expect(links.length, page.slug).toBeGreaterThan(0);
+      for (const href of links) expect(href, page.slug).toBe(`/download?from=${page.slug}`);
     }
   });
 

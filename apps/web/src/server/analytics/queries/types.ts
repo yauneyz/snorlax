@@ -88,6 +88,19 @@ export interface ChannelMetrics {
   pctVisitorToPaid: number;
 }
 
+export interface LandingPageMetrics {
+  /** First-touch landing path, e.g. `/cold-turkey-alternative`. */
+  path: string;
+  visitors: number;
+  organicVisitors: number;
+  downloaded: number;
+  installed: number;
+  activated: number;
+  paid: number;
+  /** Downloads started from this page's CTA (last touch), whatever page the person landed on. */
+  ctaDownloads: number;
+}
+
 export interface VisitorBreakdownMetric {
   label: string;
   visitors: number;

@@ -5,6 +5,7 @@ import { DetectedPlatform } from "@/components/marketing/DetectedPlatform";
 import { DownloadCard } from "@/components/marketing/DownloadCard";
 import { PlatformIcon, type Platform } from "@/components/marketing/PlatformIcon";
 import { config } from "@/lib/config";
+import { downloadSource } from "@/lib/content/intent";
 
 export const metadata: Metadata = {
   title: "Download",
@@ -66,7 +67,18 @@ const extensions: DownloadTarget[] = [
   },
 ];
 
-export default function DownloadPage() {
+/** Carries `from` (the search page whose CTA led here) on to the installer redirect. */
+function withSource(href: string, from: string | null): string {
+  return from ? `${href}&from=${from}` : href;
+}
+
+export default async function DownloadPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ from?: string | string[] }>;
+}) {
+  const { from: rawFrom } = await searchParams;
+  const from = downloadSource(typeof rawFrom === "string" ? rawFrom : null);
   return (
     <section className="download">
       <header className="download__header">
@@ -90,6 +102,7 @@ export default function DownloadPage() {
       {/* Icons are rendered here, on the server, so the banner reuses the same marks as the
           cards without pulling the icon set into the client bundle. */}
       <DetectedPlatform
+        from={from}
         icons={{
           win: <PlatformIcon platform="windows" size={22} />,
           mac: <PlatformIcon platform="macos" size={22} />,
@@ -108,7 +121,10 @@ export default function DownloadPage() {
         </div>
         <div className="download-grid">
           {desktopInstallers.map((target) => (
-            <DownloadCard key={target.platform} target={target} />
+            <DownloadCard
+              key={target.platform}
+              target={{ ...target, href: withSource(target.href, from) }}
+            />
           ))}
         </div>
         <aside className="download__windows-note" aria-labelledby="windows-download-note-title">

@@ -1,19 +1,40 @@
 // @vitest-environment node
 // Server component: render in node so config exposes the server-only store URLs.
-import { describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 
 import DownloadPage from "@/app/(marketing)/download/page";
 import { config } from "@/lib/config";
 
+async function render(searchParams: { from?: string } = {}) {
+  return renderToStaticMarkup(await DownloadPage({ searchParams: Promise.resolve(searchParams) }));
+}
+
 describe("download page", () => {
-  const html = renderToStaticMarkup(<DownloadPage />);
+  let html = "";
+  beforeAll(async () => {
+    html = await render();
+  });
 
   it("links every desktop platform to the download API route", () => {
     for (const platform of ["win", "mac", "linux"]) {
       expect(html).toContain(`href="/api/desktop/download?platform=${platform}"`);
     }
     expect(html).not.toMatch(/AppImage/i);
+  });
+
+  it("carries a search page's `from` on to the installer links", async () => {
+    const tagged = await render({ from: "cold-turkey-alternative" });
+    for (const platform of ["win", "mac", "linux"]) {
+      expect(tagged).toContain(
+        `href="/api/desktop/download?platform=${platform}&amp;from=cold-turkey-alternative"`,
+      );
+    }
+  });
+
+  it("drops a `from` that isn't a live search page", async () => {
+    const tagged = await render({ from: "not-a-page" });
+    expect(tagged).not.toContain("from=");
   });
 
   it("links browser extensions to their configured store URLs", () => {

@@ -142,7 +142,7 @@ export const brickForComputer: IntentPage = {
         },
         {
           title: "Uninstalling is key-gated too",
-          body: "The uninstaller refuses to remove the service while a focus session is running unless a paired key is present.",
+          body: "On Windows and Linux, the uninstaller refuses to remove the service while a focus session is running unless a paired key is present. On a Mac there's no uninstaller to put that check in, so this one isn't key-gated there.",
         },
         {
           title: "A second browser isn't a loophole",
@@ -214,7 +214,7 @@ export const brickForComputer: IntentPage = {
               No. {config.app.name} is desktop-only: Windows 10 and 11, macOS on Apple Silicon and
               Intel, and Debian/Ubuntu Linux, with extensions for Chrome and Firefox. If the phone
               is your main problem, a phone-first tool is the honest answer for that half.{" "}
-              <Link href="/download">See the downloads</Link>.
+              <Link href="/download?from=brick-for-computer">See the downloads</Link>.
             </p>
           ),
         },

@@ -11,6 +11,7 @@ import {
 import { queryFunnelFromDb } from "@/server/analytics/queries/funnel";
 import { retentionPct } from "@/server/analytics/queries/helpers";
 import { queryInstallHealthFromDb } from "@/server/analytics/queries/install-health";
+import { queryLandingPagesFromDb, toLandingPageMetrics } from "@/server/analytics/queries/landing-pages";
 import { queryPmf } from "@/server/analytics/queries/pmf";
 import { queryRetentionFromDb } from "@/server/analytics/queries/retention";
 import { queryRevenueFromDb } from "@/server/analytics/queries/revenue";
@@ -57,6 +58,7 @@ export async function GET(request: NextRequest) {
     installHealth,
     channels,
     visitorBreakdown,
+    landingPages,
     pmf,
   ] = await Promise.all([
     queryFunnelFromDb(target),
@@ -67,6 +69,7 @@ export async function GET(request: NextRequest) {
     queryInstallHealthFromDb(target),
     queryChannelsFromDb(target),
     queryVisitorBreakdownFromDb(target),
+    queryLandingPagesFromDb(target),
     queryPmf(target),
   ]);
 
@@ -151,6 +154,8 @@ export async function GET(request: NextRequest) {
     ),
 
     visitorBreakdown: section(visitorBreakdown, toVisitorBreakdownMetrics),
+
+    landingPages: section(landingPages, toLandingPageMetrics),
 
     // New top-level section (added alongside the PMF survey). The widget's Kotlin JSON parser
     // uses `ignoreUnknownKeys = true`, so this is safe to add without touching widget code —

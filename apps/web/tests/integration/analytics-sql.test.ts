@@ -271,6 +271,42 @@ describe("views", () => {
     expect(dev.error).toBeNull();
   });
 
+  it("analytics_landing_funnel splits first-touch landings from last-touch CTA downloads", async () => {
+    if (withStack()) return;
+    const slug = `it-${randomUUID()}`;
+    const occurredAt = new Date().toISOString();
+    const visit = async (landingPath: string, referrerHost: string, ua: "human" | "bot", from?: string) => {
+      const anon = randomUUID();
+      await db.rpc("analytics_link", {
+        p_identifiers: [`anon:${anon}`],
+        p_attribution: { landing_path: landingPath, referrer_host: referrerHost },
+      });
+      const rows = [
+        { event: "page_viewed", occurred_at: occurredAt, anon_id: anon, source: "web", props: { path: landingPath, ua_class: ua } },
+        ...(from
+          ? [{ event: "download_clicked", occurred_at: occurredAt, anon_id: anon, source: "server", props: { platform: "linux", from } }]
+          : []),
+      ];
+      const { error } = await db.from("analytics_events").insert(rows);
+      expect(error).toBeNull();
+    };
+
+    await visit(`/${slug}`, "www.google.com", "human", slug); // lands here, downloads here
+    await visit("/", "news.ycombinator.com", "human", slug); // lands elsewhere, downloads here
+    await visit(`/${slug}`, "www.google.com", "bot"); // crawler: not a visitor
+
+    const { data, error } = await db
+      .from("analytics_landing_funnel")
+      .select("*")
+      .eq("landing_path", `/${slug}`)
+      .single();
+    expect(error).toBeNull();
+    expect(data).toMatchObject({ visitors: 1, organic_visitors: 1, downloaded: 1, cta_downloads: 2 });
+
+    const dev = await db.from("analytics_dev_landing_funnel").select("*").limit(1);
+    expect(dev.error).toBeNull();
+  });
+
   it("resolves events to the merged person through analytics_events_resolved", async () => {
     if (withStack()) return;
     const anon = randomUUID();

@@ -183,7 +183,7 @@ export const focusmeAlternative: IntentPage = {
             <p>
               Free covers the whole mechanism with no card: pair a key, block{" "}
               {FREE_BLOCKED_SITE_LIMIT} sites, and run sessions only the key can end early.{" "}
-              <Link href="/download">Download it</Link>.
+              <Link href="/download?from=focusme-alternative">Download it</Link>.
             </p>
           ),
         },

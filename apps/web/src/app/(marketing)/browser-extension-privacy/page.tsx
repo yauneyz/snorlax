@@ -6,6 +6,7 @@ import { config } from "@/lib/config";
 
 export const metadata: Metadata = {
   title: "Browser Extension Privacy Policy",
+  description: `What the ${config.app.name} browser extension can see, what it stores, and what it never collects.`,
   alternates: { canonical: `${config.app.url}/browser-extension-privacy` },
 };
 

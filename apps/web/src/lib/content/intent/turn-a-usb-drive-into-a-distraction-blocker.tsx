@@ -61,7 +61,7 @@ export const turnAUsbDriveIntoADistractionBlocker: IntentPage = {
           title: "Pair it",
           body: (
             <>
-              <Link href="/download">Install {config.app.name}</Link>, plug the drive in, and pick
+              <Link href="/download?from=turn-a-usb-drive-into-a-distraction-blocker">Install {config.app.name}</Link>, plug the drive in, and pick
               it from the list of removable drives. It&apos;s now a key for this computer. Pair a
               second drive while you&apos;re there — any paired drive unlocks, so a spare is what
               turns a lost drive into a shrug.
@@ -109,7 +109,7 @@ export const turnAUsbDriveIntoADistractionBlocker: IntentPage = {
         },
         {
           label: "You try to end early",
-          body: "The service looks for a drive whose identifier matches one you paired. There isn't one, so the answer is no. Quitting the app, killing the service, rebooting and uninstalling all leave the session running.",
+          body: "The service looks for a drive whose identifier matches one you paired. There isn't one, so the answer is no. Quitting the app, killing the service and rebooting all leave the session running, and on Windows and Linux so does uninstalling.",
         },
         {
           label: "Plugged back in",
@@ -169,7 +169,7 @@ export const turnAUsbDriveIntoADistractionBlocker: IntentPage = {
             The hard part was never detecting the drive. It&apos;s that the enforcement has to
             outlive your attempts to end it: a privileged service that restarts when killed, comes
             back after a reboot with the session intact, an uninstaller that refuses to run
-            mid-session without a key, browser extensions that turn your list into browser-native
+            mid-session without a key (on Windows and Linux), browser extensions that turn your list into browser-native
             rules, and with Strict Mode on, browsers without one getting closed instead of left standing open. That&apos;s
             the part that takes a product rather than an afternoon.
           </p>

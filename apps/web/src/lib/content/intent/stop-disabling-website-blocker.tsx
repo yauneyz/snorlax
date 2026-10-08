@@ -146,7 +146,7 @@ export const stopDisablingWebsiteBlocker: IntentPage = {
         },
         {
           label: "Try to quit",
-          body: "Forty minutes in you click End session. “Insert your key to turn off the blocker.” The indicator is red. Quitting the app, killing the service, rebooting and uninstalling all leave the session running.",
+          body: "Forty minutes in you click End session. “Insert your key to turn off the blocker.” The indicator is red. Quitting the app, killing the service and rebooting all leave the session running, and on Windows and Linux so does uninstalling.",
         },
         {
           label: "Go back to work",
@@ -233,7 +233,7 @@ export const stopDisablingWebsiteBlocker: IntentPage = {
             <p>
               Yes. The mechanism is free — pair a key, block {FREE_BLOCKED_SITE_LIMIT} sites, run a session and try to
               end it early with the drive in another room. No card.{" "}
-              <Link href="/download">Downloads are here</Link>.
+              <Link href="/download?from=stop-disabling-website-blocker">Downloads are here</Link>.
             </p>
           ),
         },

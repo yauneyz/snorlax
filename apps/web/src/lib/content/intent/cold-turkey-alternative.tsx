@@ -191,8 +191,8 @@ export const coldTurkeyAlternative: IntentPage = {
           body: "A privileged background service, not a browser extension. Closing the app, killing the process, and rebooting all leave the session running.",
         },
         {
-          title: "A key-gated uninstaller",
-          body: "It refuses to remove the service mid-session without a paired drive present, so uninstalling isn't the loophole.",
+          title: "A key-gated uninstaller on Windows and Linux",
+          body: "It refuses to remove the service mid-session without a paired drive present, so uninstalling isn't the loophole. macOS has no uninstaller to put that check in.",
         },
         {
           title: "Websites and desktop apps",

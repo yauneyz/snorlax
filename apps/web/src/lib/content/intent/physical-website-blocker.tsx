@@ -131,7 +131,7 @@ export const physicalWebsiteBlocker: IntentPage = {
         },
         {
           title: "The uninstaller is gated too",
-          body: "It refuses to remove the service during an active session unless a paired key is present. Otherwise “uninstall” is just the unlock button with extra steps.",
+          body: "On Windows and Linux, it refuses to remove the service during an active session unless a paired key is present. Otherwise “uninstall” is just the unlock button with extra steps. macOS has no uninstaller to put that check in.",
         },
         {
           title: "Other browsers aren't a side door",

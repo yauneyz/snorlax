@@ -30,7 +30,14 @@ function detect(userAgent: string): Detected | null {
  * The glyphs arrive pre-rendered from the server page rather than being imported here, so the
  * Font Awesome icon data stays out of the client bundle.
  */
-export function DetectedPlatform({ icons }: { icons: Record<PlatformKey, React.ReactNode> }) {
+export function DetectedPlatform({
+  icons,
+  from,
+}: {
+  icons: Record<PlatformKey, React.ReactNode>;
+  /** The search page whose CTA led here, carried on to the installer redirect. */
+  from: string | null;
+}) {
   const [detected, setDetected] = useState<Detected | null>(null);
 
   useEffect(() => {
@@ -51,7 +58,7 @@ export function DetectedPlatform({ icons }: { icons: Record<PlatformKey, React.R
         </p>
         <a
           className="detected-platform__link"
-          href={detected.href}
+          href={from ? `${detected.href}&from=${from}` : detected.href}
           onClick={() => sendGAEvent("event", "download", { platform: detected.key })}
         >
           Download for {detected.label}

@@ -277,6 +277,17 @@ export type AnalyticsChannelFunnelRow = {
   pct_visitor_to_paid: number | null;
 };
 
+export type AnalyticsLandingFunnelRow = {
+  landing_path: string;
+  visitors: number;
+  organic_visitors: number;
+  downloaded: number;
+  installed: number;
+  activated: number;
+  paid: number;
+  cta_downloads: number;
+};
+
 export type AnalyticsVisitorBreakdownRow = {
   dimension: "device_type" | "os";
   value: string;

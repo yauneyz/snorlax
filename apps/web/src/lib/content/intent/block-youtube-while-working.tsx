@@ -74,7 +74,7 @@ export const blockYoutubeWhileWorking: IntentPage = {
           title: "Install and pair a drive",
           body: (
             <>
-              <Link href="/download">Download {config.app.name}</Link> for your platform and add the
+              <Link href="/download?from=block-youtube-while-working">Download {config.app.name}</Link> for your platform and add the
               Chrome or Firefox extension. Plug in any USB drive you own and pair it — that drive is
               now the key for this computer.
             </>

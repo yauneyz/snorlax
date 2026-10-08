@@ -6,6 +6,7 @@ import { config } from "@/lib/config";
 
 export const metadata: Metadata = {
   title: "Microsoft Edge Extension Privacy Policy",
+  description: `What the ${config.app.name} extension for Microsoft Edge can see, what it stores, and what it never collects.`,
   alternates: { canonical: `${config.app.url}/edge-extension-privacy` },
 };
 

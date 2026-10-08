@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import { config } from "@/lib/config";
+import { downloadSource } from "@/lib/content/intent";
 import { ANALYTICS_ANON_COOKIE, parseAnonId } from "@/lib/analytics/anon-id";
 import { attributionFromRequest, classifyUserAgent } from "@/server/analytics/ingest";
 import { track } from "@/server/analytics/track";
@@ -15,7 +16,8 @@ export const dynamic = "force-dynamic";
  * the `app/` prefix; the public download page (`/download`) links here so the canonical URL stays
  * on our domain while the bytes are served from S3.
  *
- * Usage: `/api/desktop/download?platform=win` → 302 to the S3 object.
+ * Usage: `/api/desktop/download?platform=win` → 302 to the S3 object. An optional `from=<slug>`
+ * (passed through from `/download?from=…`) records which search page's CTA led to the download.
  */
 
 type Platform = "win" | "mac" | "linux";
@@ -40,9 +42,11 @@ export async function GET(request: NextRequest) {
 
   const file = INSTALLERS[platform];
   const s3Url = `${normalizeBaseUrl(config.extensionHosting.publicS3BaseUrl)}/app/${file}`;
+  const from = downloadSource(request.nextUrl.searchParams.get("from"));
   const props = {
     platform,
     ua_class: classifyUserAgent(request.headers.get("user-agent")),
+    ...(from ? { from } : {}),
   };
 
   // Signed-in visitors get their download attributed to `user_id`, not just the anon cookie:

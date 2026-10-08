@@ -10,6 +10,7 @@ import {
   showMediaPlaceholders,
 } from "@/components/marketing/MediaPlaceholder";
 import {
+  downloadHref,
   getIntentPage,
   intentPages,
   relatedIntentPages,
@@ -295,7 +296,7 @@ export default async function IntentLandingPage({ params }: PageProps) {
         <h1 className="intent__title">{page.title}</h1>
         <div className="intent__lede">{page.lede}</div>
         <div className="intent__ctas">
-          <Link href="/download" className="landing__cta landing__cta--primary">
+          <Link href={downloadHref(page.slug)} className="landing__cta landing__cta--primary">
             Start focusing free
           </Link>
           <a href="#demo" className="landing__cta landing__cta--secondary">
@@ -348,7 +349,7 @@ export default async function IntentLandingPage({ params }: PageProps) {
           {page.cta?.body ??
             "Pair a key, put it somewhere inconvenient, and get back to work."}
         </p>
-        <Link href="/download" className="landing__cta landing__cta--primary">
+        <Link href={downloadHref(page.slug)} className="landing__cta landing__cta--primary">
           Start focusing free
         </Link>
         <p className="cta-band__note">

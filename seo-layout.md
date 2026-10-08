@@ -195,19 +195,19 @@ the page has a rendered video.
    `before-remove.sh`) abort removal during focus without a key. On macOS there's no installer
    hook, and `svcctl uninstall` calls `guard_uninstall()` but ignores its result
    (`native/macos/src/bin/svcctl.rs:56`; the Linux svcctl does the same, but the prerm hook covers
-   it there). The new pages avoid the claim for Mac. **Older pages still say "the uninstaller
-   refuses" without a platform qualifier.** Either ship a Mac guard or qualify those lines.
-2. **Pre-existing e2e failure:** `marketing.spec.ts` expects "$49 billed annually", but
-   `PricingPlans.tsx` now renders "Billed annually · …". This is unrelated to this work, and the
-   test needs updating.
+   it there). **Resolved 2026-10-07 by qualifying the copy:** every uninstall claim now says
+   "on Windows and Linux" and states that macOS has no uninstaller to gate. A svcctl-only Mac
+   guard wouldn't make the claim true, since a Mac app is removed by dragging it to the Trash.
+2. ~~Pre-existing e2e failure~~ **Fixed:** the pricing assertion checks the yearly price shape
+   and "Billed annually" instead of a literal amount. The suite passes against production.
 3. **Competitor facts to re-check before promoting** (I verified Cold Turkey, Freedom Locked
    Mode, FocusMe's platform list and Brick against their own sites on 2026-10-07; these are less
    certain):
    - Freedom's full platform list (ChromeOS)
    - App blocking on each competitor
    - Cold Turkey's pricing model ("one-time Pro license")
-4. **Mobile header** now wraps to two rows at 375px (three links plus the CTA). It's legible, but
-   you may want to hide "Compare" below ~420px.
+4. ~~Mobile header wrap~~ **Fixed:** below 420px "Compare" is hidden (it's in the footer) and
+   the nav is tightened, so it stays on one row from ~340px up (320px still wraps, legibly).
 
 ---
 
@@ -231,20 +231,30 @@ the page has a rendered video.
   `/cold-turkey-alternative` and `/physical-website-blocker`. Record LCP, CLS, INP and TTFB
   below. Check GSC's CWV report in ~4 weeks once field data exists.
 
-| Page | Mobile LCP | CLS | INP | TTFB | Desktop LCP |
-|---|---|---|---|---|---|
-| `/` | | | | | |
-| `/pricing` | | | | | |
-| `/cold-turkey-alternative` | | | | | |
-| `/physical-website-blocker` | | | | | |
+**Lab baseline, 2026-10-07** (local Lighthouse 12 against production. The keyless PageSpeed
+API was out of quota, so re-run PSI for the official numbers. INP needs field data, so TBT
+stands in until GSC has it.)
+
+| Page | Mobile perf | Mobile LCP | CLS | Mobile TBT | TTFB | Desktop LCP |
+|---|---|---|---|---|---|---|
+| `/` | 99 | 2.0 s | 0 | 50 ms | 20 ms | 0.6 s |
+| `/pricing` | 98 | 1.9 s | 0 | 150 ms | 20 ms | 0.5 s |
+| `/cold-turkey-alternative` | 98 | 2.3 s | 0 | 90 ms | 20 ms | 0.7 s |
+| `/physical-website-blocker` | 99 | 2.2 s | 0 | 50 ms | 20 ms | 0.5 s |
 
 ### Engineering follow-ups
 - [ ] **Static marketing pages.** Every marketing page renders dynamically because `Header`
   calls `supabase.auth.getUser()` (and middleware does too). If the TTFB baseline is poor, move the
   auth-aware nav into a client island so these pages can be served statically.
-- [ ] **Measure which intents convert.** Tag the download CTA with the source page (e.g.
-  `/download?from=cold-turkey-alternative`) and add an Insights panel. Without it we can't tell
-  which pages earn their keep.
+  **Not needed for now:** the lab baseline shows a ~20 ms root document and every mobile LCP
+  under 2.5 s. Revisit if GSC field data disagrees.
+- [x] **Measure which intents convert.** Every download link on a search page is
+  `/download?from=<slug>`. `/download` passes `from` on to the installer redirect, which records
+  it on `download_clicked` (only when it names a live page). `analytics_landing_funnel`
+  (migration 0017) reports, per first-touch landing page, visitors, organic visitors,
+  downloads, installs, activation and paid, plus last-touch CTA downloads. The **Landing pages**
+  panel on /insights groups it by footer cluster. **Needs `supabase db push` to prod** before
+  the deployed summary API can serve it.
 - [x] **Demo videos.** Rendered from the real UI by `apps/motion` (see §4). Live-action footage
   (the key on a real kitchen counter) could still replace the floor-plan scene later. The
   `demo.media` shot lists remain as the brief for that.

@@ -8,6 +8,7 @@ import { EngagementPanel } from "./EngagementPanel";
 import { ErrorsPanel } from "./ErrorsPanel";
 import { FunnelPanel } from "./FunnelPanel";
 import { InstallHealthPanel } from "./InstallHealthPanel";
+import { LandingPagesPanel } from "./LandingPagesPanel";
 import { MigrationStatePanel } from "./MigrationStatePanel";
 import { PanelLoading } from "./PanelShell";
 import { PmfPanel } from "./PmfPanel";
@@ -26,6 +27,7 @@ const SuspenseBoundary = Suspense as unknown as (props: {
 const panels = [
   ["Funnel", FunnelPanel],
   ["Channels", ChannelTablePanel],
+  ["Landing pages", LandingPagesPanel],
   ["Active users", ActiveUsersPanel],
   ["Engagement", EngagementPanel],
   ["Retention", RetentionPanel],

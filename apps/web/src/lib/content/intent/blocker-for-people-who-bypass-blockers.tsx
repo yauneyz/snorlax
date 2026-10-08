@@ -99,7 +99,7 @@ export const blockerForPeopleWhoBypassBlockers: IntentPage = {
         ],
         [
           "Uninstall it",
-          "The uninstaller refuses to remove the service during an active session unless a paired key is present.",
+          "On Windows and Linux, the uninstaller refuses to remove the service during an active session unless a paired key is present. On a Mac there's no uninstaller to put that check in, so this one isn't key-gated there.",
         ],
         [
           "Disable the extension, or open a different browser",
@@ -197,10 +197,11 @@ export const blockerForPeopleWhoBypassBlockers: IntentPage = {
           q: "I've uninstalled every blocker I've bought. Why is this different?",
           a: (
             <p>
-              Because uninstalling is key-gated too. During an active session the uninstaller
-              refuses to remove the enforcement service without a paired drive present, so the
-              escape hatch you&apos;ve used every time before opens onto the same walk as everything
-              else.
+              Because on Windows and Linux, uninstalling is key-gated too. During an active session
+              the uninstaller refuses to remove the enforcement service without a paired drive
+              present, so the escape hatch you&apos;ve used every time before opens onto the same walk
+              as everything else. On a Mac there&apos;s no uninstaller to put that check in, so
+              there it&apos;s quitting, killing the service and rebooting that lead nowhere.
             </p>
           ),
         },

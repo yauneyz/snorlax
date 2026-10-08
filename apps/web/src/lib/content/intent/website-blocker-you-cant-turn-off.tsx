@@ -32,8 +32,8 @@ export const websiteBlockerYouCantTurnOff: IntentPage = {
         ending a session early needs a physical USB key you left somewhere else. It blocks websites
         and desktop apps from a privileged background service, so
         the usual exits don&apos;t work. Closing the app doesn&apos;t lift the block. Killing the
-        service starts it again. Rebooting brings the session back intact. The uninstaller refuses
-        to run during an active session. Ending focus early asks the service to physically verify a
+        service starts it again. Rebooting brings the session back intact. On Windows and Linux,
+        the uninstaller refuses to run during an active session. Ending focus early asks the service to physically verify a
         paired USB drive is plugged in — and if it isn&apos;t, the answer is no.
       </p>
       <p>
@@ -69,7 +69,7 @@ export const websiteBlockerYouCantTurnOff: IntentPage = {
         ],
         [
           "Uninstall the app",
-          "The uninstaller refuses to remove the service while focus is active unless a paired key is present.",
+          "On Windows and Linux, the uninstaller refuses to remove the service while focus is active unless a paired key is present. On a Mac there's no uninstaller to put that check in, so this one isn't key-gated there.",
         ],
         [
           "Disable the browser extension",
@@ -215,7 +215,7 @@ export const websiteBlockerYouCantTurnOff: IntentPage = {
             <p>
               Yes. The enforcement service is privileged — that&apos;s exactly why closing a window
               or killing a process doesn&apos;t lift the block.{" "}
-              <Link href="/download">See the downloads</Link> for your platform.
+              <Link href="/download?from=website-blocker-you-cant-turn-off">See the downloads</Link> for your platform.
             </p>
           ),
         },

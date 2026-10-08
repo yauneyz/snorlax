@@ -74,6 +74,19 @@ export function getIntentPage(slug: string): IntentPage | null {
   return bySlug.get(slug) ?? null;
 }
 
+/**
+ * The download link for a search page's CTAs. `from` is carried through /download to the
+ * installer redirect, so `download_clicked` records which page earned it (analytics_landing_funnel).
+ */
+export function downloadHref(slug: string): string {
+  return `/download?from=${slug}`;
+}
+
+/** A `from` value from a query string, kept only when it names a live search page. */
+export function downloadSource(value: string | null | undefined): string | null {
+  return value && bySlug.has(value) ? value : null;
+}
+
 /** Resolves a page's `related` slugs, silently dropping any that no longer exist. */
 export function relatedIntentPages(page: IntentPage): IntentPage[] {
   return page.related

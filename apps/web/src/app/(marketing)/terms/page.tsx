@@ -6,6 +6,7 @@ import { config } from "@/lib/config";
 
 export const metadata: Metadata = {
   title: "Terms of Service",
+  description: `The terms for using ${config.app.name}: the desktop app, browser extensions, accounts and paid plans.`,
   alternates: { canonical: `${config.app.url}/terms` },
 };
 

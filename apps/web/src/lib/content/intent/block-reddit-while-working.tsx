@@ -65,7 +65,7 @@ export const blockRedditWhileWorking: IntentPage = {
           title: "Install and pair any USB drive",
           body: (
             <>
-              <Link href="/download">Download {config.app.name}</Link>, add the browser extension,
+              <Link href="/download?from=block-reddit-while-working">Download {config.app.name}</Link>, add the browser extension,
               and pair a drive you already own as the key.
             </>
           ),

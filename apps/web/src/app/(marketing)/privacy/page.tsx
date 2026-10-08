@@ -6,6 +6,7 @@ import { config } from "@/lib/config";
 
 export const metadata: Metadata = {
   title: "Privacy Policy",
+  description: `What data ${config.app.name} collects, why, and how it is stored and protected.`,
   alternates: { canonical: `${config.app.url}/privacy` },
 };
 

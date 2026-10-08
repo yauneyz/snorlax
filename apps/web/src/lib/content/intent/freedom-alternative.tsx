@@ -38,7 +38,7 @@ export const freedomAlternative: IntentPage = {
         {config.app.name} trades that breadth for a different kind of certainty. It only covers
         desktops — Windows, macOS and Linux — and ending a focus session early requires a paired USB
         drive to be physically plugged into the machine. If the drive is in the kitchen, the session
-        holds, and no amount of clicking, quitting, rebooting or uninstalling changes that.
+        holds, and no amount of clicking, quitting or rebooting changes that.
       </p>
     </>
   ),
@@ -72,7 +72,7 @@ export const freedomAlternative: IntentPage = {
         [
           "Uninstalling mid-session",
           "Uninstall prevention is available on Windows",
-          "The uninstaller refuses without a paired key present",
+          "On Windows and Linux, the uninstaller refuses without a paired key present; macOS has no uninstaller to gate",
         ],
         [
           "Desktop apps, not just sites",
@@ -115,7 +115,7 @@ export const freedomAlternative: IntentPage = {
         },
         {
           label: "The workarounds",
-          body: "Quitting the app does nothing. Killing the service restarts it. Rebooting brings the session back. The uninstaller refuses. With Strict Mode on, a browser without the extension gets closed rather than left open.",
+          body: "Quitting the app does nothing. Killing the service restarts it. Rebooting brings the session back. On Windows and Linux, the uninstaller refuses. With Strict Mode on, a browser without the extension gets closed rather than left open.",
         },
         {
           label: "The only door",
@@ -238,7 +238,7 @@ export const freedomAlternative: IntentPage = {
             <p>
               Free covers the whole mechanism with no card: pair a key, block {FREE_BLOCKED_SITE_LIMIT} sites, run
               sessions you can&apos;t click your way out of.{" "}
-              <Link href="/download">Download it</Link> and test it against a real workday.
+              <Link href="/download?from=freedom-alternative">Download it</Link> and test it against a real workday.
             </p>
           ),
         },

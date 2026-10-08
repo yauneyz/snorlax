@@ -103,6 +103,8 @@ export const ANALYTICS_EVENT_PROPS = {
   download_clicked: z.object({
     platform: analyticsPlatform,
     app_version: z.string().max(64).optional(),
+    /** The search page whose CTA led here (/download?from=<slug>). */
+    from: z.string().regex(/^[a-z0-9-]{1,128}$/).optional(),
   }),
   service_install_failed: z.object({
     platform: analyticsPlatform,

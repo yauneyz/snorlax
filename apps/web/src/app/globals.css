@@ -4089,6 +4089,37 @@ input:-webkit-autofill:focus {
   }
 }
 
+/* Phone widths: keep the nav on one row under the brand. Compare is also in the footer. */
+@media (max-width: 420px) {
+  .site-nav {
+    gap: 0.1rem;
+  }
+
+  .site-nav a {
+    padding: 0.5rem 0.55rem;
+  }
+
+  .site-nav__cta {
+    margin-left: 0.25rem;
+    padding: 0.55rem 0.95rem !important;
+  }
+
+  .site-nav__secondary {
+    display: none;
+  }
+}
+
+@media (max-width: 374px) {
+  .site-nav a {
+    font-size: 0.82rem;
+    padding: 0.5rem 0.45rem;
+  }
+
+  .site-nav__cta {
+    padding: 0.5rem 0.8rem !important;
+  }
+}
+
 /* ============================================================
  * Accessibility
  * ========================================================== */

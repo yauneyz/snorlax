@@ -18,7 +18,9 @@ export async function Header() {
       </div>
       <nav className="site-nav">
         <Link href="/physical-website-blocker">How it works</Link>
-        <Link href="/cold-turkey-vs-freedom-vs-focusme">Compare</Link>
+        <Link href="/cold-turkey-vs-freedom-vs-focusme" className="site-nav__secondary">
+          Compare
+        </Link>
         <Link href="/pricing">Pricing</Link>
         {user ? (
           <>

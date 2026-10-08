@@ -79,7 +79,7 @@ export const websiteBlockerLinux: IntentPage = {
           title: "Install the .deb",
           body: (
             <>
-              <Link href="/download">Download the .deb</Link> (x86-64) and install it with apt. It
+              <Link href="/download?from=website-blocker-linux">Download the .deb</Link> (x86-64) and install it with apt. It
               sets up and starts the systemd service.
             </>
           ),

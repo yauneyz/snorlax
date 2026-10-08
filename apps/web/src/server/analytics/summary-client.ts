@@ -7,6 +7,7 @@ import type {
   EngagementMetrics,
   FunnelMetrics,
   InstallHealthMetrics,
+  LandingPageMetrics,
   PanelData,
   RetentionCohortMetrics,
   RevenueMetrics,
@@ -29,6 +30,7 @@ interface WidgetSummary {
   installHealth: Section<InstallHealthMetrics>;
   channels: Section<ChannelMetrics[]>;
   visitorBreakdown: Section<VisitorBreakdownMetrics>;
+  landingPages: Section<LandingPageMetrics[]>;
 }
 
 type FetchResult = { ok: true; summary: WidgetSummary } | { ok: false; message: string };

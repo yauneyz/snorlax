@@ -15,10 +15,11 @@ test.describe("marketing surface", () => {
     await expect(page.getByRole("heading", { name: /talysman free/i })).toBeVisible();
     await expect(page.getByRole("heading", { name: /talysman pro/i })).toBeVisible();
 
-    // Annual leads, and its price must be stated per-month so nobody has to divide by 12.
+    // Annual leads, shown as the yearly price. No literal amount: it comes from PRO_PRICE_CENTS.
     const annual = page.getByRole("radio", { name: /annual/i });
     await expect(annual).toHaveAttribute("aria-checked", "true");
-    await expect(page.getByText(/\$49 billed annually/i)).toBeVisible();
+    await expect(page.locator(".plan--pro .plan__price")).toHaveText(/^\$\d+(\.\d{2})?\/year$/);
+    await expect(page.getByText(/billed annually/i)).toBeVisible();
 
     await page.getByRole("radio", { name: /monthly/i }).click();
     await expect(page.getByText(/billed monthly/i)).toBeVisible();
