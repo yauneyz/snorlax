@@ -36,6 +36,7 @@
 # Daily plan
 
 Daily Minimum:
+- 2 hrs in Thinky
 - f5 bot
 - 3 tweets
 - 1 linkedin
