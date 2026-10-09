@@ -245,8 +245,10 @@ const api = {
     ipcRenderer.invoke(Channels.testAiConnection, input),
 
   /** Report an uncaught renderer error/rejection so it's tracked and pushed like a main-process one. */
+  // Swallows its own failure: callers sit in the renderer's `unhandledrejection` listener, so a
+  // rejection here would re-enter that listener and report the reporter instead of the original.
   reportRendererError: (message: string, stack?: string): Promise<void> =>
-    ipcRenderer.invoke(Channels.reportRendererError, { message, stack }),
+    ipcRenderer.invoke(Channels.reportRendererError, { message, stack }).catch(() => undefined),
 
   /** Subscribe to main-pushed auth/entitlement change events. Returns an unsubscribe fn. */
   onAppEvent: (cb: (event: AppEventName) => void): (() => void) => {

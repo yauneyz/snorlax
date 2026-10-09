@@ -1,6 +1,6 @@
 [package]
 name = "talysman_engine_ffi"
-version = "0.8.0"
+version = "0.8.1"
 edition = "2021"
 description = "uniffi (Kotlin) facade over talysman_engine for Talysman for Android."
 publish = false

@@ -23,6 +23,18 @@ import { parseDeepLink } from './deepLink.js';
 let mainWindow: BrowserWindow | null = null;
 
 /**
+ * False until bootstrap has registered the IPC handlers. A window opened before then (macOS
+ * fires `activate` on first launch; a second launch fires `second-instance`) loads a renderer
+ * whose every ipcRenderer.invoke rejects with "No handler registered" — bootstrap opens the
+ * first window itself once it's safe.
+ */
+let windowsAllowed = false;
+
+export function allowWindows(): void {
+  windowsAllowed = true;
+}
+
+/**
  * Window icon for Linux and Windows, which read it off the window rather than the bundle (macOS
  * uses the .icns baked in by electron-builder). Packaged builds get it from extraResources; dev
  * falls back to the repo copy.
@@ -102,6 +114,7 @@ export function showMainWindow(): BrowserWindow | null {
     void app.whenReady().then(() => showMainWindow());
     return mainWindow;
   }
+  if (!windowsAllowed) return mainWindow;
 
   recordAppOpen();
 

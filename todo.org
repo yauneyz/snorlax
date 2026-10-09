@@ -1,11 +1,10 @@
-- post in discord/x/indie-hackers sub about the new features
+- post in indie-hackers sub
 - do my daily schedule
 
 
 - write an SEO blog post
   - humor is the ultimate purple cow. My blog actually being a humor column will get Talysman infinitely more likes than anything else
   - comedy is S-tier marketing
-- send to instagram guy - mention the new soft blocking
 - post demo video on X, reddit, linkedin, HN, etc
 
 - email 5 outlets that might cover me
@@ -41,11 +40,9 @@ Daily Minimum:
 - 3 tweets
 - 1 linkedin
 - view posthog session replays
-- 1 seo post
-- 1 reddit post
 - 1 youtube affiliate request
-- 1 random outreach
-- 5 creative software ideas
+- 1 random outreach; blog, reviewers, newsletters, etc
+- 5 creative software ideas for talysman labs
 
 
 Weekly minimum:
@@ -64,6 +61,7 @@ Indie hackers, Product hunt, etc
 * The Big Drivers
 ** Cool software markting
 - claude controls the ai adversary and writes code to program them on the fly and make them smarter
+- The Adobe Suite clean-room implementation proves that this is the proper strategy
 ** SEO - humor
 ** YouTube/Blog affiliate
 - study creators

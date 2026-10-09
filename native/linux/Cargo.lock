@@ -1016,7 +1016,7 @@ dependencies = [
 
 [[package]]
 name = "talysman-linux"
-version = "0.8.0"
+version = "0.8.1"
 dependencies = [
  "anyhow",
  "chrono",
@@ -1035,7 +1035,7 @@ dependencies = [
 
 [[package]]
 name = "talysman_common"
-version = "0.8.0"
+version = "0.8.1"
 dependencies = [
  "hex",
  "rand",
@@ -1049,7 +1049,7 @@ dependencies = [
 
 [[package]]
 name = "talysman_engine"
-version = "0.8.0"
+version = "0.8.1"
 dependencies = [
  "hex",
  "regex-lite",

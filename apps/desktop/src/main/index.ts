@@ -29,7 +29,7 @@ import { initUpdater } from './updater.js';
 import { initSmartFiltering } from './smartFiltering.js';
 import { applyAiMode } from './aiMode.js';
 import { createTray } from './tray.js';
-import { createWindow, handleDeepLink, showMainWindow } from './window.js';
+import { allowWindows, createWindow, handleDeepLink, showMainWindow } from './window.js';
 
 const CONNECT_TIMEOUT_MS = 2000;
 const features = productFeaturesForEnvironment(config.appEnv);
@@ -155,6 +155,7 @@ async function bootstrap(): Promise<void> {
     initSmartFiltering(service);
   }
 
+  allowWindows();
   createWindow();
   recordAppOpen();
   // Linux has its own standalone tray helper (see file header); avoid a duplicate icon there.

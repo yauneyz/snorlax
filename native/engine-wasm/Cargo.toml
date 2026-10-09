@@ -1,6 +1,6 @@
 [package]
 name = "talysman_engine_wasm"
-version = "0.8.0"
+version = "0.8.1"
 edition = "2021"
 description = "wasm-bindgen facade over talysman_engine for TypeScript (desktop mock service, parity tests)."
 publish = false
