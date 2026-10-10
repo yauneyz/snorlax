@@ -23,6 +23,7 @@
     "stripe:test": "tsx scripts/stripe-test.ts",
     "email:test": "tsx --tsconfig tsconfig.scripts.json scripts/email-test.ts",
     "comp": "tsx scripts/comp.ts",
+    "message": "tsx scripts/message.ts",
     "email:dev": "email dev --dir emails"
   },
   "dependencies": {

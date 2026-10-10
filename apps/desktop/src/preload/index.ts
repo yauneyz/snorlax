@@ -11,6 +11,7 @@ import type { AppRef, TransitionKind, UsageTransition } from '@talysman/shared';
 import type { CheckoutPrice, SubscriptionPlan } from '../shared/productLimits.js';
 import type { AppPickerItem } from '../shared/appPicker.js';
 import type { AiConnectionInput, AiConnectionStatus } from '../main/aiConnection.js';
+import type { AppMessage } from '@talysman/product';
 
 const Channels = {
   serviceRequest: 'service:request',
@@ -50,6 +51,8 @@ const Channels = {
   closePopup: 'app:closePopup',
   openOverrides: 'app:openOverrides',
   devSimulateAppBlocked: 'app:devSimulateAppBlocked',
+  appMessages: 'app:appMessages',
+  dismissAppMessage: 'app:dismissAppMessage',
   appEvent: 'app:event',
 } as const;
 
@@ -86,7 +89,12 @@ export interface SubscriptionDetailInfo {
   canceledAt?: string | null;
 }
 
-export type AppEventName = 'authChanged' | 'entitlementChanged' | 'openOverrides' | 'aiConnectionChanged';
+export type AppEventName =
+  | 'authChanged'
+  | 'entitlementChanged'
+  | 'openOverrides'
+  | 'aiConnectionChanged'
+  | 'messagesChanged';
 
 export interface ActionResult {
   ok: boolean;
@@ -249,6 +257,10 @@ const api = {
   // rejection here would re-enter that listener and report the reporter instead of the original.
   reportRendererError: (message: string, stack?: string): Promise<void> =>
     ipcRenderer.invoke(Channels.reportRendererError, { message, stack }).catch(() => undefined),
+
+  /** Messages pushed to this app from the server; re-pull on the `messagesChanged` app event. */
+  appMessages: (): Promise<AppMessage[]> => ipcRenderer.invoke(Channels.appMessages),
+  dismissAppMessage: (id: string): Promise<void> => ipcRenderer.invoke(Channels.dismissAppMessage, { id }),
 
   /** Subscribe to main-pushed auth/entitlement change events. Returns an unsubscribe fn. */
   onAppEvent: (cb: (event: AppEventName) => void): (() => void) => {

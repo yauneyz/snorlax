@@ -1,5 +1,5 @@
 import React from 'react';
-import { palette } from '@talysman/shared';
+import { CONTACT_SUPPORT, palette } from '@talysman/shared';
 
 interface Props {
   children: React.ReactNode;
@@ -39,7 +39,7 @@ export class ErrorBoundary extends React.Component<Props, State> {
         >
           <h2 className="text-heading font-semibold">Something went wrong.</h2>
           <p style={{ color: palette.colors.foregroundMuted }}>
-            Please restart Talysman. This has been reported.
+            Please restart Talysman. This has been reported. {CONTACT_SUPPORT}
           </p>
         </div>
       );

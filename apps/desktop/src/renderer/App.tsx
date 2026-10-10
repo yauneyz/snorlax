@@ -15,6 +15,7 @@ import { FirstRun } from './components/FirstRun.js';
 import { TalysmanMark } from './components/TalysmanMark.js';
 import { ProfileDot } from './components/ui/index.js';
 import { OverrideDialog } from './components/OverrideDialog.js';
+import { AppMessageBanners } from './components/AppMessageBanners.js';
 import { cx, effectiveAction } from './lib/utils.js';
 
 export type Route = 'dashboard' | 'blocklists' | 'schedule' | 'keys' | 'account' | 'plans' | 'settings';
@@ -203,6 +204,8 @@ export default function App({ initialRoute = 'dashboard' }: { initialRoute?: Rou
             </div>
           </div>
         )}
+
+        <AppMessageBanners />
 
         <main className="min-h-0 flex-1 overflow-y-auto px-5 pb-6">
           {!ready ? (

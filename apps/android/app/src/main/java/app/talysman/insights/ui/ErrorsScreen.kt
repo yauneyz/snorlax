@@ -100,6 +100,11 @@ private fun ErrorCard(report: ErrorReport) {
         )
         Text(report.occurredAt, color = TalysmanPalette.ForegroundMuted, fontSize = 11.sp)
         report.appVersion?.let { Text("v$it", color = TalysmanPalette.ForegroundMuted, fontSize = 11.sp) }
+        Text(
+            report.account?.let { a -> a.name?.let { "$it · ${a.email}" } ?: a.email } ?: "Anonymous (never signed in)",
+            color = TalysmanPalette.ForegroundMuted,
+            fontSize = 11.sp,
+        )
         androidx.compose.foundation.layout.Spacer(Modifier.padding(top = 6.dp))
         SelectionContainer {
             Text(

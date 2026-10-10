@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { CONTACT_SUPPORT } from '@talysman/shared';
 import { Badge, Button, Card, CardTitle, Input } from '../components/ui/index.js';
 import { DeviceLimitNotice } from '../components/DeviceLimitNotice.js';
 import { useFocusStore } from '../store/useFocusStore.js';
@@ -79,7 +80,7 @@ export function Account({ onUpgrade }: { onUpgrade: () => void }) {
     setMessage(null);
     try {
       const res = await action();
-      if (!res.ok) setMessage(res.message ?? 'Something went wrong.');
+      if (!res.ok) setMessage(res.message ?? `Something went wrong. ${CONTACT_SUPPORT}`);
       return res.ok;
     } catch (e) {
       setMessage((e as Error).message);
@@ -105,7 +106,7 @@ export function Account({ onUpgrade }: { onUpgrade: () => void }) {
     try {
       const res = await signUpPassword(formEmail, formPassword, formName || undefined);
       if (!res.ok) {
-        setMessage(res.message ?? 'Something went wrong.');
+        setMessage(res.message ?? `Something went wrong. ${CONTACT_SUPPORT}`);
       } else if (res.confirmEmail) {
         setView('checkEmail');
       }
@@ -145,7 +146,7 @@ export function Account({ onUpgrade }: { onUpgrade: () => void }) {
     setRedeemMessage(null);
     try {
       const res = await redeemCode(redeemInput);
-      setRedeemMessage(res.message ?? (res.ok ? 'Code accepted.' : 'Something went wrong.'));
+      setRedeemMessage(res.message ?? (res.ok ? 'Code accepted.' : `Something went wrong. ${CONTACT_SUPPORT}`));
       if (res.granted) {
         setRedeemInput('');
         void refreshSubscriptionDetail();

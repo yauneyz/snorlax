@@ -14,8 +14,8 @@
  * UI-only development and E2E tests opt into the mock explicitly.
  */
 
-import { app } from 'electron';
-import { DEEP_LINK_SCHEME, PROTOCOL_VERSION } from '@talysman/shared';
+import { app, dialog, shell } from 'electron';
+import { CONTACT_SUPPORT, DEEP_LINK_SCHEME, PROTOCOL_VERSION } from '@talysman/shared';
 import { productFeaturesForEnvironment } from '@talysman/product';
 import { config } from './config.js';
 import { logger } from './logging.js';
@@ -24,14 +24,17 @@ import { registerIpcHandlers } from './ipc/handlers.js';
 import { PipeServiceConnection } from './service/client.js';
 import { MockServiceConnection } from './service/mockService.js';
 import type { ServiceConnection } from './service/connection.js';
-import { ensureServiceCurrent, ensureServiceInstalled } from './service/installer.js';
+import { ensureServiceCurrent, ensureServiceInstalled, repairUnreachableService } from './service/installer.js';
 import { initUpdater } from './updater.js';
+import { appMessagesForFailureDialog, initAppMessages, refreshAppMessages } from './appMessages.js';
 import { initSmartFiltering } from './smartFiltering.js';
 import { applyAiMode } from './aiMode.js';
 import { createTray } from './tray.js';
 import { allowWindows, createWindow, handleDeepLink, showMainWindow } from './window.js';
 
 const CONNECT_TIMEOUT_MS = 2000;
+/** A freshly restarted daemon still has to load state and bind its socket. */
+const REPAIRED_CONNECT_TIMEOUT_MS = 15_000;
 const features = productFeaturesForEnvironment(config.appEnv);
 
 // `pnpm dev` shares the installed service's pipe (see file header) with whatever packaged
@@ -63,7 +66,9 @@ process.on('unhandledRejection', (reason) => {
   void flushEvents();
 });
 
-async function connectService(): Promise<{ service: ServiceConnection; mock?: MockServiceConnection }> {
+async function connectService(
+  timeoutMs = CONNECT_TIMEOUT_MS,
+): Promise<{ service: ServiceConnection; mock?: MockServiceConnection }> {
   if (config.useMockService) {
     logger.warn('[main] using explicitly requested in-process mock service');
     const mock = new MockServiceConnection();
@@ -74,7 +79,7 @@ async function connectService(): Promise<{ service: ServiceConnection; mock?: Mo
   const pipe = new PipeServiceConnection(config.pipePath);
   const connected = await Promise.race([
     pipe.connect().then(() => true),
-    new Promise<boolean>((r) => setTimeout(() => r(false), CONNECT_TIMEOUT_MS)),
+    new Promise<boolean>((r) => setTimeout(() => r(false), timeoutMs)),
   ]);
 
   if (connected && pipe.connected) {
@@ -92,6 +97,17 @@ async function connectService(): Promise<{ service: ServiceConnection; mock?: Mo
   throw new Error(
     `Privileged service is not reachable at ${config.pipePath}. Start/install Talysman, or use pnpm dev:mock for UI-only development.`,
   );
+}
+
+/** connectService, but a registered-yet-dead service gets one restart (see repairUnreachableService). */
+async function connectOrRepairService(): Promise<{ service: ServiceConnection; mock?: MockServiceConnection }> {
+  try {
+    return await connectService();
+  } catch (error) {
+    logger.warn('[main] service unreachable on first connect', error);
+    if (!(await repairUnreachableService())) throw error;
+    return connectService(REPAIRED_CONNECT_TIMEOUT_MS);
+  }
 }
 
 /**
@@ -138,6 +154,9 @@ function registerDeepLink(): void {
 }
 
 async function bootstrap(): Promise<void> {
+  // First thing, before anything that needs the daemon: if startup fails, these are how we can
+  // still reach this person (see appMessages.ts).
+  void refreshAppMessages();
   await trackAppInstalledOnce();
   // Attempt delivery now, before connectService() — the service is exactly the step most
   // likely to fail on a first real install, and initAnalytics()'s flush never runs if it does.
@@ -145,7 +164,7 @@ async function bootstrap(): Promise<void> {
   registerDeepLink();
   await ensureServiceInstalled();
 
-  const { service, mock } = await connectService();
+  const { service, mock } = await connectOrRepairService();
   connectedService = service;
   await ensureProtocolCompatible(service, mock);
   await registerIpcHandlers({ service, mock });
@@ -161,6 +180,7 @@ async function bootstrap(): Promise<void> {
   // Linux has its own standalone tray helper (see file header); avoid a duplicate icon there.
   if (process.platform !== 'linux') createTray(service, mock);
   initUpdater(service);
+  initAppMessages();
 
   // Cold start launched via a deep link (e.g. Windows protocol activation): the URL arrives
   // in argv rather than via the second-instance / open-url events.
@@ -200,8 +220,29 @@ if (!gotLock) {
     track('bootstrap_failed', { message: error.message, stack: error.stack?.slice(0, 4000) });
     // Bounded best-effort flush so this event (and any app_installed/service_install_failed
     // queued earlier) still gets a delivery attempt even though bootstrap never reached
-    // initAnalytics().
-    await shutdownFlush();
+    // initAnalytics(). Shown alongside the flush: without a dialog the app just vanishes, and
+    // users relaunch it over and over without ever learning why.
+    // Any message we've pushed to this device rides along: when startup fails, this dialog is the
+    // only surface we have to reach someone, including people who never made an account.
+    const showDialog = async () => {
+      const messages = await appMessagesForFailureDialog();
+      const { response } = await dialog.showMessageBox({
+        type: 'error',
+        title: 'Talysman could not start',
+        message: 'Talysman ran into a problem while starting up.',
+        detail: [
+          messages.text,
+          `${error.message}\n\nIf this keeps happening, restart your computer or reinstall Talysman. ${CONTACT_SUPPORT}`,
+        ]
+          .filter(Boolean)
+          .join('\n\n'),
+        buttons: messages.link ? ['Quit', messages.link.label] : ['Quit'],
+        defaultId: 0,
+        noLink: true,
+      });
+      if (messages.link && response === 1) await shell.openExternal(messages.link.url);
+    };
+    await Promise.all([shutdownFlush(), showDialog()]);
     app.quit();
   });
 

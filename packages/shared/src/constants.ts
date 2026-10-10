@@ -6,6 +6,10 @@
 /** Protocol version negotiated on connect; bump on breaking RPC changes. */
 export const PROTOCOL_VERSION = 6;
 
+/** Where every user-facing error points people, so nobody is left stuck with no one to ask. */
+export const SUPPORT_EMAIL = 'support@talysman.app';
+export const CONTACT_SUPPORT = `Contact Talysman support (${SUPPORT_EMAIL}).`;
+
 /** Deep-link scheme used for the billing return (Phase 3) and tray re-focus. */
 export const DEEP_LINK_SCHEME = 'talysman';
 

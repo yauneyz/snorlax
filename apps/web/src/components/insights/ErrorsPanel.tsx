@@ -26,6 +26,11 @@ export async function ErrorsPanel({
           {result.rows.map((row) => (
             <li key={`${row.deviceId}:${row.event}:${row.occurredAt}`}>
               <code>{row.platform ?? "?"}</code> {row.event} — {row.occurredAt}
+              <div className="insights-muted">
+                {row.account
+                  ? `${row.account.name ? `${row.account.name} · ` : ""}${row.account.email}`
+                  : "Anonymous (never signed in)"}
+              </div>
               <pre style={{ whiteSpace: "pre-wrap", margin: "4px 0 0" }}>{row.message}</pre>
               {row.stack ? (
                 <details>

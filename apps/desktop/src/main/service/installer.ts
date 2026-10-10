@@ -5,7 +5,7 @@ import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
 import { app, dialog } from 'electron';
-import { PROTOCOL_VERSION } from '@talysman/shared';
+import { CONTACT_SUPPORT, PROTOCOL_VERSION } from '@talysman/shared';
 import { logger } from '../logging.js';
 import { analyticsPlatform, track } from '../analytics.js';
 import type { ServiceConnection } from './connection.js';
@@ -107,6 +107,33 @@ export async function ensureServiceInstalled(): Promise<void> {
 }
 
 /**
+ * Repair a service that is registered but not answering on its pipe: a LaunchDaemon/Windows
+ * service that crashed, stopped, or was throttled by launchd. ensureServiceInstalled only sees
+ * that launchd has the job, so without this the app just quit on every launch until the next
+ * reboot happened to bring the daemon back. The controller's install bounces and restarts it.
+ * Linux daemons are owned by the package manager, so there's nothing to do there.
+ *
+ * Returns false when no repair applies, so the caller rethrows its original error.
+ */
+export async function repairUnreachableService(): Promise<boolean> {
+  if (!app.isPackaged || (process.platform !== 'darwin' && process.platform !== 'win32')) return false;
+
+  logger.warn('[installer] service is registered but unreachable; reinstalling to restart it');
+  track('service_install_started', { platform: analyticsPlatform() });
+  try {
+    await runElevatedServiceCommand('install');
+    track('service_installed', { platform: analyticsPlatform() });
+    return true;
+  } catch (error) {
+    track('service_install_failed', {
+      platform: analyticsPlatform(),
+      reason: error instanceof Error ? error.message : String(error),
+    });
+    throw error;
+  }
+}
+
+/**
  * Reconcile the privileged service after an application update. Install/repair is idempotent:
  * native controllers repair registration and restart the service in place.
  */
@@ -146,7 +173,7 @@ export async function ensureServiceCurrent(service: ServiceConnection): Promise<
       type: 'error',
       title: 'Talysman service update failed',
       message: 'The app updated, but its enforcement service could not be restarted.',
-      detail: `${error instanceof Error ? error.message : String(error)}\n\nRestart Talysman and approve the administrator prompt to retry.`,
+      detail: `${error instanceof Error ? error.message : String(error)}\n\nRestart Talysman and approve the administrator prompt to retry. ${CONTACT_SUPPORT}`,
       buttons: ['OK'],
       noLink: true,
     });

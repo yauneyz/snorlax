@@ -34,6 +34,8 @@ import type {
   SubscriptionRow,
   EntitledDeviceRow,
   InsightsPushDeviceRow,
+  AppMessageRow,
+  AppMessageReceiptRow,
 } from "./types";
 
 /** Matches what `supabase gen types` emits, so a future regeneration is a clean swap. */
@@ -93,6 +95,19 @@ export type Database = {
         Row: InsightsPushDeviceRow;
         Insert: Pick<InsightsPushDeviceRow, "token"> & Partial<InsightsPushDeviceRow>;
         Update: Partial<InsightsPushDeviceRow>;
+        Relationships: [];
+      };
+      app_messages: {
+        Row: AppMessageRow;
+        Insert: Pick<AppMessageRow, "title" | "body"> & Partial<AppMessageRow>;
+        Update: Partial<AppMessageRow>;
+        Relationships: [];
+      };
+      app_message_receipts: {
+        Row: AppMessageReceiptRow;
+        Insert: Pick<AppMessageReceiptRow, "message_id" | "device_id"> &
+          Partial<AppMessageReceiptRow>;
+        Update: Partial<AppMessageReceiptRow>;
         Relationships: [];
       };
       analytics_persons: {

@@ -159,6 +159,13 @@ data class ErrorReport(
     val receivedAt: String,
     val message: String,
     val stack: String? = null,
+    val account: ErrorAccount? = null,
+)
+
+@Serializable
+data class ErrorAccount(
+    val email: String,
+    val name: String? = null,
 )
 
 @Serializable

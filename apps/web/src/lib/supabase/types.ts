@@ -203,6 +203,26 @@ export type InsightsPushDeviceRow = {
   updated_at: string;
 };
 
+export type AppMessageRow = {
+  id: string;
+  device_id: string | null;
+  user_id: string | null;
+  broadcast: boolean;
+  title: string;
+  body: string;
+  link_url: string | null;
+  link_label: string | null;
+  created_at: string;
+  expires_at: string | null;
+};
+
+export type AppMessageReceiptRow = {
+  message_id: string;
+  device_id: string;
+  seen_at: string;
+  dismissed_at: string | null;
+};
+
 /** `analytics_events_resolved` / `analytics_usage_resolved`: base row + resolved person. */
 export type AnalyticsEventResolvedRow = AnalyticsEventRow & { person_id: string | null };
 export type AnalyticsUsageResolvedRow = AnalyticsUsageDailyRow & { person_id: string | null };

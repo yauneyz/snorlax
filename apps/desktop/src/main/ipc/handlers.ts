@@ -67,10 +67,16 @@ import { getAiModeEnabled, setAiModeEnabled } from '../aiMode.js';
 import { getAiConnectionStatus, onAiConnectionChange, testAiConnection, type AiConnectionInput } from '../aiConnection.js';
 import { applyAiMode } from '../aiMode.js';
 import { Channels } from './channels.js';
+import { dismissAppMessage, getAppMessages } from '../appMessages.js';
 import { closeUnlockPopup, showUnlockPopup } from '../popupWindow.js';
 
 /** Events pushed to renderers so the UI re-pulls auth/entitlement after a change. */
-export type AppEvent = 'authChanged' | 'entitlementChanged' | 'openOverrides' | 'aiConnectionChanged';
+export type AppEvent =
+  | 'authChanged'
+  | 'entitlementChanged'
+  | 'openOverrides'
+  | 'aiConnectionChanged'
+  | 'messagesChanged';
 
 let activeService: ServiceConnection | undefined;
 const features = productFeaturesForEnvironment(config.appEnv);
@@ -532,6 +538,9 @@ export async function registerIpcHandlers(ctx: HandlerContext): Promise<void> {
     await applyAiMode(service);
     return status;
   });
+
+  ipcHandle(Channels.appMessages, () => getAppMessages());
+  ipcHandle(Channels.dismissAppMessage, (_e, args: { id: string }) => dismissAppMessage(String(args?.id ?? '')));
 
   ipcHandle(Channels.reportRendererError, (_e, args: { message: string; stack?: string }) => {
     track('renderer_error', { message: args.message, stack: args.stack?.slice(0, 4000) });

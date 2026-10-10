@@ -73,6 +73,10 @@ export const Channels = {
   openOverrides: 'app:openOverrides',
   /** invoke: dev-only — pretend the mock service just closed a blocked app. */
   devSimulateAppBlocked: 'app:devSimulateAppBlocked',
+  /** invoke: messages pushed to this app from the server (appMessages.ts). */
+  appMessages: 'app:appMessages',
+  /** invoke: dismiss one pushed message by id. */
+  dismissAppMessage: 'app:dismissAppMessage',
   /** main→renderer push: { event } — 'authChanged' | 'entitlementChanged' | 'openOverrides'. */
   appEvent: 'app:event',
 } as const;
