@@ -2,24 +2,18 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { PRO_TRIAL_DAYS } from "@talysman/product";
 import { DetectedPlatform } from "@/components/marketing/DetectedPlatform";
-import { DownloadCard } from "@/components/marketing/DownloadCard";
+import { DownloadCard, LinuxDownloadCard } from "@/components/marketing/DownloadCard";
 import { PlatformIcon, type Platform } from "@/components/marketing/PlatformIcon";
 import { config } from "@/lib/config";
 import { downloadSource } from "@/lib/content/intent";
+import { startHref } from "@/lib/downloads";
+import { extensionTargets } from "@/lib/extension-stores";
 
 export const metadata: Metadata = {
   title: "Download",
   description: `Get the ${config.app.name} desktop app and browser extension for Chrome and Firefox.`,
   alternates: { canonical: `${config.app.url}/download` },
 };
-
-/**
- * Published listings are the defaults; deployment config can override them if a listing moves.
- */
-const storeUrls = {
-  chrome: "https://chromewebstore.google.com/detail/talysman/jblidbjafmpbpednomngbbmpkihedeko",
-  firefox: "https://addons.mozilla.org/en-US/firefox/addon/talysman/",
-} as const;
 
 type DownloadTarget = {
   platform: Platform;
@@ -29,47 +23,22 @@ type DownloadTarget = {
   external?: boolean;
 };
 
-const desktopInstallers: DownloadTarget[] = [
-  {
-    platform: "windows",
-    name: "Windows",
-    note: "Windows 10/11 · 64-bit",
-    href: "/api/desktop/download?platform=win",
-  },
-  {
-    platform: "macos",
-    name: "macOS",
-    note: "Apple Silicon & Intel",
-    href: "/api/desktop/download?platform=mac",
-  },
-  {
-    platform: "linux",
-    name: "Linux",
-    note: ".deb · Debian/Ubuntu · x86-64",
-    href: "/api/desktop/download?platform=linux",
-  },
-];
-
-const extensions: DownloadTarget[] = [
-  {
-    platform: "chrome",
-    name: "Chrome",
-    note: "Chrome Web Store",
-    href: config.extensionStores.chromeUrl || storeUrls.chrome,
-    external: true,
-  },
-  {
-    platform: "firefox",
-    name: "Firefox",
-    note: "Firefox Browser Add-ons",
-    href: config.extensionStores.firefoxUrl || storeUrls.firefox,
-    external: true,
-  },
-];
-
-/** Carries `from` (the search page whose CTA led here) on to the installer redirect. */
-function withSource(href: string, from: string | null): string {
-  return from ? `${href}&from=${from}` : href;
+/** Windows and macOS each have one installer; Linux gets its own multi-format card. */
+function desktopInstallers(from: string | null): DownloadTarget[] {
+  return [
+    {
+      platform: "windows",
+      name: "Windows",
+      note: "Windows 10/11 · 64-bit",
+      href: startHref({ platform: "win", format: null }, from),
+    },
+    {
+      platform: "macos",
+      name: "macOS",
+      note: "Universal · Apple Silicon & Intel",
+      href: startHref({ platform: "mac", format: null }, from),
+    },
+  ];
 }
 
 export default async function DownloadPage({
@@ -120,12 +89,10 @@ export default async function DownloadPage({
           </p>
         </div>
         <div className="download-grid">
-          {desktopInstallers.map((target) => (
-            <DownloadCard
-              key={target.platform}
-              target={{ ...target, href: withSource(target.href, from) }}
-            />
+          {desktopInstallers(from).map((target) => (
+            <DownloadCard key={target.platform} target={target} />
           ))}
+          <LinuxDownloadCard from={from} />
         </div>
         <aside className="download__windows-note" aria-labelledby="windows-download-note-title">
           <h3 id="windows-download-note-title">Windows might ask for confirmation</h3>
@@ -155,7 +122,7 @@ export default async function DownloadPage({
           </p>
         </div>
         <div className="download-grid">
-          {extensions.map((target) => (
+          {extensionTargets.map((target) => (
             <DownloadCard key={target.platform} target={target} />
           ))}
         </div>

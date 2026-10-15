@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
+import { checkBotId } from "botid/server";
+import { z } from "zod";
 
 import { config } from "@/lib/config";
 import { downloadSource } from "@/lib/content/intent";
+import { installerFile, parseDownloadTarget, type DownloadTarget } from "@/lib/downloads";
 import { ANALYTICS_ANON_COOKIE, parseAnonId } from "@/lib/analytics/anon-id";
 import { attributionFromRequest, classifyUserAgent } from "@/server/analytics/ingest";
 import { track } from "@/server/analytics/track";
@@ -12,40 +15,66 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 /**
- * Redirects to desktop installers hosted in the release-artifacts S3 bucket. Installers live under
- * the `app/` prefix; the public download page (`/download`) links here so the canonical URL stays
- * on our domain while the bytes are served from S3.
+ * Desktop installers, hosted in the release-artifacts S3 bucket under the `app/` prefix (see
+ * src/lib/downloads.ts for the file names). The canonical URL stays on our domain while the
+ * bytes are served from S3.
  *
- * Usage: `/api/desktop/download?platform=win` → 302 to the S3 object. An optional `from=<slug>`
- * (passed through from `/download?from=…`) records which search page's CTA led to the download.
+ *   GET  /api/desktop/download?platform=win|mac|linux[&format=deb|rpm|pacman]
+ *        302 to the installer. Deliberately untracked: anything can fetch a URL, and when this
+ *        route recorded every hit, one scraper requesting it 702 times in five minutes (and
+ *        crawlers walking all three platforms) buried the real download count.
+ *
+ *   POST /api/desktop/download  { platform, format?, from? }  ->  { url }
+ *        Called by the post-download page (/download/start) from a real browser. BotID's
+ *        client challenge is attached to this request (see layout.tsx), so only a verified
+ *        human is recorded as `download_clicked`. The installer URL is returned either way: a
+ *        false positive costs a data point, never a download.
  */
 
-type Platform = "win" | "mac" | "linux";
-
-// Stable names the release upload step (scripts/upload-release.mjs) publishes to; the versioned
-// electron-builder artifacts from `pnpm build:win|mac|linux` are uploaded under these keys.
-const INSTALLERS: Record<Platform, string> = {
-  win: "Talysman-Setup.exe",
-  mac: "Talysman.dmg",
-  linux: "Talysman.deb",
-};
-
-function normalizeBaseUrl(value: string): string {
-  return value.replace(/\/+$/, "");
+function installerUrl(target: DownloadTarget): string {
+  const base = config.extensionHosting.publicS3BaseUrl.replace(/\/+$/, "");
+  return `${base}/app/${installerFile(target)}`;
 }
 
 export async function GET(request: NextRequest) {
-  const platform = request.nextUrl.searchParams.get("platform");
-  if (platform !== "win" && platform !== "mac" && platform !== "linux") {
-    return new NextResponse("Unknown platform", { status: 404 });
+  const { searchParams } = request.nextUrl;
+  const target = parseDownloadTarget(searchParams.get("platform"), searchParams.get("format"));
+  if (!target) return new NextResponse("Unknown platform", { status: 404 });
+  return NextResponse.redirect(installerUrl(target), { status: 302 });
+}
+
+const startBody = z.object({
+  platform: z.string(),
+  format: z.string().nullish(),
+  from: z.string().nullish(),
+});
+
+export async function POST(request: NextRequest) {
+  let body: unknown;
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ error: "invalid json" }, { status: 400 });
+  }
+  const parsed = startBody.safeParse(body);
+  const target = parsed.success
+    ? parseDownloadTarget(parsed.data.platform, parsed.data.format)
+    : null;
+  if (!parsed.success || !target) {
+    return NextResponse.json({ error: "unknown platform" }, { status: 404 });
   }
 
-  const file = INSTALLERS[platform];
-  const s3Url = `${normalizeBaseUrl(config.extensionHosting.publicS3BaseUrl)}/app/${file}`;
-  const from = downloadSource(request.nextUrl.searchParams.get("from"));
+  const url = installerUrl(target);
+  const botId = await checkBotId();
+  if (botId.isBot || classifyUserAgent(request.headers.get("user-agent")) === "bot") {
+    return NextResponse.json({ url });
+  }
+
+  const from = downloadSource(parsed.data.from);
   const props = {
-    platform,
-    ua_class: classifyUserAgent(request.headers.get("user-agent")),
+    platform: target.platform,
+    ...(target.format ? { format: target.format } : {}),
+    ua_class: "human" as const,
     ...(from ? { from } : {}),
   };
 
@@ -61,10 +90,10 @@ export async function GET(request: NextRequest) {
     source: "server",
     anonId: parseAnonId(request.cookies.get(ANALYTICS_ANON_COOKIE)?.value),
     userId: data.user?.id ?? null,
-    platform,
+    platform: target.platform,
     attribution: attributionFromRequest(request, props),
     props,
   });
-  await sendInsightsPush({ type: "download", platform });
-  return NextResponse.redirect(s3Url, { status: 302 });
+  await sendInsightsPush({ type: "download", platform: target.platform });
+  return NextResponse.json({ url });
 }

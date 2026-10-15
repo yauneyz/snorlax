@@ -1,5 +1,7 @@
 /** Guarded electron-updater integration for packaged production builds. */
 
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { app, dialog, Notification } from 'electron';
 import electronUpdater, { type AppUpdater, type UpdateDownloadedEvent } from 'electron-updater';
 import { logger } from './logging.js';
@@ -22,6 +24,21 @@ let runManualCheck: () => Promise<AppUpdateCheckResult> = async () => ({
 /** Run a user-requested update check. */
 export function checkForAppUpdates(): Promise<AppUpdateCheckResult> {
   return runManualCheck();
+}
+
+/**
+ * rpm and pacman installs have no package repository behind them, so electron-updater keeps them
+ * current from latest-linux.yml (installing through pkexec + dnf/zypper/pacman). electron-builder
+ * writes `resources/package-type` into every fpm package; deb reads "deb" and stays on the signed
+ * APT repository, and the NixOS AppImage has no such file at all.
+ */
+function selfUpdatingLinuxPackage(): boolean {
+  try {
+    const type = readFileSync(join(process.resourcesPath, 'package-type'), 'utf8').trim();
+    return type === 'rpm' || type === 'pacman';
+  } catch {
+    return false;
+  }
 }
 
 function updaterInstance(): AppUpdater {
@@ -58,7 +75,7 @@ export function initUpdater(service: ServiceConnection): () => void {
     });
     return () => undefined;
   }
-  if (process.platform === 'linux') {
+  if (process.platform === 'linux' && !selfUpdatingLinuxPackage()) {
     logger.info('[updater] Linux updates are managed by the signed APT/Nix package source');
     runManualCheck = async () => ({
       status: 'unavailable',

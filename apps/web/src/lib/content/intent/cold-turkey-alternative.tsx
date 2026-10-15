@@ -108,7 +108,7 @@ export const coldTurkeyAlternative: IntentPage = {
           "None documented — a lock runs until it expires",
           "Five keyless emergency unlocks per computer, for life",
         ],
-        ["Platforms", "Windows and macOS", "Windows, macOS, and Debian/Ubuntu Linux"],
+        ["Platforms", "Windows and macOS", "Windows, macOS, and Linux (Ubuntu, Debian, Fedora, Arch)"],
         [
           "What you buy",
           "A one-time Pro license; the basic blocker is free",
@@ -208,7 +208,7 @@ export const coldTurkeyAlternative: IntentPage = {
         },
         {
           title: "Windows, macOS and Linux",
-          body: "Windows 10 and 11, macOS on Apple Silicon and Intel, and Debian/Ubuntu Linux, with Chrome and Firefox extensions.",
+          body: "Windows 10 and 11, macOS on Apple Silicon and Intel, and Linux (Ubuntu, Debian, Fedora, Arch), with Chrome and Firefox extensions.",
         },
       ],
     },

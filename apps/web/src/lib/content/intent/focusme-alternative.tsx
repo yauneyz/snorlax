@@ -85,7 +85,7 @@ export const focusmeAlternative: IntentPage = {
         [
           "Platforms",
           "Windows, macOS, Linux, Android, iOS",
-          "Windows, macOS, Debian/Ubuntu Linux — desktops only",
+          "Windows, macOS, Linux — desktops only",
         ],
         [
           "Setup effort",
@@ -172,7 +172,8 @@ export const focusmeAlternative: IntentPage = {
           q: "Does Talysman work on Linux like FocusMe?",
           a: (
             <p>
-              Yes, on Debian and Ubuntu. See the <Link href="/website-blocker-linux">Linux page</Link>{" "}
+              Yes: Ubuntu, Debian, Fedora, openSUSE and Arch. See the{" "}
+              <Link href="/website-blocker-linux">Linux page</Link>{" "}
               for how it enforces there.
             </p>
           ),

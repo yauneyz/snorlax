@@ -212,7 +212,7 @@ export const brickForComputer: IntentPage = {
           a: (
             <p>
               No. {config.app.name} is desktop-only: Windows 10 and 11, macOS on Apple Silicon and
-              Intel, and Debian/Ubuntu Linux, with extensions for Chrome and Firefox. If the phone
+              Intel, and Linux (Ubuntu, Debian, Fedora, Arch), with extensions for Chrome and Firefox. If the phone
               is your main problem, a phone-first tool is the honest answer for that half.{" "}
               <Link href="/download?from=brick-for-computer">See the downloads</Link>.
             </p>

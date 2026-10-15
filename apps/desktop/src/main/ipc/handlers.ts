@@ -26,6 +26,7 @@ import { isServiceError, type ServiceConnection } from '../service/connection.js
 import type { MockServiceConnection } from '../service/mockService.js';
 import { uninstallService } from '../service/uninstaller.js';
 import { flushEvents, track } from '../analytics.js';
+import { bridgedLinkUrl } from '../analyticsBridge.js';
 import { loadDeviceIdentity } from '../deviceIdentity.js';
 import {
   getEntitlement,
@@ -403,7 +404,9 @@ export async function registerIpcHandlers(ctx: HandlerContext): Promise<void> {
   ipcHandle(Channels.listInstalledApps, () => listInstalledApps());
 
   ipcHandle(Channels.openExternal, async (_e, url: string) => {
-    await shell.openExternal(url);
+    // Through the analytics bridge, so first-run's store and download links also join this
+    // install to the browser that downloaded it. Hosts the bridge won't forward open directly.
+    await shell.openExternal(await bridgedLinkUrl(url));
     return { ok: true };
   });
 

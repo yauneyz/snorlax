@@ -2,9 +2,9 @@
 /**
  * Build, publish, and verify desktop releases.
  *
- * Website installers retain stable aliases under app/. Windows and macOS updater feeds use
- * versioned, immutable artifacts under desktop/<os>/<arch>/ with the latest*.yml pointer uploaded
- * last. Two generations are retained by default so a client holding the immediately previous
+ * Website installers retain stable aliases under app/ (one per package kind: Linux publishes
+ * deb, rpm and pacman). Updater feeds use versioned, immutable artifacts under
+ * desktop/<os>/<arch>/ with the latest*.yml pointer uploaded last. Two generations are retained by default so a client holding the immediately previous
  * metadata never races deletion during promotion.
  */
 
@@ -24,6 +24,8 @@ import {
 } from "./lib/stripe-mode.mjs";
 import {
   BUILD_SCRIPTS,
+  INSTALLERS,
+  INSTALLER_KINDS,
   PLATFORMS,
   STABLE_INSTALLER_KEYS,
   UPDATE_METADATA_FILES,
@@ -35,8 +37,9 @@ import {
   metadataArtifactNames,
   platformsForHost,
   publicUrlFor,
+  kindsForPlatform,
   selectArtifacts,
-  updateFeedPrefix,
+  updateFeedPrefixes,
 } from "./lib/release-hosting.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -253,9 +256,10 @@ function metadataVersion(source) {
   return source.match(/^version:\s*['"]?([^'"\s]+)['"]?\s*$/m)?.[1] ?? null;
 }
 
+/** Publishes one platform's feed (and its legacy mirrors); returns one publication per prefix. */
 async function publishUpdateFeed(hosting, platform, installer) {
   const metadataName = UPDATE_METADATA_FILES[platform];
-  if (!metadataName) return null;
+  if (!metadataName) return [];
   const identity = artifactIdentity(installer.name);
   if (!identity)
     throw new Error(`Cannot derive update identity from ${installer.name}`);
@@ -281,23 +285,26 @@ async function publishUpdateFeed(hosting, platform, installer) {
       throw new Error(`${metadataName} references missing ${name}`);
   }
 
-  const prefix = updateFeedPrefix(platform, identity.arch);
-  for (const name of artifactNames) {
-    uploadFile(hosting, join(distDir, name), `${prefix}/${name}`, {
-      cacheControl: "public,max-age=31536000,immutable",
+  const publications = [];
+  for (const prefix of updateFeedPrefixes(platform, identity.arch)) {
+    for (const name of artifactNames) {
+      uploadFile(hosting, join(distDir, name), `${prefix}/${name}`, {
+        cacheControl: "public,max-age=31536000,immutable",
+      });
+    }
+    // The mutable pointer is deliberately last.
+    uploadFile(hosting, metadataPath, `${prefix}/${metadataName}`, {
+      cacheControl: "no-cache,max-age=0,must-revalidate",
     });
-  }
-  // The mutable pointer is deliberately last.
-  uploadFile(hosting, metadataPath, `${prefix}/${metadataName}`, {
-    cacheControl: "no-cache,max-age=0,must-revalidate",
-  });
 
-  if (!dryRun) {
-    for (const name of artifactNames)
-      await verifyObject(hosting, `${prefix}/${name}`, join(distDir, name));
-    await verifyObject(hosting, `${prefix}/${metadataName}`, metadataPath);
+    if (!dryRun) {
+      for (const name of artifactNames)
+        await verifyObject(hosting, `${prefix}/${name}`, join(distDir, name));
+      await verifyObject(hosting, `${prefix}/${metadataName}`, metadataPath);
+    }
+    publications.push({ prefix, platform, version: identity.version, metadataName });
   }
-  return { prefix, platform, version: identity.version, metadataName };
+  return publications;
 }
 
 function versionFromUpdateKey(key) {
@@ -376,11 +383,11 @@ function pruneUpdateFeed(hosting, publication) {
   );
 }
 
-function uploadStableInstaller(hosting, platform, artifact) {
+function uploadStableInstaller(hosting, kind, artifact) {
   uploadFile(
     hosting,
     join(distDir, artifact.name),
-    STABLE_INSTALLER_KEYS[platform],
+    STABLE_INSTALLER_KEYS[kind],
     {
       cacheControl: "no-cache,max-age=0,must-revalidate",
     },
@@ -388,22 +395,23 @@ function uploadStableInstaller(hosting, platform, artifact) {
 }
 
 async function verifyStableInstallers(hosting, uploaded) {
-  for (const platform of PLATFORMS) {
-    const artifact = uploaded[platform];
-    const required = requiredPlatforms.includes(platform) || Boolean(artifact);
+  for (const kind of INSTALLER_KINDS) {
+    const artifact = uploaded[kind];
+    const required =
+      requiredPlatforms.includes(INSTALLERS[kind].platform) || Boolean(artifact);
     const source = artifact ? join(distDir, artifact.name) : null;
     const result = await checkUrl(
-      `${publicUrlFor(hosting.publicBaseUrl, STABLE_INSTALLER_KEYS[platform])}?verify=${Date.now()}`,
+      `${publicUrlFor(hosting.publicBaseUrl, STABLE_INSTALLER_KEYS[kind])}?verify=${Date.now()}`,
       source ? statSync(source).size : null,
     );
     if (!result.ok && required)
       throw new Error(
-        `${platform} stable installer is unavailable (HTTP ${result.status})`,
+        `${kind} stable installer is unavailable (HTTP ${result.status})`,
       );
     console.log(
       result.ok
-        ? `verified ${platform} stable installer`
-        : `${platform} is not published yet`,
+        ? `verified ${kind} stable installer`
+        : `${kind} is not published yet`,
     );
   }
 }
@@ -461,9 +469,10 @@ async function main() {
   const selected = selectArtifacts(files);
   const selectedPlatforms =
     requiredPlatforms.length > 0 ? requiredPlatforms : buildable;
+  // Keyed by package kind (win, mac, deb, rpm, pacman).
   const artifacts = Object.fromEntries(
-    Object.entries(selected).filter(([platform]) =>
-      selectedPlatforms.includes(platform),
+    Object.entries(selected).filter(([kind]) =>
+      selectedPlatforms.includes(INSTALLERS[kind].platform),
     ),
   );
   const expected = new Set(
@@ -471,7 +480,10 @@ async function main() {
       ? requiredPlatforms
       : [...buildable, ...requiredPlatforms],
   );
-  const missing = [...expected].filter((platform) => !(platform in artifacts));
+  // A platform is only complete with every one of its package kinds (Linux: deb, rpm, pacman).
+  const missing = [...expected]
+    .flatMap((platform) => kindsForPlatform(platform))
+    .filter((kind) => !(kind in artifacts));
   if (missing.length > 0)
     throw new Error(
       `Missing required installers in dist/: ${missing.join(", ")}`,
@@ -479,23 +491,25 @@ async function main() {
   if (Object.keys(artifacts).length === 0)
     throw new Error(`No installers found in ${distDir}`);
 
-  const publishApt = process.platform === "linux" && Boolean(artifacts.linux);
+  const publishApt = process.platform === "linux" && Boolean(artifacts.deb);
   if (publishApt) {
     if (dryRun)
       console.log("[dry run] would promote the signed APT repository");
     else assertAptPublishingReady();
   }
 
+  // One feed per platform: Linux's latest-linux.yml already lists the deb, rpm and pacman files.
   const publications = [];
-  for (const [platform, artifact] of Object.entries(artifacts)) {
-    const publication = await publishUpdateFeed(hosting, platform, artifact);
-    if (publication) publications.push(publication);
+  for (const platform of PLATFORMS) {
+    const kind = kindsForPlatform(platform).find((candidate) => artifacts[candidate]);
+    if (!kind) continue;
+    publications.push(...(await publishUpdateFeed(hosting, platform, artifacts[kind])));
   }
-  // Linux's signed package feed is the update channel. Promote it before changing the website's
-  // stable DEB alias, so one release:upload command completes the whole Linux release.
+  // The signed APT repository is the deb's update channel. Promote it before changing the
+  // website's stable aliases, so one release:upload command completes the whole Linux release.
   if (publishApt && !dryRun) publishAptRepository();
-  for (const [platform, artifact] of Object.entries(artifacts))
-    uploadStableInstaller(hosting, platform, artifact);
+  for (const [kind, artifact] of Object.entries(artifacts))
+    uploadStableInstaller(hosting, kind, artifact);
 
   if (dryRun) return;
   await verifyStableInstallers(hosting, artifacts);

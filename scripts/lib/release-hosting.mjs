@@ -9,37 +9,85 @@
 
 export const PLATFORMS = ["win", "mac", "linux"];
 
-// Stable object keys served by apps/web/src/app/api/desktop/download/route.ts.
-// The basenames must stay in sync with that route's INSTALLERS map.
-export const STABLE_INSTALLER_KEYS = {
-  win: "app/Talysman-Setup.exe",
-  mac: "app/Talysman.dmg",
-  linux: "app/Talysman.deb",
+/**
+ * Every public installer, keyed by package kind. Linux ships three package formats; each kind
+ * maps back to the analytics/build platform it belongs to.
+ *
+ * `stableKey` is served by apps/web/src/app/api/desktop/download/route.ts; the basenames must
+ * stay in sync with that route's INSTALLERS map.
+ *
+ * Versioned artifact names produced by electron-builder (see electron-builder.yml):
+ *   win     nsis    Talysman-Setup-<version>-x64.exe
+ *   mac     dmg     Talysman-<version>-universal.dmg
+ *   deb     deb     Talysman-<version>-amd64.deb
+ *   rpm     rpm     Talysman-<version>-x86_64.rpm
+ *   pacman  pacman  Talysman-<version>-x64.pacman
+ * Each Linux package ships the privileged daemon and installs it from native/linux/installer.
+ */
+const SEMVER = "\\d+\\.\\d+\\.\\d+(?:-[0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*)?";
+const LINUX_ARCH = "(amd64|x86_64|x64|arm64|aarch64)";
+export const INSTALLERS = {
+  win: {
+    platform: "win",
+    stableKey: "app/Talysman-Setup.exe",
+    pattern: new RegExp(`^Talysman-Setup-(${SEMVER})-(x64|arm64|ia32)\\.exe$`),
+    contentType: "application/octet-stream",
+  },
+  mac: {
+    platform: "mac",
+    stableKey: "app/Talysman.dmg",
+    pattern: new RegExp(`^Talysman-(${SEMVER})-(x64|arm64|universal)\\.dmg$`),
+    contentType: "application/x-apple-diskimage",
+  },
+  deb: {
+    platform: "linux",
+    stableKey: "app/Talysman.deb",
+    pattern: new RegExp(`^Talysman-(${SEMVER})-${LINUX_ARCH}\\.deb$`),
+    contentType: "application/vnd.debian.binary-package",
+  },
+  rpm: {
+    platform: "linux",
+    stableKey: "app/Talysman.rpm",
+    pattern: new RegExp(`^Talysman-(${SEMVER})-${LINUX_ARCH}\\.rpm$`),
+    contentType: "application/x-rpm",
+  },
+  pacman: {
+    platform: "linux",
+    stableKey: "app/Talysman.pacman",
+    pattern: new RegExp(`^Talysman-(${SEMVER})-${LINUX_ARCH}\\.pacman$`),
+    contentType: "application/octet-stream",
+  },
 };
 
+export const INSTALLER_KINDS = Object.keys(INSTALLERS);
+
+/** Package kinds a platform publishes, e.g. linux -> deb, rpm, pacman. */
+export function kindsForPlatform(platform) {
+  return INSTALLER_KINDS.filter((kind) => INSTALLERS[kind].platform === platform);
+}
+
+// Stable object keys, by package kind.
+export const STABLE_INSTALLER_KEYS = Object.fromEntries(
+  INSTALLER_KINDS.map((kind) => [kind, INSTALLERS[kind].stableKey]),
+);
+
+// electron-updater channel files. deb installs update through the signed APT repository, but
+// rpm and pacman installs have no repository and update from latest-linux.yml instead.
 export const UPDATE_METADATA_FILES = {
   win: "latest.yml",
   mac: "latest-mac.yml",
+  linux: "latest-linux.yml",
+};
+
+/**
+ * Extra feed directories a platform's feed is mirrored into. Installs before the universal mac
+ * build were arm64-only and poll desktop/mac/arm64; the universal zip serves them just as well.
+ */
+export const UPDATE_FEED_MIRRORS = {
+  "mac/universal": ["mac/arm64"],
 };
 
 export const UPDATE_FEED_ROOT = "desktop";
-
-// Versioned artifact names produced by electron-builder (see electron-builder.yml):
-//   win   nsis  Talysman-Setup-<version>.exe
-//   mac   dmg   Talysman-<version>[-<arch>].dmg
-//   linux deb   Talysman-<version>-<arch>.deb (ships + installs the privileged daemon)
-const SEMVER = "\\d+\\.\\d+\\.\\d+(?:-[0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*)?";
-const ARTIFACT_PATTERNS = {
-  win: new RegExp(`^Talysman-Setup-(${SEMVER})-(x64|arm64|ia32)\\.exe$`),
-  mac: new RegExp(`^Talysman-(${SEMVER})-(x64|arm64|universal)\\.dmg$`),
-  linux: new RegExp(`^Talysman-(${SEMVER})-(amd64|arm64)\\.deb$`),
-};
-
-const CONTENT_TYPES = {
-  win: "application/octet-stream",
-  mac: "application/x-apple-diskimage",
-  linux: "application/vnd.debian.binary-package",
-};
 
 // Which platforms each build host is expected to publish: Linux cross-builds the
 // Windows installer (electron-builder + wine), macOS only builds its own dmg, and
@@ -81,55 +129,61 @@ export function buildablePlatformsForHost(nodePlatform) {
   );
 }
 
-/** Map a dist/ file name to its platform, or null if it is not a release installer. */
+/** Map a dist/ file name to its package kind, or null if it is not a release installer. */
 export function classifyArtifact(fileName) {
-  for (const platform of PLATFORMS) {
-    if (ARTIFACT_PATTERNS[platform].test(fileName)) return platform;
+  for (const kind of INSTALLER_KINDS) {
+    if (INSTALLERS[kind].pattern.test(fileName)) return kind;
   }
   return null;
 }
 
 /**
- * Pick the newest installer per platform from a dist/ listing.
+ * Pick the newest installer per package kind from a dist/ listing.
  *
  * @param {Array<{name: string, mtimeMs: number}>} files
- * @returns {Partial<Record<"win"|"mac"|"linux", {name: string, mtimeMs: number}>>}
+ * @returns {Partial<Record<keyof typeof INSTALLERS, {name: string, mtimeMs: number}>>}
  */
 export function selectArtifacts(files) {
   const selected = {};
   for (const file of files) {
-    const platform = classifyArtifact(file.name);
-    if (!platform) continue;
-    if (!selected[platform] || file.mtimeMs > selected[platform].mtimeMs) {
-      selected[platform] = file;
+    const kind = classifyArtifact(file.name);
+    if (!kind) continue;
+    if (!selected[kind] || file.mtimeMs > selected[kind].mtimeMs) {
+      selected[kind] = file;
     }
   }
   return selected;
 }
 
-export function contentTypeFor(platform) {
-  const type = CONTENT_TYPES[platform];
-  if (!type) throw new Error(`Unknown platform: ${platform}`);
+export function contentTypeFor(kind) {
+  const type = INSTALLERS[kind]?.contentType;
+  if (!type) throw new Error(`Unknown installer kind: ${kind}`);
   return type;
 }
 
 export function contentTypeForFile(fileName) {
   if (fileName.endsWith(".yml")) return "text/yaml; charset=utf-8";
   if (fileName.endsWith(".zip")) return "application/zip";
-  if (fileName.endsWith(".dmg")) return CONTENT_TYPES.mac;
-  if (fileName.endsWith(".deb")) return CONTENT_TYPES.linux;
+  const kind = classifyArtifact(fileName);
+  if (kind) return INSTALLERS[kind].contentType;
+  if (fileName.endsWith(".dmg")) return INSTALLERS.mac.contentType;
+  if (fileName.endsWith(".deb")) return INSTALLERS.deb.contentType;
+  if (fileName.endsWith(".rpm")) return INSTALLERS.rpm.contentType;
   return "application/octet-stream";
 }
 
+const NORMALIZED_ARCH = { amd64: "x64", x86_64: "x64", aarch64: "arm64" };
+
 export function artifactIdentity(fileName) {
-  for (const platform of PLATFORMS) {
-    const match = fileName.match(ARTIFACT_PATTERNS[platform]);
+  for (const kind of INSTALLER_KINDS) {
+    const match = fileName.match(INSTALLERS[kind].pattern);
     if (!match) continue;
     const rawArch = match[2];
     return {
-      platform,
+      kind,
+      platform: INSTALLERS[kind].platform,
       version: match[1],
-      arch: rawArch === "amd64" ? "x64" : rawArch,
+      arch: NORMALIZED_ARCH[rawArch] ?? rawArch,
     };
   }
   return null;
@@ -142,6 +196,15 @@ export function updateFeedPrefix(platform, arch) {
   if (!/^[0-9A-Za-z_-]+$/.test(arch))
     throw new Error(`Invalid architecture: ${arch}`);
   return `${UPDATE_FEED_ROOT}/${platform}/${arch}`;
+}
+
+/** The feed prefix plus any legacy directories it is mirrored into (UPDATE_FEED_MIRRORS). */
+export function updateFeedPrefixes(platform, arch) {
+  const mirrors = UPDATE_FEED_MIRRORS[`${platform}/${arch}`] ?? [];
+  return [
+    updateFeedPrefix(platform, arch),
+    ...mirrors.map((relative) => `${UPDATE_FEED_ROOT}/${relative}`),
+  ];
 }
 
 /** Extract relative artifact names from electron-builder's YAML without accepting remote URLs. */

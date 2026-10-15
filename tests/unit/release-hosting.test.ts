@@ -4,8 +4,10 @@ import { describe, expect, it } from 'vitest';
 
 import {
   BUILD_SCRIPTS,
+  INSTALLER_KINDS,
   PLATFORMS,
   buildablePlatformsForHost,
+  kindsForPlatform,
   STABLE_INSTALLER_KEYS,
   artifactIdentity,
   classifyArtifact,
@@ -15,6 +17,7 @@ import {
   platformsForHost,
   publicUrlFor,
   selectArtifacts,
+  updateFeedPrefixes,
   // eslint-disable-next-line @typescript-eslint/ban-ts-comment
   // @ts-ignore — untyped .mjs module shared with release scripts
 } from '../../scripts/lib/release-hosting.mjs';
@@ -32,8 +35,10 @@ import {
   // @ts-ignore — untyped .mjs module shared with release scripts
 } from '../../scripts/lib/apple-release.mjs';
 
-type Platform = keyof typeof STABLE_INSTALLER_KEYS;
+type Platform = 'win' | 'mac' | 'linux';
+type InstallerKind = keyof typeof STABLE_INSTALLER_KEYS;
 const platforms = PLATFORMS as Platform[];
+const kinds = INSTALLER_KINDS as InstallerKind[];
 
 describe('release command boundaries', () => {
   const localReleaseSource = readFileSync(
@@ -232,15 +237,18 @@ describe('desktop release environment', () => {
 });
 
 describe('classifyArtifact', () => {
-  it('recognizes electron-builder artifact names for each platform', () => {
+  it('recognizes electron-builder artifact names for each package kind', () => {
     expect(classifyArtifact('Talysman-Setup-0.1.0-x64.exe')).toBe('win');
     expect(classifyArtifact('Talysman-0.1.0-arm64.dmg')).toBe('mac');
-    expect(classifyArtifact('Talysman-0.1.0-amd64.deb')).toBe('linux');
+    expect(classifyArtifact('Talysman-0.1.0-universal.dmg')).toBe('mac');
+    expect(classifyArtifact('Talysman-0.1.0-amd64.deb')).toBe('deb');
+    expect(classifyArtifact('Talysman-0.1.0-x86_64.rpm')).toBe('rpm');
+    expect(classifyArtifact('Talysman-0.1.0-x64.pacman')).toBe('pacman');
   });
 
   it('recognizes prerelease versions', () => {
     expect(classifyArtifact('Talysman-Setup-1.2.3-beta.1-x64.exe')).toBe('win');
-    expect(classifyArtifact('Talysman-1.2.3-beta.1-amd64.deb')).toBe('linux');
+    expect(classifyArtifact('Talysman-1.2.3-beta.1-amd64.deb')).toBe('deb');
   });
 
   it('ignores non-installer files, AppImages, and stale pre-rename artifacts', () => {
@@ -254,31 +262,59 @@ describe('classifyArtifact', () => {
 });
 
 describe('selectArtifacts', () => {
-  it('picks the newest artifact per platform', () => {
+  it('picks the newest artifact per package kind', () => {
     const selected = selectArtifacts([
       { name: 'Talysman-0.1.0-amd64.deb', mtimeMs: 100 },
       { name: 'Talysman-0.2.0-amd64.deb', mtimeMs: 200 },
+      { name: 'Talysman-0.2.0-x86_64.rpm', mtimeMs: 200 },
+      { name: 'Talysman-0.2.0-x64.pacman', mtimeMs: 200 },
       { name: 'Talysman-Setup-0.2.0-x64.exe', mtimeMs: 150 },
       { name: 'Talysman-0.2.0-x86_64.AppImage', mtimeMs: 999 },
     ]);
-    expect(selected.linux?.name).toBe('Talysman-0.2.0-amd64.deb');
+    expect(selected.deb?.name).toBe('Talysman-0.2.0-amd64.deb');
+    expect(selected.rpm?.name).toBe('Talysman-0.2.0-x86_64.rpm');
+    expect(selected.pacman?.name).toBe('Talysman-0.2.0-x64.pacman');
     expect(selected.win?.name).toBe('Talysman-Setup-0.2.0-x64.exe');
     expect(selected.mac).toBeUndefined();
+  });
+});
+
+describe('kindsForPlatform', () => {
+  it('publishes every Linux package format and one installer elsewhere', () => {
+    expect(kindsForPlatform('linux')).toEqual(['deb', 'rpm', 'pacman']);
+    expect(kindsForPlatform('mac')).toEqual(['mac']);
+    expect(kindsForPlatform('win')).toEqual(['win']);
   });
 });
 
 describe('updater feed identity', () => {
   it('extracts platform, version, and normalized architecture', () => {
     expect(artifactIdentity('Talysman-Setup-1.2.3-beta.1-x64.exe')).toEqual({
+      kind: 'win',
       platform: 'win',
       version: '1.2.3-beta.1',
       arch: 'x64',
     });
     expect(artifactIdentity('Talysman-1.2.3-amd64.deb')).toEqual({
+      kind: 'deb',
       platform: 'linux',
       version: '1.2.3',
       arch: 'x64',
     });
+    expect(artifactIdentity('Talysman-1.2.3-x86_64.rpm')).toMatchObject({ kind: 'rpm', arch: 'x64' });
+    expect(artifactIdentity('Talysman-1.2.3-universal.dmg')).toMatchObject({
+      kind: 'mac',
+      arch: 'universal',
+    });
+  });
+
+  it('mirrors the universal mac feed into the arm64 directory existing installs poll', () => {
+    expect(updateFeedPrefixes('mac', 'universal')).toEqual([
+      'desktop/mac/universal',
+      'desktop/mac/arm64',
+    ]);
+    expect(updateFeedPrefixes('win', 'x64')).toEqual(['desktop/win/x64']);
+    expect(updateFeedPrefixes('linux', 'x64')).toEqual(['desktop/linux/x64']);
   });
 
   it('extracts relative metadata artifacts and rejects remote or nested paths', () => {
@@ -324,32 +360,36 @@ describe('BUILD_SCRIPTS', () => {
 });
 
 describe('STABLE_INSTALLER_KEYS', () => {
-  it('covers every platform under the app/ prefix, with no AppImage anywhere', () => {
-    for (const platform of platforms) {
-      expect(STABLE_INSTALLER_KEYS[platform]).toMatch(/^app\//);
-      expect(STABLE_INSTALLER_KEYS[platform]).not.toMatch(/AppImage/i);
-      expect(contentTypeFor(platform)).toBeTruthy();
+  it('covers every package kind under the app/ prefix, with no AppImage anywhere', () => {
+    for (const kind of kinds) {
+      expect(STABLE_INSTALLER_KEYS[kind]).toMatch(/^app\//);
+      expect(STABLE_INSTALLER_KEYS[kind]).not.toMatch(/AppImage/i);
+      expect(contentTypeFor(kind)).toBeTruthy();
     }
   });
 
   it('matches the file names the web download route redirects to', () => {
-    // The route owns the public contract; this guards against the two maps drifting.
+    // The web catalogue owns the public contract; this guards against the two maps drifting.
+    const catalogueSource = readFileSync(
+      resolve(__dirname, '../../apps/web/src/lib/downloads.ts'),
+      'utf8',
+    );
     const routeSource = readFileSync(
       resolve(__dirname, '../../apps/web/src/app/api/desktop/download/route.ts'),
       'utf8',
     );
-    for (const platform of platforms) {
-      const basename = STABLE_INSTALLER_KEYS[platform].replace(/^app\//, '');
-      expect(routeSource).toContain(`"${basename}"`);
+    for (const kind of kinds) {
+      const basename = STABLE_INSTALLER_KEYS[kind].replace(/^app\//, '');
+      expect(catalogueSource).toContain(`"${basename}"`);
     }
     expect(routeSource).toContain('/app/');
-    expect(routeSource).not.toMatch(/AppImage/);
+    expect(catalogueSource).not.toMatch(/AppImage/);
   });
 });
 
 describe('publicUrlFor', () => {
   it('joins base URL and key, tolerating trailing slashes', () => {
-    const key = STABLE_INSTALLER_KEYS.linux;
+    const key = STABLE_INSTALLER_KEYS.deb;
     expect(publicUrlFor('https://bucket.s3.amazonaws.com', key)).toBe(
       'https://bucket.s3.amazonaws.com/app/Talysman.deb',
     );

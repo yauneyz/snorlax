@@ -7,7 +7,13 @@ import { Providers } from "./providers";
 import { config } from "@/lib/config";
 import "./globals.css";
 
-const botIdProtectedRoutes = [{ path: "/api/analytics/track", method: "POST" }];
+const botIdProtectedRoutes = [
+  { path: "/api/pulse", method: "POST" },
+  // Legacy browser ingest path; a tab loaded before the /api/pulse switch still posts here.
+  { path: "/api/analytics/track", method: "POST" },
+  // The post-download page's request: only a verified browser records `download_clicked`.
+  { path: "/api/desktop/download", method: "POST" },
+];
 
 /**
  * Space Grotesk for everything, JetBrains Mono for the small caps-and-numbers labels

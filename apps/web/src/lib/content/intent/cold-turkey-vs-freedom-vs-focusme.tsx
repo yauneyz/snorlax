@@ -83,7 +83,7 @@ export const coldTurkeyVsFreedomVsFocusme: IntentPage = {
           "Windows, macOS",
           "Windows, macOS, iOS, Android, ChromeOS and browsers",
           "Windows, macOS, Linux, Android, iOS",
-          "Windows, macOS, Debian/Ubuntu Linux",
+          "Windows, macOS, Linux",
         ],
         [
           "Phone blocking",
@@ -185,7 +185,8 @@ export const coldTurkeyVsFreedomVsFocusme: IntentPage = {
           a: (
             <p>
               FocusMe lists Linux; Cold Turkey doesn&apos;t support it. {config.app.name} runs on
-              Debian and Ubuntu — see <Link href="/website-blocker-linux">the Linux page</Link>.
+              Ubuntu, Debian, Fedora, openSUSE and Arch — see{" "}
+              <Link href="/website-blocker-linux">the Linux page</Link>.
             </p>
           ),
         },

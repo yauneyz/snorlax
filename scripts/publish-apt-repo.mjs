@@ -134,7 +134,7 @@ function packageIdentityFromKey(key) {
 
 const candidates = readdirSync(distDir)
   .map((name) => ({ name, identity: artifactIdentity(name) }))
-  .filter((item) => item.identity?.platform === "linux");
+  .filter((item) => item.identity?.kind === "deb");
 if (candidates.length === 0)
   throw new Error(`No Talysman DEB found in ${distDir}`);
 const current = candidates.sort(

@@ -20,6 +20,7 @@ import { productFeaturesForEnvironment } from '@talysman/product';
 import { config } from './config.js';
 import { logger } from './logging.js';
 import { flushEvents, initAnalytics, recordAppOpen, shutdownFlush, track, trackAppInstalledOnce } from './analytics.js';
+import { openWelcomeOnce } from './analyticsBridge.js';
 import { registerIpcHandlers } from './ipc/handlers.js';
 import { PipeServiceConnection } from './service/client.js';
 import { MockServiceConnection } from './service/mockService.js';
@@ -161,6 +162,8 @@ async function bootstrap(): Promise<void> {
   // Attempt delivery now, before connectService() — the service is exactly the step most
   // likely to fail on a first real install, and initAnalytics()'s flush never runs if it does.
   void flushEvents();
+  // Also before the service: the download<->install link should survive a failed service setup.
+  void openWelcomeOnce();
   registerDeepLink();
   await ensureServiceInstalled();
 

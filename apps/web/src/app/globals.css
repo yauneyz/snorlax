@@ -2006,6 +2006,103 @@ input:-webkit-autofill:focus {
   font-size: 0.9rem;
 }
 
+/* Linux card: three package formats instead of one whole-card link. */
+.download-card--multi:hover {
+  transform: none;
+}
+
+.download-card__formats {
+  width: 100%;
+  margin: 1.4rem 0 0;
+  padding: 0;
+  list-style: none;
+  border-top: 1px solid var(--border);
+}
+
+.download-card__formats a {
+  display: grid;
+  grid-template-columns: 4.5rem 1fr auto;
+  align-items: baseline;
+  gap: 0.5rem;
+  padding: 0.6rem 0;
+  border-bottom: 1px solid var(--border);
+  color: var(--fg-2);
+  font-size: 0.78rem;
+}
+
+.download-card__formats li:last-child a {
+  border-bottom: 0;
+  padding-bottom: 0;
+}
+
+.download-card__format {
+  font-weight: 600;
+  color: var(--fg-0);
+}
+
+.download-card__distros {
+  color: var(--fg-4);
+}
+
+.download-card__formats a > span:last-child {
+  color: var(--signal);
+  transition: transform var(--t-base) var(--ease);
+}
+
+.download-card__formats a:hover > span:last-child {
+  transform: translateX(3px);
+}
+
+/* Post-download page (/download/start). */
+.download-start__status {
+  margin: 0;
+  color: var(--fg-2);
+  font-size: 1.02rem;
+  line-height: 1.6;
+}
+
+.download-start__status a,
+.download-start__alt a {
+  color: var(--accent-lo);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.download-start__steps {
+  max-width: 720px;
+  margin: 1.15rem 0 0;
+  padding-left: 1.25rem;
+  color: var(--fg-2);
+  font-size: 0.95rem;
+  line-height: 1.65;
+}
+
+.download-start__steps li + li {
+  margin-top: 0.75rem;
+}
+
+.download-start__steps code {
+  font-family: var(--font-mono);
+  font-size: 0.85em;
+}
+
+.download-start__code {
+  margin: 0.6rem 0;
+  padding: 0.85rem 1rem;
+  overflow-x: auto;
+  background: rgb(var(--color-white)/0.04);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  color: var(--fg-1);
+  line-height: 1.6;
+}
+
+.download-start__alt {
+  margin: 1.25rem 0 0;
+  color: var(--fg-3);
+  font-size: 0.88rem;
+}
+
 @media (max-width: 48rem) {
   .detected-platform__banner {
     flex-wrap: wrap;

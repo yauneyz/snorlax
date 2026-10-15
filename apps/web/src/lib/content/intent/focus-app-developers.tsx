@@ -31,7 +31,7 @@ export const focusAppDevelopers: IntentPage = {
       </p>
       <p>
         Ending a coding session early requires a paired USB key plugged in. It runs on Windows,
-        macOS and Debian/Ubuntu Linux.
+        macOS and Linux (Ubuntu, Debian, Fedora, Arch).
       </p>
     </>
   ),
@@ -74,7 +74,7 @@ export const focusAppDevelopers: IntentPage = {
         },
         {
           q: "Does it work on Linux?",
-          a: <p>Yes, Debian and Ubuntu. See <Link href="/website-blocker-linux">the Linux page</Link>.</p>,
+          a: <p>Yes: Ubuntu, Debian, Fedora, openSUSE and Arch. See <Link href="/website-blocker-linux">the Linux page</Link>.</p>,
         },
         {
           q: "Can I tune what YouTube hides?",

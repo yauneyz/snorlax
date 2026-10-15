@@ -102,6 +102,8 @@ export const ANALYTICS_EVENT_PROPS = {
   }),
   download_clicked: z.object({
     platform: analyticsPlatform,
+    /** Linux package format; absent for Windows and macOS. */
+    format: z.enum(["deb", "rpm", "pacman"]).optional(),
     app_version: z.string().max(64).optional(),
     /** The search page whose CTA led here (/download?from=<slug>). */
     from: z.string().regex(/^[a-z0-9-]{1,128}$/).optional(),

@@ -5,7 +5,7 @@
  *   2. electron-vite build (main + preload + renderer)
  *   3. electron-builder (platform installer that registers/starts the service)
  *
- * Usage: node scripts/build.mjs --target win|linux|mac
+ * Usage: node scripts/build.mjs --target win|linux|mac [--linux-targets deb,rpm,pacman,AppImage]
  */
 
 import { execFileSync } from "node:child_process";
@@ -36,6 +36,13 @@ const args = process.argv.slice(2);
 const targetIdx = args.indexOf("--target");
 const target = targetIdx !== -1 ? args[targetIdx + 1] : "win";
 const cross = args.includes("--cross");
+// Overrides electron-builder.yml's linux.target list, e.g. `--linux-targets AppImage` for
+// release:local, which installs the AppImage on NixOS rather than any public package.
+const linuxTargetsIdx = args.indexOf("--linux-targets");
+const linuxTargets =
+  linuxTargetsIdx !== -1
+    ? (args[linuxTargetsIdx + 1] ?? "").split(",").map((t) => t.trim()).filter(Boolean)
+    : [];
 // Set by scripts/release-local.mjs: a production build that stays on this NixOS host.
 const isLocalRelease = process.env.LOCAL_RELEASE_BUILD === "true";
 
@@ -264,6 +271,7 @@ run(
     "exec",
     "electron-builder",
     cfg.builderFlag,
+    ...(target === "linux" ? linuxTargets : []),
     ...(crossWindowsFromLinux ? ["--x64"] : []),
     "--config",
     "electron-builder.yml",

@@ -38,7 +38,8 @@ export function trackEvent(
     idempotency_key: options.idempotencyKey,
     props: properties ?? {},
   });
-  const endpoint = new URL("/api/analytics/track", window.location.origin);
+  // /api/pulse, not /api/analytics/track: see the comment in src/app/api/pulse/route.ts.
+  const endpoint = new URL("/api/pulse", window.location.origin);
   for (const key of [
     "utm_source",
     "utm_medium",

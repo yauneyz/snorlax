@@ -94,7 +94,11 @@ jobs:
         with:
           node-version: 24
           cache: pnpm
+      # Both slices: build-native.mjs lipo's them into universal service binaries for the
+      # universal dmg (Apple Silicon + Intel).
       - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin,x86_64-apple-darwin
       - uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ vars.AWS_RELEASE_ROLE_ARN }}
@@ -134,15 +138,19 @@ jobs:
         with:
           role-to-assume: ${{ vars.AWS_RELEASE_ROLE_ARN }}
           aws-region: ${{ vars.AWS_REGION }}
-      - run: sudo apt-get update && sudo apt-get install --yes dpkg-dev
+      # dpkg-dev: APT repository index. rpm: rpmbuild for the .rpm. libarchive-tools: bsdtar,
+      # which fpm needs to assemble the pacman package.
+      - run: sudo apt-get update && sudo apt-get install --yes dpkg-dev rpm libarchive-tools
       - run: pnpm install --frozen-lockfile
       - uses: actions/download-artifact@v4
         with:
           name: premade-blocklists
-      - name: Build Linux packages
+      - name: Build Linux packages (deb, rpm, pacman)
         run: pnpm build:linux
       - name: Smoke-test Linux install/uninstall
         run: sudo ./scripts/smoke-linux-uninstall.sh
+      - name: Check rpm and pacman dependencies resolve
+        run: ./scripts/smoke-linux-packages.sh
       - name: Import APT signing key
         run: printf '%s' "$APT_GPG_PRIVATE_KEY" | base64 --decode | gpg --batch --import
         env:

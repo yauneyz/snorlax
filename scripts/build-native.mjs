@@ -25,6 +25,10 @@ const target =
   targetIdx !== -1 ? args[targetIdx + 1] : platformTarget(process.platform);
 const cross = args.includes("--cross");
 const WINDOWS_CROSS_TARGET = "x86_64-pc-windows-msvc";
+// The public dmg is universal, so every Mach-O staged into Contents/Resources/bin must carry
+// both slices. electron-builder.yml's mac.x64ArchFiles lets @electron/universal accept these
+// already-fat binaries as-is instead of failing on identical files in both per-arch builds.
+const MAC_UNIVERSAL_TARGETS = ["aarch64-apple-darwin", "x86_64-apple-darwin"];
 
 const TARGETS = {
   win: {
@@ -147,6 +151,22 @@ if (crossWindowsFromLinux) {
     crate,
     cfg.cargoEnv(crate),
   );
+} else if (target === "mac") {
+  for (const triple of MAC_UNIVERSAL_TARGETS) {
+    run("cargo", ["build", "--release", "--target", triple], crate, cfg.cargoEnv(crate));
+  }
+  const universalDir = resolve(crate, "target/universal-apple-darwin/release");
+  mkdirSync(universalDir, { recursive: true });
+  for (const artifact of cfg.artifacts) {
+    run("lipo", [
+      "-create",
+      ...MAC_UNIVERSAL_TARGETS.map((triple) =>
+        resolve(crate, `target/${triple}/release/${artifact}`),
+      ),
+      "-output",
+      resolve(universalDir, artifact),
+    ]);
+  }
 } else {
   run("cargo", ["build", "--release"], crate, cfg.cargoEnv(crate));
 }
@@ -155,7 +175,9 @@ const targetDir = resolve(
   crate,
   crossWindowsFromLinux
     ? `target/${WINDOWS_CROSS_TARGET}/release`
-    : "target/release",
+    : target === "mac"
+      ? "target/universal-apple-darwin/release"
+      : "target/release",
 );
 const platformOutDir = resolve(root, "apps/desktop/resources/bin", cfg.outName);
 mkdirSync(platformOutDir, { recursive: true });

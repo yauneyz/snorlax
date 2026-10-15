@@ -35,8 +35,19 @@ function hostOf(value: string): string | null {
 }
 
 /**
+ * Browser-extension listings the desktop's first-run step links to. Kept in sync with
+ * EXTENSION_STORE_HOSTS in apps/desktop/src/main/analyticsBridge.ts.
+ */
+const EXTENSION_STORE_HOSTS = new Set([
+  "chromewebstore.google.com",
+  "addons.mozilla.org",
+  "microsoftedge.microsoft.com",
+]);
+
+/**
  * Hosts the desktop is allowed to send a browser to through this route: Stripe (checkout and
- * the billing portal), our Supabase project (the OAuth consent hop), and our own domain.
+ * the billing portal), our Supabase project (the OAuth consent hop), the browser-extension
+ * stores, and our own domain (including /welcome, opened once on a new install's first launch).
  */
 export function isAllowedDestination(
   target: string,
@@ -55,6 +66,7 @@ export function isAllowedDestination(
 
   const host = url.hostname.toLowerCase();
   if (host === "stripe.com" || host.endsWith(".stripe.com")) return true;
+  if (EXTENSION_STORE_HOSTS.has(host)) return true;
 
   const supabaseHost = hostOf(supabaseUrl);
   if (supabaseHost && host === supabaseHost) return true;

@@ -160,11 +160,13 @@ function buildAppImage() {
   const buildStartedAt = Date.now();
 
   // Reuse the standard orchestration (native Rust + extension + electron + electron-builder).
+  // Only the AppImage: the public deb/rpm/pacman packages are never installed on NixOS.
+  const buildArgs = ['run', 'build:linux', '--', '--linux-targets', 'AppImage'];
   if (rustToolchainAvailable()) {
-    run('pnpm', ['run', 'build:linux']);
+    run('pnpm', buildArgs);
   } else if (commandAvailable('nix')) {
     console.log('\n🧰 Rust toolchain not found; building with nixpkgs#cargo and nixpkgs#rustc');
-    run('nix', ['shell', 'nixpkgs#cargo', 'nixpkgs#rustc', '-c', 'pnpm', 'run', 'build:linux']);
+    run('nix', ['shell', 'nixpkgs#cargo', 'nixpkgs#rustc', '-c', 'pnpm', ...buildArgs]);
   } else {
     throw new Error('cargo is required to build the native Linux service. Install Rust or run on a system with nix.');
   }

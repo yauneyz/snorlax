@@ -17,6 +17,12 @@ describe("bridge destination allowlist", () => {
     expect(isAllowedDestination(`${APP}/pricing`, APP, SUPABASE)).toBe(true);
   });
 
+  it("accepts the browser-extension stores first-run links to", () => {
+    expect(isAllowedDestination("https://chromewebstore.google.com/detail/talysman/abc", APP, SUPABASE)).toBe(true);
+    expect(isAllowedDestination("https://addons.mozilla.org/en-US/firefox/addon/talysman/", APP, SUPABASE)).toBe(true);
+    expect(isAllowedDestination("https://chromewebstore.google.com.evil.test/", APP, SUPABASE)).toBe(false);
+  });
+
   it("rejects an unrelated host", () => {
     expect(isAllowedDestination("https://evil.example.com/phish", APP, SUPABASE)).toBe(false);
   });

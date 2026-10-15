@@ -2,23 +2,29 @@
 
 import { useEffect, useState } from "react";
 import { sendGAEvent } from "@next/third-parties/google";
+import { LINUX_FORMATS, startHref, type DownloadTarget } from "@/lib/downloads";
 
 type PlatformKey = "win" | "mac" | "linux";
-type Detected = { key: PlatformKey; label: string; href: string };
-
-const byPlatform: Record<PlatformKey, Detected> = {
-  win: { key: "win", label: "Windows", href: "/api/desktop/download?platform=win" },
-  mac: { key: "mac", label: "macOS", href: "/api/desktop/download?platform=mac" },
-  linux: { key: "linux", label: "Linux", href: "/api/desktop/download?platform=linux" },
-};
+type Detected = { key: PlatformKey; label: string; target: DownloadTarget };
 
 function detect(userAgent: string): Detected | null {
-  if (/windows|win32|win64/i.test(userAgent)) return byPlatform.win;
+  if (/windows|win32|win64/i.test(userAgent)) {
+    return { key: "win", label: "Windows", target: { platform: "win", format: null } };
+  }
   // Order matters: iPadOS reports a Mac-like UA, and "like Mac OS X" appears on iOS too.
   if (/mac os x|macintosh/i.test(userAgent) && !/iphone|ipad|ipod/i.test(userAgent)) {
-    return byPlatform.mac;
+    return { key: "mac", label: "macOS", target: { platform: "mac", format: null } };
   }
-  if (/linux/i.test(userAgent) && !/android/i.test(userAgent)) return byPlatform.linux;
+  if (/linux/i.test(userAgent) && !/android/i.test(userAgent)) {
+    // Distro builds of Firefox name the distro ("X11; Fedora; Linux x86_64"); anything we
+    // can't place gets the .deb, the most common, with the other formats one click away below.
+    const format = /fedora|red hat|opensuse|suse/i.test(userAgent) ? "rpm" : "deb";
+    return {
+      key: "linux",
+      label: `Linux (${LINUX_FORMATS[format].label})`,
+      target: { platform: "linux", format },
+    };
+  }
   return null;
 }
 
@@ -35,7 +41,7 @@ export function DetectedPlatform({
   from,
 }: {
   icons: Record<PlatformKey, React.ReactNode>;
-  /** The search page whose CTA led here, carried on to the installer redirect. */
+  /** The search page whose CTA led here, carried on to the post-download page. */
   from: string | null;
 }) {
   const [detected, setDetected] = useState<Detected | null>(null);
@@ -58,7 +64,7 @@ export function DetectedPlatform({
         </p>
         <a
           className="detected-platform__link"
-          href={from ? `${detected.href}&from=${from}` : detected.href}
+          href={startHref(detected.target, from)}
           onClick={() => sendGAEvent("event", "download", { platform: detected.key })}
         >
           Download for {detected.label}

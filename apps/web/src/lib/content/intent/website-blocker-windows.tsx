@@ -142,7 +142,7 @@ export const websiteBlockerWindows: IntentPage = {
           a: (
             <p>
               Yes: <Link href="/website-blocker-mac">macOS</Link> and{" "}
-              <Link href="/website-blocker-linux">Debian/Ubuntu Linux</Link>. One USB drive can be
+              <Link href="/website-blocker-linux">Linux</Link>. One USB drive can be
               paired on all of them.
             </p>
           ),

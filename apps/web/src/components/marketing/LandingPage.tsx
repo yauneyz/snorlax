@@ -147,7 +147,7 @@ const faqs = [
       <p>
         <Link href="/website-blocker-windows">Windows 10 and 11</Link>,{" "}
         <Link href="/website-blocker-mac">macOS on Apple Silicon and Intel</Link>, and{" "}
-        <Link href="/website-blocker-linux">Debian/Ubuntu Linux</Link>, with extensions for Chrome
+        <Link href="/website-blocker-linux">Linux (Ubuntu, Debian, Fedora, Arch)</Link>, with extensions for Chrome
         and Firefox. <Link href="/download">See the downloads</Link>.
       </p>
     ),

@@ -68,9 +68,16 @@ nsis:
   artifactName: ${productName}-Setup-${version}-${arch}.${ext}
 
 mac:
+  # One universal dmg runs natively on Apple Silicon and Intel, so the website never has to guess
+  # a visitor's CPU (Safari reports "Intel" on every Mac). The zip is the electron-updater payload.
   target:
-    - dmg
-    - zip
+    - target: dmg
+      arch: universal
+    - target: zip
+      arch: universal
+  # scripts/build-native.mjs stages these already-fat (lipo'd) binaries into both per-arch builds,
+  # so @electron/universal sees identical Mach-O files and must be told to keep them as-is.
+  x64ArchFiles: "Contents/Resources/bin/talysman-*"
   icon: assets/brand/generated/macos/icon.icns
   extraResources:
     - from: apps/desktop/resources/bin/mac
@@ -98,9 +105,12 @@ mac:
 afterSign: scripts/after-sign.mjs
 
 linux:
+  # deb (Debian/Ubuntu/Mint/Pop), rpm (Fedora/RHEL/openSUSE) and pacman (Arch/Manjaro/EndeavourOS)
+  # are public. AppImage is only built for release:local (scripts/build.mjs --linux-targets).
   target:
     - deb
-    - AppImage
+    - rpm
+    - pacman
   # A directory of NxN.png files: electron-builder installs each into the matching
   # hicolor icon theme size so desktop environments pick the right one.
   icon: assets/brand/generated/linux
@@ -119,11 +129,12 @@ linux:
   maintainer: Talysman <support@talysman.app>
   artifactName: ${productName}-${version}-${arch}.${ext}
 
-# The deb is the only PUBLIC Linux artifact (uploaded by scripts/upload-release.mjs and
-# served by /download). It ships the privileged daemon and installs it via the
-# after-install hook. The AppImage is local-only: release-local.mjs stages it for the
-# NixOS install (wrapped via appimageTools in nixos-config), where the daemon is built
-# from source and started by a declarative systemd unit instead.
+# deb, rpm and pacman are the PUBLIC Linux artifacts (uploaded by scripts/upload-release.mjs
+# and served by /download). Each ships the privileged daemon and installs it from the shared
+# hooks in native/linux/installer, which branch on each package manager's upgrade arguments.
+# The AppImage is local-only: release-local.mjs stages it for the NixOS install (wrapped via
+# appimageTools in nixos-config), where the daemon is built from source and started by a
+# declarative systemd unit instead.
 appImage:
   artifactName: ${productName}-${version}-${arch}.${ext}
 
@@ -135,6 +146,42 @@ deb:
     - --depends=systemd
     - --depends=dnsmasq
     - --before-remove=native/linux/installer/before-remove.sh
+
+# electron-updater's RpmUpdater/PacmanUpdater keep these current (no dnf/pacman repo to host);
+# the deb stays on the signed APT repository.
+rpm:
+  afterInstall: native/linux/installer/after-install.sh
+  afterRemove: native/linux/installer/after-remove.sh
+  fpm:
+    - --depends=nftables
+    - --depends=systemd
+    - --depends=dnsmasq
+    - --before-remove=native/linux/installer/before-remove.sh
+
+pacman:
+  afterInstall: native/linux/installer/after-install.sh
+  afterRemove: native/linux/installer/after-remove.sh
+  # electron-builder's default pacman depends name packages Arch has since dropped
+  # (http-parser, libappindicator-gtk3), which makes `pacman -U` refuse the package outright.
+  depends:
+    - gtk3
+    - nss
+    - alsa-lib
+    - libxss
+    - libxtst
+    - libnotify
+    - libsecret
+    - xdg-utils
+    - at-spi2-core
+    - util-linux-libs
+    - nftables
+    - systemd
+    - dnsmasq
+  fpm:
+    - --before-remove=native/linux/installer/before-remove.sh
+    # pacman runs no install hook on upgrade unless asked; re-running the install hook is how the
+    # daemon picks up the new binary (svcctl install restarts an existing unit).
+    - --after-upgrade=native/linux/installer/after-install.sh
 
 publish:
   provider: generic

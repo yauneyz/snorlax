@@ -29,7 +29,7 @@ export function softwareApplicationJsonLd() {
     name: config.app.name,
     url: `${config.app.url}/`,
     applicationCategory: "UtilitiesApplication",
-    operatingSystem: "Windows 10, Windows 11, macOS, Debian, Ubuntu",
+    operatingSystem: "Windows 10, Windows 11, macOS, Ubuntu, Debian, Fedora, openSUSE, Arch Linux",
     description:
       "A website and app blocker for desktop computers. Ending a focus session early requires a paired USB key to be plugged in.",
     downloadUrl: `${config.app.url}/download`,
