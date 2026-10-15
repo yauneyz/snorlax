@@ -3,7 +3,8 @@
  * Build browser-store deliverables from the shared extension source.
  *
  * Output:
- *   apps/extension/dist/chrome/                         Chrome upload + Load-unpacked build
+ *   apps/extension/dist/chrome/                         Chrome Web Store upload build
+ *   apps/extension/dist/chrome-dev/                     stable-ID Chrome Load-unpacked build
  *   apps/extension/dist/edge/                           Edge Add-ons upload + unpacked inspection
  *   apps/extension/dist/edge-dev/                       stable-ID Edge Load-unpacked build
  *   apps/extension/dist/firefox/                        unpacked Firefox build
@@ -14,9 +15,9 @@
  *                                                       Store-review source archives
  *
  * The stores sign, host, and update the published packages. Store update URLs and store-assigned
- * Chromium update URLs therefore do not belong in these manifests. The Chrome package has the Web
- * Store public manifest `key` from native/common/extension-identities.json, so its ZIP and unpacked
- * directory both use the store ID. Firefox keeps its authored Gecko ID.
+ * Chromium update URLs therefore do not belong in these manifests. Store packages omit `key`;
+ * Chrome and Edge development builds use the Web Store public key from
+ * native/common/extension-identities.json for a stable ID. Firefox keeps its authored Gecko ID.
  */
 
 import crypto from "node:crypto";
@@ -408,7 +409,7 @@ const chromiumManifest = {
 };
 const { manifestKey: chromeSideloadKey, id: chromeSideloadId } =
   chromeIdentity();
-const chromeManifest = {
+const chromiumDevManifest = {
   ...chromiumManifest,
   key: chromeSideloadKey,
 };
@@ -431,17 +432,17 @@ firefoxManifest.browser_specific_settings = {
 firefoxManifest.background = { scripts: ["background.js"] };
 
 const stores = [
-  { name: "chrome", manifest: chromeManifest },
+  { name: "chrome", manifest: chromiumManifest },
   { name: "edge", manifest: chromiumManifest },
   { name: "firefox", manifest: firefoxManifest },
 ];
 
 // A key-free unpacked extension gets a path-derived ID. That ID is unsuitable for native
-// messaging because every developer checkout would need a different allowed_origins entry. Edge
-// accepts Chromium's manifest key when loading an unpacked extension, so use the already-trusted
-// Chrome identity for local Edge testing. The Edge Add-ons upload remains key-free and receives its
-// production identity from Microsoft.
-const edgeDevDir = stageStore("edge-dev", chromeManifest, background);
+// messaging because every developer checkout would need a different allowed_origins entry. Chrome
+// and Edge accept the manifest key for unpacked development builds. Store uploads remain key-free
+// and receive their production identities from their stores.
+const chromeDevDir = stageStore("chrome-dev", chromiumDevManifest, background);
+const edgeDevDir = stageStore("edge-dev", chromiumDevManifest, background);
 
 const artifacts = [];
 for (const store of stores) {
@@ -485,9 +486,12 @@ for (const artifact of artifacts) {
   );
 }
 console.log(
+  `  ${"chrome-dev".padEnd(7)} ${relative(root, chromeDevDir)} (Load unpacked; stable native-messaging ID)`,
+);
+console.log(
   `  ${"edge-dev".padEnd(7)} ${relative(root, edgeDevDir)} (Load unpacked; stable native-messaging ID)`,
 );
-console.log(`\nChrome ID (upload + Load unpacked): ${chromeSideloadId}`);
+console.log(`\nChrome development ID: ${chromeSideloadId}`);
 console.log(`Edge development ID: ${chromeSideloadId}`);
 console.log(`Firefox Gecko ID: ${FIREFOX_ID}`);
 console.log(`Chrome Web Store ID: ${identities.chromeStoreId}`);

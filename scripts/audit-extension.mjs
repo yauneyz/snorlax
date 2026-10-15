@@ -194,11 +194,7 @@ for (const [store, directory] of Object.entries({
   }
 
   const manifest = readJson(resolve(storeDir, "manifest.json"));
-  assertMinimalManifest(
-    manifest,
-    store,
-    store === "chrome" ? identities.chromePublicKey : null,
-  );
+  assertMinimalManifest(manifest, store);
   assertPremadeRulesets(manifest, storeDir, store);
   const expectedActionIcons = { 16: "icon-16.png", 32: "icon-32.png" };
   if (JSON.stringify(manifest.action?.default_icon) !== JSON.stringify(expectedActionIcons)) {
@@ -290,15 +286,18 @@ if (generatedIds.edgeStore !== (identities.edgeStoreId || null)) {
   fail("edge: generated store ID does not match extension-identities.json");
 }
 
-const edgeDevDir = resolve(distDir, "edge-dev");
-const edgeDevFiles = readdirSync(edgeDevDir).sort();
-if (JSON.stringify(edgeDevFiles) !== JSON.stringify(expectedFiles)) {
-  fail(`edge-dev: package files are ${edgeDevFiles.join(", ")}`);
-}
-const edgeDevManifest = readJson(resolve(edgeDevDir, "manifest.json"));
-assertMinimalManifest(edgeDevManifest, "edge-dev", identities.chromePublicKey);
-if (edgeDevManifest.background?.service_worker !== "background.js") {
-  fail("edge-dev: Chromium service worker background is required");
+for (const browser of ["chrome", "edge"]) {
+  const name = `${browser}-dev`;
+  const devDir = resolve(distDir, name);
+  const files = readdirSync(devDir).sort();
+  if (JSON.stringify(files) !== JSON.stringify(expectedFiles)) {
+    fail(`${name}: package files are ${files.join(", ")}`);
+  }
+  const manifest = readJson(resolve(devDir, "manifest.json"));
+  assertMinimalManifest(manifest, name, identities.chromePublicKey);
+  if (manifest.background?.service_worker !== "background.js") {
+    fail(`${name}: Chromium service worker background is required`);
+  }
 }
 
 console.log("OK Extension compliance audit passed");

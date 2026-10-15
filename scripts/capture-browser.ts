@@ -4,7 +4,7 @@
 //
 //   pnpm capture:browser
 //
-// Chrome gets the unpacked Chrome build of the extension (apps/extension/dist/chrome) and a stub
+// Chrome gets the unpacked Chrome build of the extension (apps/extension/dist/chrome-dev) and a stub
 // native host (lib/stub-native-host.mjs) in place of the daemon. The stub pushes the same state
 // frame the daemon sends when focus turns on, so everything after that — background policy,
 // content script, the catalog's selectors — is the shipping code path.
@@ -25,7 +25,7 @@ import { chromium, type Page } from '@playwright/test';
 import { chromePath, profilesDir, repoRoot } from './lib/site-captures.js';
 
 const OUT = process.env.CAPTURE_OUT ?? path.join(repoRoot, 'apps/web/public/media');
-const EXTENSION_DIR = path.join(repoRoot, 'apps/extension/dist/chrome');
+const EXTENSION_DIR = path.join(repoRoot, 'apps/extension/dist/chrome-dev');
 const PROFILE_DIR = path.join(profilesDir, 'marketing-browser');
 const HOST_NAME = 'com.talysman.host';
 const CHALLENGE_TIMEOUT_MS = 10 * 60_000;

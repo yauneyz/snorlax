@@ -91,10 +91,9 @@ user-installed extension in place and pushes `active:false` so it clears its rul
 ## Store packages and identities
 
 `pnpm build:extension` builds three compressed upload-ready ZIP files, matching store-review source ZIPs, and
-unpacked directories under `apps/extension/dist/`. The same keyed `dist/chrome` package is used for
-Chrome Web Store upload and Chrome's **Load unpacked** button. Edge has two directories: key-free
-`dist/edge` matches the Edge Add-ons upload, while keyed `dist/edge-dev` has the already-trusted
-Chrome development ID and is the directory to use with Edge's **Load unpacked** button:
+unpacked directories under `apps/extension/dist/`. The key-free `dist/chrome` and `dist/edge`
+directories match their store uploads. Use keyed `dist/chrome-dev` and `dist/edge-dev` with each
+browser's **Load unpacked** button to retain the trusted Chrome development ID:
 
 ```text
 talysman-chrome-<version>.zip
@@ -118,8 +117,8 @@ talysman-firefox-source-<version>.zip
 ```
 
 Chrome Web Store, Microsoft Edge Add-ons, and Firefox AMO sign, host, and update their respective
-packages. The manifests contain no custom `update_url`. The Chrome manifest includes the Web Store
-public key so its ZIP and unpacked directory share the official item ID.
+packages. Store manifests contain no custom `update_url` or `key`. The development manifests
+include the Web Store public key to retain the official Chrome item ID when loaded unpacked.
 
 Firefox uses the authored ID `talysman-firefox@talysman.app`. Chrome and Edge assign separate IDs
 when their store items are created, before review or publication. All store IDs and Chrome's Web
@@ -127,8 +126,8 @@ Store public key live in `native/common/extension-identities.json`; update that 
 creating a new store item. Chrome is currently configured as
 `jblidbjafmpbpednomngbbmpkihedeko`.
 
-Use `apps/extension/dist/chrome` for Chrome Load unpacked and upload
-`talysman-chrome-<version>.zip` to Chrome Web Store. They contain the same files, including the public
+Use `apps/extension/dist/chrome-dev` for Chrome Load unpacked and upload the key-free
+`talysman-chrome-<version>.zip` to Chrome Web Store. Only the development build includes the public
 key copied from the Chrome Web Store Package tab, so Chrome assigns the official item ID
 `jblidbjafmpbpednomngbbmpkihedeko` on every machine. No private key is generated, stored, or
 distributed. The normal native service allowlists that same ID.
@@ -151,7 +150,7 @@ The `HOST_NAME` (`com.talysman.host`) must match between `background.js` and
    `cargo test --manifest-path native/linux/Cargo.toml extension_policy` and the equivalent
    `native/macos/Cargo.toml` command for native host manifests.
 2. **Build + load unpacked (dev/testers):** `pnpm build:extension`, then load
-   `apps/extension/dist/chrome` in Chrome or `apps/extension/dist/edge-dev` in Edge. Open the toolbar
+   `apps/extension/dist/chrome-dev` in Chrome or `apps/extension/dist/edge-dev` in Edge. Open the toolbar
    action to verify the connection and focus status, and the unlock button on a blocked tab.
 3. **Store release prep:** `pnpm release:extension`, then inspect
    `apps/extension/release/store/` and `apps/extension/release/store-submission.json`.

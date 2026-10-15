@@ -7,8 +7,8 @@
  *   - Microsoft Edge Add-ons signs, hosts, and updates the Edge package.
  *   - Firefox AMO signs, hosts, and updates the Firefox package.
  *
- * Store packages must not contain custom update_url values. Chrome includes the Web Store public
- * key so the upload ZIP and Load-unpacked directory have the same item ID.
+ * Store packages must not contain custom update_url values or manifest keys. The Web Store public
+ * key is included only in separate Load-unpacked development builds.
  */
 
 import { spawnSync } from "node:child_process";
@@ -62,11 +62,7 @@ function assertFile(path) {
 
 function assertStoreManifest(store, manifest) {
   if ("update_url" in manifest) fail(`${store}: store manifest must not contain update_url`);
-  if (store === "chrome") {
-    if (manifest.key !== identities.chromePublicKey) {
-      fail("chrome: manifest key must match extension-identities.json");
-    }
-  } else if ("key" in manifest) {
+  if ("key" in manifest) {
     fail(`${store}: store manifest must not contain key`);
   }
   if (store === "firefox") {
@@ -158,7 +154,7 @@ function main() {
       "Upload each zip to its matching browser store.",
       "Keep each source zip with its matching upload for store review.",
       "Do not add custom update_url values to store manifests.",
-      "The Chrome ZIP and dist/chrome directory are the same keyed package for upload and Load unpacked.",
+      "Chrome uploads are key-free; use dist/chrome-dev for Load unpacked with the stable native-messaging ID.",
       "Store item IDs are assigned before review; record them in native/common/extension-identities.json before building the reviewer desktop installer.",
     ],
   };
