@@ -62,33 +62,6 @@ export const brickForComputer: IntentPage = {
   ),
   sections: [
     {
-      kind: "cards",
-      title: "Why a desktop blocker has more doors to close",
-      lede: "A phone is a locked-down appliance. A computer is not, which is why blocking on one takes more than an app.",
-      cards: [
-        {
-          title: "Quitting the app can't lift the block",
-          body: "Enforcement runs in a privileged background service, not in the window you see. Closing Talysman changes nothing, and killing the service just makes it start again.",
-        },
-        {
-          title: "Rebooting isn't an escape hatch",
-          body: "Session state is written to protected storage and the service starts with the machine. You come back to the session you left.",
-        },
-        {
-          title: "Uninstalling is key-gated too",
-          body: "On Windows and Linux, the uninstaller refuses to remove the service while a focus session is running unless a paired key is present. On a Mac there's no uninstaller to put that check in, so this one isn't key-gated there.",
-        },
-        {
-          title: "A second browser isn't a loophole",
-          body: "Blocking also runs at the network level, below any browser. Turn on Strict Mode and browsers without the Chrome or Firefox extension are closed during focus — and Strict Mode only turns off with the key.",
-        },
-        {
-          title: "Desktop apps count as distractions",
-          body: "Discord, Steam and the rest are blocked as apps, not just as tabs. On a computer, the tab is only half the problem.",
-        },
-      ],
-    },
-    {
       kind: "honesty",
       title: "What a key can't do",
       body: (
@@ -149,6 +122,16 @@ export const brickForComputer: IntentPage = {
               Firefox. If the phone is your main problem, a phone-first tool is the honest answer
               for that half.{" "}
               <Link href="/download?from=brick-for-computer">See the downloads</Link>.
+            </p>
+          ),
+        },
+        {
+          q: `Is ${config.app.name} affiliated with Brick?`,
+          a: (
+            <p>
+              No. {config.app.name} is independent and isn&apos;t affiliated with, endorsed by or
+              sponsored by Brick. We compare the two because Brick is what people search for; its
+              name belongs to its owner.
             </p>
           ),
         },

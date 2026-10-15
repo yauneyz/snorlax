@@ -152,16 +152,6 @@ const faqs = [
       </p>
     ),
   },
-  {
-    q: `Is ${config.app.name} affiliated with Brick, Freedom, Cold Turkey or FocusMe?`,
-    a: (
-      <p>
-        No. {config.app.name} is independent and isn&apos;t affiliated with, endorsed by or
-        sponsored by any of them. We compare against them on our comparison pages because
-        they&apos;re what people search for; their names belong to their owners.
-      </p>
-    ),
-  },
 ];
 
 /**
