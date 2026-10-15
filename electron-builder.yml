@@ -89,6 +89,9 @@ mac:
   category: public.app-category.productivity
   artifactName: ${productName}-${version}-${arch}.${ext}
   hardenedRuntime: true
+  # Developer ID builds need no provisioning profile. Avoid osx-sign's project-root
+  # discovery, which follows unrelated (and potentially broken) development symlinks.
+  sign: scripts/sign-macos-app.mjs
   # electron-builder's own notarize+staple runs *before* the afterSign hook below, but afterSign
   # still needs to re-sign the outer app afterward (see its comment) -- re-signing after a staple
   # orphans the ticket, so notarize is disabled here and afterSign does it itself, last.
