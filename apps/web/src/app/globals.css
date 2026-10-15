@@ -3630,6 +3630,14 @@ input:-webkit-autofill:focus {
   animation: fadeUp 700ms var(--ease) 100ms both;
 }
 
+.intent__lede p {
+  color: inherit;
+}
+
+.intent__lede p:last-child {
+  margin-bottom: 0;
+}
+
 .intent__ctas {
   display: flex;
   gap: 0.85rem;
@@ -3782,6 +3790,11 @@ input:-webkit-autofill:focus {
   border-radius: var(--r-xl);
   background: var(--bg-1);
   box-shadow: var(--shadow-card);
+}
+
+.intent__video {
+  margin-top: 1.6rem;
+  scroll-margin-top: 6rem;
 }
 
 .intent-demo__video {
@@ -4026,7 +4039,7 @@ input:-webkit-autofill:focus {
 }
 
 .intent__reviewed {
-  margin: 0.4rem 0 0;
+  margin: 2.5rem 0 0;
   font-family: var(--font-mono);
   font-size: 0.7rem;
   letter-spacing: 0.06em;

@@ -105,6 +105,16 @@ export type IntentGraphic = {
       rows: string[];
     }
   | {
+      /**
+       * Products side by side, for a page that doesn't carry the table itself. Same shape as a
+       * table section's columns and rows; the last column is ours and lit if `highlightLast`.
+       */
+      kind: "compare";
+      columns: string[];
+      rows: string[][];
+      highlightLast?: boolean;
+    }
+  | {
       /** Per site: what a site rule hides and what keeps working (site | hidden | works rows). */
       kind: "rules";
       fromTable: string;
@@ -156,6 +166,11 @@ export type IntentPage = {
   metaTitle: string;
   metaDescription: string;
   lede: React.ReactNode;
+  /**
+   * Play the page's demo video straight under the hero instead of inside a demo section. A
+   * page that sets this usually has no demo section left to give it a home.
+   */
+  videoAtTop?: boolean;
   /** The direct answer, above everything else. Two short paragraphs at most. */
   answer: React.ReactNode;
   sections: IntentSection[];

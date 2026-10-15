@@ -143,8 +143,8 @@ function ladder(page: IntentPage, g: Extract<IntentGraphic, { kind: "ladder" }>)
 }
 
 function compare(page: IntentPage, g: Extract<IntentGraphic, { kind: "compare" }>): Body {
-  const section = table(page, g.fromTable);
-  const rows = pickRows(page, g.fromTable, g.rows);
+  const section = "fromTable" in g ? table(page, g.fromTable) : g;
+  const rows = "fromTable" in g ? pickRows(page, g.fromTable, g.rows) : g.rows;
   const columns = section.columns.slice(1);
   const labelW = 300;
   const gap = 14;

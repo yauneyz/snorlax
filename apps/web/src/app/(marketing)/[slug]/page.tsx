@@ -294,6 +294,11 @@ export default async function IntentLandingPage({ params }: PageProps) {
       <header className="intent__hero">
         <p className="intent__eyebrow">{page.eyebrow}</p>
         <h1 className="intent__title">{page.title}</h1>
+        {page.videoAtTop && video ? (
+          <figure className="intent-demo__media intent__video" id="demo">
+            <DemoVideo slug={page.slug} label={video.description} />
+          </figure>
+        ) : null}
         <div className="intent__lede">{page.lede}</div>
         <div className="intent__ctas">
           <Link href={downloadHref(page.slug)} className="landing__cta landing__cta--primary">
@@ -307,12 +312,6 @@ export default async function IntentLandingPage({ params }: PageProps) {
           Free forever for {FREE_BLOCKED_SITE_LIMIT} sites · or try{" "}
           <Link href="/pricing">Pro free for {PRO_TRIAL_DAYS} days</Link>
         </p>
-        {page.showLastReviewed ? (
-          <p className="intent__reviewed">
-            Last checked{" "}
-            <time dateTime={page.lastReviewed}>{formatReviewed(page.lastReviewed)}</time>
-          </p>
-        ) : null}
       </header>
 
       {/* The intent, answered before anything is sold. Someone who leaves after ten
@@ -342,6 +341,15 @@ export default async function IntentLandingPage({ params }: PageProps) {
       {rest.map((section, index) => (
         <Section key={`${section.kind}-${index}`} section={section} slug={page.slug} />
       ))}
+
+      {/* After the content it dates rather than in the hero: it's there to put an "as of" on
+          claims about other products, not to sell anything. */}
+      {page.showLastReviewed ? (
+        <p className="intent__reviewed">
+          Last checked{" "}
+          <time dateTime={page.lastReviewed}>{formatReviewed(page.lastReviewed)}</time>
+        </p>
+      ) : null}
 
       <section className="cta-band">
         <h2>{page.cta?.heading ?? "Make your next session one you actually finish"}</h2>

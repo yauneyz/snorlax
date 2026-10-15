@@ -1,0 +1,3 @@
+Anyone with administrator rights on their own machine can eventually force their way past any blocker, this one included. We aren't going to pretend otherwise. The goal is to add enough friction to prevent you from giving into cravings for distraction.
+
+If you can always just go get the USB to unlock, you aren't going to try to uninstall Talysman instead. So now you're stuck having to go get the USB to unlock, which was the whole point of Talysman. We add just the right amount of annoying friction to keep you on task.
