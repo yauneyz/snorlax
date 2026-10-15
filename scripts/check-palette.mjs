@@ -59,8 +59,9 @@ readPalette();
 const files = [...new Set([...SOURCE_ROOTS.flatMap(filesUnder), ...SOURCE_FILES])]
   .filter((path) => !EXCLUDED.has(path));
 
+// `(?![\w-])` keeps CSS ID selectors like `#feed-news-module` from reading as `#feed`.
 const literalPattern =
-  /#[0-9a-f]{3,8}\b|rgba?\(\s*\d+\s*[, ]\s*\d+\s*[, ]\s*\d+|Color\(0x[0-9a-f]+\)/gi;
+  /#[0-9a-f]{3,8}(?![\w-])|rgba?\(\s*\d+\s*[, ]\s*\d+\s*[, ]\s*\d+|Color\(0x[0-9a-f]+\)/gi;
 const failures = [];
 for (const path of files) {
   const lines = readFileSync(path, 'utf8').split(/\r?\n/);

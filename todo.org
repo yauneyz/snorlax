@@ -1,5 +1,6 @@
-- post in indie-hackers sub
-- do my daily schedule
+- double down on "brick for computer" page, "physical website blocker"
+- daily outreach work
+- write tweets
 
 
 - write an SEO blog post
@@ -38,12 +39,12 @@
 Daily Minimum:
 - 2 hrs in Thinky
 - f5 bot
-- 3 tweets
-- 1 linkedin
-- view posthog session replays
+- view posthog session replays, web analytics, google search console
 - 1 youtube affiliate request
 - 1 random outreach; blog, reviewers, newsletters, etc
-- 5 creative software ideas for talysman labs
+- 3 tweets
+- 1 linkedin
+- 1 short form video
 
 
 Weekly minimum:
