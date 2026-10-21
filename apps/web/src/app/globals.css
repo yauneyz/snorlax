@@ -4237,10 +4237,6 @@ input:-webkit-autofill:focus {
     margin-left: 0.25rem;
     padding: 0.55rem 0.95rem !important;
   }
-
-  .site-nav__secondary {
-    display: none;
-  }
 }
 
 @media (max-width: 374px) {
