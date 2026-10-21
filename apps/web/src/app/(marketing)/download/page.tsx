@@ -94,7 +94,7 @@ export default async function DownloadPage({
           ))}
           <LinuxDownloadCard from={from} />
         </div>
-        <aside className="download__windows-note" aria-labelledby="windows-download-note-title">
+        <aside className="download__platform-note" aria-labelledby="windows-download-note-title">
           <h3 id="windows-download-note-title">Windows might ask for confirmation</h3>
           <p>
             Microsoft Defender SmartScreen may call {config.app.name} an &ldquo;unrecognized
@@ -108,6 +108,27 @@ export default async function DownloadPage({
             >
               Why this happens
             </a>
+          </p>
+        </aside>
+        <aside className="download__platform-note" aria-labelledby="macos-download-note-title">
+          <h3 id="macos-download-note-title">
+            Why does {config.app.name} need administrator access on macOS?
+          </h3>
+          <p>
+            {config.app.name} blocks distracting websites and apps even when its window is closed.
+            To do that, it installs a background service and configures local blocking rules.
+          </p>
+          <h4>What this access is used for</h4>
+          <ul>
+            <li>Installing the persistent blocking service</li>
+            <li>Enforcing website and app restrictions</li>
+            <li>Keeping focus sessions active after restarts</li>
+          </ul>
+          <h4>What happens to your data</h4>
+          <p>
+            Your website blocklist stays on your Mac. {config.app.name}&rsquo;s published{" "}
+            <Link href="/privacy">privacy policy</Link> describes separate, limited desktop usage
+            analytics and in-app session replay.
           </p>
         </aside>
       </div>

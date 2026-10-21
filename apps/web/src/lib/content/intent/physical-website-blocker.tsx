@@ -15,14 +15,17 @@ export const physicalWebsiteBlocker: IntentPage = {
   lastReviewed: "2026-10-07",
   intent: "physical website blocker / distraction blocker that requires a physical key",
   eyebrow: "Physical website blocker",
-  title: "Physical website blocker for desktop: how USB-key focus works",
-  metaTitle: "Physical Website Blocker for Desktop: How USB-Key Focus Works",
+  title: `Physical website blocker for desktop: How ${config.app.name} protects your focus with a physical key`,
+  metaTitle: `Physical Website Blocker for Desktop: How ${config.app.name} Protects Your Focus with a Physical Key`,
   metaDescription:
     "Move your distraction blocker's off-switch into the physical world using an ordinary USB drive.",
   lede: (
     <>
-      Every software lock ends in a decision you make at the keyboard, in the worst possible
-      second. A physical lock ends in a walk.
+      Your website blocker is useless to you if you can just hit &ldquo;override&rdquo; whenever
+      there is an urge to be distracted. {config.app.name} prevents this by only letting you turn
+      the blocker off when there is a physical key inserted. The &ldquo;key&rdquo; is a USB drive
+      that you pair with your computer. When you want to focus, you just turn on the blocker and put
+      the key in another room.
     </>
   ),
   answer: (
@@ -31,86 +34,37 @@ export const physicalWebsiteBlocker: IntentPage = {
         Yes, there is a distraction blocker that requires a physical key: {config.app.name}. A
         physical website blocker is one where the thing that ends the block is an object, not a
         button, a password, or a timer you can wait out. If the object isn&apos;t in the room,
-        neither is the option.
+        neither is the option to turn off the blocker.
       </p>
       <p>
-        {config.app.name} is that, built for desktops. It blocks distracting websites and desktop
-        applications on Windows, macOS and Linux, and turning focus off early requires a paired USB
-        drive to be physically plugged into the computer. The key is any drive you already own —
-        there is no hardware to buy and nothing to wait for in the mail.
+        {config.app.name} brings physical distraction blocking to the desktop. It blocks distracting
+        websites and desktop applications on Windows, macOS and Linux, and turning focus off
+        requires a paired USB drive to be physically plugged into the computer. The key can be any
+        USB drive you already own — there is no hardware to buy and nothing to wait for in the mail.
       </p>
     </>
   ),
   sections: [
     {
-      kind: "table",
-      title: "Why the other kinds of lock come off",
-      lede: "Every blocker has a lock. What separates them is what it costs you to undo it at the exact moment you want to.",
-      columns: ["The lock", "What it costs to undo", "Where it fails"],
-      rows: [
-        [
-          "A button in the app",
-          "One click",
-          "The impulse and the escape are the same gesture. You're past it before you notice you decided.",
-        ],
-        [
-          "A password you set",
-          "Typing a password you know",
-          "You chose it. Future you has it. It only stops other people.",
-        ],
-        [
-          "A password a friend holds",
-          "One text message",
-          "Works right up until it's 11pm, or they answer, or you stop asking and just uninstall.",
-        ],
-        [
-          "A random string to retype",
-          "30 to 60 seconds of typing",
-          "It's a toll, not a wall. Once you've decided to quit, you'll pay it — and the second time is faster.",
-        ],
-        [
-          "A timer you wait out",
-          "Waiting",
-          "Waiting is something you can do in another tab. The block ends on its own schedule, not on the work being done.",
-        ],
-        [
-          "A physical key in another room",
-          "Standing up and walking there",
-          "It fails if you keep the key on the desk. That part is on you.",
-        ],
-      ],
-      footnote: (
-        <>
-          Every one of these locks works when you&apos;re calm. The question a blocker is actually
-          judged on is what happens forty minutes in, when the task turns ambiguous and you go
-          looking for an exit without quite admitting that&apos;s what you&apos;re doing.
-        </>
-      ),
-    },
-    {
       kind: "demo",
-      title: "The moment a physical lock is different",
-      lede: "Everything up to the fourth beat is the same in every blocker ever made. The fourth beat is the product.",
+      title: "How it works",
+      lede: "Check out this brief walk-through of how Talysman protects your focus",
       beats: [
         {
           label: "Pair",
-          body: "Plug in a USB drive, pick it from the list of removable drives, and it becomes a key for this computer.",
+          body: "Plug in a USB drive, pick it from the list, and it becomes a key for this computer.",
         },
         {
           label: "Block",
-          body: "Add the sites that take your afternoons. Add the desktop apps too, or flip to allow-only and permit just the tools the job needs.",
+          body: "Add the sites that take your afternoons. Add the desktop apps too, or maybe just block the entire internet.",
         },
         {
           label: "Unplug",
-          body: "Take the drive out of the machine and leave it somewhere inconvenient. This is the step that does the work.",
+          body: "Take the drive out of the machine and leave it somewhere inconvenient. This is the step that makes all the difference.",
         },
         {
           label: "Try to quit",
-          body: "You click End session. The background service checks for a paired key, finds no drive, and declines. Focus stays on. There is no override in the dialog, because an override is just a slower button.",
-        },
-        {
-          label: "Come back",
-          body: "When the session ends — or when you fetch the key on purpose — everything unblocks at once. Nothing is left behind on your machine.",
+          body: "You try to turn of the blocker. Talysman checks for a paired key, doesn't find it, and declines. Focus stays on. You go back to work",
         },
       ],
       media: {
@@ -119,76 +73,6 @@ export const physicalWebsiteBlocker: IntentPage = {
         ratio: "16 / 9",
         kind: "video",
       },
-    },
-    {
-      kind: "cards",
-      title: "What “physical” has to mean to be worth anything",
-      lede: "A key on the desk is a decoration. These are the parts that make the key the only door.",
-      cards: [
-        {
-          title: "The block doesn't live in the window",
-          body: "Enforcement runs in a privileged background service. Closing the app, killing the process, or rebooting doesn't lift it — the service comes back with the session intact.",
-        },
-        {
-          title: "The uninstaller is gated too",
-          body: "On Windows and Linux, it refuses to remove the service during an active session unless a paired key is present. Otherwise “uninstall” is just the unlock button with extra steps. macOS has no uninstaller to put that check in.",
-        },
-        {
-          title: "Other browsers aren't a side door",
-          body: "Chrome and Firefox get the extension, and blocking also runs at the network level. With Strict Mode on, browsers without the extension get closed during focus instead of left open as the obvious workaround.",
-        },
-        {
-          title: "Apps are blocked, not just tabs",
-          body: "The desktop apps that pull you away are covered as well, so quitting the browser doesn't just relocate the problem.",
-        },
-        {
-          title: "The key is verified, not remembered",
-          body: "The service checks for the drive at the moment you ask to unlock. There's no session token, no grace period, no “trusted for 15 minutes”.",
-        },
-        {
-          title: "You can have more than one",
-          body: "Pair as many drives as you like — any one of them unlocks. A lost key is an inconvenience, not a lockout.",
-        },
-      ],
-    },
-    {
-      kind: "prose",
-      title: "Why the key is a drive you already own",
-      body: (
-        <>
-          <p>
-            A dedicated piece of hardware sounds more serious, and it costs you a purchase, a
-            shipping wait, and a single point of failure the day you lose it. A USB drive skips all
-            three. The one in your desk drawer works, the one from a conference works, and you can
-            pair three of them this afternoon.
-          </p>
-          <p>
-            Your files, your blocklist, and your account never touch the drive.{" "}
-            {config.app.name} normally just reads the hardware serial or volume ID the drive
-            already reports. The one exception is a drive with no usable identifier, where pairing
-            writes a single small marker file so presence can still be detected. The drive stays a
-            normal drive the whole time — you can keep using it for files.
-          </p>
-        </>
-      ),
-    },
-    {
-      kind: "honesty",
-      title: "The limits, stated plainly",
-      body: (
-        <>
-          <p>
-            A physical key raises the price of quitting; it doesn&apos;t make quitting impossible.
-            Anyone with administrator rights on their own computer can eventually force the issue,
-            and we&apos;d rather say that here than have you discover it and conclude we were
-            selling something we couldn&apos;t deliver.
-          </p>
-          <p>
-            It also can&apos;t help if the key stays plugged in. The mechanism is a walk down the
-            hall, and the walk only exists if you put the drive somewhere that requires one.
-          </p>
-        </>
-      ),
     },
     {
       kind: "faq",
@@ -209,8 +93,9 @@ export const physicalWebsiteBlocker: IntentPage = {
             <p>
               You go get the key, plug it in, and turn focus off. It&apos;s meant to be a walk, not
               a wall. If the key is truly out of reach, each computer has five keyless emergency
-              unlocks for life — a real exit, deliberately too scarce to use on a whim. And a session only blocks what you put on the list — everything else on the
-              computer keeps working the whole time.
+              unlocks for life — a real exit, deliberately too scarce to use on a whim. And a
+              session only blocks what you put on the list — everything else on the computer keeps
+              working the whole time.
             </p>
           ),
         },
@@ -218,18 +103,35 @@ export const physicalWebsiteBlocker: IntentPage = {
           q: "Is there a version where even the key doesn't work?",
           a: (
             <p>
-              Yes, and it&apos;s opt-in. Mark a scheduled window <em>locked</em> and the key won&apos;t
-              end focus early. The window releases on its own when it&apos;s over; the only way
-              out before then is one of five emergency unlocks per computer, for life.
+              Yes, and it&apos;s opt-in. Mark a scheduled window <em>locked</em> and the key
+              won&apos;t end focus early. The window releases on its own when it&apos;s over; the
+              only way out before then is one of five emergency unlocks per computer, for life.
             </p>
+          ),
+        },
+        {
+          q: "Can I get around it?",
+          a: (
+            <>
+              <p>
+                A physical key raises the price of quitting; it doesn&apos;t make quitting
+                impossible. Anyone with administrator rights on their own computer can eventually
+                force the issue, and we&apos;d rather say that here than have you discover it and
+                conclude we were selling something we couldn&apos;t deliver.
+              </p>
+              <p>
+                It also can&apos;t help if the key stays plugged in. The mechanism is a walk down
+                the hall, and the walk only exists if you put the drive somewhere that requires one.
+              </p>
+            </>
           ),
         },
         {
           q: "What does it cost?",
           a: (
             <p>
-              Free covers {FREE_BLOCKED_SITE_LIMIT} blocked websites, unlimited manual sessions,
-              and the key requirement — no card, no time limit. Pro adds app blocking, recurring
+              Free covers {FREE_BLOCKED_SITE_LIMIT} blocked websites, unlimited manual sessions, and
+              the key requirement — no card, no time limit. Pro adds app blocking, recurring
               schedules, unlimited sites and unlimited profiles, free for {PRO_TRIAL_DAYS} days.{" "}
               <Link href="/pricing">See pricing</Link>.
             </p>
@@ -241,20 +143,6 @@ export const physicalWebsiteBlocker: IntentPage = {
   cta: {
     heading: "Try the version of this that doesn't depend on willpower",
     body: "Pair a drive, block the sites that take your afternoons, and leave the key in the kitchen.",
-  },
-  graphic: {
-    kind: "ladder",
-    title: "What each kind of lock costs to undo",
-    caption: "Six ways to lock a blocker, from a button in the app to a physical key in another room, with what each costs to undo.",
-    fromTable: "Why the other kinds of lock come off",
-    rows: {
-      "A button in the app": "blocked",
-      "A password you set": "blocked",
-      "A password a friend holds": "cost",
-      "A random string to retype": "cost",
-      "A timer you wait out": "cost",
-      "A physical key in another room": "open",
-    },
   },
   related: [
     "website-blocker-you-cant-turn-off",

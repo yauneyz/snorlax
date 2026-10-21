@@ -17,7 +17,7 @@ import {
   type IntentSection,
 } from "@/lib/content/intent";
 import { demoVideo } from "@/lib/content/intent/videos";
-import { graphicSize } from "@/lib/og/intentGraphic";
+import { graphicSize, hasGraphic } from "@/lib/og/intentGraphic";
 import { config } from "@/lib/config";
 import { LandingPage } from "@/components/marketing/LandingPage";
 import { isVariantKey, VARIANT_KEYS } from "@/components/marketing/heroVariants";
@@ -280,7 +280,7 @@ export default async function IntentLandingPage({ params }: PageProps) {
 
   const related = relatedIntentPages(page);
   const video = demoVideo(page.slug);
-  const graphic = graphicSize(page);
+  const graphic = hasGraphic(page) ? { ...page.graphic, ...graphicSize(page) } : null;
   // The demo is the centerpiece, so it comes straight after the answer wherever the page
   // file lists it; everything else keeps its written order.
   const demo = page.sections.find((section) => section.kind === "demo");
@@ -324,19 +324,21 @@ export default async function IntentLandingPage({ params }: PageProps) {
       {demo ? <Section section={demo} slug={page.slug} /> : null}
 
       {/* The answer drawn: src/lib/og/intentGraphic.tsx, prerendered by Satori at build. */}
-      <figure className="intent-graphic">
-        {/* eslint-disable-next-line @next/next/no-img-element -- a prerendered PNG with fixed
-            dimensions; the image optimizer would only re-encode it. */}
-        <img
-          src={`/${page.slug}/graphic.png`}
-          alt={`${page.graphic.title}. ${page.graphic.caption}`}
-          width={graphic.width}
-          height={graphic.height}
-          loading="lazy"
-          decoding="async"
-        />
-        <figcaption>{page.graphic.caption}</figcaption>
-      </figure>
+      {graphic ? (
+        <figure className="intent-graphic">
+          {/* eslint-disable-next-line @next/next/no-img-element -- a prerendered PNG with fixed
+              dimensions; the image optimizer would only re-encode it. */}
+          <img
+            src={`/${page.slug}/graphic.png`}
+            alt={`${graphic.title}. ${graphic.caption}`}
+            width={graphic.width}
+            height={graphic.height}
+            loading="lazy"
+            decoding="async"
+          />
+          <figcaption>{graphic.caption}</figcaption>
+        </figure>
+      ) : null}
 
       {rest.map((section, index) => (
         <Section key={`${section.kind}-${index}`} section={section} slug={page.slug} />

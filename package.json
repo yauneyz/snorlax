@@ -66,6 +66,7 @@
     "capture:marketing": "node scripts/capture-marketing.mjs",
     "capture:demo": "node scripts/record-demo.mjs",
     "capture:browser": "pnpm build:extension && tsx scripts/capture-browser.ts",
+    "capture:store": "pnpm build:extension && pnpm capture:build && tsx scripts/capture-store.ts",
     "motion:fixtures": "pnpm --filter @talysman/motion fixtures",
     "motion:studio": "pnpm --filter @talysman/motion studio",
     "motion:render": "pnpm --filter @talysman/motion render",

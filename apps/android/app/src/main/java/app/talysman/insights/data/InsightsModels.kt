@@ -176,6 +176,8 @@ data class ChannelRow(
     val downloaded: Long? = null,
     val installed: Long? = null,
     val accounts: Long,
+    // Defaulted so an APK built against this model still parses a server that predates it.
+    val paired: Long? = null,
     val trials: Long,
     val paid: Long,
     val pctVisitorToPaid: Double = 0.0,

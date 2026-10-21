@@ -58,4 +58,12 @@ describe("download page", () => {
       'href="https://learn.microsoft.com/en-us/windows/apps/package-and-deploy/smartscreen-reputation"',
     );
   });
+
+  it("explains why macOS asks for administrator access", () => {
+    expect(html).toContain("need administrator access on macOS?");
+    expect(html).toContain("Installing the persistent blocking service");
+    expect(html).toContain("Keeping focus sessions active after restarts");
+    expect(html).toContain("Your website blocklist stays on your Mac.");
+    expect(html).toContain('href="/privacy"');
+  });
 });

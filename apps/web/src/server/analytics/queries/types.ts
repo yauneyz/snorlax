@@ -83,6 +83,7 @@ export interface ChannelMetrics {
   downloaded: number;
   installed: number;
   accounts: number;
+  paired: number;
   trials: number;
   paid: number;
   pctVisitorToPaid: number;

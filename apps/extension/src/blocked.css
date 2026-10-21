@@ -137,6 +137,11 @@ p {
   margin-top: 18px;
 }
 
+/* `display: grid` would otherwise override `hidden` and leave an empty ring when there's no pause. */
+.pause[hidden] {
+  display: none;
+}
+
 .pause-ring {
   display: grid;
   place-items: center;

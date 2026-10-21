@@ -175,7 +175,7 @@ export type IntentPage = {
   answer: React.ReactNode;
   sections: IntentSection[];
   cta?: { heading: string; body: string };
-  graphic: IntentGraphic;
+  graphic?: IntentGraphic;
   /** Slugs of sibling pages. Keeps the set crawlable from any one of its members. */
   related: string[];
 };

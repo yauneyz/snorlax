@@ -6,13 +6,15 @@
  *
  * Chrome launches it when the extension calls connectNative. It answers `hello` with the state
  * frame in <state.json> — exactly what the daemon pushes when focus turns on — and acks
- * heartbeats so the extension reports itself connected. Nothing else: no service relay, no judge.
+ * heartbeats so the extension reports itself connected. If <state.json> carries a `popupInfo`
+ * fixture, `getPopupInfo` service requests (the blocked page's unlock card) are answered with it.
+ * Nothing else: no other service calls, no judge.
  * See `installStubNativeHost` in browser-capture.mjs for how a capture profile is pointed at it.
  */
 
 import { readFileSync } from 'node:fs';
 
-const state = JSON.parse(readFileSync(process.argv[2], 'utf8'));
+const { popupInfo, ...state } = JSON.parse(readFileSync(process.argv[2], 'utf8'));
 
 function send(message) {
   const body = Buffer.from(JSON.stringify(message), 'utf8');
@@ -32,6 +34,11 @@ process.stdin.on('data', (chunk) => {
     pending = pending.subarray(4 + length);
     if (message?.type === 'hello') send({ type: 'state', ...state });
     else if (message?.type === 'heartbeat') send({ type: 'heartbeatAck', sequence: message.sequence });
+    else if (message?.type === 'service-request') {
+      const { requestId, method } = message;
+      if (method === 'getPopupInfo' && popupInfo) send({ type: 'service-response', requestId, ok: true, result: popupInfo });
+      else send({ type: 'service-response', requestId, ok: false, code: 'INTERNAL', message: 'Not available in captures.' });
+    }
   }
 });
 process.stdin.on('end', () => process.exit(0));

@@ -232,14 +232,14 @@ private fun RetentionTable(rows: List<RetentionRow>) {
 @Composable
 private fun ChannelsTable(rows: List<ChannelRow>) {
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        TableHeader(listOf("Channel", "Visit", "Down", "Install", "Trial", "Paid"))
+        TableHeader(listOf("Channel", "Visit", "Paired", "Acct", "Trial", "Paid"))
         rows.take(8).forEach { row ->
             TableRow(
                 listOf(
                     "${row.channel} / ${row.medium}",
                     row.visitors.toString(),
-                    row.downloaded?.toString() ?: "—",
-                    row.installed?.toString() ?: "—",
+                    row.paired?.toString() ?: "—",
+                    row.accounts.toString(),
                     row.trials.toString(),
                     row.paid.toString(),
                 ),

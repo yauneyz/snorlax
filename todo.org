@@ -1,4 +1,3 @@
-- double down on "brick for computer" page, "physical website blocker"
 - how it works page
 - compare page
 - chrome and firefox store page, improve SEO
@@ -76,6 +75,13 @@ Indie hackers, Product hunt, etc
 Eventually:
 - the verge (installer?)
 - cal newport
+
+
+* Master plan
+- Get Talysman SEO optimized
+- practice viral distribution with Talysman Labs
+- add viral multiplayer to talysman
+- make an unrelated money-making viral product
 ======================================================
 # Ideas
 

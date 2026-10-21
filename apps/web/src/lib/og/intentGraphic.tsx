@@ -4,6 +4,13 @@ import { ImageResponse } from "next/og";
 import { palette } from "@talysman/shared";
 import type { GraphicTone, IntentGraphic, IntentPage } from "@/lib/content/intent/types";
 
+/** A page that has an infographic — `graphic` is optional on IntentPage. */
+export type GraphicPage = IntentPage & { graphic: IntentGraphic };
+
+export function hasGraphic(page: IntentPage): page is GraphicPage {
+  return page.graphic !== undefined;
+}
+
 /**
  * The search pages' infographics, drawn by Satori (via next/og) at build time. One template per
  * `IntentGraphic` kind; every number and claim comes from the page's own data.
@@ -390,7 +397,7 @@ function states(g: Extract<IntentGraphic, { kind: "states" }>): Body {
   };
 }
 
-function body(page: IntentPage): Body {
+function body(page: GraphicPage): Body {
   const g = page.graphic;
   switch (g.kind) {
     case "ladder":
@@ -411,13 +418,13 @@ function formatMonth(iso: string) {
 }
 
 /** The graphic's full size, for width/height on the <img>. */
-export function graphicSize(page: IntentPage) {
+export function graphicSize(page: GraphicPage) {
   // Bold display type runs wider than the body estimate; measure it as if larger.
   const titleH = 64 * lines(page.graphic.title, INNER, 62);
   return { width: GRAPHIC_WIDTH, height: PAD + 40 + 26 + titleH + 48 + body(page).height + 56 + 40 + PAD };
 }
 
-export function intentGraphic(page: IntentPage, { label }: { label: string }) {
+export function intentGraphic(page: GraphicPage, { label }: { label: string }) {
   const { node } = body(page);
   const size = graphicSize(page);
   return new ImageResponse(

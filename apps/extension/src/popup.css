@@ -165,8 +165,9 @@ footer {
   margin-top: 14px;
 }
 
-/* `display: grid` would otherwise override `hidden` and show pairing on desktop. */
-.pairing[hidden] {
+/* `display: grid` would otherwise override `hidden` and show pairing on desktop (and an empty unlock card). */
+.pairing[hidden],
+.unlock-card[hidden] {
   display: none;
 }
 

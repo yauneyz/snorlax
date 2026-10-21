@@ -8,7 +8,7 @@ import { existsSync } from "node:fs";
 import { resolve } from "node:path";
 import { softwareApplicationJsonLd } from "@/components/seo/JsonLd";
 import { demoVideo } from "@/lib/content/intent/videos";
-import { graphicSize } from "@/lib/og/intentGraphic";
+import { graphicSize, hasGraphic } from "@/lib/og/intentGraphic";
 import IntentLandingPage from "@/app/(marketing)/[slug]/page";
 
 // Static segments under (marketing) that a root-level slug must never shadow or collide with.
@@ -75,8 +75,10 @@ describe("intent page media", () => {
 
   // graphicSize lays the graphic out, which resolves every `fromTable` row it names — a renamed
   // table or reworded row label fails here rather than at build.
-  it("each have a graphic built from rows that exist", () => {
-    for (const page of intentPages) expect(() => graphicSize(page), page.slug).not.toThrow();
+  it("build each graphic from rows that exist", () => {
+    for (const page of intentPages.filter(hasGraphic)) {
+      expect(() => graphicSize(page), page.slug).not.toThrow();
+    }
   });
 
   // Rendered by apps/motion (`pnpm --filter @talysman/motion render <slug>`).
