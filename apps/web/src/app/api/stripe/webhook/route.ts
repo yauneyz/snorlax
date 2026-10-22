@@ -7,8 +7,7 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
 import { sendEmail } from "@/lib/resend/send";
 import { config } from "@/lib/config";
 import { captureException } from "@/lib/sentry";
-import { billingSignalsFor, trackBillingEvent } from "@/server/analytics/billing";
-import { sendInsightsPush } from "@/server/insights/push";
+import { trackBillingEvent } from "@/server/analytics/billing";
 
 // Node runtime is required: we read the raw body (`text()`) for signature
 // verification, and the Edge runtime does not expose what Stripe needs.
@@ -117,9 +116,6 @@ export async function POST(request: NextRequest) {
   }
 
   await markProcessed(event);
-  if (billingSignalsFor(event).some((signal) => signal.event === "subscription_started")) {
-    await sendInsightsPush({ type: "paid_conversion" });
-  }
   return NextResponse.json({ received: true });
 }
 

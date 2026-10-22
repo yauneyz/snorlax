@@ -9,18 +9,25 @@ const mocks = vi.hoisted(() => ({
   posthogCapture: vi.fn(),
   posthogFlush: vi.fn(),
   getPosthogServer: vi.fn(),
+  personLookup: vi.fn(),
+  sendInsightsPush: vi.fn(),
 }));
 
 vi.mock("@/lib/supabase/admin", () => ({
   supabaseAdmin: () => ({
     rpc: mocks.rpc,
-    from: () => ({ insert: mocks.insert, upsert: mocks.upsert }),
+    from: () => ({
+      insert: mocks.insert,
+      upsert: mocks.upsert,
+      select: () => ({ eq: () => ({ maybeSingle: mocks.personLookup }) }),
+    }),
   }),
 }));
 vi.mock("@/lib/sentry", () => ({ captureException: mocks.captureException }));
 vi.mock("@/lib/analytics/posthog-server", () => ({
   getPosthogServer: mocks.getPosthogServer,
 }));
+vi.mock("@/server/insights/push", () => ({ sendInsightsPush: mocks.sendInsightsPush }));
 
 import {
   clampOccurredAt,
@@ -38,6 +45,8 @@ beforeEach(() => {
   mocks.upsert.mockResolvedValue({ error: null });
   mocks.getPosthogServer.mockReturnValue(null);
   mocks.posthogFlush.mockResolvedValue(undefined);
+  mocks.personLookup.mockResolvedValue({ data: null, error: null });
+  mocks.sendInsightsPush.mockResolvedValue(undefined);
 });
 
 describe("ingestAllowed", () => {
@@ -237,6 +246,57 @@ describe("track", () => {
     await expect(track({ event: "page_viewed", source: "web", anonId: "a1" })).resolves.toBeUndefined();
     expect(mocks.insert).toHaveBeenCalledOnce();
     expect(mocks.captureException).not.toHaveBeenCalled();
+  });
+});
+
+describe("track milestone pushes", () => {
+  const person = (fields: Record<string, string | null>) => ({
+    data: { first_utm_source: null, first_utm_medium: null, first_referrer_host: null, ...fields },
+    error: null,
+  });
+
+  it("pushes a trial start with the person's first-touch channel", async () => {
+    mocks.personLookup.mockResolvedValue(person({ first_utm_source: "reddit", first_utm_medium: "cpc" }));
+    await track({ event: "trial_started", source: "server", userId: "u1" });
+    expect(mocks.sendInsightsPush).toHaveBeenCalledWith({
+      type: "trial_started",
+      channel: "reddit (cpc)",
+    });
+  });
+
+  it("pushes a key pairing, classifying a search referrer like the channel funnel does", async () => {
+    mocks.personLookup.mockResolvedValue(person({ first_referrer_host: "www.google.com" }));
+    await track({ event: "usb_key_paired", source: "desktop", deviceId: "d1", platform: "linux" });
+    expect(mocks.sendInsightsPush).toHaveBeenCalledWith({
+      type: "usb_key_paired",
+      channel: "google (organic)",
+      platform: "linux",
+    });
+  });
+
+  it("labels a person with no attribution as direct", async () => {
+    mocks.personLookup.mockResolvedValue(person({}));
+    await track({ event: "usb_key_paired", source: "desktop", deviceId: "d1" });
+    expect(mocks.sendInsightsPush.mock.calls[0][0]).toMatchObject({ channel: "direct" });
+  });
+
+  it("does not re-push a duplicate (replayed flush or retried webhook)", async () => {
+    mocks.insert.mockResolvedValue({ error: { code: "23505", message: "duplicate key" } });
+    await track({ event: "trial_started", source: "server", userId: "u1" });
+    expect(mocks.sendInsightsPush).not.toHaveBeenCalled();
+  });
+
+  it("does not push paid starts or downloads", async () => {
+    await track({ event: "subscription_started", source: "server", userId: "u1" });
+    await track({ event: "download_clicked", source: "server", anonId: "a1", props: { platform: "mac" } });
+    expect(mocks.sendInsightsPush).not.toHaveBeenCalled();
+  });
+
+  it("still pushes, as an unknown channel, when the lookup fails", async () => {
+    mocks.personLookup.mockResolvedValue({ data: null, error: { message: "timeout" } });
+    await track({ event: "trial_started", source: "server", userId: "u1" });
+    expect(mocks.sendInsightsPush).toHaveBeenCalledWith({ type: "trial_started", channel: "unknown" });
+    expect(mocks.captureException).toHaveBeenCalledOnce();
   });
 });
 

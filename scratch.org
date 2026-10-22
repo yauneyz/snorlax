@@ -1,3 +1,13 @@
-Anyone with administrator rights on their own machine can eventually force their way past any blocker, this one included. We aren't going to pretend otherwise. The goal is to add enough friction to prevent you from giving into cravings for distraction.
+As a hacker my work lives on my computer. I can put my phone in another room if it is too distracting, or I can use Brick or something like that for my phone.
 
-If you can always just go get the USB to unlock, you aren't going to try to uninstall Talysman instead. So now you're stuck having to go get the USB to unlock, which was the whole point of Talysman. We add just the right amount of annoying friction to keep you on task.
+But my computer has a browser, and that browser has Reddit, Hacker News, all the distracting stuff. It makes it really hard to get stuff done sometimes, especially because I have ADHD.
+
+It was so bad that out of desperation I ended up building a distraction blocker app where you can only turn off the blocker if a specific USB device is inserted.
+
+You see, I had used other blockers in the past for both my phone and my computer and the problem was that I would always just use the "temporary override" button whenever I felt the urge to be distracted.
+
+Physically separating the "off switch" from the distraction device makes all the difference. I can actually get things done now!
+
+It was so helpful for me personally that I turned it into an app that other people can download and use. And it works on Windows, MacOS, *and LInux.*
+
+Hope somebody gets some use out of it. It is called Talysman, you can check it out at talysman.app

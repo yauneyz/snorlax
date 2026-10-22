@@ -23,10 +23,14 @@ import com.google.firebase.messaging.FirebaseMessaging
 import java.util.concurrent.atomic.AtomicInteger
 
 object PushNotifications {
-    private const val DOWNLOAD_CHANNEL = "downloads_v1"
-    private const val CONVERSION_CHANNEL = "paid_conversions_v1"
+    private const val PAIRING_CHANNEL = "key_pairings_v1"
+    private const val TRIAL_CHANNEL = "trial_starts_v1"
     private const val ERROR_CHANNEL = "app_errors_v1"
-    private const val CONVERSION_SOUND_RESOURCE = "conversion_unlocked"
+    private const val TRIAL_SOUND_RESOURCE = "conversion_unlocked"
+
+    /** Channels from earlier builds: downloads no longer push, and the Zelda sound moved from
+     * paid conversions to trial starts. Deleted so they stop showing in system settings. */
+    private val RETIRED_CHANNELS = listOf("downloads_v1", "paid_conversions_v1")
     private val nextNotificationId = AtomicInteger(1000)
 
     fun initializeFirebase(context: Context): Boolean {
@@ -58,18 +62,19 @@ object PushNotifications {
     fun createChannels(context: Context) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
         val manager = context.getSystemService(NotificationManager::class.java)
+        RETIRED_CHANNELS.forEach(manager::deleteNotificationChannel)
         manager.createNotificationChannel(
             NotificationChannel(
-                DOWNLOAD_CHANNEL,
-                "Downloads",
+                PAIRING_CHANNEL,
+                "Key pairings",
                 NotificationManager.IMPORTANCE_DEFAULT,
             ).apply {
-                description = "A Talysman installer was downloaded"
+                description = "Someone successfully paired a Talysman USB key"
             },
         )
 
         val soundId = context.resources.getIdentifier(
-            CONVERSION_SOUND_RESOURCE,
+            TRIAL_SOUND_RESOURCE,
             "raw",
             context.packageName,
         )
@@ -83,11 +88,11 @@ object PushNotifications {
             .build()
         manager.createNotificationChannel(
             NotificationChannel(
-                CONVERSION_CHANNEL,
-                "Paid conversions",
+                TRIAL_CHANNEL,
+                "Trial starts",
                 NotificationManager.IMPORTANCE_HIGH,
             ).apply {
-                description = "Celebrates a new paid Talysman customer"
+                description = "Celebrates a new Talysman trial user"
                 setSound(soundUri, audioAttributes)
                 enableVibration(true)
             },
@@ -112,7 +117,7 @@ object PushNotifications {
                 PackageManager.PERMISSION_GRANTED
         ) return
 
-        val conversion = data["type"] == "paid_conversion"
+        val trial = data["type"] == "trial_started"
         val isError = data["type"] == "app_error"
         val intent = Intent(context, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
@@ -126,18 +131,18 @@ object PushNotifications {
         )
         val channel = when {
             isError -> ERROR_CHANNEL
-            conversion -> CONVERSION_CHANNEL
-            else -> DOWNLOAD_CHANNEL
+            trial -> TRIAL_CHANNEL
+            else -> PAIRING_CHANNEL
         }
         val notification = NotificationCompat.Builder(context, channel)
             .setSmallIcon(R.mipmap.ic_launcher)
-            .setContentTitle(data["title"] ?: if (conversion) "A new paid user! 🎉" else "New download")
-            .setContentText(data["body"] ?: "Talysman has a new event.")
+            .setContentTitle(data["title"] ?: if (trial) "A new trial user! 🎉" else "USB key paired")
+            .setContentText(data["body"] ?: data["channel"]?.let { "Channel: $it" } ?: "Talysman has a new event.")
             .setStyle(NotificationCompat.BigTextStyle().bigText(data["body"]))
             .setContentIntent(pendingIntent)
             .setAutoCancel(true)
             .setPriority(
-                if (conversion || isError) NotificationCompat.PRIORITY_HIGH else NotificationCompat.PRIORITY_DEFAULT,
+                if (trial || isError) NotificationCompat.PRIORITY_HIGH else NotificationCompat.PRIORITY_DEFAULT,
             )
             .build()
 

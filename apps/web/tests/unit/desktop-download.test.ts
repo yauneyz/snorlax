@@ -4,10 +4,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
 
 const track = vi.hoisted(() => vi.fn().mockResolvedValue(undefined));
-const sendInsightsPush = vi.hoisted(() => vi.fn().mockResolvedValue(undefined));
 const checkBotId = vi.hoisted(() => vi.fn().mockResolvedValue({ isBot: false }));
 vi.mock("@/server/analytics/track", () => ({ track }));
-vi.mock("@/server/insights/push", () => ({ sendInsightsPush }));
 vi.mock("botid/server", () => ({ checkBotId }));
 vi.mock("@/lib/supabase/server", () => ({
   supabaseServer: async () => ({
@@ -59,7 +57,6 @@ describe("GET /api/desktop/download", () => {
   it("does not record a download: anything can fetch a URL", async () => {
     await GET(get("?platform=mac"));
     expect(track).not.toHaveBeenCalled();
-    expect(sendInsightsPush).not.toHaveBeenCalled();
   });
 
   it.each(["?platform=freebsd", "?platform=deb", "?platform=linux&format=snap", ""])(
@@ -84,7 +81,6 @@ describe("POST /api/desktop/download", () => {
         props: expect.objectContaining({ platform: "linux", format: "rpm", ua_class: "human" }),
       }),
     );
-    expect(sendInsightsPush).toHaveBeenCalledWith({ type: "download", platform: "linux" });
   });
 
   it("keeps a live search page as the download's source and drops an unknown one", async () => {
@@ -100,7 +96,6 @@ describe("POST /api/desktop/download", () => {
     const response = await POST(post({ platform: "mac" }));
     expect(await response.json()).toEqual({ url: `${base}/app/Talysman.dmg` });
     expect(track).not.toHaveBeenCalled();
-    expect(sendInsightsPush).not.toHaveBeenCalled();
   });
 
   it("does not record a self-declared crawler", async () => {

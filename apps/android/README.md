@@ -85,9 +85,11 @@ fcm_service_account_file = "local-credentials/firebase-service-account.json"
 Apply Supabase migration `0009_insights_push_devices.sql`, run `pnpm sync:env:prod`, and redeploy
 the web app before installing the newly built APK.
 
-Paid conversions use a separate high-priority notification channel. The build stages
+Pushes go out for trial starts and successful USB key pairings (each naming the person's
+first-touch acquisition channel) and for user-facing app errors; downloads and paid conversions
+do not push. Trial starts use a separate high-priority notification channel. The build stages
 `../../assets/zelda-secret.mp3` as the Android resource `conversion_unlocked.mp3`; if that source
 asset is absent, the OS default notification sound is used. Android stores channel sound settings
-after first creation, so reinstall the app (or delete the “Paid conversions” channel in system
+after first creation, so reinstall the app (or delete the “Trial starts” channel in system
 settings) after changing the file. Users and some device policies can override or silence any
 channel sound.

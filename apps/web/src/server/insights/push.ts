@@ -5,36 +5,40 @@ import { captureException } from "@/lib/sentry";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 
 export type InsightsPush =
-  | { type: "download"; platform: "win" | "mac" | "linux" }
-  | { type: "paid_conversion" }
+  | { type: "trial_started"; channel: string }
+  | { type: "usb_key_paired"; channel: string; platform?: "win" | "mac" | "linux" | null }
   | { type: "app_error"; platform?: "win" | "mac" | "linux" | null; message: string };
 
 const FCM_SCOPE = "https://www.googleapis.com/auth/firebase.messaging";
 
+const PLATFORM_NAMES = { win: "Windows", mac: "macOS", linux: "Linux" } as const;
+
 function payloadFor(message: InsightsPush): Record<string, string> {
-  if (message.type === "paid_conversion") {
+  if (message.type === "trial_started") {
     return {
       type: message.type,
-      title: "A new paid user! 🎉",
-      body: "Someone just became a paying Talysman customer.",
+      title: "A new trial user! 🎉",
+      body: `Someone just started a Talysman trial. Channel: ${message.channel}`,
+      channel: message.channel,
     };
   }
 
-  if (message.type === "app_error") {
+  if (message.type === "usb_key_paired") {
+    const on = message.platform ? ` on ${PLATFORM_NAMES[message.platform]}` : "";
     return {
       type: message.type,
-      title: "Talysman error",
-      body: message.message.slice(0, 180),
+      title: "USB key paired",
+      body: `Someone paired a Talysman key${on}. Channel: ${message.channel}`,
+      channel: message.channel,
       ...(message.platform ? { platform: message.platform } : {}),
     };
   }
 
-  const platform = { win: "Windows", mac: "macOS", linux: "Linux" }[message.platform];
   return {
     type: message.type,
-    title: "New download",
-    body: `Someone downloaded Talysman for ${platform}.`,
-    platform: message.platform,
+    title: "Talysman error",
+    body: message.message.slice(0, 180),
+    ...(message.platform ? { platform: message.platform } : {}),
   };
 }
 
@@ -83,7 +87,7 @@ async function sendOne(token: string, accessToken: string, message: InsightsPush
   throw new Error(`FCM send failed (${response.status}): ${body.slice(0, 500)}`);
 }
 
-/** Best-effort fan-out. Push delivery must never break a download or Stripe webhook. */
+/** Best-effort fan-out. Push delivery must never break analytics ingest. */
 export async function sendInsightsPush(message: InsightsPush): Promise<void> {
   if (!configured()) return;
 

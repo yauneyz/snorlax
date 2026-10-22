@@ -10,7 +10,8 @@
     "studio": "tsx scripts/assets.ts && remotion studio src/index.ts",
     "render": "tsx scripts/render.ts",
     "typecheck": "tsc --noEmit",
-    "stills": "tsx scripts/stills.ts"
+    "stills": "tsx scripts/stills.ts",
+    "promo": "tsx scripts/promo.ts"
   },
   "dependencies": {
     "@fontsource-variable/jetbrains-mono": "^5.3.0",

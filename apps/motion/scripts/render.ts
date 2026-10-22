@@ -61,7 +61,7 @@ async function main() {
 
   // The demos live in the bundle (they import the desktop renderer, CSS and all), so their
   // metadata comes back through the compositions they register — see src/Root.tsx.
-  const all = (await getCompositions(serveUrl)).filter((composition) => composition.id !== 'gallery');
+  const all = (await getCompositions(serveUrl)).filter((composition) => composition.id !== 'gallery' && !composition.id.startsWith('promo-'));
   const demos = only.length > 0 ? all.filter((d) => only.includes(d.id)) : all;
   const missing = only.filter((slug) => !all.some((d) => d.id === slug));
   if (missing.length > 0) throw new Error(`no demo for: ${missing.join(', ')}`);

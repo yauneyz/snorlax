@@ -26,11 +26,16 @@ import {
   type AnalyticsPlatform,
   type AnalyticsSource,
 } from "@/lib/analytics/events";
-import { sendInsightsPush } from "@/server/insights/push";
+import { sendInsightsPush, type InsightsPush } from "@/server/insights/push";
+import { channelLabel } from "./channel";
 
 /** Caps app_error pushes at one per device+event in this window during a crash loop. Every
  * occurrence still lands in analytics_events — this only throttles the notification. */
 const ERROR_PUSH_THROTTLE_MS = 15 * 60_000;
+
+/** Milestones worth a phone buzz. Paid starts are deliberately absent: they follow from a trial
+ * on a predictable schedule, whereas a trial start or a key pairing is the news. */
+const MILESTONE_PUSH_EVENTS = new Set<AnalyticsEventName>(["trial_started", "usb_key_paired"]);
 
 /** Channel context for a request. Written to the person once, and onto each event row. */
 export type Attribution = {
@@ -253,12 +258,14 @@ export async function track(input: TrackInput): Promise<void> {
     // Resolve/merge the person first. Events store raw identifiers, so this is only about
     // keeping the graph current and recording attribution — the event row does not carry a
     // person_id and never needs backfilling after a merge.
+    let personId: string | null = null;
     if (identifiers.length > 0) {
-      const { error } = await db.rpc("analytics_link", {
+      const { data, error } = await db.rpc("analytics_link", {
         p_identifiers: identifiers,
         p_attribution: attributionPayload(input.attribution),
       });
       if (error) throw new Error(`analytics_link failed: ${error.message}`);
+      personId = typeof data === "string" ? data : null;
     }
 
     const occurredAt = clampOccurredAt(input.occurredAt, input.source);
@@ -292,6 +299,10 @@ export async function track(input: TrackInput): Promise<void> {
       }
     } else {
       await fanoutToPosthog(input);
+      // Only on a fresh row, so a replayed desktop flush or a retried webhook can't re-push.
+      if (MILESTONE_PUSH_EVENTS.has(input.event)) {
+        await pushMilestone(db, input, personId);
+      }
     }
 
     if (USER_FACING_ERROR_EVENTS.has(input.event)) {
@@ -300,6 +311,35 @@ export async function track(input: TrackInput): Promise<void> {
   } catch (err) {
     await captureException(err, { scope: "analytics.track", event: input.event });
   }
+}
+
+/** The person's first-touch channel rides along, so the notification says where they came from.
+ * A failed lookup still pushes, labelled "unknown" — the event is the news, the channel is detail. */
+async function pushMilestone(
+  db: ReturnType<typeof supabaseAdmin>,
+  input: TrackInput,
+  personId: string | null,
+): Promise<void> {
+  let channel = "unknown";
+  if (personId) {
+    try {
+      const { data, error } = await db
+        .from("analytics_persons")
+        .select("first_utm_source, first_utm_medium, first_referrer_host")
+        .eq("id", personId)
+        .maybeSingle();
+      if (error) throw new Error(`channel lookup failed: ${error.message}`);
+      if (data) channel = channelLabel(data);
+    } catch (err) {
+      await captureException(err, { scope: "analytics.pushMilestone", event: input.event });
+    }
+  }
+
+  const message: InsightsPush =
+    input.event === "trial_started"
+      ? { type: "trial_started", channel }
+      : { type: "usb_key_paired", channel, platform: input.platform };
+  await sendInsightsPush(message);
 }
 
 /**
