@@ -170,8 +170,11 @@ async function resolvedModel(value: AiConnection, signal: AbortSignal): Promise<
   return model;
 }
 
+// Ask for uncompressed responses: the user-configured endpoint is untrusted, and Electron's bundled Node
+// (24.22.0 as of Electron 43.8.3) predates the CVE-2026-111497 Brotli decoder fix in 24.22.1.
+// TODO: drop once Electron ships Node >= 24.22.1.
 function authHeaders(value: AiConnection): Record<string, string> {
-  return { ...(value.apiKey ? { Authorization: `Bearer ${value.apiKey}` } : {}), ...value.headers };
+  return { ...(value.apiKey ? { Authorization: `Bearer ${value.apiKey}` } : {}), ...value.headers, 'Accept-Encoding': 'identity' };
 }
 
 export async function completeAiChat(
