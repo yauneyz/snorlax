@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Talysman – Website Blocker for Deep Work",
   "short_name": "Talysman",
-  "version": "0.7.2",
+  "version": "0.8.0",
   "description": "Talysman blocks distracting websites and requires a physical key to be turned off. Companion to the Talysman desktop app.",
   "minimum_chrome_version": "120",
   "permissions": [
