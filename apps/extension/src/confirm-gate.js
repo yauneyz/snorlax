@@ -2,7 +2,8 @@
 // Pure — no `chrome.*` — so the background worker and the unit tests run the same code.
 //
 // The native host sends the default profile as plain block/allow (`state.confirm`) while focus is
-// off; `decide()` evaluates it like the active policy. "Yes, continue" lets a site through for
+// off, with soft-blocked sites' hosts folded into its blocklist; `decide()` evaluates it like the
+// active policy. "Yes, continue" lets a site through for
 // `CONFIRM_GRACE_MS`, renewed by every navigation to it, so the user is asked again only after
 // staying away for that long. Premade lists live only in static DNR rulesets, which `decide()`
 // can't query, so they don't prompt.

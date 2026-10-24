@@ -195,9 +195,9 @@ impl Core {
     }
 
     /// What the browser extension asks about while focus is off: the default profile — what "turn
-    /// on focus mode" would enforce — as plain website block/allow. Site rules and the AI judge only
-    /// make sense with focus on, so they're left out and a judged default lets pages through; apps
-    /// aren't asked about at all.
+    /// on focus mode" would enforce. Hard blocks and soft blocks (site rules that restrict at least
+    /// one feature) both prompt; the AI judge needs focus on, so a judged default lets pages through.
+    /// Apps aren't asked about at all.
     fn compute_confirm(&self) -> Option<ConfirmWhenOff> {
         let settings = &self.state.settings;
         if !settings.confirm_when_off_enabled || self.active {
@@ -207,7 +207,10 @@ impl Core {
         let profile = self.engine.state.profiles.iter().find(|p| p.id == profile_id)?;
         let mut policy = talysman_engine::effective::materialize(profile, &[]).policy;
         policy.apps.clear();
-        policy.sites.clear();
+        policy.sites.retain(|id, rule| {
+            talysman_engine::site_catalog::site(id)
+                .is_some_and(|site| site.effective(Some(rule)).values().any(|action| *action != RuleAction::Allow))
+        });
         policy.judge = None;
         policy.universal_soft_block = false;
         if policy.default_action == RuleAction::Judge {
@@ -1268,7 +1271,17 @@ mod dispatch_tests {
         let mut policy = blocks(&["reddit.com"]);
         policy.apps = vec![steam];
         policy.default_action = RuleAction::Judge;
-        policy.sites.insert("youtube".into(), Default::default());
+        // A soft block (reddit posts hidden) asks; a site rule that allows everything doesn't.
+        policy.sites.insert("reddit".into(), crate::model::SiteRule { features: [("content".to_string(), RuleAction::Block)].into() });
+        // (Sites with a locked restricting feature, like YouTube's, always soft-block once enabled.)
+        let allow_all = |site: &talysman_engine::site_catalog::CatalogSite| crate::model::SiteRule {
+            features: site.effective(None).into_keys().map(|f| (f, RuleAction::Allow)).collect(),
+        };
+        let open_site = talysman_engine::site_catalog::sites()
+            .iter()
+            .find(|site| site.id != "reddit" && site.effective(Some(&allow_all(site))).values().all(|a| *a == RuleAction::Allow))
+            .expect("a catalog site whose features can all be allowed");
+        policy.sites.insert(open_site.id.clone(), allow_all(open_site));
         let (mut core, mut rx) = core_with(policy, false);
         assert!(core.snapshot().confirm.is_none(), "off by default");
 
@@ -1277,7 +1290,7 @@ mod dispatch_tests {
         assert_eq!(confirm.message, "Are you sure?");
         assert_eq!(confirm.policy.blocked_domains, vec!["reddit.com".to_string()]);
         assert_eq!(confirm.policy.default_action, RuleAction::Allow, "no judge with focus off");
-        assert!(confirm.policy.sites.is_empty());
+        assert_eq!(confirm.policy.sites.keys().collect::<Vec<_>>(), vec!["reddit"], "soft blocks ask too");
         assert!(confirm.policy.apps.is_empty(), "apps are never asked about");
         assert!(core.network_policy.blocked_domains.is_empty(), "nothing is enforced");
         let announced = loop {

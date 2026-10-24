@@ -42,7 +42,7 @@ export interface Settings {
   blockedSiteStatsEnabled: boolean;
   /**
    * While focus is off, the browser extension shows an "are you sure?" page before opening a website
-   * the default profile blocks, offering to continue, go back, or turn on focus mode instead. Apps
+   * the default profile hard- or soft-blocks (a site rule restricting any feature), offering to continue, go back, or turn on focus mode instead. Apps
    * aren't asked about. Never key-gated. Default off.
    */
   confirmWhenOffEnabled: boolean;

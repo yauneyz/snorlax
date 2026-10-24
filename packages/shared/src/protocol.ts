@@ -100,8 +100,8 @@ export interface ServiceState {
 
 /**
  * The extension's "are you sure?" prompt while focus is off: the default profile's website blocking
- * as plain block/allow (no site rules, AI judge or apps), and the prompt text with the default
- * already applied.
+ * (hard blocks, plus site rules that restrict at least one feature; no AI judge or apps), and the
+ * prompt text with the default already applied.
  */
 export interface ConfirmWhenOff {
   policy: Policy;

@@ -156,12 +156,20 @@ pub fn state_frame(blocking: &Blocking, caps: &ExtensionCaps) -> Value {
 }
 
 /// The extension's "are you sure?" interstitial while focus is off: plain block/allow, which its
-/// `decide()` evaluates the same way as the active policy. Premade lists are static DNR rulesets
-/// the extension can only toggle, not query, so they aren't part of it.
+/// `decide()` evaluates the same way as the active policy. Soft-blocked sites ask too, so their
+/// hosts are folded into `blockedDomains` — with focus off nothing hides features in the page, so
+/// the whole site is the thing to ask about. Premade lists are static DNR rulesets the extension
+/// can only toggle, not query, so they aren't part of it.
 fn confirm_frame(blocking: &Blocking) -> Value {
     match &blocking.confirm {
         Some(confirm) if !blocking.active => json!({
-            "blockedDomains": confirm.policy.blocked_domains,
+            "blockedDomains": confirm
+                .policy
+                .blocked_domains
+                .iter()
+                .cloned()
+                .chain(confirm.policy.catalog_sites().flat_map(|(site, _)| site.hosts.iter().cloned()))
+                .collect::<Vec<_>>(),
             "allowedDomains": confirm.policy.allowed_domains,
             "defaultAction": confirm.policy.default_action,
             "message": confirm.message,
@@ -383,6 +391,15 @@ mod tests {
         assert_eq!(frame["confirm"]["blockedDomains"], json!(["reddit.com"]));
         assert_eq!(frame["confirm"]["defaultAction"], json!("allow"));
         assert_eq!(frame["confirm"]["message"], json!("Really?"));
+
+        // A soft-blocked site asks about the whole site.
+        let mut soft = policy.clone();
+        soft.sites.insert("youtube".into(), SiteRule::default());
+        blocking.apply_confirm_json(&json!({ "policy": soft, "message": "Really?" }));
+        let hosts = state_frame(&blocking, &caps)["confirm"]["blockedDomains"].clone();
+        assert_eq!(hosts[0], json!("reddit.com"));
+        assert!(hosts.as_array().unwrap().contains(&json!("youtube.com")), "{hosts}");
+        blocking.apply_confirm_json(&json!({ "policy": policy, "message": "Really?" }));
 
         blocking.active = true;
         assert!(state_frame(&blocking, &caps)["confirm"].is_null());

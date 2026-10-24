@@ -379,8 +379,9 @@ export function Settings() {
         </CardTitle>
         <div className="flex flex-col gap-3 text-body text-slate-300">
           <p className="text-slate-400">
-            When you open a website your default profile blocks, the browser extension asks first. You
-            can continue, go back, or turn on focus mode instead.
+            When you open a website your default profile blocks or restricts (like a site with its feed
+            hidden), the browser extension asks first. You can continue, go back, or turn on focus mode
+            instead.
           </p>
           <div className="flex items-center justify-between gap-3">
             <span className="font-medium text-slate-200">

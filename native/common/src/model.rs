@@ -95,7 +95,7 @@ pub struct Settings {
     #[serde(default)]
     pub blocked_site_stats_enabled: bool,
     /// While focus is off, the browser extension asks "are you sure?" before opening a website the
-    /// default profile blocks. Never key-gated.
+    /// default profile hard- or soft-blocks. Never key-gated.
     #[serde(default)]
     pub confirm_when_off_enabled: bool,
     /// Custom text for that prompt; empty means the default "Are you sure?".
@@ -198,8 +198,8 @@ pub struct ServiceState {
 }
 
 /// The extension's "are you sure?" prompt while focus is off: the default profile's website
-/// blocking, minus what needs focus on to mean something (site rules, the AI judge) and apps, plus
-/// the prompt text.
+/// blocking (hard blocks, and site rules that restrict something), minus the AI judge and apps,
+/// plus the prompt text.
 #[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct ConfirmWhenOff {
