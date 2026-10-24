@@ -62,6 +62,8 @@ const extensionFiles = [
   "blocked.html",
   "blocked.css",
   "blocked.js",
+  "confirm.html",
+  "confirm.js",
   "popup.html",
   "popup.css",
   "popup.js",
@@ -138,6 +140,7 @@ function bundledBackground(firefox = false) {
       "legacy-compat.js",
       firefox ? "loopback-port.js" : "loopback-stub.js",
       "universal-background.js",
+      "confirm-gate.js",
       "background.js",
     ])
   );

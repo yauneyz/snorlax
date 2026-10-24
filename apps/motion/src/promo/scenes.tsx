@@ -3,7 +3,8 @@
  * of the same scenes on a shorter timeline (see Promo.tsx).
  *
  * Feed rules these follow: the first frame already says something, every scene reads with the
- * sound off, the type sits in the middle of a 4:5 frame (clear of feed UI), and cuts are hard.
+ * sound off, the type sits in the middle of a 4:5 stage (clear of feed UI — the 9:16 cut places
+ * that stage clear of the short-form UI too), and cuts are hard.
  */
 import React, { useLayoutEffect, useRef, useState } from 'react';
 import { AbsoluteFill, Easing, interpolate } from 'remotion';
@@ -14,7 +15,7 @@ import { ramp, track, useTime } from '../ui/anim';
 import { Callout, Pointer, Ring, center, useAnchors } from '../ui/Pointer';
 import { APP_H, APP_W, RealApp } from '../ui/RealApp';
 import { BLOCK_EVERY, HOOK_TOTAL, REFUSAL_LAG, hookCount, hookLands, type Span } from './timeline';
-import { Backdrop, PROMO_W, PortEdge, Rise, Shockwave, Slam, UsbKey, impact, rgbSplit } from './fx';
+import { Backdrop, FullBleed, PROMO_W, PortEdge, Rise, Shockwave, Slam, UsbKey, impact, rgbSplit } from './fx';
 
 const out = Easing.bezier(0.16, 1, 0.3, 1);
 const inOut = Easing.bezier(0.65, 0, 0.35, 1);
@@ -77,7 +78,9 @@ export function Hook({ from, to, total = HOOK_TOTAL }: { from: number; to: numbe
           <br />
           have you <span style={{ color: c.signal }}>turned off</span>
           <br />
-          your blocker?
+          your distraction
+          <br />
+          blocker?
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 34 }}>
           <span style={{ fontFamily: fonts.mono, fontSize: 30, fontWeight: 700, letterSpacing: '0.2em', color: c.foregroundMuted }}>BLOCKER</span>
@@ -110,7 +113,7 @@ export function Hook({ from, to, total = HOOK_TOTAL }: { from: number; to: numbe
 export function Interrupt({ from, to, lines }: { from: number; to: number; lines: { at: number; text: string }[] }) {
   return (
     <Cut from={from} to={to}>
-      <AbsoluteFill style={{ background: c.signal }} />
+      <FullBleed style={{ background: c.signal }} />
       <AbsoluteFill style={{ ...column, gap: 6 }}>
         {lines.map((line) => (
           <Slam key={line.at} at={line.at} size={150} color={c.signalInk} weight={700}>
@@ -170,22 +173,22 @@ const flexCol: React.CSSProperties = { display: 'flex', flexDirection: 'column',
 /** The key slides out and is flung off to another room. */
 export function PullKey({ from, to, place }: { from: number; to: number; place: string }) {
   const t = useTime();
-  const pull = from + 0.35;
-  const fling = from + 0.85;
+  const pull = from + 0.45;
+  const fling = from + 1.1;
   const x = track(t, [
     { at: from, value: IN_X },
     { at: pull, value: IN_X + 260 },
     { at: fling, value: IN_X + 300 },
-    { at: fling + 0.55, value: PROMO_W + 100 },
+    { at: fling + 0.7, value: PROMO_W + 100 },
   ]);
   const y = track(t, [
     { at: fling, value: SLOT_Y - 90 },
-    { at: fling + 0.55, value: -300 },
+    { at: fling + 0.7, value: -300 },
   ]);
-  const spin = interpolate(t, [fling, fling + 0.55], [0, -38], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' });
-  const shrink = interpolate(t, [fling, fling + 0.55], [1, 0.45], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' });
+  const spin = interpolate(t, [fling, fling + 0.7], [0, -38], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' });
+  const shrink = interpolate(t, [fling, fling + 0.7], [1, 0.45], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' });
   const lit = 1 - ramp(t, from + 0.15, 0.15);
-  const pin = ramp(t, fling + 0.4, 0.35, out);
+  const pin = ramp(t, fling + 0.5, 0.4, out);
   return (
     <Cut from={from} to={to}>
       <Backdrop glow={c.danger} strength={0.08 * (1 - lit)} />
@@ -380,7 +383,7 @@ export function Refused({ from, to, click, title = 'Try turning it off.' }: { fr
 export type Site = { host: string; dot: string; note?: string };
 
 export const SITES: Site[] = [
-  { host: 'reddit.com', dot: '#ff4500', note: 'yes, even this one' },
+  { host: 'reddit.com', dot: '#ff4500', },
   { host: 'youtube.com', dot: '#ff0033' },
   { host: 'x.com', dot: c.foregroundStrong },
   { host: 'instagram.com', dot: c.profilePink },
@@ -482,7 +485,7 @@ function clock(seconds: number): string {
   return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
 }
 
-/** The urge passes; the focus timer races to a real afternoon. */
+/** You go back to work; the focus timer races to a real afternoon. */
 export function Payoff({ from, to, hours = 3.2 }: { from: number; to: number; hours?: number }) {
   const t = useTime();
   const p = ramp(t, from + 0.3, to - from - 0.6, Easing.bezier(0.3, 0, 0.1, 1));
@@ -490,7 +493,7 @@ export function Payoff({ from, to, hours = 3.2 }: { from: number; to: number; ho
     <Cut from={from} to={to}>
       <Backdrop glow={c.signal} strength={0.12} />
       <AbsoluteFill style={{ ...column, gap: 40 }}>
-        <Rise at={from} text="The urge passes." size={92} weight={700} />
+        <Rise at={from} text="You go back to work." size={92} weight={700} />
         <div
           style={{
             fontFamily: fonts.mono,
@@ -512,7 +515,8 @@ export function Payoff({ from, to, hours = 3.2 }: { from: number; to: number; ho
 
 // ─── End card ──────────────────────────────────────────────────────────────────────────────────
 
-export function EndCard({ from, to }: { from: number; to: number }) {
+/** `note` sits under the button — "Link in bio" where the URL can't be tapped. */
+export function EndCard({ from, to, note }: { from: number; to: number; note?: string }) {
   const t = useTime();
   const mark = ramp(t, from, 0.5, out);
   const cta = ramp(t, from + 0.55, 0.4, out);
@@ -547,10 +551,50 @@ export function EndCard({ from, to }: { from: number; to: number }) {
         >
           Start free → talysman.app
         </div>
+        {note ? (
+          <div style={{ marginTop: 26, fontFamily: fonts.sans, fontSize: 40, fontWeight: 600, color: c.signal, opacity: cta, transform: `translateY(${(1 - cta) * 40}px)` }}>{note}</div>
+        ) : null}
         <div style={{ marginTop: 40, fontFamily: fonts.mono, fontSize: 26, letterSpacing: '0.18em', color: c.foregroundMuted, opacity: ramp(t, from + 0.8, 0.4) }}>
           WINDOWS · MACOS · LINUX · ANY USB DRIVE
         </div>
       </AbsoluteFill>
     </Cut>
+  );
+}
+
+// ─── Cover ─────────────────────────────────────────────────────────────────────────────────────
+
+/**
+ * The thumbnail: one claim and the key, lit. Big enough to read as a grid tile, and inside the
+ * centre 3:4 that profile grids crop to.
+ */
+export function Cover() {
+  return (
+    <AbsoluteFill>
+      <Backdrop glow={c.signal} strength={0.2} />
+      <div style={{ position: 'absolute', left: 0, right: 0, top: 170, ...flexCol }}>
+        <div style={{ fontFamily: fonts.sans, fontSize: 136, fontWeight: 700, letterSpacing: '-0.04em', lineHeight: 0.98, color: c.foregroundStrong }}>
+          The blocker
+          <br />
+          you <span style={{ color: c.signal }}>can’t</span>
+          <br />
+          <span style={{ color: c.signal }}>turn off.</span>
+        </div>
+      </div>
+      <div
+        style={{
+          position: 'absolute',
+          left: (PROMO_W - 560) / 2,
+          top: 820,
+          transform: 'rotate(-9deg) scale(1.4)',
+          filter: `drop-shadow(0 30px 60px ${alpha(c.black, 0.8)}) drop-shadow(0 0 70px ${alpha(c.signal, 0.35)})`,
+        }}
+      >
+        <UsbKey led={1} />
+      </div>
+      <div style={{ position: 'absolute', left: 0, right: 0, top: 1150, ...flexCol }}>
+        <div style={{ fontFamily: fonts.sans, fontSize: 48, fontWeight: 600, color: c.foregroundSoft }}>Unless you have the key.</div>
+      </div>
+    </AbsoluteFill>
   );
 }

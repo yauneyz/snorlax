@@ -171,8 +171,28 @@
     });
   });
 
+  /**
+   * Count this block for the desktop Stats page — hostname only. The service drops it unless the
+   * user opted in to blocked-site stats. `history.state` marks the entry so a reload or Back/Forward
+   * to this blocked page isn't counted twice.
+   */
+  function countVisit() {
+    if (history.state && history.state.talysmanCounted) return;
+    var host;
+    try {
+      host = new URL(url).hostname;
+    } catch (e) {
+      return;
+    }
+    history.replaceState({ talysmanCounted: true }, '');
+    void service('recordBlockedSite', { host: host });
+  }
+
   send({ type: 'talysman:blocked-context' }).then(function (context) {
     url = context && context.url;
-    if (url) void refresh();
+    if (url) {
+      countVisit();
+      void refresh();
+    }
   });
 })();

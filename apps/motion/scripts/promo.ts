@@ -1,7 +1,7 @@
 /**
- * Renders the 4:5 feed promos, with sound.
+ * Renders the feed promos (4:5, plus the 9:16 hero for short-form), with sound.
  *
- *   pnpm --filter @talysman/motion promo                 # both cuts
+ *   pnpm --filter @talysman/motion promo                 # every cut
  *   pnpm --filter @talysman/motion promo promo-short     # one
  *   pnpm --filter @talysman/motion promo --scale=1       # faster draft
  *
@@ -9,14 +9,15 @@
  * here with ffmpeg (no licensed audio in the repo) and laid on the cues in src/promo/timeline.ts,
  * the same beats the picture hits. Feeds autoplay muted, so nothing depends on the sound.
  *
- * Output → apps/motion/out/promo/<id>.mp4 and <id>.jpg (thumbnail).
+ * Output → apps/motion/out/promo/<id>.mp4 and <id>.jpg (thumbnail: a designed cover still, or a
+ * frame of the cut).
  */
 import { execFileSync } from 'node:child_process';
-import { mkdirSync } from 'node:fs';
+import { mkdirSync, rmSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { bundle } from '@remotion/bundler';
-import { getCompositions, renderMedia } from '@remotion/renderer';
+import { getCompositions, renderMedia, renderStill } from '@remotion/renderer';
 import { stageAssets } from './assets';
 import { webpackOverride } from '../src/webpack';
 import { HERO_CUES, SHORT_CUES, type Cue, type Sfx } from '../src/promo/timeline';
@@ -27,8 +28,10 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 const OUT = resolve(HERE, '../out/promo');
 const SFX_DIR = join(OUT, 'sfx');
 
-const CUTS: Record<string, { cues: Cue[]; thumbnail: number }> = {
-  'promo-hero': { cues: HERO_CUES, thumbnail: 3.4 },
+/** `thumbnail` is a cover still's composition id, or the second of the cut to grab. */
+const CUTS: Record<string, { cues: Cue[]; thumbnail: string | number }> = {
+  'promo-hero': { cues: HERO_CUES, thumbnail: 'promo-cover' },
+  'promo-hero-vertical': { cues: HERO_CUES, thumbnail: 'promo-cover-vertical' },
   'promo-short': { cues: SHORT_CUES, thumbnail: 0.9 },
 };
 
@@ -80,8 +83,8 @@ function mix(cues: Cue[], seconds: number, output: string) {
     const ms = Math.max(0, Math.round(cue.at * 1000));
     return `[${i}]adelay=${ms}|${ms},volume=${cue.gain ?? 1}[a${i}]`;
   });
-  const graph = `${chains.join(';')};${cues.map((_, i) => `[a${i}]`).join('')}amix=inputs=${cues.length}:normalize=0,alimiter=limit=0.79,apad,atrim=0:${seconds}[out]`;
-  ffmpeg(...inputs, '-filter_complex', graph, '-map', '[out]', '-ar', '48000', output);
+  const graph = `${chains.join(';')};${cues.map((_, i) => `[a${i}]`).join('')}amix=inputs=${cues.length}:normalize=0,alimiter=limit=0.79:level=disabled,apad=whole_dur=${seconds}[out]`;
+  ffmpeg(...inputs, '-filter_complex', graph, '-map', '[out]', '-t', String(seconds), '-ar', '48000', output);
 }
 
 async function main() {
@@ -92,7 +95,8 @@ async function main() {
 
   console.log('bundling…');
   const serveUrl = await bundle({ entryPoint: resolve(HERE, '../src/index.ts'), webpackOverride, publicDir: resolve(HERE, '../public') });
-  const all = (await getCompositions(serveUrl)).filter((composition) => composition.id in CUTS);
+  const compositions = await getCompositions(serveUrl);
+  const all = compositions.filter((composition) => composition.id in CUTS);
   const cuts = only.length > 0 ? all.filter((c) => only.includes(c.id)) : all;
   const missing = only.filter((id) => !all.some((c) => c.id === id));
   if (missing.length > 0) throw new Error(`no promo: ${missing.join(', ')}`);
@@ -133,7 +137,19 @@ async function main() {
       '-movflags', '+faststart', '-shortest',
       join(OUT, `${composition.id}.mp4`),
     );
-    ffmpeg('-ss', String(thumbnail), '-i', raw, '-frames:v', '1', '-vf', size, '-q:v', '2', join(OUT, `${composition.id}.jpg`));
+    const jpg = join(OUT, `${composition.id}.jpg`);
+    if (typeof thumbnail === 'string') {
+      const cover = compositions.find((c) => c.id === thumbnail);
+      if (!cover) throw new Error(`no cover: ${thumbnail}`);
+      const png = join(OUT, `${thumbnail}.png`);
+      await renderStill({ serveUrl, composition: cover, output: png, scale, envVariables: { TZ: 'UTC' }, chromiumOptions: { gl: 'angle' } });
+      ffmpeg('-i', png, '-vf', size, '-q:v', '2', jpg);
+      rmSync(png);
+    } else {
+      ffmpeg('-ss', String(thumbnail), '-i', raw, '-frames:v', '1', '-vf', size, '-q:v', '2', jpg);
+    }
+    rmSync(raw);
+    rmSync(audio);
     console.log(`  ✓ ${join(OUT, `${composition.id}.mp4`)}`);
   }
 }

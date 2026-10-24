@@ -2,7 +2,7 @@
  * Effects for the feed promos: grain, impacts (shake, flash, shockwave, RGB split), kinetic type,
  * and the USB key itself. Everything is a pure function of time, like the rest of the motion app.
  */
-import React from 'react';
+import React, { createContext, useContext } from 'react';
 import { AbsoluteFill, Easing, interpolate, useCurrentFrame } from 'remotion';
 import { TalysmanMark } from '../../../desktop/src/renderer/components/TalysmanMark';
 import { alpha, c, fonts } from '../theme';
@@ -10,6 +10,21 @@ import { ramp, useTime } from '../ui/anim';
 
 export const PROMO_W = 1080;
 export const PROMO_H = 1350;
+
+/**
+ * How far past the 1080×1350 stage the frame really extends, in stage pixels — nonzero when the
+ * stage is placed inside a taller frame (the 9:16 cut). Full-bleed layers stretch by this much.
+ */
+export type Bleed = { x: number; top: number; bottom: number };
+const BleedContext = createContext<Bleed>({ x: 0, top: 0, bottom: 0 });
+export const BleedProvider = BleedContext.Provider;
+export const useBleed = () => useContext(BleedContext);
+
+/** Fills the whole frame, past the stage's edges when there is bleed. */
+export function FullBleed({ style, children }: { style?: React.CSSProperties; children?: React.ReactNode }) {
+  const b = useBleed();
+  return <AbsoluteFill style={{ top: -b.top, bottom: -b.bottom, left: -b.x, right: -b.x, width: 'auto', height: 'auto', ...style }}>{children}</AbsoluteFill>;
+}
 
 const out = Easing.bezier(0.16, 1, 0.3, 1);
 const back = Easing.bezier(0.34, 1.56, 0.64, 1);
@@ -96,7 +111,7 @@ export function Finish() {
 export function Backdrop({ glow = c.signal, strength = 0.12 }: { glow?: string; strength?: number }) {
   const t = useTime();
   return (
-    <AbsoluteFill style={{ background: c.background }}>
+    <FullBleed style={{ background: c.background }}>
       <AbsoluteFill style={{ background: `radial-gradient(ellipse 70% 45% at 50% 50%, ${alpha(glow, strength)}, transparent 70%)` }} />
       <AbsoluteFill
         style={{
@@ -106,7 +121,7 @@ export function Backdrop({ glow = c.signal, strength = 0.12 }: { glow?: string; 
           maskImage: 'radial-gradient(ellipse 75% 60% at 50% 50%, black, transparent)',
         }}
       />
-    </AbsoluteFill>
+    </FullBleed>
   );
 }
 
@@ -233,8 +248,9 @@ export function UsbKey({ led = 0, style }: { led?: number; style?: React.CSSProp
 
 /** The side of a laptop with a USB-A slot, filling the left edge. Drawn over the key so the plug disappears into it. */
 export function PortEdge({ slotY, glow = 0, width = 300 }: { slotY: number; glow?: number; width?: number }) {
+  const b = useBleed();
   return (
-    <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width }}>
+    <div style={{ position: 'absolute', left: -b.x, top: -b.top, bottom: -b.bottom, width: width + b.x }}>
       <div
         style={{
           position: 'absolute',
@@ -248,7 +264,7 @@ export function PortEdge({ slotY, glow = 0, width = 300 }: { slotY: number; glow
         style={{
           position: 'absolute',
           right: -2,
-          top: slotY - 60,
+          top: b.top + slotY - 60,
           width: 40,
           height: 120,
           borderRadius: '8px 0 0 8px',

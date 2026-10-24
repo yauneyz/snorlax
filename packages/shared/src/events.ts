@@ -3,7 +3,7 @@
 import type { AppRef, Policy } from './policy.js';
 import type { OnOff } from './schedule.js';
 import type { Settings } from './settings.js';
-import type { FocusSource, ServiceState } from './protocol.js';
+import type { ConfirmWhenOff, FocusSource, ServiceState } from './protocol.js';
 import type { JudgePolicy } from './policy.js';
 import type { JudgePage, JudgeVerdict } from './judge.js';
 
@@ -21,6 +21,8 @@ export interface EventMap {
    * the unlock popup (streak, pools, other options).
    */
   appBlocked: { app: AppRef };
+  /** The "are you sure?" prompt changed (`ServiceState.confirm`). */
+  confirmChanged: { confirm: ConfirmWhenOff | null };
   settingsChanged: { settings: Settings };
   /**
    * The browser handshake watchdog is about to close a browser whose extension stopped responding

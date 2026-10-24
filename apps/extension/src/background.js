@@ -27,6 +27,7 @@
 // feature there rather than leaving the page.
 
 import { createUniversalClassifier, universalEligible } from './universal-background.js';
+import { createConfirmGate } from './confirm-gate.js';
 
 import { buildRules } from './rules.js';
 import { heartbeatDelayForState } from './heartbeat-timing.js';
@@ -101,6 +102,9 @@ let currentPolicy = {
   sites: {},
   judge: null,
 };
+
+// The "are you sure?" prompt while focus is off; see confirm-gate.js.
+const confirmGate = createConfirmGate();
 
 // Stable-ish identifiers for this worker session (best-effort; the service correlates by browser
 // PID, not these).
@@ -220,6 +224,7 @@ function applyState(frame) {
     universalSoftBlock: state.universalSoftBlock === true,
     judge: sanitizeJudge(state.judge),
   };
+  confirmGate.update(state.confirm, blockingActive);
   policyGeneration += 1;
   invalidatePendingJudges();
   universalClassifier.invalidate();
@@ -420,6 +425,20 @@ browserApi.runtime.onMessage.addListener((message, sender, sendResponse) => {
     const tabId = sender && sender.tab ? sender.tab.id : undefined;
     const url = tabId === undefined ? null : attemptedUrlByTab.get(tabId) ?? null;
     sendResponse({ url, decision: url ? decide(currentPolicy, url) : null });
+    return false;
+  }
+  if (message?.type === 'talysman:confirm-context') {
+    const tabId = sender && sender.tab ? sender.tab.id : undefined;
+    const url = tabId === undefined ? null : attemptedUrlByTab.get(tabId) ?? null;
+    sendResponse({ url, message: confirmGate.message() });
+    return false;
+  }
+  if (message?.type === 'talysman:confirm-continue') {
+    continueToConfirmedUrl(sender);
+    return false;
+  }
+  if (message?.type === 'talysman:confirm-cancel') {
+    leaveConfirmPage(sender);
     return false;
   }
   if (message?.type === 'talysman:active-tab') {
@@ -810,13 +829,49 @@ async function judgePage(tabId, url, decision) {
 // the page's content.
 // ---------------------------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------------------------
+// "Are you sure?" while focus is off
+//
+// Focus is off, so nothing is enforced (no DNR rules, `currentPolicy.active` is false), but the
+// user asked to be stopped before opening what their default profile blocks. Navigations are
+// checked as they start (onBeforeNavigate) and, for pages a service worker serves without a
+// request, again on commit; a match sends the tab to confirm.html.
+// ---------------------------------------------------------------------------------------------
+
+function evaluateConfirm(tabId, url) {
+  if (currentPolicy.active || typeof tabId !== 'number' || tabId < 0 || !confirmGate.needsConfirm(url)) return;
+  attemptedUrlByTab.set(tabId, url);
+  Promise.resolve(browserApi.tabs.update(tabId, { url: browserApi.runtime.getURL('confirm.html') })).catch((e) => {
+    console.warn('[talysman] confirm redirect failed', { tabId, error: e && e.message });
+  });
+}
+
+/** "Yes, continue": let the site the tab was headed to through, then load it. */
+function continueToConfirmedUrl(sender) {
+  const tabId = sender && sender.tab ? sender.tab.id : undefined;
+  const url = tabId === undefined ? null : attemptedUrlByTab.get(tabId);
+  if (!url || !confirmGate.allow(url)) return;
+  Promise.resolve(browserApi.tabs.update(tabId, { url })).catch(() => {});
+}
+
+/** "No" (or focus mode just turned on): back to where the tab was, or close it if there's nowhere. */
+function leaveConfirmPage(sender) {
+  const tabId = sender && sender.tab ? sender.tab.id : undefined;
+  if (typeof tabId !== 'number') return;
+  Promise.resolve(browserApi.tabs.goBack(tabId)).catch(() => Promise.resolve(browserApi.tabs.remove(tabId)).catch(() => {}));
+}
+
 /**
  * Decide a top-level navigation and act on it.
  * @param {'commit'|'complete'|'spa'} phase
  * @returns {boolean} true when the navigation was blocked (caller should stop here).
  */
 function evaluateNavigation(tabId, url, phase) {
-  if (!currentPolicy.active || typeof tabId !== 'number' || tabId < 0) return false;
+  if (!currentPolicy.active) {
+    if (phase === 'commit') evaluateConfirm(tabId, url);
+    return false;
+  }
+  if (typeof tabId !== 'number' || tabId < 0) return false;
   if (!url || !/^https?:\/\//i.test(url)) return false; // extension/browser-internal pages
   const decision = decide(currentPolicy, url);
   if (phase === 'spa' || phase === 'complete') {
@@ -898,6 +953,7 @@ if (browserApi.webNavigation) {
   browserApi.webNavigation.onBeforeNavigate.addListener((details) => {
     if (details.frameId !== 0 || !/^https?:/i.test(details.url)) return;
     attemptedUrlByTab.set(details.tabId, details.url);
+    evaluateConfirm(details.tabId, details.url);
   });
   if (browserApi.tabs && browserApi.tabs.onRemoved) {
     browserApi.tabs.onRemoved.addListener((tabId) => attemptedUrlByTab.delete(tabId));

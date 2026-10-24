@@ -1081,7 +1081,6 @@ inventory. The platform READMEs and source-level module comments describe the im
 | `src/main/ipc/channels.ts` | String constants for renderer↔main channels (no magic strings). |
 | `src/main/ipc/handlers.ts` | `ipcMain.handle` implementations the preload calls; they translate UI intents into service RPCs and auth calls. |
 | `src/main/service/client.ts` | The NDJSON-RPC client: connects to the pipe/socket, sends requests, dispatches pushed events to subscribers (tray, renderer). Reconnects if the service restarts. |
-| `src/main/service/protocol.ts` | Re-exports the shared protocol types so the client is fully typed. |
 | `src/main/service/installer.ts` | Ensures the privileged service is installed and current; runs the elevated install/repair/upgrade when versions differ. |
 | `src/main/auth/supabase.ts` | Creates the `supabase-js` client from config; sign-in/out, session refresh. |
 | `src/main/auth/session.ts` | Persists/loads the session via `safeStorage` (DPAPI/Keychain). |

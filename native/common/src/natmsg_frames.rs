@@ -15,6 +15,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use serde_json::{json, Value};
 
 use crate::natmsg_legacy;
+use crate::model::ConfirmWhenOff;
 use crate::policy::{DefaultAction, JudgePolicy, Policy, RuleAction};
 use crate::site_catalog::CatalogSite;
 
@@ -29,6 +30,8 @@ pub struct Blocking {
     pub policy: Policy,
     pub handshake_enabled: bool,
     pub smart_filtering_enabled: bool,
+    /// The "are you sure?" prompt while focus is off (`ServiceState.confirm`).
+    pub confirm: Option<ConfirmWhenOff>,
 }
 
 impl Blocking {
@@ -39,6 +42,17 @@ impl Blocking {
             Ok(policy) => self.policy = policy,
             Err(error) => eprintln!("talysman-natmsg: ignoring unparseable policy: {error}"),
         }
+    }
+
+    /// Replace the prompt from a `getState` result or `confirmChanged` payload (`null` clears it).
+    /// One that doesn't parse clears it too: unlike the policy, this only ever adds friction.
+    pub fn apply_confirm_json(&mut self, confirm: &Value) {
+        self.confirm = serde_json::from_value(confirm.clone()).unwrap_or_else(|error| {
+            if !confirm.is_null() {
+                eprintln!("talysman-natmsg: ignoring unparseable confirm prompt: {error}");
+            }
+            None
+        });
     }
 
     /// The judge policy, if AI filtering can actually answer right now.
@@ -137,7 +151,23 @@ pub fn state_frame(blocking: &Blocking, caps: &ExtensionCaps) -> Value {
         "universalSoftBlock": blocking.policy.universal_soft_block && blocking.smart_filtering_enabled,
         "judge": blocking.available_judge(),
         "handshakeEnabled": blocking.handshake_required(),
+        "confirm": confirm_frame(blocking),
     })
+}
+
+/// The extension's "are you sure?" interstitial while focus is off: plain block/allow, which its
+/// `decide()` evaluates the same way as the active policy. Premade lists are static DNR rulesets
+/// the extension can only toggle, not query, so they aren't part of it.
+fn confirm_frame(blocking: &Blocking) -> Value {
+    match &blocking.confirm {
+        Some(confirm) if !blocking.active => json!({
+            "blockedDomains": confirm.policy.blocked_domains,
+            "allowedDomains": confirm.policy.allowed_domains,
+            "defaultAction": confirm.policy.default_action,
+            "message": confirm.message,
+        }),
+        _ => Value::Null,
+    }
 }
 
 /// `judgeRequest` RPC params from the extension's `judge-request` frame. The daemon attaches the
@@ -184,9 +214,11 @@ pub fn judge_result_frame(payload: &Value, caps: &ExtensionCaps) -> Value {
 }
 
 /// Service calls the extension may make through the host, for the blocked page's unlock popup:
-/// read-only popup info and the *keyless* pool-unlock commands. Everything else (overrides,
-/// config edits, emergency unlocks) stays in the desktop app, so a compromised page can at most
-/// spend the user's own daily pool budget.
+/// read-only popup info, the *keyless* pool-unlock commands, the write-only blocked-visit count
+/// (never `getStats`, so a page can't read the user's history back), and `enableFocus` for the
+/// "are you sure?" page's "turn on focus mode instead" (it only ever adds blocking). Everything else
+/// (overrides, config edits, emergency unlocks) stays in the desktop app, so a compromised page can
+/// at most spend the user's own daily pool budget.
 const RELAYED_COMMANDS: &[&str] = &["requestPoolUnlock", "confirmPoolUnlock", "cancelPoolUnlock"];
 
 /// Validate an extension `service-request` frame (`{requestId, method, params}`) against the
@@ -197,6 +229,9 @@ pub fn relay_request(frame: &Value) -> Option<(Value, String, Value)> {
     let params = frame.get("params").cloned().unwrap_or(Value::Null);
     let allowed = match method {
         "getPopupInfo" => params.pointer("/target/kind").and_then(Value::as_str) == Some("url"),
+        // Write-only: the service drops it unless the user opted in to blocked-site stats.
+        "recordBlockedSite" => params.get("host").is_some_and(Value::is_string),
+        "enableFocus" => true,
         "applyCommand" => {
             params.get("dryRun").is_none()
                 && params
@@ -264,7 +299,7 @@ mod tests {
         policy.sites.insert("reddit".into(), SiteRule { features: [("content".to_string(), RuleAction::Judge)].into() });
         policy.sites.insert("youtube".into(), SiteRule::default());
         policy.sites.insert("from-the-future".into(), SiteRule::default());
-        Blocking { active: true, policy, handshake_enabled: false, smart_filtering_enabled: true }
+        Blocking { active: true, policy, handshake_enabled: false, smart_filtering_enabled: true, confirm: None }
     }
 
     #[test]
@@ -312,7 +347,7 @@ mod tests {
         policy.blocked_domains = vec!["example.com".into()];
         policy.judge = Some(judge());
         policy.sites.insert("reddit".into(), SiteRule::default());
-        let on = Blocking { active: true, policy, handshake_enabled: false, smart_filtering_enabled: true };
+        let on = Blocking { active: true, policy, handshake_enabled: false, smart_filtering_enabled: true, confirm: None };
         let off = Blocking { smart_filtering_enabled: false, ..on.clone() };
         let caps = caps(&["reddit"]);
         let (mut on_frame, mut off_frame) = (state_frame(&on, &caps), state_frame(&off, &caps));
@@ -338,6 +373,26 @@ mod tests {
     }
 
     #[test]
+    fn the_confirm_prompt_is_sent_only_while_focus_is_off() {
+        let mut policy = Policy::default();
+        policy.blocked_domains = vec!["reddit.com".into()];
+        let mut blocking = Blocking::default();
+        blocking.apply_confirm_json(&json!({ "policy": policy, "message": "Really?" }));
+        let caps = ExtensionCaps { site_capability: SITE_CAPABILITY, ..Default::default() };
+        let frame = state_frame(&blocking, &caps);
+        assert_eq!(frame["confirm"]["blockedDomains"], json!(["reddit.com"]));
+        assert_eq!(frame["confirm"]["defaultAction"], json!("allow"));
+        assert_eq!(frame["confirm"]["message"], json!("Really?"));
+
+        blocking.active = true;
+        assert!(state_frame(&blocking, &caps)["confirm"].is_null());
+
+        blocking.active = false;
+        blocking.apply_confirm_json(&Value::Null);
+        assert!(state_frame(&blocking, &caps)["confirm"].is_null());
+    }
+
+    #[test]
     fn keeps_the_previous_policy_when_a_payload_does_not_parse() {
         let mut b = blocking();
         b.apply_policy_json(&json!({ "defaultAction": "sideways" }));
@@ -353,6 +408,11 @@ mod tests {
         assert!(!ok(json!({ "requestId": 1, "method": "applyCommand", "params": { "command": { "type": "startOverrideAll" } } })));
         assert!(!ok(json!({ "requestId": 1, "method": "applyCommand", "params": { "command": { "type": "confirmPoolUnlock" }, "dryRun": true } })));
         assert!(!ok(json!({ "requestId": 1, "method": "getPopupInfo", "params": { "target": { "kind": "app", "app": {} } } })));
+        assert!(ok(json!({ "requestId": 1, "method": "recordBlockedSite", "params": { "host": "reddit.com" } })));
+        assert!(ok(json!({ "requestId": 1, "method": "enableFocus", "params": null })));
+        assert!(!ok(json!({ "requestId": 1, "method": "disableFocus", "params": null })));
+        assert!(!ok(json!({ "requestId": 1, "method": "getStats", "params": {} })));
+        assert!(!ok(json!({ "requestId": 1, "method": "clearBlockedSiteStats", "params": {} })));
         assert!(!ok(json!({ "requestId": 1, "method": "pairKey", "params": {} })));
         assert!(!ok(json!({ "method": "getPopupInfo", "params": { "target": { "kind": "url", "url": "x" } } })));
         let refused = relay_response_frame(&json!(7), &json!({ "ok": false, "code": "POOL_EXHAUSTED", "message": "none left" }));

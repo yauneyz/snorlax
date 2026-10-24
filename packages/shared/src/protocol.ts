@@ -56,6 +56,24 @@ export interface UsageTransition {
   source: FocusSource;
 }
 
+/** One day of opt-in blocked-site counts (mirrors `talysman_common::blocked_sites`). */
+export interface BlockedSiteDay {
+  /** Local date, "YYYY-MM-DD". */
+  localDate: string;
+  /** Hostname (lowercased, no leading `www.`) → blocked visits that day. */
+  hosts: Record<string, number>;
+}
+
+/** Everything the Stats page computes from. */
+export interface StatsData {
+  /** Focus on/off transitions (the same log `drainUsage` serves), ~35 days. */
+  usage: UsageTransition[];
+  /** The engine journal: overrides, pool unlocks, emergency unlocks, streak breaks (~90 days). */
+  journal: JournalEntry[];
+  /** Empty unless `settings.blockedSiteStatsEnabled`; the last 30 days. */
+  blockedSites: BlockedSiteDay[];
+}
+
 /**
  * Full authoritative snapshot returned by `getState` and broadcast on changes (protocol 6).
  * `focusActive`/`policy` keep their v5 meaning for the native-messaging hosts, tray, and CLIs:
@@ -76,6 +94,18 @@ export interface ServiceState {
   presentKeyId?: string;
   /** Some active profile is held by a locked schedule window. */
   scheduleLocked: boolean;
+  /** What to ask about while focus is off (`settings.confirmWhenOffEnabled`); null otherwise. */
+  confirm?: ConfirmWhenOff | null;
+}
+
+/**
+ * The extension's "are you sure?" prompt while focus is off: the default profile's website blocking
+ * as plain block/allow (no site rules, AI judge or apps), and the prompt text with the default
+ * already applied.
+ */
+export interface ConfirmWhenOff {
+  policy: Policy;
+  message: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -117,6 +147,22 @@ export interface RequestMap {
    * without changing the policy contract.
    */
   setSmartFilteringEnabled: { params: { enabled: boolean }; result: Ok };
+  /** Opt in/out of blocked-site counts. Turning it off deletes them. Never key-gated. */
+  setBlockedSiteStatsEnabled: { params: { enabled: boolean }; result: Ok };
+  /**
+   * Turn the "are you sure?" page for blocked websites while focus is off on or off, and set its
+   * text (trimmed, at most `CONFIRM_MESSAGE_MAX` chars; empty uses the default). Never key-gated.
+   */
+  setConfirmWhenOff: { params: { enabled: boolean; message: string }; result: Ok };
+  /** Delete every recorded blocked-site count (tracking stays on if it was). */
+  clearBlockedSiteStats: { params: void; result: Ok };
+  /**
+   * Extension → (via natmsg) → service: its blocked page just showed for `host`. Write-only and a
+   * no-op unless `settings.blockedSiteStatsEnabled`.
+   */
+  recordBlockedSite: { params: { host: string }; result: Ok };
+  /** Focus log, journal and (when opted in) blocked-site counts, for the Stats page. */
+  getStats: { params: void; result: StatsData };
   /**
    * Liveness heartbeat from the browser extension, relayed by the native-messaging host
    * (talysman-natmsg). Fire-and-forget; the service records it for the watchdog. `browserPid` is

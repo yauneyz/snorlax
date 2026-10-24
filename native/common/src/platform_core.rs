@@ -15,11 +15,12 @@ use serde_json::{json, Value};
 use talysman_engine::engine::{Command, Gate, PopupTarget};
 use talysman_engine::{Auth, Ctx, Engine, EngineError, Tick};
 use talysman_common::active_ping;
+use talysman_common::blocked_sites::BlockedSites;
 use tokio::sync::{broadcast, watch, Mutex};
 
 use crate::constants::{err, PROTOCOL_VERSION, SERVICE_VERSION};
 use crate::enforce::{self, EnforceShared};
-use crate::model::{DefaultAction, FocusSource, PairedKey, Policy, ServiceState, TransitionKind};
+use crate::model::{ConfirmWhenOff, DefaultAction, FocusSource, PairedKey, Policy, RuleAction, ServiceState, TransitionKind};
 use crate::pairing;
 use crate::secure_store::{KeySecret, SecureStore};
 use crate::state::{local_now, AnalyticsIdentity, PersistentState};
@@ -41,6 +42,11 @@ const MAX_TICK_DELAY: Duration = Duration::from_secs(60 * 60);
 /// How often the DAU-protected ping loop re-checks. Protection is detected from the transition
 /// log, not sampled, so this only bounds how late in the day the ping lands (and retries).
 const PROTECTED_PING_INTERVAL: Duration = Duration::from_secs(5 * 60);
+
+/// The "are you sure?" prompt text when the user hasn't written their own.
+const DEFAULT_CONFIRM_MESSAGE: &str = "Are you sure?";
+/// Longest custom prompt text kept; mirrors `CONFIRM_MESSAGE_MAX` in packages/shared/src/settings.ts.
+const CONFIRM_MESSAGE_MAX: usize = 280;
 
 /// A `judgeRequest` awaiting `submitJudgeVerdict`. The judge policy is captured at request time
 /// so the timeout sweep answers with the requesting profile's fallback, and so a verdict computed
@@ -98,6 +104,11 @@ pub struct Core {
     /// Whether any profile was enforced at the last effective-policy push.
     active: bool,
     focus_source: FocusSource,
+    /// Opt-in blocked-site counts (`Settings::blocked_site_stats_enabled`), persisted on their own
+    /// in `blocked-sites.json` — never in `state.json`, whose `.bak` would outlive a delete.
+    blocked_sites: BlockedSites,
+    /// The "are you sure?" prompt last announced (`confirmChanged`).
+    confirm: Option<ConfirmWhenOff>,
     /// Tests stand in for USB enumeration with this.
     #[cfg(test)]
     pub test_present_key: Option<String>,
@@ -108,6 +119,13 @@ impl Core {
         let (events, _) = broadcast::channel(64);
         let engine = Engine::new(state.engine_state());
         state.engine = None;
+        let blocked_sites = if state.settings.blocked_site_stats_enabled {
+            load_blocked_sites()
+        } else {
+            // A file left behind with tracking off (e.g. a crash mid-delete) is removed, not read.
+            delete_blocked_sites_file();
+            BlockedSites::default()
+        };
         Core {
             state,
             engine,
@@ -121,6 +139,8 @@ impl Core {
             network_policy: Policy::default(),
             active: false,
             focus_source: FocusSource::Boot,
+            blocked_sites,
+            confirm: None,
             #[cfg(test)]
             test_present_key: None,
         }
@@ -170,7 +190,43 @@ impl Core {
             paired_keys: self.state.paired_keys.clone(),
             key_present: self.key_present,
             present_key_id: self.present_key_id.clone(),
+            confirm: self.confirm.clone(),
         }
+    }
+
+    /// What the browser extension asks about while focus is off: the default profile — what "turn
+    /// on focus mode" would enforce — as plain website block/allow. Site rules and the AI judge only
+    /// make sense with focus on, so they're left out and a judged default lets pages through; apps
+    /// aren't asked about at all.
+    fn compute_confirm(&self) -> Option<ConfirmWhenOff> {
+        let settings = &self.state.settings;
+        if !settings.confirm_when_off_enabled || self.active {
+            return None;
+        }
+        let profile_id = self.default_profile_id()?;
+        let profile = self.engine.state.profiles.iter().find(|p| p.id == profile_id)?;
+        let mut policy = talysman_engine::effective::materialize(profile, &[]).policy;
+        policy.apps.clear();
+        policy.sites.clear();
+        policy.judge = None;
+        policy.universal_soft_block = false;
+        if policy.default_action == RuleAction::Judge {
+            policy.default_action = RuleAction::Allow;
+        }
+        let message = settings.confirm_message.trim();
+        let message = if message.is_empty() { DEFAULT_CONFIRM_MESSAGE } else { message };
+        Some(ConfirmWhenOff { policy, message: message.to_string() })
+    }
+
+    /// Recompute the prompt after anything it depends on (settings, profiles, focus) may have
+    /// changed, and announce it to the native-messaging hosts.
+    fn refresh_confirm(&mut self) {
+        let confirm = self.compute_confirm();
+        if confirm == self.confirm {
+            return;
+        }
+        self.confirm = confirm;
+        self.emit("confirmChanged", json!({ "confirm": self.confirm }));
     }
 
     fn save(&mut self) {
@@ -182,6 +238,7 @@ impl Core {
     }
 
     fn persist_state(&mut self) {
+        self.refresh_confirm();
         self.save();
         self.emit("stateChanged", json!({ "state": self.snapshot() }));
     }
@@ -297,6 +354,7 @@ impl Core {
             self.emit("focusChanged", json!({ "active": active, "source": source }));
             tracing::info!("enforcement {} ({:?})", if active { "on" } else { "off" }, source);
         }
+        self.refresh_confirm();
     }
 
     fn handle_tick(&mut self, tick: &Tick) -> bool {
@@ -439,6 +497,72 @@ impl Core {
             "settingsChanged",
             json!({ "settings": self.state.settings.clone() }),
         );
+    }
+
+    /// Turn the "are you sure?" prompt on/off and set its text. Only ever applies while focus is
+    /// off, so it's never gated.
+    fn set_confirm_when_off(&mut self, enabled: bool, message: &str) {
+        let message: String = message.trim().chars().take(CONFIRM_MESSAGE_MAX).collect();
+        let settings = &self.state.settings;
+        if settings.confirm_when_off_enabled == enabled && settings.confirm_message == message {
+            return;
+        }
+        self.state.settings.confirm_when_off_enabled = enabled;
+        self.state.settings.confirm_message = message;
+        self.persist_state();
+        self.emit(
+            "settingsChanged",
+            json!({ "settings": self.state.settings.clone() }),
+        );
+    }
+
+    /// Opt in/out of blocked-site counts. Turning it off deletes everything recorded. Never gated.
+    fn set_blocked_site_stats_enabled(&mut self, enabled: bool) {
+        if self.state.settings.blocked_site_stats_enabled == enabled {
+            return;
+        }
+        self.state.settings.blocked_site_stats_enabled = enabled;
+        if !enabled {
+            self.clear_blocked_sites();
+        }
+        self.persist_state();
+        self.emit(
+            "settingsChanged",
+            json!({ "settings": self.state.settings.clone() }),
+        );
+    }
+
+    /// Extension (via natmsg) → service: its blocked page just showed for `host`. Ignored unless
+    /// the user opted in.
+    fn record_blocked_site(&mut self, host: &str) {
+        if !self.state.settings.blocked_site_stats_enabled {
+            return;
+        }
+        if self.blocked_sites.record(host, &local_now()) {
+            save_blocked_sites(&self.blocked_sites);
+        }
+    }
+
+    fn clear_blocked_sites(&mut self) {
+        self.blocked_sites = BlockedSites::default();
+        delete_blocked_sites_file();
+    }
+
+    /// What the Stats page computes from: the focus on/off log, the engine journal, and (only when
+    /// opted in) the blocked-site counts.
+    fn stats(&mut self) -> Value {
+        if self.blocked_sites.prune(&local_now()) {
+            save_blocked_sites(&self.blocked_sites);
+        }
+        json!({
+            "usage": self.state.usage_log,
+            "journal": self.engine.state.journal,
+            "blockedSites": if self.state.settings.blocked_site_stats_enabled {
+                serde_json::to_value(&self.blocked_sites.days).unwrap()
+            } else {
+                json!([])
+            },
+        })
     }
 
     /// Answer a judge request immediately without asking the judge.
@@ -779,6 +903,31 @@ impl Core {
                 self.set_smart_filtering_enabled(enabled);
                 Ok(ok())
             }
+            "setBlockedSiteStatsEnabled" => {
+                let enabled = params
+                    .get("enabled")
+                    .and_then(|v| v.as_bool())
+                    .ok_or_else(|| RpcError::new(err::BAD_REQUEST, "Missing field: enabled"))?;
+                self.set_blocked_site_stats_enabled(enabled);
+                Ok(ok())
+            }
+            "setConfirmWhenOff" => {
+                let enabled = params
+                    .get("enabled")
+                    .and_then(|v| v.as_bool())
+                    .ok_or_else(|| RpcError::new(err::BAD_REQUEST, "Missing field: enabled"))?;
+                self.set_confirm_when_off(enabled, &str_field(params, "message")?);
+                Ok(ok())
+            }
+            "clearBlockedSiteStats" => {
+                self.clear_blocked_sites();
+                Ok(ok())
+            }
+            "recordBlockedSite" => {
+                self.record_blocked_site(&str_field(params, "host")?);
+                Ok(ok())
+            }
+            "getStats" => Ok(self.stats()),
             "extHeartbeat" => {
                 // Fire-and-forget liveness from the extension (relayed by talysman-natmsg). Record
                 // it for the watchdog; never errors so a malformed beat can't disrupt the bridge.
@@ -937,6 +1086,55 @@ fn utc_date(epoch_ms: u64) -> String {
         .unwrap_or_default()
 }
 
+#[cfg(not(test))]
+fn blocked_sites_file() -> std::path::PathBuf {
+    crate::paths::state_file().with_file_name("blocked-sites.json")
+}
+
+#[cfg(not(test))]
+fn load_blocked_sites() -> BlockedSites {
+    std::fs::read(blocked_sites_file())
+        .ok()
+        .and_then(|bytes| serde_json::from_slice(&bytes).ok())
+        .unwrap_or_default()
+}
+
+#[cfg(test)]
+fn load_blocked_sites() -> BlockedSites {
+    BlockedSites::default()
+}
+
+/// Temp file + rename, and deliberately no `.bak`: a deleted entry must not survive anywhere.
+#[cfg(not(test))]
+fn save_blocked_sites(sites: &BlockedSites) {
+    let path = blocked_sites_file();
+    let tmp = path.with_extension("json.tmp");
+    let written = crate::paths::ensure_data_dir()
+        .and_then(|_| std::fs::write(&tmp, serde_json::to_vec(sites).unwrap_or_default()))
+        .and_then(|_| std::fs::rename(&tmp, &path));
+    if let Err(e) = written {
+        tracing::error!("blocked-site stats save failed: {e}");
+    }
+}
+
+#[cfg(test)]
+fn save_blocked_sites(_sites: &BlockedSites) {}
+
+#[cfg(not(test))]
+fn delete_blocked_sites_file() {
+    let path = blocked_sites_file();
+    for file in [path.with_extension("json.tmp"), path] {
+        if let Err(e) = std::fs::remove_file(&file) {
+            if e.kind() != std::io::ErrorKind::NotFound {
+                tracing::error!("could not delete {}: {e}", file.display());
+            }
+        }
+    }
+}
+
+#[cfg(test)]
+fn delete_blocked_sites_file() {}
+
 fn ok() -> Value {
     json!({ "ok": true })
 }
@@ -1039,6 +1237,71 @@ mod dispatch_tests {
         core.test_present_key = Some("k".into());
         apply(&mut core, upsert).unwrap_or_else(|e| panic!("{}", e.message));
         assert!(core.network_policy.blocked_domains.is_empty());
+    }
+
+    #[test]
+    fn blocked_sites_are_only_counted_after_opting_in_and_turning_off_deletes_them() {
+        let (mut core, _rx) = core_with(blocks(&["reddit.com"]), true);
+        let record = |core: &mut Core| core.dispatch("recordBlockedSite", &json!({ "host": "www.reddit.com" })).unwrap_or_else(|_| panic!());
+        let sites = |core: &mut Core| core.dispatch("getStats", &Value::Null).unwrap_or_else(|_| panic!())["blockedSites"].clone();
+
+        record(&mut core);
+        assert_eq!(sites(&mut core), json!([]), "off by default");
+
+        core.dispatch("setBlockedSiteStatsEnabled", &json!({ "enabled": true })).unwrap_or_else(|_| panic!());
+        record(&mut core);
+        record(&mut core);
+        assert_eq!(sites(&mut core)[0]["hosts"]["reddit.com"], 2);
+
+        core.dispatch("clearBlockedSiteStats", &Value::Null).unwrap_or_else(|_| panic!());
+        assert_eq!(sites(&mut core), json!([]));
+        record(&mut core);
+
+        core.dispatch("setBlockedSiteStatsEnabled", &json!({ "enabled": false })).unwrap_or_else(|_| panic!());
+        assert!(core.blocked_sites.days.is_empty());
+        assert!(!core.state.settings.blocked_site_stats_enabled);
+    }
+
+    #[test]
+    fn confirm_when_off_asks_about_the_default_profile_only_while_focus_is_off() {
+        let steam = crate::model::AppRef { linux_process_name: Some("steam".into()), label: "Steam".into(), ..Default::default() };
+        let mut policy = blocks(&["reddit.com"]);
+        policy.apps = vec![steam];
+        policy.default_action = RuleAction::Judge;
+        policy.sites.insert("youtube".into(), Default::default());
+        let (mut core, mut rx) = core_with(policy, false);
+        assert!(core.snapshot().confirm.is_none(), "off by default");
+
+        core.dispatch("setConfirmWhenOff", &json!({ "enabled": true, "message": "  " })).unwrap_or_else(|_| panic!());
+        let confirm = core.snapshot().confirm.expect("prompt while focus is off");
+        assert_eq!(confirm.message, "Are you sure?");
+        assert_eq!(confirm.policy.blocked_domains, vec!["reddit.com".to_string()]);
+        assert_eq!(confirm.policy.default_action, RuleAction::Allow, "no judge with focus off");
+        assert!(confirm.policy.sites.is_empty());
+        assert!(confirm.policy.apps.is_empty(), "apps are never asked about");
+        assert!(core.network_policy.blocked_domains.is_empty(), "nothing is enforced");
+        let announced = loop {
+            let event = rx.try_recv().expect("confirmChanged");
+            if event["event"] == "confirmChanged" {
+                break event;
+            }
+        };
+        assert_eq!(announced["payload"]["confirm"]["message"], "Are you sure?");
+
+        core.dispatch("setConfirmWhenOff", &json!({ "enabled": true, "message": " Back to work? " })).unwrap_or_else(|_| panic!());
+        assert_eq!(core.state.settings.confirm_message, "Back to work?");
+        assert_eq!(core.snapshot().confirm.unwrap().message, "Back to work?");
+
+        core.dispatch("enableFocus", &Value::Null).unwrap_or_else(|_| panic!());
+        assert!(core.snapshot().confirm.is_none(), "focus on blocks for real instead");
+    }
+
+    #[test]
+    fn stats_carry_the_focus_log_and_journal() {
+        let (mut core, _rx) = core_with(blocks(&["reddit.com"]), true);
+        let stats = core.dispatch("getStats", &Value::Null).unwrap_or_else(|_| panic!());
+        assert_eq!(stats["usage"].as_array().unwrap().last().unwrap()["kind"], "focusOn");
+        assert!(stats["journal"].is_array());
     }
 
     #[test]

@@ -345,6 +345,7 @@ async fn pump_pipe(
                             if let Some(enabled) = result.pointer("/settings/smartFilteringEnabled").and_then(Value::as_bool) {
                                 b.smart_filtering_enabled = enabled;
                             }
+                            b.apply_confirm_json(result.get("confirm").unwrap_or(&Value::Null));
                             changed = true;
                         }
                     }
@@ -385,6 +386,10 @@ async fn pump_pipe(
                                 b.smart_filtering_enabled = enabled;
                                 changed = true;
                             }
+                        }
+                        Some("confirmChanged") => {
+                            b.apply_confirm_json(v.pointer("/payload/confirm").unwrap_or(&Value::Null));
+                            changed = true;
                         }
                         Some("judgeResult") => {
                             if let Some(payload) = v.get("payload") {

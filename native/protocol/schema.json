@@ -79,7 +79,18 @@
       "browserHandshakeEnabled": "boolean",
       "trayIconEnabled": "boolean",
       "streakBadgeEnabled": "boolean",
-      "smartFilteringEnabled": "boolean"
+      "smartFilteringEnabled": "boolean",
+      "blockedSiteStatsEnabled": "boolean",
+      "confirmWhenOffEnabled": "boolean",
+      "confirmMessage": "string"
+    },
+    "ConfirmWhenOff": {
+      "policy": "Policy",
+      "message": "string"
+    },
+    "BlockedSiteDay": {
+      "localDate": "string",
+      "hosts": "Record<string, number>"
     },
     "BrowserHealth": {
       "canBlock": "boolean",
@@ -106,6 +117,7 @@
       "keyPresent": "boolean",
       "presentKeyId": "string?",
       "scheduleLocked": "boolean",
+      "confirm": "ConfirmWhenOff|null",
       "$comment": "focusActive/policy keep their v5 meaning for natmsg, tray and CLIs: whether anything is enforced, and the flat merged policy."
     }
   },
@@ -249,6 +261,45 @@
         "LOCKED"
       ]
     },
+    "setBlockedSiteStatsEnabled": {
+      "params": {
+        "enabled": "boolean"
+      },
+      "result": {
+        "ok": true
+      }
+    },
+    "setConfirmWhenOff": {
+      "params": {
+        "enabled": "boolean",
+        "message": "string"
+      },
+      "result": {
+        "ok": true
+      }
+    },
+    "clearBlockedSiteStats": {
+      "params": null,
+      "result": {
+        "ok": true
+      }
+    },
+    "recordBlockedSite": {
+      "params": {
+        "host": "string"
+      },
+      "result": {
+        "ok": true
+      }
+    },
+    "getStats": {
+      "params": null,
+      "result": {
+        "usage": "UsageTransition[]",
+        "journal": "JournalEntry[]",
+        "blockedSites": "BlockedSiteDay[]"
+      }
+    },
     "drainUsage": {
       "params": {
         "afterSeq": "number"
@@ -368,6 +419,9 @@
     },
     "appBlocked": {
       "app": "AppRef"
+    },
+    "confirmChanged": {
+      "confirm": "ConfirmWhenOff|null"
     }
   },
   "errorCodes": [

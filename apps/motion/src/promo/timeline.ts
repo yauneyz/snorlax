@@ -22,23 +22,25 @@ export const BLOCK_EVERY = 0.55;
 export const blockStamps = ([from]: Span, count: number, every = BLOCK_EVERY) => Array.from({ length: count }, (_, i) => from + 0.35 + i * every + every * 0.45);
 
 export const HERO = {
-  hook: [0, 2.4],
-  interrupt: [2.4, 3.7],
+  hook: [0, 3.4],
+  interrupt: [3.4, 5.2],
   lines: [
-    { at: 2.4, text: 'What if' },
-    { at: 2.72, text: 'it needed' },
-    { at: 3.04, text: 'a key?' },
+    { at: 3.4, text: 'What if' },
+    { at: 3.85, text: 'it needed' },
+    { at: 4.3, text: 'a key?' },
   ],
-  plug: [3.7, 5.5],
-  click: 4.45,
-  locked: [5.5, 7.0],
-  blocked: [7.0, 9.6],
+  plug: [5.2, 7.8],
+  click: 6.25,
+  locked: [7.8, 10.3],
+  blocked: [10.3, 13.9],
   sites: 4,
-  pull: [9.6, 11.2],
-  refused: [11.2, 13.4],
-  refuseClick: 11.95,
-  payoff: [13.4, 15.0],
-  end: [15.0, 18.0],
+  /** Slower than the default so the list gets savored. */
+  blockEvery: 0.75,
+  pull: [13.9, 16.1],
+  refused: [16.1, 19.3],
+  refuseClick: 16.85,
+  payoff: [19.3, 21.5],
+  end: [21.5, 25.0],
 } as const;
 
 export const SHORT = {
@@ -82,9 +84,9 @@ export const HERO_CUES: Cue[] = [
   { at: HERO.click, sfx: 'plug' },
   { at: HERO.click, sfx: 'thump', gain: 0.9 },
   { at: HERO.locked[0], sfx: 'whoosh', gain: 0.6 },
-  ...blockStamps(HERO.blocked, HERO.sites).map((at): Cue => ({ at, sfx: 'stamp' })),
+  ...blockStamps(HERO.blocked, HERO.sites, HERO.blockEvery).map((at): Cue => ({ at, sfx: 'stamp' })),
   { at: HERO.pull[0] + 0.2, sfx: 'unplug' },
-  { at: HERO.pull[0] + 0.85, sfx: 'whoosh' },
+  { at: HERO.pull[0] + 1.1, sfx: 'whoosh' },
   { at: HERO.refuseClick, sfx: 'tick' },
   { at: HERO.refuseClick + 0.1, sfx: 'buzz' },
   { at: HERO.refuseClick + REFUSAL_LAG, sfx: 'thump' },

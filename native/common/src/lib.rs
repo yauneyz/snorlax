@@ -10,6 +10,7 @@
 //! that every backend must accept and emit identically.
 
 pub mod active_ping;
+pub mod blocked_sites;
 pub mod browsers;
 pub mod extension_compat;
 pub mod model;

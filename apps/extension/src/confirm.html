@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Are you sure? · Talysman</title>
+    <link rel="stylesheet" href="blocked.css" />
+  </head>
+  <body>
+    <main>
+      <section class="blocked-card" aria-labelledby="confirm-title">
+        <header class="brand">
+          <img src="blocked-logo.svg" alt="" width="48" height="48" />
+          <span>Talysman</span>
+        </header>
+
+        <div class="divider"></div>
+
+        <h1 id="confirm-title">Are you sure?</h1>
+        <p id="confirm-summary">This website is on your blocklist. Focus mode is off, so it’s up to you.</p>
+
+        <div class="actions choices">
+          <button type="button" class="secondary" id="continue">Yes, continue</button>
+          <button type="button" class="primary" id="cancel">No, don’t continue</button>
+          <button type="button" class="secondary" id="focus">Turn on focus mode instead</button>
+        </div>
+        <p class="detail error" id="confirm-error" hidden></p>
+      </section>
+    </main>
+    <script src="confirm.js"></script>
+  </body>
+</html>

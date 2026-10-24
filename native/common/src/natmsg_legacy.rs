@@ -87,7 +87,7 @@ mod tests {
         );
         policy.sites.insert("hackernews".into(), SiteRule::default());
         policy.sites.insert("youtube".into(), SiteRule::default());
-        Blocking { active: true, policy, handshake_enabled: false, smart_filtering_enabled: true }
+        Blocking { active: true, policy, handshake_enabled: false, smart_filtering_enabled: true, confirm: None }
     }
 
     #[test]

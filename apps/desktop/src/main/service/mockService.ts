@@ -12,6 +12,7 @@
 import {
   DEFAULT_PROFILE_ID,
   DEFAULT_PROFILE_NAME,
+  CONFIRM_MESSAGE_MAX,
   DEFAULT_SETTINGS,
   EMPTY_POLICY,
   ErrorCode,
@@ -20,6 +21,7 @@ import {
   emptyProfileConfig,
   type AppRef,
   type Auth,
+  type BlockedSiteDay,
   type Command,
   type Drive,
   type EventName,
@@ -83,6 +85,7 @@ export class MockServiceConnection implements ServiceConnection {
   private usageSeq = 0;
   private pairedKeys: PairedKey[] = [];
   private settings: Settings = { ...DEFAULT_SETTINGS };
+  private blockedSites: BlockedSiteDay[] = [];
   private engine: Engine;
   private networkPolicy: Policy = EMPTY_POLICY;
   private active = false;
@@ -319,6 +322,53 @@ export class MockServiceConnection implements ServiceConnection {
         this.emit('settingsChanged', { settings: this.settings });
         return OK;
       }
+
+      case 'setBlockedSiteStatsEnabled': {
+        // Turning it off deletes what was recorded, like the daemon.
+        const enabled = (params as Params<'setBlockedSiteStatsEnabled'>).enabled;
+        if (!enabled) this.blockedSites = [];
+        this.settings = { ...this.settings, blockedSiteStatsEnabled: enabled };
+        this.emit('settingsChanged', { settings: this.settings });
+        return OK;
+      }
+
+      case 'setConfirmWhenOff': {
+        // Only applies while focus is off, so never gated.
+        const { enabled, message } = params as Params<'setConfirmWhenOff'>;
+        this.settings = {
+          ...this.settings,
+          confirmWhenOffEnabled: enabled,
+          confirmMessage: message.trim().slice(0, CONFIRM_MESSAGE_MAX),
+        };
+        this.emit('settingsChanged', { settings: this.settings });
+        return OK;
+      }
+
+      case 'clearBlockedSiteStats':
+        this.blockedSites = [];
+        return OK;
+
+      case 'recordBlockedSite': {
+        if (!this.settings.blockedSiteStatsEnabled) return OK;
+        const host = (params as Params<'recordBlockedSite'>).host.trim().toLowerCase().replace(/^www\./, '');
+        if (!host) return OK;
+        const now = new Date(this.clock());
+        const localDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+        let day = this.blockedSites[this.blockedSites.length - 1];
+        if (day?.localDate !== localDate) {
+          day = { localDate, hosts: {} };
+          this.blockedSites.push(day);
+        }
+        day.hosts[host] = (day.hosts[host] ?? 0) + 1;
+        return OK;
+      }
+
+      case 'getStats':
+        return {
+          usage: this.usageLog,
+          journal: this.engine.export().journal,
+          blockedSites: this.settings.blockedSiteStatsEnabled ? this.blockedSites : [],
+        } as Result<M>;
 
       case 'extHeartbeat': {
         // The mock has no real browsers to watch, but it still announces the beat so the UI's

@@ -6,7 +6,7 @@
 
 import { create } from 'zustand';
 import type { EngineSnapshot, Policy, Profile, ServiceState, Settings } from '@talysman/shared';
-import { DEFAULT_PROFILE_ID, DEFAULT_SETTINGS, EMPTY_POLICY } from '@talysman/shared';
+import { CONFIRM_MESSAGE_MAX, DEFAULT_PROFILE_ID, DEFAULT_SETTINGS, EMPTY_POLICY } from '@talysman/shared';
 import { productFeaturesForEnvironment } from '@talysman/product';
 import {
   aiModeStatus,
@@ -119,6 +119,8 @@ interface FocusStore {
   setBrowserHandshake: (enabled: boolean) => Promise<void>;
   setTrayIconEnabled: (enabled: boolean) => Promise<void>;
   setStreakBadgeEnabled: (enabled: boolean) => Promise<void>;
+  setBlockedSiteStatsEnabled: (enabled: boolean) => Promise<void>;
+  setConfirmWhenOff: (enabled: boolean, message: string) => Promise<void>;
   clearWatchdogWarning: () => void;
   setError: (e?: { code: string; message: string }) => void;
   applySnapshot: (s: ServiceState) => void;
@@ -289,6 +291,17 @@ export const useFocusStore = create<FocusStore>((set, get) => ({
   setStreakBadgeEnabled: async (enabled) => {
     await request('setStreakBadgeEnabled', { enabled });
     set((s) => ({ settings: { ...s.settings, streakBadgeEnabled: enabled } }));
+  },
+
+  setBlockedSiteStatsEnabled: async (enabled) => {
+    await request('setBlockedSiteStatsEnabled', { enabled });
+    set((s) => ({ settings: { ...s.settings, blockedSiteStatsEnabled: enabled } }));
+  },
+
+  setConfirmWhenOff: async (enabled, message) => {
+    await request('setConfirmWhenOff', { enabled, message });
+    const confirmMessage = message.trim().slice(0, CONFIRM_MESSAGE_MAX);
+    set((s) => ({ settings: { ...s.settings, confirmWhenOffEnabled: enabled, confirmMessage } }));
   },
 
   refresh: async () => {

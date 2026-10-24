@@ -90,6 +90,17 @@ pub struct Settings {
     /// Runtime/product capability. Production keeps this false and uses classic filtering.
     #[serde(default)]
     pub smart_filtering_enabled: bool,
+    /// Opt-in: count blocked site visits per day for the Stats page. Kept on this machine only.
+    /// Default off; turning it off deletes what was recorded. Never key-gated.
+    #[serde(default)]
+    pub blocked_site_stats_enabled: bool,
+    /// While focus is off, the browser extension asks "are you sure?" before opening a website the
+    /// default profile blocks. Never key-gated.
+    #[serde(default)]
+    pub confirm_when_off_enabled: bool,
+    /// Custom text for that prompt; empty means the default "Are you sure?".
+    #[serde(default)]
+    pub confirm_message: String,
 }
 
 fn default_true() -> bool {
@@ -103,6 +114,9 @@ impl Default for Settings {
             tray_icon_enabled: true,
             streak_badge_enabled: true,
             smart_filtering_enabled: false,
+            blocked_site_stats_enabled: false,
+            confirm_when_off_enabled: false,
+            confirm_message: String::new(),
         }
     }
 }
@@ -179,6 +193,18 @@ pub struct ServiceState {
     pub present_key_id: Option<String>,
     /// Some active profile is held by a locked window.
     pub schedule_locked: bool,
+    /// What to ask about while focus is off (`Settings::confirm_when_off_enabled`); `None` otherwise.
+    pub confirm: Option<ConfirmWhenOff>,
+}
+
+/// The extension's "are you sure?" prompt while focus is off: the default profile's website
+/// blocking, minus what needs focus on to mean something (site rules, the AI judge) and apps, plus
+/// the prompt text.
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct ConfirmWhenOff {
+    pub policy: Policy,
+    pub message: String,
 }
 
 #[cfg(test)]

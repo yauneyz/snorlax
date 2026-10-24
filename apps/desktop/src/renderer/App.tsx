@@ -5,6 +5,7 @@ import { desktopPaletteColor } from './lib/desktopPalette.js';
 import { productFeaturesForEnvironment } from '@talysman/product';
 import { useFocusStore } from './store/useFocusStore.js';
 import { Dashboard } from './pages/Dashboard.js';
+import { Stats } from './pages/Stats.js';
 import { Blocklists } from './pages/Blocklists.js';
 import { SchedulePage } from './pages/Schedule.js';
 import { Keys } from './pages/Keys.js';
@@ -18,10 +19,11 @@ import { OverrideDialog } from './components/OverrideDialog.js';
 import { AppMessageBanners } from './components/AppMessageBanners.js';
 import { cx, effectiveAction } from './lib/utils.js';
 
-export type Route = 'dashboard' | 'blocklists' | 'schedule' | 'keys' | 'account' | 'plans' | 'settings';
+export type Route = 'dashboard' | 'stats' | 'blocklists' | 'schedule' | 'keys' | 'account' | 'plans' | 'settings';
 
 const NAV: { route: Route; label: string }[] = [
   { route: 'dashboard', label: 'Dashboard' },
+  { route: 'stats', label: 'Stats' },
   { route: 'blocklists', label: 'Blocklists' },
   { route: 'schedule', label: 'Schedule' },
   { route: 'keys', label: 'Keys' },
@@ -213,6 +215,7 @@ export default function App({ initialRoute = 'dashboard' }: { initialRoute?: Rou
           ) : (
             <div key={route} className="mx-auto h-full w-full max-w-[960px] animate-rise">
               {route === 'dashboard' && <Dashboard />}
+              {route === 'stats' && <Stats />}
               {route === 'blocklists' && <Blocklists onUpgrade={() => setRoute('plans')} />}
               {route === 'schedule' && <SchedulePage onUpgrade={() => setRoute('plans')} />}
               {route === 'keys' && <Keys />}

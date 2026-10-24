@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { productFeaturesForEnvironment } from '@talysman/product';
+import { CONFIRM_MESSAGE_MAX, DEFAULT_CONFIRM_MESSAGE } from '@talysman/shared';
 import { useFocusStore } from '../store/useFocusStore.js';
 import {
   checkForUpdates,
@@ -42,6 +43,9 @@ export function Settings() {
   const setTrayIconEnabled = useFocusStore((s) => s.setTrayIconEnabled);
   const streakBadgeEnabled = useFocusStore((s) => s.settings.streakBadgeEnabled);
   const setStreakBadgeEnabled = useFocusStore((s) => s.setStreakBadgeEnabled);
+  const confirmEnabled = useFocusStore((s) => s.settings.confirmWhenOffEnabled);
+  const confirmMessage = useFocusStore((s) => s.settings.confirmMessage);
+  const setConfirmWhenOff = useFocusStore((s) => s.setConfirmWhenOff);
   const aiMode = useFocusStore((s) => s.aiMode);
   const setAiMode = useFocusStore((s) => s.setAiMode);
   const replayOnboarding = useFocusStore((s) => s.replayOnboarding);
@@ -63,6 +67,9 @@ export function Settings() {
   const [streakError, setStreakError] = useState<string | null>(null);
   const [trayBusy, setTrayBusy] = useState(false);
   const [trayError, setTrayError] = useState<string | null>(null);
+  const [confirmBusy, setConfirmBusy] = useState(false);
+  const [confirmError, setConfirmError] = useState<string | null>(null);
+  const [confirmDraft, setConfirmDraft] = useState(confirmMessage);
   const [aiModeBusy, setAiModeBusy] = useState(false);
   const [aiModeError, setAiModeError] = useState<string | null>(null);
   const [aiConnection, setAiConnection] = useState<AiConnectionStatus | null>(null);
@@ -168,6 +175,20 @@ export function Settings() {
       setStreakError((e as Error).message);
     } finally {
       setStreakBusy(false);
+    }
+  }
+
+  useEffect(() => setConfirmDraft(confirmMessage), [confirmMessage]);
+
+  async function saveConfirm(enabled: boolean, message: string) {
+    setConfirmBusy(true);
+    setConfirmError(null);
+    try {
+      await setConfirmWhenOff(enabled, message);
+    } catch (e) {
+      setConfirmError((e as Error).message);
+    } finally {
+      setConfirmBusy(false);
     }
   }
 
@@ -349,6 +370,49 @@ export function Settings() {
             <p className="text-caption text-slate-500">Insert your paired USB key to turn this off.</p>
           )}
           {handshakeError && <p className="text-body text-warn">{handshakeError}</p>}
+        </div>
+      </Card>
+
+      <Card>
+        <CardTitle hint="Only while focus mode is off. With focus on, blocked sites stay blocked.">
+          Ask before opening blocked websites
+        </CardTitle>
+        <div className="flex flex-col gap-3 text-body text-slate-300">
+          <p className="text-slate-400">
+            When you open a website your default profile blocks, the browser extension asks first. You
+            can continue, go back, or turn on focus mode instead.
+          </p>
+          <div className="flex items-center justify-between gap-3">
+            <span className="font-medium text-slate-200">
+              Status: <Badge tone={confirmEnabled ? 'ok' : 'neutral'}>{confirmEnabled ? 'On' : 'Off'}</Badge>
+            </span>
+            <Button
+              variant={confirmEnabled ? 'ghost' : 'primary'}
+              disabled={confirmBusy}
+              onClick={() => saveConfirm(!confirmEnabled, confirmDraft)}
+            >
+              {confirmEnabled ? 'Turn off' : 'Turn on'}
+            </Button>
+          </div>
+          <label className="text-caption text-slate-300">
+            Message
+            <div className="mt-1 flex gap-2">
+              <Input
+                value={confirmDraft}
+                maxLength={CONFIRM_MESSAGE_MAX}
+                placeholder={DEFAULT_CONFIRM_MESSAGE}
+                onChange={(e) => setConfirmDraft(e.target.value)}
+              />
+              <Button
+                variant="ghost"
+                disabled={confirmBusy || confirmDraft.trim() === confirmMessage}
+                onClick={() => saveConfirm(confirmEnabled, confirmDraft)}
+              >
+                Save
+              </Button>
+            </div>
+          </label>
+          {confirmError && <p className="text-body text-warn">{confirmError}</p>}
         </div>
       </Card>
 

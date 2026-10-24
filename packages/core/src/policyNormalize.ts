@@ -91,7 +91,7 @@ function normalizeApp(app: AppRef): AppRef | null {
 /** Normalize a domain list against its own `normalizeDomain` rules, deduped, order-stable. */
 function normalizeDomainList(
   input: string[] | undefined,
-  rejected: { value: string; reason: string }[],
+  rejected: NormalizedPolicy['rejected'],
 ): string[] {
   const seen = new Set<string>();
   const domains: string[] = [];
@@ -150,7 +150,7 @@ function clip(value: unknown): string {
 /** Normalize the judge configuration. A judge with no task is dropped: there is nothing to judge against. */
 function normalizeJudge(
   judge: JudgePolicy | null | undefined,
-  rejected: { value: string; reason: string }[],
+  rejected: NormalizedPolicy['rejected'],
 ): JudgePolicy | null {
   if (!judge) return null;
   const tasks: JudgeTask[] = [];
@@ -180,7 +180,7 @@ function normalizeJudge(
  */
 function normalizeSites(
   sites: Record<string, SiteRule> | undefined,
-  rejected: { value: string; reason: string }[],
+  rejected: NormalizedPolicy['rejected'],
 ): Record<string, SiteRule> {
   const out: Record<string, SiteRule> = {};
   for (const [id, rule] of Object.entries(sites ?? {})) {
@@ -204,9 +204,52 @@ function normalizeSites(
   return out;
 }
 
+/** Normalize app identities, keeping the first label for each distinct identity. */
+function normalizeApps(input: AppRef[] | undefined, rejected: NormalizedPolicy['rejected']): AppRef[] {
+  const seen = new Set<string>();
+  const apps: AppRef[] = [];
+  for (const app of input ?? []) {
+    const normalized = normalizeApp(app);
+    if (!normalized) {
+      rejected.push({
+        value: app.label ?? '(app)',
+        reason: 'no windowsImageName, linuxProcessName, or macBundleId',
+      });
+      continue;
+    }
+    const key = `${normalized.windowsImageName ?? ''}|${normalized.linuxProcessName ?? ''}|${normalized.macBundleId ?? ''}`;
+    if (!seen.has(key)) {
+      seen.add(key);
+      apps.push(normalized);
+    }
+  }
+  return apps;
+}
+
+/** Reject unknown list ids and preserve the authored order of known lists. */
+function normalizePremadeLists(
+  input: PremadeListId[] | undefined,
+  rejected: NormalizedPolicy['rejected'],
+): PremadeListId[] {
+  const knownListIds = new Set<PremadeListId>(PREMADE_LISTS.map((l) => l.id));
+  const enabledPremadeLists: PremadeListId[] = [];
+  const premadeSeen = new Set<PremadeListId>();
+  for (const id of input ?? []) {
+    if (!knownListIds.has(id)) {
+      rejected.push({ value: id, reason: 'unknown premade list id' });
+      continue;
+    }
+    if (!premadeSeen.has(id)) {
+      premadeSeen.add(id);
+      enabledPremadeLists.push(id);
+    }
+  }
+  return enabledPremadeLists;
+}
+
 /** Normalize and validate an entire policy. */
 export function normalizePolicy(input: Policy | (Partial<Policy> & LegacyPolicyFields)): NormalizedPolicy {
-  const rejected: { value: string; reason: string }[] = [];
+  const rejected: NormalizedPolicy['rejected'] = [];
   const policy = migrateLegacyPolicy(input);
 
   const blockedDomains = normalizeDomainList(policy.blockedDomains, rejected);
@@ -227,38 +270,8 @@ export function normalizePolicy(input: Policy | (Partial<Policy> & LegacyPolicyF
   // Without a judge, `judge` actions resolve to allow at enforcement; say so explicitly.
   if (defaultAction === 'judge' && !judge) defaultAction = 'allow';
 
-  const appSeen = new Set<string>();
-  const apps: AppRef[] = [];
-  for (const a of policy.apps ?? []) {
-    const n = normalizeApp(a);
-    if (!n) {
-      rejected.push({
-        value: a.label ?? '(app)',
-        reason: 'no windowsImageName, linuxProcessName, or macBundleId',
-      });
-      continue;
-    }
-    const key = `${n.windowsImageName ?? ''}|${n.linuxProcessName ?? ''}|${n.macBundleId ?? ''}`;
-    if (!appSeen.has(key)) {
-      appSeen.add(key);
-      apps.push(n);
-    }
-  }
-
-  const knownListIds = new Set<PremadeListId>(PREMADE_LISTS.map((l) => l.id));
-  const enabledPremadeLists: PremadeListId[] = [];
-  const premadeSeen = new Set<PremadeListId>();
-  for (const id of policy.enabledPremadeLists ?? []) {
-    if (!knownListIds.has(id)) {
-      rejected.push({ value: id, reason: 'unknown premade list id' });
-      continue;
-    }
-    if (!premadeSeen.has(id)) {
-      premadeSeen.add(id);
-      enabledPremadeLists.push(id);
-    }
-  }
-
+  const apps = normalizeApps(policy.apps, rejected);
+  const enabledPremadeLists = normalizePremadeLists(policy.enabledPremadeLists, rejected);
   const sites = normalizeSites(policy.sites, rejected);
 
   return {
