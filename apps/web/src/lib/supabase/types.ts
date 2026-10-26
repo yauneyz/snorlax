@@ -53,6 +53,52 @@ export type LifetimePurchaseRow = {
   refunded_at: string | null;
 };
 
+/** An affiliate link, https://www.talysman.app/r/<slug>. Managed only by `pnpm affiliates`. */
+export type AffiliateRow = {
+  id: string;
+  slug: string;
+  name: string;
+  contact: string | null;
+  notes: string | null;
+  active: boolean;
+  landing_path: string;
+  commission_bps: number;
+  commission_months: number;
+  created_at: string;
+  updated_at: string;
+};
+
+/** Money actually sent to an affiliate. */
+export type AffiliatePayoutRow = {
+  id: string;
+  affiliate_id: string;
+  amount_cents: number;
+  currency: string;
+  paid_at: string;
+  note: string | null;
+  created_at: string;
+};
+
+/** `affiliate_referrals` view: one row per person an affiliate earned, all time. */
+export type AffiliateReferralRow = {
+  affiliate_id: string;
+  affiliate_slug: string;
+  person_id: string;
+  affiliate_at: string;
+  first_seen_at: string;
+  user_id: string | null;
+  email: string | null;
+  stripe_customer_id: string | null;
+  downloaded_at: string | null;
+  installed_at: string | null;
+  signed_up_at: string | null;
+  paired_at: string | null;
+  trial_at: string | null;
+  paid_at: string | null;
+  lifetime_purchased_at: string | null;
+  subscription_status: string | null;
+};
+
 /** Redemption code for a complimentary grant. Server-only: the row holds a secret's hash. */
 export type CompCodeRow = {
   id: string;
@@ -112,6 +158,10 @@ export type AnalyticsPersonRow = {
   last_utm_source: string | null;
   last_utm_medium: string | null;
   last_utm_campaign: string | null;
+  /** First affiliate link this person arrived through (migration 0020). Wins over first-touch
+   * for channel reporting. */
+  affiliate_id: string | null;
+  affiliate_at: string | null;
 };
 
 /** `identifier` is prefixed: 'anon:<uuid>' | 'device:<uuid>' | 'user:<uuid>'. */

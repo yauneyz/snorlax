@@ -5,6 +5,9 @@
  */
 import type {
   ActiveEntitlementRow,
+  AffiliatePayoutRow,
+  AffiliateReferralRow,
+  AffiliateRow,
   AnalyticsActiveDailyRow,
   AnalyticsActiveDayRow,
   AnalyticsDauRow,
@@ -103,6 +106,19 @@ export type Database = {
         Update: Partial<AppMessageRow>;
         Relationships: [];
       };
+      affiliates: {
+        Row: AffiliateRow;
+        Insert: Pick<AffiliateRow, "slug" | "name"> & Partial<AffiliateRow>;
+        Update: Partial<Omit<AffiliateRow, "id" | "slug">>;
+        Relationships: [];
+      };
+      affiliate_payouts: {
+        Row: AffiliatePayoutRow;
+        Insert: Pick<AffiliatePayoutRow, "affiliate_id" | "amount_cents"> &
+          Partial<AffiliatePayoutRow>;
+        Update: Partial<AffiliatePayoutRow>;
+        Relationships: [];
+      };
       app_message_receipts: {
         Row: AppMessageReceiptRow;
         Insert: Pick<AppMessageReceiptRow, "message_id" | "device_id"> &
@@ -170,6 +186,10 @@ export type Database = {
       };
     };
     Views: {
+      affiliate_referrals: {
+        Row: AffiliateReferralRow;
+        Relationships: [];
+      };
       active_subscriptions: {
         Row: SubscriptionRow;
         Relationships: [];

@@ -325,11 +325,17 @@ async function pushMilestone(
     try {
       const { data, error } = await db
         .from("analytics_persons")
-        .select("first_utm_source, first_utm_medium, first_referrer_host")
+        .select("first_utm_source, first_utm_medium, first_referrer_host, affiliate_id")
         .eq("id", personId)
         .maybeSingle();
       if (error) throw new Error(`channel lookup failed: ${error.message}`);
-      if (data) channel = channelLabel(data);
+      if (data) {
+        const affiliate = data.affiliate_id
+          ? (await db.from("affiliates").select("slug").eq("id", data.affiliate_id).maybeSingle())
+              .data
+          : null;
+        channel = channelLabel({ ...data, affiliate_slug: affiliate?.slug });
+      }
     } catch (err) {
       await captureException(err, { scope: "analytics.pushMilestone", event: input.event });
     }

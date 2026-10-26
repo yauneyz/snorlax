@@ -1,5 +1,15 @@
 # Affiliate Program Implementation Guide
 
+> **What is actually built (2026-10-26): the informal version, not this guide.** Links are
+> `https://www.talysman.app/r/<slug>` (`apps/web/src/app/r/[slug]/route.ts`), which redirect with
+> `utm_source=<slug>&utm_medium=affiliate`. `analytics_link()` stamps the first affiliate onto
+> the analytics person, and that affiliate wins over first-touch in the Channels panel and in
+> Insights (migration `0020_affiliates.sql`). There are no promotion codes, webhook ledger, or
+> payout batching. Instead, `pnpm affiliates` starts a local-only admin app
+> (`apps/web/scripts/affiliates/`) that manages affiliates, computes commission from Stripe
+> charges, and records payouts by hand. The rest of this document is the fuller design for
+> when the program outgrows that.
+
 The recommended manual-reconciliation design is automated attribution and
 bookkeeping followed by manual review and payout. Do not calculate commissions
 from scratch in a spreadsheet every month. Stripe webhooks should maintain an

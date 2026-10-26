@@ -25,6 +25,7 @@
     "web:start": "pnpm --filter @talysman/web start",
     "web:test": "pnpm --filter @talysman/web test",
     "comp": "pnpm --filter @talysman/web comp",
+    "affiliates": "pnpm --filter @talysman/web affiliates",
     "message": "pnpm --filter @talysman/web message",
     "web:test:webhook": "pnpm --filter @talysman/web test:webhook",
     "web:test:email": "pnpm --filter @talysman/web email:test",
