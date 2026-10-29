@@ -30,7 +30,7 @@ export const websiteBlockerMac: IntentPage = {
         be plugged in.
       </p>
       <p>
-        It blocks sites in Safari, Chrome, Firefox and every other browser at the network level, adds
+        It blocks sites at the network level, below whatever browser you open, adds
         Chrome and Firefox extensions for finer rules, and blocks desktop apps with Pro.
       </p>
     </>
@@ -45,7 +45,7 @@ export const websiteBlockerMac: IntentPage = {
         ["Force Quit or kill the daemon", "launchd starts it again."],
         ["Stop it with launchctl as a standard user", "Denied — it's a root daemon."],
         ["Restart the Mac", "The daemon starts at boot and the session is still on."],
-        ["Switch to Safari", "Blocking runs at the network level, below every browser. With Strict Mode on, browsers without the extension are closed."],
+        ["Switch to another browser", "Blocking runs at the network level, below every browser. With Strict Mode on, browsers without the extension are closed."],
         ["Click End session", "The daemon checks for your paired USB key. Not there, no unlock."],
       ],
     },
@@ -54,13 +54,13 @@ export const websiteBlockerMac: IntentPage = {
       title: "On a Mac, mid-afternoon",
       beats: [
         { label: "Cmd-Q", body: "You quit Talysman. The site is still blocked." },
-        { label: "Safari", body: "You try another browser. Same block — it isn't an extension trick." },
+        { label: "Other browser", body: "You try another browser. Same block — it isn't an extension trick." },
         { label: "End session", body: "“Insert your key to turn off the blocker.” The indicator is red." },
         { label: "The key", body: "It's on the hallway shelf. You'd have to go get it. You go back to work instead." },
       ],
       media: {
         label: "macOS: quit, switch browsers, refusal",
-        note: "Screen recording on macOS: Cmd-Q → site still blocked → Safari also blocked → End session refusal → cut to the drive on a shelf.",
+        note: "Screen recording on macOS: Cmd-Q → site still blocked → another browser also blocked → End session refusal → cut to the drive on a shelf.",
         ratio: "16 / 9",
         kind: "video",
       },
@@ -106,14 +106,14 @@ export const websiteBlockerMac: IntentPage = {
   graphic: {
     kind: "ladder",
     title: "Getting out on a Mac: every route",
-    caption: "What happens on macOS when you quit Talysman, kill its daemon, use launchctl, restart, switch to Safari or click End session without the key.",
+    caption: "What happens on macOS when you quit Talysman, kill its daemon, use launchctl, restart, switch browsers or click End session without the key.",
     fromTable: "What happens when you try to get out on a Mac",
     rows: {
       "Cmd-Q the app": "blocked",
       "Force Quit or kill the daemon": "blocked",
       "Stop it with launchctl as a standard user": "blocked",
       "Restart the Mac": "blocked",
-      "Switch to Safari": "blocked",
+      "Switch to another browser": "blocked",
       "Click End session": "blocked",
     },
   },

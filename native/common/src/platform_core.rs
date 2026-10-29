@@ -422,7 +422,7 @@ impl Core {
             return Err(RpcError::new(err::NO_PAIRED_KEY, "Pair a key before turning on focus."));
         }
         let Some(profile_id) = self.default_profile_id() else {
-            return Err(RpcError::new(err::BAD_REQUEST, "No profile to turn on."));
+            return Err(RpcError::new(err::BAD_REQUEST, "No mode to turn on."));
         };
         self.run_command(Command::SetLatch { profile_id, on: true })?;
         Ok(())

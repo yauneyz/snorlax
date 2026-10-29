@@ -103,7 +103,7 @@ export function Keys() {
           <div className="mt-0.5 text-caption text-slate-400">
             {keyPresent
               ? 'Controls are unlocked while a paired drive is connected.'
-              : 'Insert a paired drive to turn focus off or loosen a profile.'}
+              : 'Insert a paired drive to turn focus off or loosen a mode.'}
           </div>
         </div>
       </div>

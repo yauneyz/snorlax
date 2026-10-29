@@ -47,7 +47,7 @@ export default async function CancelPage() {
             : `Pro stays on until the end of the period you've already paid for, and you won't be charged again.`}
         </p>
         <p>
-          You&apos;ll keep {appName} Free. Note that scheduled windows and extra blocking profiles
+          You&apos;ll keep {appName} Free. Note that scheduled windows and extra blocking modes
           are removed on the way down.
         </p>
         <div className="account__plan-actions">

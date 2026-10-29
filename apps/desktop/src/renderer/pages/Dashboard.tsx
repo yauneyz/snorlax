@@ -41,7 +41,7 @@ export function Dashboard() {
                   <li key={`${event.profileId}:${event.atMs}:${event.kind}`} className="flex items-center gap-2 text-body text-slate-200">
                     <ProfileDot color={profile?.color ?? palette.colors.foregroundFaint} size={7} />
                     <span className="truncate">
-                      {profile?.name ?? 'Profile'} {EVENT_VERB[event.kind]}
+                      {profile?.name ?? 'Mode'} {EVENT_VERB[event.kind]}
                     </span>
                     <span className="ml-auto font-mono text-caption text-slate-400">{formatClock(event.atMs, now)}</span>
                   </li>

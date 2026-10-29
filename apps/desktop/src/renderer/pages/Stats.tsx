@@ -162,7 +162,7 @@ function FocusByDay({ summary, range }: { summary: StatsSummary; range: RangeDay
       </div>
       {empty ? (
         <p className="py-8 text-center text-body text-slate-450">
-          No focus time yet in this period. Turn on a profile and it shows up here.
+          No focus time yet in this period. Turn on a mode and it shows up here.
         </p>
       ) : (
         <>
@@ -404,7 +404,7 @@ function describe(entry: JournalEntry, profileName: (id: string) => string): str
 
 function RecentActivity({ entries }: { entries: JournalEntry[] }) {
   const profiles = useFocusStore((s) => s.profiles);
-  const profileName = (id: string) => profiles.find((p) => p.id === id)?.name ?? 'A deleted profile';
+  const profileName = (id: string) => profiles.find((p) => p.id === id)?.name ?? 'A deleted mode';
   return (
     <Card>
       <CardTitle>Recent activity</CardTitle>

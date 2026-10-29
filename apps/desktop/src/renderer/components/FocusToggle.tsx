@@ -125,7 +125,7 @@ export function FocusToggle() {
               active.slice(0, 4).map((p) => <ProfileDot key={p.profile.id} color={p.profile.color} size={7} />)
             )}
             <span className="whitespace-nowrap text-body font-semibold text-slate-200">
-              {only ? only.name : active.length > 1 ? `${active.length} profiles on` : next ? next.name : 'No profile on'}
+              {only ? only.name : active.length > 1 ? `${active.length} modes on` : next ? next.name : 'No mode on'}
             </span>
           </button>
 

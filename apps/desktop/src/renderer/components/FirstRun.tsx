@@ -77,15 +77,12 @@ const MODES: { value: ModePreset; label: string; blurb: string }[] = [
     : []),
 ];
 
-/**
- * Published listings, mirroring apps/web's download page. Chromium browsers other than Chrome
- * (Edge, Brave, Vivaldi) install the Chrome Web Store build.
- */
+/** Published listings, mirroring apps/web's download page. Only Chrome and Firefox are supported. */
 const EXTENSION_STORES: { key: string; name: string; note: string; url: string }[] = [
   {
     key: 'chrome',
     name: 'Chrome',
-    note: 'also Edge, Brave, Vivaldi',
+    note: 'Chrome Web Store',
     url: 'https://chromewebstore.google.com/detail/talysman/jblidbjafmpbpednomngbbmpkihedeko',
   },
   {
@@ -95,8 +92,6 @@ const EXTENSION_STORES: { key: string; name: string; note: string; url: string }
     url: 'https://addons.mozilla.org/en-US/firefox/addon/talysman/',
   },
 ];
-
-const DOWNLOAD_PAGE = 'https://talysman.app/download';
 
 const MODE_LABELS: Record<ModePreset, string> = {
   blacklist: 'Blacklist',
@@ -275,10 +270,10 @@ export function FirstRun({ onDone }: { onDone: () => void }) {
 
         {current === 'profile' && (
           <div className="flex flex-col items-center animate-rise">
-            <StepKicker>Step 2 · Your first profile</StepKicker>
+            <StepKicker>Step 2 · Your first mode</StepKicker>
             <StepTitle>How much do you want blocked?</StepTitle>
             <StepBlurb>
-              This becomes a profile you can rename, duplicate and schedule. Most people end up with
+              This becomes a mode you can rename, duplicate and schedule. Most people end up with
               two or three.
             </StepBlurb>
             <div className="mt-[26px] flex gap-3">
@@ -445,10 +440,10 @@ export function FirstRun({ onDone }: { onDone: () => void }) {
             </h1>
             <p className="mt-2.5 max-w-[440px] text-body leading-relaxed text-slate-400">
               {canRaise
-                ? 'Raising the shield starts enforcement immediately and keeps it on across restarts. You can add more profiles and schedule them later.'
+                ? 'Raising the shield starts enforcement immediately and keeps it on across restarts. You can add more modes and schedule them later.'
                 : !hasKey
                   ? 'Pair a USB key from the Keys page before you can raise the shield — it’s the only way back out of a session.'
-                  : 'Add the sites this profile covers from the Blocklists page, then raise the shield from the dashboard.'}
+                  : 'Add the sites this mode covers from the Blocklists page, then raise the shield from the dashboard.'}
             </p>
           </div>
         )}
@@ -534,13 +529,6 @@ function ExtensionStep({
           </button>
         ))}
       </div>
-
-      <button
-        onClick={() => void openExternal(DOWNLOAD_PAGE)}
-        className="mt-2.5 text-caption font-medium text-slate-450 transition hover:text-slate-300"
-      >
-        Other browsers →
-      </button>
 
       {/* The handshake read-out: the app on the left, the browser on the right, and the channel
           between them lighting up once a heartbeat lands. */}

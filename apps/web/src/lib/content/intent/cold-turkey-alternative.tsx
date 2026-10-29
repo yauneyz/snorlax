@@ -262,7 +262,7 @@ export const coldTurkeyAlternative: IntentPage = {
               Free covers the entire mechanism — pair a key, block {FREE_BLOCKED_SITE_LIMIT} sites, run
               locked sessions —
               with no card. Pro adds unlimited sites, desktop app blocking, schedules and unlimited
-              profiles. <Link href="/pricing">See pricing</Link>.
+              modes. <Link href="/pricing">See pricing</Link>.
             </p>
           ),
         },

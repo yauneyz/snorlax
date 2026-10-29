@@ -77,7 +77,7 @@ export const websiteBlockerYouCantTurnOff: IntentPage = {
         ],
         [
           "Open a different browser",
-          "With Strict Mode on, browsers without the extension are closed during focus, so “just use Edge” isn't the door it usually is.",
+          "With Strict Mode on, browsers without the extension are closed during focus, so “just use another browser” isn't the door it usually is.",
         ],
         [
           "Wait for the app to forget",

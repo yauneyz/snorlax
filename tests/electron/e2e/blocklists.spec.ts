@@ -10,7 +10,7 @@ test('paste results and key rejections stay beside the list; mode confirmation k
 
     await win.getByRole('button', { name: 'Settings' }).click();
     await win.getByRole('group', { name: 'Development account plan' }).getByText('Free').click();
-    await win.getByRole('button', { name: 'Profiles', exact: true }).click();
+    await win.getByRole('button', { name: 'Blocklists', exact: true }).click();
     await win.getByRole('button', { name: /^Hard blocks/ }).click();
 
     const blocked = win
@@ -58,7 +58,7 @@ test('paste results and key rejections stay beside the list; mode confirmation k
     // Activate with a paired key, then loosen without the key present.
     await win.getByRole('button', { name: 'Keys', exact: true }).click();
     await win.getByRole('button', { name: 'Pair this drive' }).click();
-    await win.getByRole('button', { name: 'Profiles', exact: true }).click();
+    await win.getByRole('button', { name: 'Blocklists', exact: true }).click();
     await win.getByRole('switch', { name: 'Default off' }).click();
     await expect(win.getByRole('switch', { name: 'Default on' })).toBeVisible();
     const hardSection = win.getByRole('button', { name: /^Hard blocks/ });

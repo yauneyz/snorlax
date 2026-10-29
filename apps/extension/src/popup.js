@@ -95,7 +95,7 @@ function renderUnlock() {
   const minutes = Math.max(...info.pools.map((p) => p.unlockMinutes));
   unlockTitle.textContent = `${info.pools.map((p) => p.name).join(' + ')} · ${left} of ${perDay} unlocks left today`;
   let detail = `Each unlock: ${minutes} minutes.`;
-  if (info.unpooledProfiles.length) detail += ' Another profile blocks this with no unlocks.';
+  if (info.unpooledProfiles.length) detail += ' Another mode blocks this with no unlocks.';
   else if (left === 0) detail += ' Resets at midnight.';
   unlockDetail.textContent = detail;
 

@@ -73,7 +73,7 @@ test('temporary unlock can be kept or ended early from the dashboard', async () 
 
     await win.getByRole('button', { name: 'Keys', exact: true }).click();
     await win.getByRole('button', { name: 'Pair this drive' }).click();
-    await win.getByRole('button', { name: 'Profiles', exact: true }).click();
+    await win.getByRole('button', { name: 'Blocklists', exact: true }).click();
     await win.getByRole('button', { name: /^Unlock groups/ }).click();
     await win.getByRole('button', { name: '+ New group', exact: true }).click();
     await win.getByRole('button', { name: 'youtube.com', exact: true }).click();

@@ -243,7 +243,7 @@ export const turnAUsbDriveIntoADistractionBlocker: IntentPage = {
             <p>
               The mechanism is free: {FREE_BLOCKED_SITE_LIMIT} blocked websites, unlimited manual
               sessions, and the key requirement, with no card. Pro adds unlimited sites, desktop app
-              blocking, recurring schedules and unlimited profiles, free for {PRO_TRIAL_DAYS} days.{" "}
+              blocking, recurring schedules and unlimited modes, free for {PRO_TRIAL_DAYS} days.{" "}
               <Link href="/pricing">See pricing</Link>.
             </p>
           ),

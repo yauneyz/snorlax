@@ -5,8 +5,7 @@ title: "Talysman Browser Extension Privacy Policy"
 _Last updated: July 21, 2026_
 
 This policy applies to the Talysman extensions for Google Chrome and Mozilla Firefox. The
-extension is a local companion to the Talysman desktop application. A separate
-[Microsoft Edge extension policy](/edge-extension-privacy) is available for the Edge listing.
+extension is a local companion to the Talysman desktop application.
 
 ## What the extension does
 

@@ -90,7 +90,7 @@ export const websiteBlockerLinux: IntentPage = {
         },
         {
           title: "Add the browser extension",
-          body: "Chrome/Chromium or Firefox, for site rules and in-browser block pages.",
+          body: "Chrome or Firefox, for site rules and in-browser block pages.",
         },
         {
           title: "Pair a USB drive and start a session",

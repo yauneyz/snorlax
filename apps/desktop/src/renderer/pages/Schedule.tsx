@@ -86,6 +86,18 @@ function daysLabel(days: Weekday[]): string {
 
 const startMinutes = (w: ScheduleWindow) => parseHm(w.start) ?? 0;
 
+/** Whether the window is running at `nowMs`, counting one that started yesterday and wraps past midnight. */
+function coversNow(w: Pick<WindowRule, 'days' | 'start' | 'end'>, nowMs: number): boolean {
+  const start = parseHm(w.start);
+  const length = windowMinutes(w.start, w.end);
+  if (start === null || length === 0) return false;
+  const d = new Date(nowMs);
+  const minutes = d.getHours() * 60 + d.getMinutes();
+  const today = DAY_ORDER[(d.getDay() + 6) % 7]!;
+  const yesterday = DAY_ORDER[(d.getDay() + 5) % 7]!;
+  if (w.days.includes(today) && minutes >= start && minutes < start + length) return true;
+  return w.days.includes(yesterday) && minutes + 24 * 60 < start + length;
+}
 
 const INPUT =
   'rounded-[7px] border border-white/[0.10] bg-white/[0.04] px-2.5 py-1.5 font-mono text-body font-medium text-slate-100 outline-none transition focus:border-white/25';
@@ -153,6 +165,8 @@ export function SchedulePage({ onUpgrade }: { onUpgrade: () => void }) {
   const defaultProfileId = useFocusStore((s) => s.defaultProfileId);
   const productLimits = useFocusStore((s) => s.productLimits);
   const [openId, setOpenId] = useState<string | null>(null);
+  // A new block stays local until saved, so it can't switch on (and lock) before it's set up.
+  const [draft, setDraft] = useState<ScheduleWindow | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [newShotAt, setNewShotAt] = useState(() => toLocalInput(Date.now() + 60 * 60 * 1000));
   const [newShotAction, setNewShotAction] = useState<OnOff>('on');
@@ -176,7 +190,7 @@ export function SchedulePage({ onUpgrade }: { onUpgrade: () => void }) {
   const scheduleEnabled = isScheduleEnabled(productLimits);
   const profileFor = (id: string): Profile | undefined => profiles.find((p) => p.id === id);
   const colorFor = (id: string) => profileFor(id)?.color ?? palette.colors.foregroundFaint;
-  const nameFor = (id: string) => profileFor(id)?.name ?? 'Profile';
+  const nameFor = (id: string) => profileFor(id)?.name ?? 'Mode';
 
   const windows: ScheduleWindow[] = useMemo(
     () =>
@@ -203,12 +217,14 @@ export function SchedulePage({ onUpgrade }: { onUpgrade: () => void }) {
   const today = DAY_ORDER[(new Date(now).getDay() + 6) % 7]!;
 
   /** Save one profile's schedule/one-shots through the (key-gated) engine. */
-  async function saveConfig(profile: Profile, patch: Partial<Profile['config']>) {
+  async function saveConfig(profile: Profile, patch: Partial<Profile['config']>): Promise<boolean> {
     setError(null);
     try {
       await saveProfile({ ...profile, config: { ...profile.config, ...patch } });
+      return true;
     } catch (e) {
       setError((e as Error).message);
+      return false;
     }
   }
 
@@ -238,11 +254,20 @@ export function SchedulePage({ onUpgrade }: { onUpgrade: () => void }) {
 
   function addWindow() {
     if (!scheduleEnabled) return onUpgrade();
+    if (draft) return;
     const profile = profileFor(defaultProfileId) ?? profiles[0];
     if (!profile) return;
-    const rule: WindowRule = { kind: 'window', id: newId(), days: [...WEEKDAY_SET], start: '09:00', end: '11:00', locked: false };
-    setOpenId(rule.id);
-    void saveConfig(profile, { schedule: [...profile.config.schedule, rule] });
+    setOpenId(null);
+    setDraft({ kind: 'window', id: newId(), profileId: profile.id, days: [...WEEKDAY_SET], start: '09:00', end: '11:00', locked: false });
+  }
+
+  async function saveDraft() {
+    if (!draft) return;
+    const { profileId, ...rule } = draft;
+    const profile = profileFor(profileId);
+    if (!profile) return;
+    if (windowMinutes(rule.start, rule.end) === 0) return setError('Pick an end time different from the start.');
+    if (await saveConfig(profile, { schedule: [...profile.config.schedule, rule] })) setDraft(null);
   }
 
   function addAtRule(action: OnOff) {
@@ -267,6 +292,73 @@ export function SchedulePage({ onUpgrade }: { onUpgrade: () => void }) {
     const profile = profileFor(profileId);
     if (profile) void saveConfig(profile, { oneShots: profile.config.oneShots.filter((e) => e.id !== id) });
   };
+
+  /** The profile, time and day controls shared by saved blocks and the unsaved draft. */
+  const windowFields = (
+    w: ScheduleWindow,
+    onPatch: (fields: Partial<WindowRule>) => void,
+    onMove: (profileId: string) => void,
+  ) => (
+    <>
+      <div>
+        <Kicker className="text-caption tracking-[0.16em]">Mode</Kicker>
+        <div className="mt-1.5">
+          <ProfileChooser profiles={profiles} value={w.profileId} onChange={(id) => onMove(id)} />
+        </div>
+      </div>
+      <div>
+        <Kicker className="text-caption tracking-[0.16em]">Time of day</Kicker>
+        <div className="mt-1.5 flex items-center gap-2">
+          <input
+            type="time"
+            aria-label="Start time"
+            value={w.start}
+            onChange={(e) => onPatch({ start: e.target.value })}
+            className={cx(INPUT, 'w-full')}
+          />
+          <span className="font-mono text-caption text-slate-450">→</span>
+          <input
+            type="time"
+            aria-label="End time"
+            value={w.end}
+            onChange={(e) => onPatch({ end: e.target.value })}
+            className={cx(INPUT, 'w-full')}
+          />
+        </div>
+      </div>
+      <div>
+        <Kicker className="text-caption tracking-[0.16em]">Repeat weekly</Kicker>
+        <div className="mt-1.5">
+          <DayPicker days={w.days} onChange={(days) => onPatch({ days })} />
+        </div>
+        <div className="mt-1.5 flex gap-1.5">
+          {(
+            [
+              ['Weekdays', WEEKDAY_SET],
+              ['Weekend', WEEKEND_SET],
+              ['Every day', DAY_ORDER],
+            ] as const
+          ).map(([label, set]) => {
+            const on = sameDays(w.days, set);
+            return (
+              <button
+                key={label}
+                onClick={() => onPatch({ days: [...set] })}
+                className={cx(
+                  'rounded-full border px-2.5 py-1 text-caption font-medium transition',
+                  on
+                    ? 'border-white/[0.18] bg-white/[0.08] text-slate-150'
+                    : 'border-white/[0.08] bg-transparent text-slate-400 hover:bg-white/[0.05]',
+                )}
+              >
+                {label}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    </>
+  );
 
   return (
     <div className="flex h-full min-h-0 flex-col pt-3">
@@ -311,6 +403,55 @@ export function SchedulePage({ onUpgrade }: { onUpgrade: () => void }) {
       {error && <p className="mt-2 text-caption text-dangerInk">{error}</p>}
 
       <div className="mt-3 flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto pb-2 pr-1">
+        {draft && (
+          <div className="shrink-0 overflow-hidden rounded-xl border border-seal/30 bg-white/[0.05] shadow-[0_10px_26px_rgb(var(--color-black)/0.35)]">
+            <div className="flex items-center gap-2 px-3.5 py-3">
+              <span className="font-mono text-heading font-medium tracking-[-0.02em] text-slate-100">New block</span>
+              <span className="rounded-full border border-white/[0.12] px-1.5 py-px font-mono text-caption font-semibold tracking-[0.14em] text-slate-400">
+                NOT SAVED
+              </span>
+            </div>
+            <div className="grid grid-cols-2 gap-x-4 gap-y-3.5 border-t border-white/[0.06] bg-white/[0.022] px-3.5 pb-3.5 pt-3.5">
+              {windowFields(
+                draft,
+                (fields) => setDraft({ ...draft, ...fields }),
+                (profileId) => setDraft({ ...draft, profileId }),
+              )}
+              <div className="flex flex-col justify-end gap-2">
+                <button
+                  onClick={() => setDraft({ ...draft, locked: !draft.locked })}
+                  className={cx(
+                    'rounded-lg border py-2.5 text-caption font-medium transition',
+                    draft.locked
+                      ? 'border-locked/35 bg-locked/[0.14] text-lockedInk'
+                      : 'border-white/[0.08] bg-white/[0.03] text-slate-400 hover:bg-white/[0.06]',
+                  )}
+                >
+                  {draft.locked ? 'Locked · key can’t turn it off' : 'Key can turn it off during this block'}
+                </button>
+              </div>
+              <div className="col-span-2 flex items-center gap-2">
+                <span className="text-caption leading-relaxed text-warn">
+                  {coversNow(draft, now) &&
+                    `This covers right now, so ${nameFor(draft.profileId)} turns on as soon as you save${draft.locked ? ' — and stays locked until the block ends' : ''}.`}
+                </span>
+                <button
+                  onClick={() => setDraft(null)}
+                  className="ml-auto rounded-lg border border-white/[0.08] px-3.5 py-2 text-caption font-medium text-slate-400 transition hover:bg-white/[0.06] hover:text-slate-200"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => void saveDraft()}
+                  className="rounded-lg border border-seal/35 bg-seal/[0.14] px-3.5 py-2 text-caption font-semibold text-sealInk transition hover:border-seal/50 hover:bg-seal/[0.2]"
+                >
+                  Save block
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {windows.map((w) => {
           const open = openId === w.id;
           const color = colorFor(w.profileId);
@@ -374,63 +515,7 @@ export function SchedulePage({ onUpgrade }: { onUpgrade: () => void }) {
 
               {open && (
                 <div className="grid grid-cols-2 gap-x-4 gap-y-3.5 border-t border-white/[0.06] bg-white/[0.022] px-3.5 pb-3.5 pt-3.5">
-                  <div>
-                    <Kicker className="text-caption tracking-[0.16em]">Profile</Kicker>
-                    <div className="mt-1.5">
-                      <ProfileChooser profiles={profiles} value={w.profileId} onChange={(id) => void moveWindow(w, id)} />
-                    </div>
-                  </div>
-                  <div>
-                    <Kicker className="text-caption tracking-[0.16em]">Time of day</Kicker>
-                    <div className="mt-1.5 flex items-center gap-2">
-                      <input
-                        type="time"
-                        aria-label="Start time"
-                        value={w.start}
-                        onChange={(e) => void patchWindow(w, { start: e.target.value })}
-                        className={cx(INPUT, 'w-full')}
-                      />
-                      <span className="font-mono text-caption text-slate-450">→</span>
-                      <input
-                        type="time"
-                        aria-label="End time"
-                        value={w.end}
-                        onChange={(e) => void patchWindow(w, { end: e.target.value })}
-                        className={cx(INPUT, 'w-full')}
-                      />
-                    </div>
-                  </div>
-                  <div>
-                    <Kicker className="text-caption tracking-[0.16em]">Repeat weekly</Kicker>
-                    <div className="mt-1.5">
-                      <DayPicker days={w.days} onChange={(days) => void patchWindow(w, { days })} />
-                    </div>
-                    <div className="mt-1.5 flex gap-1.5">
-                      {(
-                        [
-                          ['Weekdays', WEEKDAY_SET],
-                          ['Weekend', WEEKEND_SET],
-                          ['Every day', DAY_ORDER],
-                        ] as const
-                      ).map(([label, set]) => {
-                        const on = sameDays(w.days, set);
-                        return (
-                          <button
-                            key={label}
-                            onClick={() => void patchWindow(w, { days: [...set] })}
-                            className={cx(
-                              'rounded-full border px-2.5 py-1 text-caption font-medium transition',
-                              on
-                                ? 'border-white/[0.18] bg-white/[0.08] text-slate-150'
-                                : 'border-white/[0.08] bg-transparent text-slate-400 hover:bg-white/[0.05]',
-                            )}
-                          >
-                            {label}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
+                  {windowFields(w, (fields) => void patchWindow(w, fields), (id) => void moveWindow(w, id))}
                   <div className="flex items-end gap-2">
                     <button
                       onClick={() => void patchWindow(w, { locked: !w.locked })}
@@ -459,12 +544,12 @@ export function SchedulePage({ onUpgrade }: { onUpgrade: () => void }) {
           );
         })}
 
-        {windows.length === 0 && (
+        {windows.length === 0 && !draft && (
           <div className="flex shrink-0 flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-white/[0.10] px-6 py-6 text-center">
             <span className="text-body font-semibold text-slate-250">No blocks yet</span>
             <span className="max-w-sm text-caption leading-relaxed text-slate-400">
-              A block is a profile plus a time range that repeats every week — like an alarm, but for
-              focus. Several profiles can run at once.
+              A block is a mode plus a time range that repeats every week — like an alarm, but for
+              focus. Several modes can run at once.
             </span>
           </div>
         )}
@@ -485,7 +570,7 @@ export function SchedulePage({ onUpgrade }: { onUpgrade: () => void }) {
           return (
             <div key={`${profileId}:${rule.id}`} className="flex shrink-0 flex-wrap items-center gap-2 rounded-xl border border-white/[0.06] bg-white/[0.025] px-3.5 py-2.5">
               <Select
-                aria-label="Profile"
+                aria-label="Mode"
                 value={profileId}
                 className="w-40"
                 onChange={(e) => {
@@ -529,7 +614,7 @@ export function SchedulePage({ onUpgrade }: { onUpgrade: () => void }) {
         </div>
         <div className="flex shrink-0 flex-wrap items-center gap-2 rounded-xl border border-dashed border-white/[0.10] px-3.5 py-2.5">
           <Select
-            aria-label="One-time profile"
+            aria-label="One-time mode"
             className="w-40"
             value={newShotProfile || defaultProfileId}
             onChange={(e) => setNewShotProfile(e.target.value)}

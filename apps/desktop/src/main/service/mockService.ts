@@ -273,7 +273,7 @@ export class MockServiceConnection implements ServiceConnection {
           throw err(ErrorCode.NO_PAIRED_KEY, 'Pair a key before turning on focus.');
         }
         const profileId = this.defaultProfileId();
-        if (!profileId) throw err(ErrorCode.BAD_REQUEST, 'No profile to turn on.');
+        if (!profileId) throw err(ErrorCode.BAD_REQUEST, 'No mode to turn on.');
         this.run({ type: 'setLatch', profileId, on: true });
         return OK;
       }

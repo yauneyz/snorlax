@@ -8,9 +8,9 @@
 import { test, expect, type Page } from '@playwright/test';
 import { launchApp } from './launch.js';
 
-/** The Profiles page heading doubles as the profile switcher; it names the profile being edited. */
+/** The Blocklists page heading doubles as the mode switcher; it names the mode being edited. */
 function switcher(win: Page) {
-  return win.getByRole('button', { name: 'Choose profile', exact: true });
+  return win.getByRole('button', { name: 'Choose mode', exact: true });
 }
 
 test('Pro gets unlimited blocking profiles that run side by side, Free gets one', async () => {
@@ -30,7 +30,7 @@ test('Pro gets unlimited blocking profiles that run side by side, Free gets one'
     await win.getByRole('button', { name: 'Keys' }).click();
     await win.getByRole('button', { name: 'Pair this drive' }).click();
 
-    await win.getByRole('button', { name: 'Profiles' }).click();
+    await win.getByRole('button', { name: 'Blocklists' }).click();
 
     // One profile out of the box, switched off.
     await expect(switcher(win)).toContainText('Default');
@@ -38,23 +38,25 @@ test('Pro gets unlimited blocking profiles that run side by side, Free gets one'
 
     // Pro can add profiles; a new one starts off.
     await switcher(win).click();
-    await expect(win.getByText('SWITCH PROFILE · 1', { exact: true })).toBeVisible();
-    await win.getByRole('button', { name: 'New profile' }).click();
-    await expect(switcher(win)).toContainText('Profile 2');
+    await expect(win.getByText('SWITCH MODE · 1', { exact: true })).toBeVisible();
+    await win.getByRole('button', { name: 'New mode' }).click();
+    await expect(switcher(win)).toContainText('Mode 2');
 
-    // Renaming writes through to the switcher.
+    // Renaming happens in place from the row's pencil and writes through to the switcher.
     await switcher(win).click();
-    const nameField = win.getByLabel('Profile name');
+    await win.getByRole('button', { name: 'Rename Mode 2', exact: true }).click();
+    const nameField = win.getByLabel('Mode name');
     await nameField.fill('Evening');
     await nameField.press('Enter');
     await expect(switcher(win)).toContainText('Evening');
-    // Deletion is separate from rename and requires confirmation.
-    await win.getByRole('button', { name: 'Delete profile…', exact: true }).click();
-    await expect(win.getByText('Delete “Evening” and its rules?')).toBeVisible();
+    // The row's trash icon asks before deleting.
+    await win.getByRole('button', { name: 'Delete Evening', exact: true }).click();
+    await expect(win.getByRole('dialog', { name: 'Delete mode?' })).toBeVisible();
     await win.getByRole('button', { name: 'Cancel', exact: true }).click();
     await expect(switcher(win)).toContainText('Evening');
 
-    // Make it the profile "Turn on focus" uses.
+    // Make it the mode "Turn on focus" uses.
+    await switcher(win).click();
     await win.getByRole('button', { name: 'Make default' }).click();
 
     // Switching it on is free and leaves other profiles alone.
@@ -65,13 +67,13 @@ test('Pro gets unlimited blocking profiles that run side by side, Free gets one'
     await win.getByRole('button', { name: 'Settings' }).click();
     await devPlan.getByText('Free').click();
 
-    await win.getByRole('button', { name: 'Profiles' }).click();
+    await win.getByRole('button', { name: 'Blocklists' }).click();
     await expect(switcher(win)).toContainText('Evening');
     await switcher(win).click();
-    await expect(win.getByText('SWITCH PROFILE · 1/1', { exact: true })).toBeVisible();
+    await expect(win.getByText('SWITCH MODE · 1/1', { exact: true })).toBeVisible();
     await expect(win.getByRole('button', { name: /^Default/ })).toBeHidden();
 
-    await win.getByRole('button', { name: 'Upgrade for more profiles' }).click();
+    await win.getByRole('button', { name: 'Upgrade for more modes' }).click();
     await expect(win.getByRole('heading', { name: 'Pro' })).toBeVisible();
   } finally {
     await app.close();

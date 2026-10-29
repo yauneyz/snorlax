@@ -22,7 +22,7 @@ import {
   Badge,
   Button,
   Input,
-  Kicker,
+  Modal,
   ProfileDot,
   Switch,
   StatusLabel,
@@ -69,6 +69,67 @@ function InlineFeedback({ feedback }: { feedback?: Feedback }) {
 }
 
 type SectionId = 'ai' | 'hard' | 'soft' | 'premade' | 'apps' | 'pools';
+
+/** Rename/delete affordance on a switcher row: hidden until the row is hovered or focused. */
+function RowIconButton({
+  label,
+  danger,
+  onClick,
+  children,
+}: {
+  label: string;
+  danger?: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      aria-label={label}
+      title={label}
+      onClick={(e) => {
+        e.stopPropagation();
+        onClick();
+      }}
+      className={cx(
+        'shrink-0 rounded-[5px] p-1 text-slate-450 opacity-0 transition hover:bg-white/[0.08] focus-visible:opacity-100 group-hover:opacity-100 group-focus-within:opacity-100',
+        danger ? 'hover:text-dangerInk' : 'hover:text-slate-150',
+      )}
+    >
+      {children}
+    </button>
+  );
+}
+
+const ICON_PROPS = {
+  width: 13,
+  height: 13,
+  viewBox: '0 0 16 16',
+  fill: 'none',
+  stroke: 'currentColor',
+  strokeWidth: 1.5,
+  strokeLinecap: 'round',
+  strokeLinejoin: 'round',
+  'aria-hidden': true,
+} as const;
+
+function PencilIcon() {
+  return (
+    <svg {...ICON_PROPS}>
+      <path d="M11.2 2.3a1.4 1.4 0 0 1 2 2L5.6 11.9 2.8 12.7l.8-2.8z" />
+      <path d="M10 3.5l2 2" />
+    </svg>
+  );
+}
+
+function TrashIcon() {
+  return (
+    <svg {...ICON_PROPS}>
+      <path d="M2.8 4.2h10.4M6.4 4.2V2.8h3.2v1.4M4.2 4.2l.6 8.6a1 1 0 0 0 1 .9h4.4a1 1 0 0 0 1-.9l.6-8.6" />
+      <path d="M6.8 6.8v4.2M9.2 6.8v4.2" />
+    </svg>
+  );
+}
 
 function plural(n: number, word: string): string {
   return `${n} ${word}${n === 1 ? '' : 's'}`;
@@ -333,7 +394,8 @@ export function Blocklists({ onUpgrade }: { onUpgrade: () => void }) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const [openSection, setOpenSection] = useState<SectionId | null>(null);
-  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [renamingId, setRenamingId] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<Profile | null>(null);
   // "Block everything" empties the allow list, so with sites on it the button asks once first.
   const [confirmBlockAll, setConfirmBlockAll] = useState(false);
   const [appName, setAppName] = useState('');
@@ -446,7 +508,7 @@ export function Blocklists({ onUpgrade }: { onUpgrade: () => void }) {
     const id = newProfileId();
     const ok = await saveProfile({
       id,
-      name: `Profile ${profiles.length + 1}`,
+      name: `Mode ${profiles.length + 1}`,
       color: nextProfileColor(profiles),
       createdAtMs: Date.now(),
       config: emptyProfileConfig(),
@@ -471,10 +533,10 @@ export function Blocklists({ onUpgrade }: { onUpgrade: () => void }) {
     });
   }
 
-  async function renameProfile(name: string) {
+  async function renameProfile(profile: Profile, name: string) {
     const trimmed = name.trim().slice(0, MAX_PROFILE_NAME_LENGTH);
-    if (!selected || !trimmed || trimmed === selected.name) return;
-    await saveProfile({ ...selected, name: trimmed });
+    if (!trimmed || trimmed === profile.name) return;
+    await saveProfile({ ...profile, name: trimmed });
   }
 
   async function runProfileRequest(run: () => Promise<unknown>) {
@@ -760,9 +822,9 @@ export function Blocklists({ onUpgrade }: { onUpgrade: () => void }) {
           <button
             onClick={() => {
               setMenuOpen((v) => !v);
-              setConfirmDelete(false);
+              setRenamingId(null);
             }}
-            aria-label="Choose profile"
+            aria-label="Choose mode"
             aria-expanded={menuOpen}
             className={cx(
               'flex items-center gap-3 rounded-[11px] border py-2 pl-3 pr-3.5 transition',
@@ -773,7 +835,7 @@ export function Blocklists({ onUpgrade }: { onUpgrade: () => void }) {
           >
             <ProfileDot color={selected?.color ?? accent} size={10} glow />
             <span className="max-w-[190px] truncate text-heading font-bold leading-none text-slate-100">
-              {selected?.name ?? 'No profile'}
+              {selected?.name ?? 'No mode'}
             </span>
             <span
               className={cx(
@@ -790,50 +852,109 @@ export function Blocklists({ onUpgrade }: { onUpgrade: () => void }) {
               <div className="fixed inset-0 z-40" onClick={() => setMenuOpen(false)} />
               <div className="absolute left-0 top-[calc(100%+7px)] z-50 w-[322px] animate-rise rounded-xl border border-white/[0.12] bg-[rgb(var(--color-panel)/0.97)] p-[7px] shadow-[0_18px_46px_rgb(var(--color-black)/0.6)] backdrop-blur-xl">
                 <div className="px-2 pb-[7px] pt-1.5 font-mono text-caption font-medium tracking-[0.18em] text-slate-450">
-                  SWITCH PROFILE ·{' '}
+                  SWITCH MODE ·{' '}
                   {profileLimit === null ? profiles.length : `${profiles.length}/${profileLimit}`}
                 </div>
 
                 <div className="flex max-h-56 flex-col gap-0.5 overflow-y-auto">
-                  {profiles.map((p) => (
-                    <button
-                      key={p.id}
-                      onClick={() => {
-                        setSelectedId(p.id);
-                        setConfirmDelete(false);
-                        setConfirmBlockAll(false);
-                        setMenuOpen(false);
-                      }}
-                      className={cx(
-                        'flex items-center gap-2.5 rounded-[9px] border px-2.5 py-2.5 text-left transition',
-                        p.id === selected?.id
-                          ? 'border-white/[0.12] bg-white/[0.06]'
-                          : 'border-white/[0.05] bg-transparent hover:border-white/[0.10] hover:bg-white/[0.03]',
-                      )}
-                    >
-                      <ProfileDot color={p.color} />
-                      <span className="min-w-0 flex-1">
-                        <span
-                          className={cx(
-                            'block truncate text-body font-semibold',
-                            p.id === selected?.id ? 'text-slate-100' : 'text-slate-250',
+                  {profiles.map((p) => {
+                    const renaming = renamingId === p.id;
+                    const choose = () => {
+                      if (renaming) return;
+                      setSelectedId(p.id);
+                      setConfirmBlockAll(false);
+                      setMenuOpen(false);
+                    };
+                    return (
+                      // A div, not a button, so the rename and delete buttons can sit inside it.
+                      <div
+                        key={p.id}
+                        role="button"
+                        tabIndex={0}
+                        onClick={choose}
+                        onKeyDown={(e) => {
+                          if (e.target !== e.currentTarget) return;
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault();
+                            choose();
+                          }
+                        }}
+                        className={cx(
+                          'group flex cursor-pointer items-center gap-2.5 rounded-[9px] border px-2.5 py-2.5 text-left transition',
+                          p.id === selected?.id
+                            ? 'border-white/[0.12] bg-white/[0.06]'
+                            : 'border-white/[0.05] bg-transparent hover:border-white/[0.10] hover:bg-white/[0.03]',
+                        )}
+                      >
+                        <ProfileDot color={p.color} />
+                        <span className="min-w-0 flex-1">
+                          {renaming ? (
+                            <Input
+                              autoFocus
+                              defaultValue={p.name}
+                              maxLength={MAX_PROFILE_NAME_LENGTH}
+                              onClick={(e) => e.stopPropagation()}
+                              onFocus={(e) => e.currentTarget.select()}
+                              onBlur={(e) => {
+                                setRenamingId(null);
+                                void renameProfile(p, e.target.value);
+                              }}
+                              onKeyDown={(e) => {
+                                e.stopPropagation();
+                                if (e.key === 'Enter') e.currentTarget.blur();
+                                if (e.key === 'Escape') {
+                                  e.currentTarget.value = p.name;
+                                  e.currentTarget.blur();
+                                }
+                              }}
+                              className="py-1 text-body font-semibold"
+                              aria-label="Mode name"
+                            />
+                          ) : (
+                            <span className="flex min-w-0 items-center gap-1">
+                              <span
+                                className={cx(
+                                  'truncate text-body font-semibold',
+                                  p.id === selected?.id ? 'text-slate-100' : 'text-slate-250',
+                                )}
+                              >
+                                {p.name}
+                              </span>
+                              <RowIconButton
+                                label={`Rename ${p.name}`}
+                                onClick={() => setRenamingId(p.id)}
+                              >
+                                <PencilIcon />
+                              </RowIconButton>
+                              {/* The engine keeps at least one mode, so the last can't be deleted. */}
+                              {profiles.length > 1 && (
+                                <RowIconButton
+                                  label={`Delete ${p.name}`}
+                                  danger
+                                  onClick={() => {
+                                    setMenuOpen(false);
+                                    setDeleteTarget(p);
+                                  }}
+                                >
+                                  <TrashIcon />
+                                </RowIconButton>
+                              )}
+                            </span>
                           )}
-                        >
-                          {p.name}
+                          <span className="mt-0.5 block break-words font-mono text-caption text-slate-450">
+                            {profileSummary(p, aiMode)}
+                          </span>
                         </span>
-                        <span className="mt-0.5 block break-words font-mono text-caption text-slate-450">
-                          {profileSummary(p, aiMode)}
-                        </span>
-                      </span>
-                      {isOn(p.id) ? (
-                        <Badge tone="ok">ON</Badge>
-                      ) : (
-                        p.id === selected?.id && (
-                          <span className="text-caption text-slate-400">editing</span>
-                        )
-                      )}
-                    </button>
-                  ))}
+                        {isOn(p.id) ? (
+                          <Badge tone="ok">ON</Badge>
+                        ) : (
+                          p.id === selected?.id && (
+                            <span className="text-caption text-slate-400">editing</span>
+                          )
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
 
                 <div className="mt-1.5 flex flex-col gap-0.5 border-t border-white/[0.07] pt-1.5">
@@ -845,7 +966,7 @@ export function Blocklists({ onUpgrade }: { onUpgrade: () => void }) {
                     className="flex items-center gap-2.5 rounded-[9px] px-2.5 py-2 text-left text-caption font-medium text-slate-200 transition hover:bg-white/[0.05]"
                   >
                     <span className="font-mono text-body text-slate-500">+</span>
-                    {profileLimitReached ? 'Upgrade for more profiles' : 'New profile'}
+                    {profileLimitReached ? 'Upgrade for more modes' : 'New mode'}
                   </button>
                   <button
                     onClick={() => {
@@ -872,70 +993,45 @@ export function Blocklists({ onUpgrade }: { onUpgrade: () => void }) {
                   )}
                 </div>
 
-                <div className="mt-1.5 border-t border-white/[0.07] px-1.5 pb-1 pt-2">
-                  <div className="flex items-baseline justify-between">
-                    <Kicker className="text-caption tracking-[0.18em]">Rename</Kicker>
+                {(feedback.profile || !keyPresent) && (
+                  <div className="mt-1.5 border-t border-white/[0.07] px-1.5 pb-1 pt-1">
+                    <InlineFeedback feedback={feedback.profile} />
+                    {/* Only worth saying while the key is out — with it in, nothing here is gated. */}
+                    {!keyPresent && (
+                      <p className="mt-2 text-caption leading-relaxed text-slate-450">
+                        Loosening a mode needs your key.
+                      </p>
+                    )}
                   </div>
-                  <Input
-                    key={selected?.id}
-                    className="mt-1.5"
-                    defaultValue={selected?.name ?? ''}
-                    maxLength={MAX_PROFILE_NAME_LENGTH}
-                    onBlur={(e) => void renameProfile(e.target.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
-                    placeholder="Profile name"
-                    aria-label="Profile name"
-                  />
-                  {profiles.length > 1 && selected && (
-                    <div className="mt-3 border-t border-white/[0.07] pt-2">
-                      {confirmDelete ? (
-                        <>
-                          <p className="text-caption text-slate-300">
-                            Delete “{selected.name}” and its rules?
-                          </p>
-                          <div className="mt-2 flex gap-2">
-                            <Button
-                              variant="ghost"
-                              onClick={() => setConfirmDelete(false)}
-                              className="px-3 py-1.5"
-                            >
-                              Cancel
-                            </Button>
-                            <Button
-                              variant="danger"
-                              onClick={() => {
-                                setMenuOpen(false);
-                                setConfirmDelete(false);
-                                void deleteProfile(selected.id);
-                              }}
-                              className="px-3 py-1.5"
-                            >
-                              Delete profile
-                            </Button>
-                          </div>
-                        </>
-                      ) : (
-                        <button
-                          onClick={() => setConfirmDelete(true)}
-                          className="text-caption font-medium text-dangerInk"
-                        >
-                          Delete profile…
-                        </button>
-                      )}
-                    </div>
-                  )}
-                  <InlineFeedback feedback={feedback.profile} />
-                  {/* Only worth saying while the key is out — with it in, nothing here is gated. */}
-                  {!keyPresent && (
-                    <p className="mt-2 text-caption leading-relaxed text-slate-450">
-                      Loosening a profile needs your key.
-                    </p>
-                  )}
-                </div>
+                )}
               </div>
             </>
           )}
         </div>
+
+        {deleteTarget && (
+          <Modal title="Delete mode?" onClose={() => setDeleteTarget(null)} width={420}>
+            <p className="text-body leading-relaxed text-slate-300">
+              “{deleteTarget.name}” and everything in it — its blocklists, schedule and unlock groups
+              — will be deleted. This can’t be undone.
+            </p>
+            <div className="mt-4 flex justify-end gap-2">
+              <Button variant="ghost" onClick={() => setDeleteTarget(null)}>
+                Cancel
+              </Button>
+              <Button
+                variant="danger"
+                onClick={() => {
+                  const { id } = deleteTarget;
+                  setDeleteTarget(null);
+                  void deleteProfile(id);
+                }}
+              >
+                Delete mode
+              </Button>
+            </div>
+          </Modal>
+        )}
 
         {selected && (
           <div className="ml-auto flex items-center gap-2">
@@ -1013,7 +1109,7 @@ export function Blocklists({ onUpgrade }: { onUpgrade: () => void }) {
           help={
             <>
               Choose whether to block listed sites, allow only listed sites, or block the whole
-              internet. These rules apply while this profile is on.
+              internet. These rules apply while this mode is on.
             </>
           }
           active={unlisted !== 'allow' || policy.blockedDomains.length > 0}
@@ -1061,7 +1157,7 @@ export function Blocklists({ onUpgrade }: { onUpgrade: () => void }) {
           </div>
           <p className="mt-2 text-caption text-slate-400">
             {blockingEverything
-              ? 'Nothing loads while this profile is on. Add allowed sites to let them through.'
+              ? 'Nothing loads while this mode is on. Add allowed sites to let them through.'
               : unlisted === 'block'
                 ? 'Only sites on the allow list can load.'
                 : unlisted === 'judge'
@@ -1286,7 +1382,7 @@ export function Blocklists({ onUpgrade }: { onUpgrade: () => void }) {
                 ))}
                 {policy.apps.length === 0 && (
                   <p className="text-caption text-slate-500">
-                    These programs get closed whenever this profile is on.
+                    These programs get closed whenever this mode is on.
                   </p>
                 )}
               </div>

@@ -22,7 +22,7 @@ export const metadata: Metadata = {
 /**
  * Free is scoped around the activation event — pair a key, run a locked session — not
  * around a crippled blocklist. What it withholds is repeatability: schedules, extra
- * profiles, and app blocking.
+ * modes, and app blocking.
  */
 const freeFeatures = [
   "Turn any USB drive into your physical key",
@@ -38,7 +38,7 @@ const proFeatures = [
   "Pre-made blocklists for social media, shopping, sports, NSFW, and more",
   "Block distracting desktop apps, not just tabs",
   "Schedule recurring focus windows that arm themselves",
-  "Unlimited blocking profiles for different kinds of work",
+  "Unlimited blocking modes for different kinds of work",
   "Lock a scheduled window so even the key won't end it early",
   "Every future Pro feature, included",
 ];
@@ -82,10 +82,10 @@ const faqs = [
     a: (
       <>
         <p>
-          Scheduled windows are cleared and extra blocking profiles are deleted. Your active
-          profile keeps up to {FREE_BLOCKED_SITE_LIMIT} blocked websites on Free; its extra blocked
+          Scheduled windows are cleared and extra blocking modes are deleted. Your active
+          mode keeps up to {FREE_BLOCKED_SITE_LIMIT} blocked websites on Free; its extra blocked
           websites and Pro policy settings are saved on this computer and restored if you return to
-          Pro. The profile you are actively using is always the one kept.
+          Pro. The mode you are actively using is always the one kept.
         </p>
         <p>
           One wrinkle worth knowing: loosening enforcement is key-gated like everything else, so if

@@ -106,7 +106,7 @@ export function UnlockPopup({ target }: { target: PopupTarget }) {
           <div className="mt-0.5 text-caption text-slate-400">Each unlock: {minutes} minutes</div>
           {info.unpooledProfiles.length > 0 && (
             <div className="mt-1 text-caption text-warn">
-              Also blocked by a profile with no unlocks for this.
+              Also blocked by a mode with no unlocks for this.
             </div>
           )}
           {left === 0 && <div className="mt-1 text-caption text-warn">Resets at midnight.</div>}

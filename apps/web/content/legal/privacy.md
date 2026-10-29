@@ -9,10 +9,9 @@ collects, uses, and protects your information when you use our website,
 web application, desktop application, and related services (collectively, the
 "Service"). By using the Service, you agree to the practices described here.
 
-This policy covers the Talysman account and web service. Our browser extensions
-are covered by separate policies: the
-[Chrome and Firefox extension policy](/browser-extension-privacy) and the
-[Microsoft Edge extension policy](/edge-extension-privacy).
+This policy covers the Talysman account and web service. Our Chrome and Firefox
+browser extensions are covered by a separate
+[browser extension policy](/browser-extension-privacy).
 
 ## Information we collect
 

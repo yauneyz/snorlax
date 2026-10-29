@@ -407,10 +407,10 @@ impl Engine {
             Command::UpsertProfile { profile } => {
                 let name = profile.name.trim();
                 if profile.id.trim().is_empty() || name.is_empty() {
-                    return denied(codes::BAD_REQUEST, "Profiles need an id and a name.");
+                    return denied(codes::BAD_REQUEST, "Modes need an id and a name.");
                 }
                 if name.chars().count() > MAX_PROFILE_NAME_LENGTH {
-                    return denied(codes::BAD_REQUEST, format!("Profile names are limited to {MAX_PROFILE_NAME_LENGTH} characters."));
+                    return denied(codes::BAD_REQUEST, format!("Mode names are limited to {MAX_PROFILE_NAME_LENGTH} characters."));
                 }
                 if let Err(message) = restrictive::validate(&profile.config) {
                     return match message.strip_prefix("POOL_ITEM_CONFLICT: ") {
@@ -435,16 +435,16 @@ impl Engine {
             }
             Command::DuplicateProfile { profile_id, new_id, .. } => {
                 if self.state.profile(profile_id).is_none() || new_id.trim().is_empty() || self.state.profile(new_id).is_some() {
-                    return denied(codes::BAD_REQUEST, "Can't duplicate that profile.");
+                    return denied(codes::BAD_REQUEST, "Can't duplicate that mode.");
                 }
                 self.gate_new_profile(ctx)
             }
             Command::DeleteProfile { profile_id } => {
                 let Some(profile) = self.state.profile(profile_id) else {
-                    return denied(codes::BAD_REQUEST, "Profile not found.");
+                    return denied(codes::BAD_REQUEST, "Mode not found.");
                 };
                 if self.state.profiles.len() == 1 {
-                    return denied(codes::LAST_PROFILE, "Keep at least one blocking profile.");
+                    return denied(codes::LAST_PROFILE, "Keep at least one blocking mode.");
                 }
                 if !activation::is_committed(&self.state, profile, now) {
                     return Gate::Free;
@@ -457,11 +457,11 @@ impl Engine {
             }
             Command::SetLatch { profile_id, on } => {
                 let Some(a) = self.activation_of(profile_id, now) else {
-                    return denied(codes::BAD_REQUEST, "Profile not found.");
+                    return denied(codes::BAD_REQUEST, "Mode not found.");
                 };
                 if *on {
                     if !ctx.has_paired_keys {
-                        return denied(codes::NO_PAIRED_KEY, "Pair a key before turning on a profile.");
+                        return denied(codes::NO_PAIRED_KEY, "Pair a key before turning on a mode.");
                     }
                     return Gate::Free;
                 }
@@ -475,7 +475,7 @@ impl Engine {
             }
             Command::SetDefaultProfile { profile_id } => {
                 if self.state.profile(profile_id).is_none() {
-                    return denied(codes::BAD_REQUEST, "Profile not found.");
+                    return denied(codes::BAD_REQUEST, "Mode not found.");
                 }
                 Gate::Free
             }
@@ -510,7 +510,7 @@ impl Engine {
                     return denied(codes::BAD_REQUEST, "Choose what to turn off.");
                 }
                 if profiles.iter().any(|id| self.state.profile(id).is_none()) {
-                    return denied(codes::BAD_REQUEST, "Profile not found.");
+                    return denied(codes::BAD_REQUEST, "Mode not found.");
                 }
                 let acts = self.activations(now);
                 let locked: Vec<LockedProfile> = locked_profiles(&acts)
@@ -555,7 +555,7 @@ impl Engine {
     fn gate_new_profile(&self, ctx: &Ctx) -> Gate {
         if let Some(max) = ctx.limits.max_profiles {
             if self.state.profiles.len() as u32 >= max {
-                return denied(codes::LIMIT_EXCEEDED, "Your plan's profile limit is reached.");
+                return denied(codes::LIMIT_EXCEEDED, "Your plan's mode limit is reached.");
             }
         }
         Gate::Free

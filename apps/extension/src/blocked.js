@@ -95,7 +95,7 @@
       show('pool');
       show('pool-title', info.pools.map(function (p) { return p.name; }).join(' + ') + ' · ' + left + ' of ' + perDay + ' unlocks left today');
       var detail = 'Each unlock: ' + minutes + ' minutes.';
-      if (info.unpooledProfiles.length) detail += ' Another profile blocks this with no unlocks.';
+      if (info.unpooledProfiles.length) detail += ' Another mode blocks this with no unlocks.';
       else if (left === 0) detail += ' Resets at midnight.';
       show('pool-detail', detail);
 

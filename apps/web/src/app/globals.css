@@ -2673,6 +2673,14 @@ input:-webkit-autofill:focus {
   margin-top: 3.5rem;
 }
 
+/* The CTA sits inside the article, so the prose link rule above would otherwise recolor and
+ * underline the button. Keep it reading like the nav CTA. */
+.blog-post .blog-cta .landing__cta--primary,
+.blog-post .blog-cta .landing__cta--primary:hover {
+  color: var(--signal-ink);
+  text-decoration: none;
+}
+
 .blog-post__meta,
 .blog-index__meta {
   margin-top: 0.5rem;

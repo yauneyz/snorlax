@@ -45,7 +45,7 @@ export function ProfileList({ onClose }: { onClose: () => void }) {
       await runCommand({ type: 'setLatch', profileId, on: true });
     } catch (e) {
       const code = (e as { code?: string }).code;
-      setError(code === ErrorCode.NO_PAIRED_KEY ? 'Pair a key before turning on a profile.' : (e as Error).message);
+      setError(code === ErrorCode.NO_PAIRED_KEY ? 'Pair a key before turning on a mode.' : (e as Error).message);
     }
   }
 
@@ -60,7 +60,7 @@ export function ProfileList({ onClose }: { onClose: () => void }) {
 
   return (
     <>
-      <Modal title="Profiles" onClose={onClose} width={520}>
+      <Modal title="Modes" onClose={onClose} width={520}>
         <p className="text-caption text-slate-400">
           Turn on as many as you like — everything any of them blocks is blocked.
         </p>
@@ -99,7 +99,7 @@ export function ProfileList({ onClose }: { onClose: () => void }) {
             );
           })}
         </div>
-        {pairedKeys.length === 0 && <p className="mt-3 text-caption text-warn">Pair a key to turn profiles on.</p>}
+        {pairedKeys.length === 0 && <p className="mt-3 text-caption text-warn">Pair a key to turn modes on.</p>}
         {error && <p className="mt-3 text-caption text-dangerInk">{error}</p>}
       </Modal>
     </>

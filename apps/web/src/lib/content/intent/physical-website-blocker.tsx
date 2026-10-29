@@ -132,7 +132,7 @@ export const physicalWebsiteBlocker: IntentPage = {
             <p>
               Free covers {FREE_BLOCKED_SITE_LIMIT} blocked websites, unlimited manual sessions, and
               the key requirement — no card, no time limit. Pro adds app blocking, recurring
-              schedules, unlimited sites and unlimited profiles, free for {PRO_TRIAL_DAYS} days.{" "}
+              schedules, unlimited sites and unlimited modes, free for {PRO_TRIAL_DAYS} days.{" "}
               <Link href="/pricing">See pricing</Link>.
             </p>
           ),

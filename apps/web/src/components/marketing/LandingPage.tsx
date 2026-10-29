@@ -28,7 +28,7 @@ const steps = [
     body: "Block distracting websites, and apps.",
     image: {
       src: "/media/app-blocklist.png",
-      alt: "The Blocklists screen: a “Deep work” profile blocking eight sites including youtube.com and reddit.com, plus Discord, Steam and Slack.",
+      alt: "The Blocklists screen: a “Deep work” mode blocking eight sites including youtube.com and reddit.com, plus Discord, Steam and Slack.",
     },
   },
   {
@@ -135,7 +135,7 @@ const faqs = [
         Free covers {FREE_BLOCKED_SITE_LIMIT} blocked websites and unlimited manual focus sessions,
         with no card and no time limit. Pro is {formatPriceUsd(PRO_PRICE_CENTS.monthly)}/month or{" "}
         {formatPriceUsd(PRO_PRICE_CENTS.yearly)}/year, and adds app blocking, recurring schedules,
-        unlimited sites and unlimited profiles. Prefer to pay once? Lifetime is a single{" "}
+        unlimited sites and unlimited modes. Prefer to pay once? Lifetime is a single{" "}
         {formatPriceUsd(LIFETIME_PRICE_CENTS)} payment for Pro forever. New accounts get{" "}
         {PRO_TRIAL_DAYS} days of Pro free — see <Link href="/pricing">pricing</Link>.
       </p>
@@ -343,7 +343,7 @@ export function LandingPage({ variantOverride }: { variantOverride?: VariantKey 
           <div className="split__col split__col--pro">
             <span className="split__label">UNLEASH YOUR POTENTIAL</span>
             <h3>Pro</h3>
-            <p>Unlimited sites, pre-made blocklists, recurring schedules, and unlimited profiles</p>
+            <p>Unlimited sites, pre-made blocklists, recurring schedules, and unlimited modes</p>
           </div>
         </div>
         <p className="split__cta">

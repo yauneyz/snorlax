@@ -154,7 +154,7 @@ function TemporaryUnlock({ onClose }: { onClose: () => void }) {
 
       {pools.length === 0 ? (
         <p className="mt-4 text-body text-slate-300">
-          None of the profiles that are on has an unlock group. Insert your key to pause.
+          None of the modes that are on has an unlock group. Insert your key to pause.
         </p>
       ) : (
         <>

@@ -349,7 +349,7 @@ export function Settings() {
           </p>
           <p className="text-slate-400">You can only turn off Strict Mode using your paired USB key.</p>
           {softBlocksRequireHandshake && (
-            <p className="text-slate-400">Strict Mode stays on while the active profile has site rules.</p>
+            <p className="text-slate-400">Strict Mode stays on while the active mode has site rules.</p>
           )}
           <div className="flex items-center justify-between gap-3">
             <span className="font-medium text-slate-200">
@@ -379,7 +379,7 @@ export function Settings() {
         </CardTitle>
         <div className="flex flex-col gap-3 text-body text-slate-300">
           <p className="text-slate-400">
-            When you open a website your default profile blocks or restricts (like a site with its feed
+            When you open a website your default mode blocks or restricts (like a site with its feed
             hidden), the browser extension asks first. You can continue, go back, or turn on focus mode
             instead.
           </p>
@@ -666,7 +666,7 @@ export function Settings() {
           <div>
             <p className="mb-3 text-body text-slate-400">
               Clear the first-run flag and reopen the setup walkthrough. This only affects what the
-              app shows you — profiles, keys and enforcement state are left alone.
+              app shows you — modes, keys and enforcement state are left alone.
             </p>
             <Button
               variant="ghost"

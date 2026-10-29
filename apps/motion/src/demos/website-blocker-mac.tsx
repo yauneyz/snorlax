@@ -9,7 +9,7 @@ import type { Demo } from './types';
 const BEATS: Beat[] = [
   { at: 4.6, label: 'Cmd-Q', text: 'You quit Talysman.' },
   { at: 8.4, label: 'Still blocked', text: 'The site is still blocked. The app was never doing the blocking.' },
-  { at: 11.6, label: 'Safari', text: 'Another browser. Same block — it isn’t an extension trick.' },
+  { at: 11.6, label: 'Other browser', text: 'Another browser. Same block — it isn’t an extension trick.' },
   { at: 14.8, label: 'Turn off', text: 'Turning off needs the key. The indicator is red.' },
   { at: 20.8, label: 'The key', text: 'It’s on the hallway shelf. You go back to work instead.', until: 26.8 },
 ];
