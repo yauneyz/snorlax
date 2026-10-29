@@ -9,17 +9,21 @@ const mocks = vi.hoisted(() => ({
   posthogCapture: vi.fn(),
   posthogFlush: vi.fn(),
   getPosthogServer: vi.fn(),
-  personLookup: vi.fn(),
+  journeyLookup: vi.fn(),
   sendInsightsPush: vi.fn(),
 }));
 
 vi.mock("@/lib/supabase/admin", () => ({
   supabaseAdmin: () => ({
     rpc: mocks.rpc,
-    from: () => ({
+    from: (table: string) => ({
       insert: mocks.insert,
       upsert: mocks.upsert,
-      select: () => ({ eq: () => ({ maybeSingle: mocks.personLookup }) }),
+      select: () => ({
+        eq: () => ({
+          maybeSingle: table === "analytics_person_trail" ? mocks.journeyLookup : vi.fn(),
+        }),
+      }),
     }),
   }),
 }));
@@ -45,7 +49,7 @@ beforeEach(() => {
   mocks.upsert.mockResolvedValue({ error: null });
   mocks.getPosthogServer.mockReturnValue(null);
   mocks.posthogFlush.mockResolvedValue(undefined);
-  mocks.personLookup.mockResolvedValue({ data: null, error: null });
+  mocks.journeyLookup.mockResolvedValue({ data: null, error: null });
   mocks.sendInsightsPush.mockResolvedValue(undefined);
 });
 
@@ -250,34 +254,25 @@ describe("track", () => {
 });
 
 describe("track milestone pushes", () => {
-  const person = (fields: Record<string, string | null>) => ({
-    data: { first_utm_source: null, first_utm_medium: null, first_referrer_host: null, ...fields },
-    error: null,
-  });
+  const journey = (value: string) => ({ data: { journey: value }, error: null });
 
-  it("pushes a trial start with the person's first-touch channel", async () => {
-    mocks.personLookup.mockResolvedValue(person({ first_utm_source: "reddit", first_utm_medium: "cpc" }));
+  it("pushes a trial start with the person's journey", async () => {
+    mocks.journeyLookup.mockResolvedValue(journey("chatgpt → attention-armor (blog)"));
     await track({ event: "trial_started", source: "server", userId: "u1" });
     expect(mocks.sendInsightsPush).toHaveBeenCalledWith({
       type: "trial_started",
-      channel: "reddit (cpc)",
+      channel: "chatgpt → attention-armor (blog)",
     });
   });
 
-  it("pushes a key pairing, classifying a search referrer like the channel funnel does", async () => {
-    mocks.personLookup.mockResolvedValue(person({ first_referrer_host: "www.google.com" }));
+  it("pushes a key pairing with the platform", async () => {
+    mocks.journeyLookup.mockResolvedValue(journey("google"));
     await track({ event: "usb_key_paired", source: "desktop", deviceId: "d1", platform: "linux" });
     expect(mocks.sendInsightsPush).toHaveBeenCalledWith({
       type: "usb_key_paired",
-      channel: "google (organic)",
+      channel: "google",
       platform: "linux",
     });
-  });
-
-  it("labels a person with no attribution as direct", async () => {
-    mocks.personLookup.mockResolvedValue(person({}));
-    await track({ event: "usb_key_paired", source: "desktop", deviceId: "d1" });
-    expect(mocks.sendInsightsPush.mock.calls[0][0]).toMatchObject({ channel: "direct" });
   });
 
   it("does not re-push a duplicate (replayed flush or retried webhook)", async () => {
@@ -293,7 +288,7 @@ describe("track milestone pushes", () => {
   });
 
   it("still pushes, as an unknown channel, when the lookup fails", async () => {
-    mocks.personLookup.mockResolvedValue({ data: null, error: { message: "timeout" } });
+    mocks.journeyLookup.mockResolvedValue({ data: null, error: { message: "timeout" } });
     await track({ event: "trial_started", source: "server", userId: "u1" });
     expect(mocks.sendInsightsPush).toHaveBeenCalledWith({ type: "trial_started", channel: "unknown" });
     expect(mocks.captureException).toHaveBeenCalledOnce();

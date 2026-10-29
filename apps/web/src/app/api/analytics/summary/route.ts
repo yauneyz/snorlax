@@ -1,6 +1,7 @@
 import "server-only";
 import { NextRequest, NextResponse } from "next/server";
 import { config } from "@/lib/config";
+import { queryBlogPostsFromDb, toBlogPostMetrics } from "@/server/analytics/queries/blog-posts";
 import { queryChannelsFromDb } from "@/server/analytics/queries/channels";
 import {
   queryActiveUsersFromDb,
@@ -14,7 +15,8 @@ import { queryInstallHealthFromDb } from "@/server/analytics/queries/install-hea
 import { queryLandingPagesFromDb, toLandingPageMetrics } from "@/server/analytics/queries/landing-pages";
 import { queryPmf } from "@/server/analytics/queries/pmf";
 import { queryRetentionFromDb } from "@/server/analytics/queries/retention";
-import { queryRevenueFromDb } from "@/server/analytics/queries/revenue";
+import { queryRevenueFromDb, toRevenueMetrics } from "@/server/analytics/queries/revenue";
+import { queryTrailFromDb, toTrailMetrics } from "@/server/analytics/queries/trail";
 import {
   queryVisitorBreakdownFromDb,
   toVisitorBreakdownMetrics,
@@ -59,6 +61,8 @@ export async function GET(request: NextRequest) {
     channels,
     visitorBreakdown,
     landingPages,
+    blogPosts,
+    trail,
     pmf,
   ] = await Promise.all([
     queryFunnelFromDb(target),
@@ -70,6 +74,8 @@ export async function GET(request: NextRequest) {
     queryChannelsFromDb(target),
     queryVisitorBreakdownFromDb(target),
     queryLandingPagesFromDb(target),
+    queryBlogPostsFromDb(target),
+    queryTrailFromDb(target),
     queryPmf(target),
   ]);
 
@@ -97,19 +103,9 @@ export async function GET(request: NextRequest) {
 
     engagement: section(engagement, toEngagement),
 
-    revenue: section(revenue, (row) =>
-      row
-        ? {
-            activeSubscriptions: row.active_subscriptions,
-            activeTrials: row.active_trials,
-            subscriptionsStarted: row.subscriptions_started,
-            cancelIntents: row.cancel_intents,
-            subscriptionsEnded: row.subscriptions_ended,
-            paymentsFailed: row.payments_failed,
-            refunds: row.refunds,
-          }
-        : null,
-    ),
+    // Active trials/subscriptions exclude cancel-at-period-end (migration 0022); those are
+    // reported separately as canceling*.
+    revenue: section(revenue, (row) => (row ? toRevenueMetrics(row) : null)),
 
     retention: section(retention, (rows) =>
       rows.slice(0, 12).map((row) => ({
@@ -157,6 +153,12 @@ export async function GET(request: NextRequest) {
     visitorBreakdown: section(visitorBreakdown, toVisitorBreakdownMetrics),
 
     landingPages: section(landingPages, toLandingPageMetrics),
+
+    // Per-post traffic and conversions (migration 0021). Older widget builds ignore unknown keys.
+    blogPosts: section(blogPosts, toBlogPostMetrics),
+
+    // Every person's three attribution layers and whole journeys, with outcomes (migration 0022).
+    trail: section(trail, toTrailMetrics),
 
     // New top-level section (added alongside the PMF survey). The widget's Kotlin JSON parser
     // uses `ignoreUnknownKeys = true`, so this is safe to add without touching widget code —

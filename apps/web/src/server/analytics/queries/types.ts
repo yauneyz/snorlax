@@ -41,13 +41,47 @@ export interface EngagementSummary {
 }
 
 export interface RevenueMetrics {
+  /** Paid and not set to cancel at period end. */
   activeSubscriptions: number;
+  /** Trialing and not set to cancel at period end. */
   activeTrials: number;
   subscriptionsStarted: number;
   cancelIntents: number;
   subscriptionsEnded: number;
   paymentsFailed: number;
   refunds: number;
+  /** Still entitled, but set to cancel at period end. Not counted as active. */
+  cancelingSubscriptions: number;
+  cancelingTrials: number;
+  lifetimeCustomers: number;
+  /** Monthly recurring revenue of active subscriptions, at list price (yearly / 12). */
+  mrrCents: number;
+}
+
+/** One channel on one layer of the trail, all time (analytics_trail_outcomes, migration 0022). */
+export interface TrailOutcomeMetrics {
+  channel: string;
+  /** Source kind (search, ai, social, referral, campaign, paid, direct, none); for blog
+   * post / hybrid / none; for affiliate affiliate / none. */
+  kind: string;
+  people: number;
+  people30d: number;
+  downloaded: number;
+  paired: number;
+  trials: number;
+  paid: number;
+  lifetime: number;
+  /** Right now, excluding cancel-at-period-end. */
+  activeTrials: number;
+  activeSubs: number;
+}
+
+export interface TrailMetrics {
+  sources: TrailOutcomeMetrics[];
+  blog: TrailOutcomeMetrics[];
+  affiliates: TrailOutcomeMetrics[];
+  /** Whole journeys ("chatgpt → attention-armor (blog) → maya (affiliate)"), busiest first. */
+  journeys: TrailOutcomeMetrics[];
 }
 
 export interface RetentionCohortMetrics {
@@ -100,6 +134,36 @@ export interface LandingPageMetrics {
   paid: number;
   /** Downloads started from this page's CTA (last touch), whatever page the person landed on. */
   ctaDownloads: number;
+}
+
+/** One blog post's last 90 days (analytics_blog_posts, migration 0021). */
+export interface BlogPostMetrics {
+  slug: string;
+  views: number;
+  views7d: number;
+  /** Distinct readers. */
+  visitors: number;
+  /** People whose very first page on the site was this post. */
+  entrances: number;
+  /** Distinct people who clicked the post's CTA. */
+  ctaClickers: number;
+  /** People whose blog channel starts with this post (their first read before converting). */
+  attributed: number;
+  downloaded: number;
+  installed: number;
+  paired: number;
+  activated: number;
+  trials: number;
+  paid: number;
+  /**
+   * People linked to the post: they read it first, or clicked its CTA, before converting. A hybrid
+   * "a → b" reader is linked to both posts, so these overlap across posts; `attributed` never does.
+   */
+  linked: number;
+  linkedDownloaded: number;
+  linkedPaired: number;
+  linkedTrials: number;
+  linkedPaid: number;
 }
 
 export interface VisitorBreakdownMetric {

@@ -47,6 +47,8 @@ describe("sendEmail", () => {
       template: "PaymentFailed",
       props: {
         appName: "Acme",
+        updateCardUrl: "https://acme.test/account/billing/update-card",
+        cancelUrl: "https://acme.test/account/cancel",
         invoiceUrl: "https://acme.test/i",
         amount: 1000,
         currency: "usd",

@@ -12,11 +12,22 @@ describe("email templates", () => {
     expect(html).toContain("Acme");
   });
 
-  it("PaymentFailedEmail includes the formatted amount", async () => {
+  it("PaymentFailedEmail includes the amount and the update, pay, and cancel links", async () => {
     const html = await render(
-      <PaymentFailedEmail appName="Acme" invoiceUrl="https://example.com/i" amount={2000} currency="usd" />,
+      <PaymentFailedEmail
+        appName="Acme"
+        updateCardUrl="https://acme.test/account/billing/update-card"
+        cancelUrl="https://acme.test/account/cancel"
+        invoiceUrl="https://example.com/i"
+        amount={2000}
+        currency="usd"
+      />,
     );
     expect(html).toContain("$20");
+    expect(html).toContain("https://acme.test/account/billing/update-card");
+    expect(html).toContain("https://acme.test/account/cancel");
+    expect(html).toContain("https://example.com/i");
+    expect(html).toContain("ignore this email");
   });
 
   it("SubscriptionCancelledEmail mentions the period end", async () => {

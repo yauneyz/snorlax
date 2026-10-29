@@ -63,10 +63,12 @@ const SAMPLES = {
     element: (c) => createElement(WelcomeEmail, { appName: c.app.name, userName: "Resend Test" }),
   },
   PaymentFailed: {
-    subject: () => "Payment failed — action required",
+    subject: (c) => `Your ${c.app.name} Pro renewal didn't go through`,
     element: (c) =>
       createElement(PaymentFailedEmail, {
         appName: c.app.name,
+        updateCardUrl: `${c.app.url_prod}/account/billing/update-card`,
+        cancelUrl: `${c.app.url_prod}/account/cancel`,
         invoiceUrl: `${c.app.url_prod}/account`,
         amount: 1000,
         currency: "usd",

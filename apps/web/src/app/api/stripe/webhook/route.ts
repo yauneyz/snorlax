@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import type Stripe from "stripe";
+import { adoptSubscriptionPaymentMethod } from "@talysman/billing-server";
 import { getStripe } from "@/lib/stripe/client";
 import { syncSubscription } from "@/lib/stripe/sync-subscription";
 import { fulfillLifetimeCheckoutSession, refundLifetimePurchase } from "@/lib/stripe/lifetime";
@@ -86,6 +87,7 @@ export async function POST(request: NextRequest) {
         const subscription = event.data.object as Stripe.Subscription;
         const full = await stripe.subscriptions.retrieve(subscription.id, { expand: ["customer"] });
         await syncSubscription(full);
+        await adoptSubscriptionPaymentMethod({ stripe, subscription: full });
 
         if (event.type === "customer.subscription.deleted") {
           await notify(event, () => notifyCancellation(full));
@@ -179,7 +181,13 @@ async function lookupProfileEmail(customerId: string): Promise<string | null> {
   return data?.email ?? null;
 }
 
+/**
+ * One email per failed invoice, on the first decline. Stripe keeps retrying for days and
+ * fires `invoice.payment_failed` on every attempt; the email tells the customer they can
+ * ignore it, so following up on each retry would contradict it.
+ */
 async function notifyPaymentFailed(invoice: Stripe.Invoice) {
+  if ((invoice.attempt_count ?? 0) > 1) return;
   const customerId = typeof invoice.customer === "string" ? invoice.customer : invoice.customer?.id;
   if (!customerId) return;
   const email = await lookupProfileEmail(customerId);
@@ -189,7 +197,9 @@ async function notifyPaymentFailed(invoice: Stripe.Invoice) {
     template: "PaymentFailed",
     props: {
       appName: config.app.name,
-      invoiceUrl: invoice.hosted_invoice_url ?? `${config.app.url}/account`,
+      updateCardUrl: `${config.app.url}/account/billing/update-card`,
+      cancelUrl: `${config.app.url}/account/cancel`,
+      invoiceUrl: invoice.hosted_invoice_url ?? null,
       amount: invoice.amount_due,
       currency: invoice.currency,
     },

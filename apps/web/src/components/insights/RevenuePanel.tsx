@@ -4,6 +4,10 @@ import { queryRevenue } from "@/server/analytics/queries/revenue";
 import { PanelShell } from "./PanelShell";
 import { Unavailable } from "./Unavailable";
 
+function dollars(cents: number): string {
+  return `$${(cents / 100).toLocaleString("en-US", { maximumFractionDigits: 0 })}`;
+}
+
 export async function RevenuePanel({
   target,
   audience,
@@ -16,7 +20,7 @@ export async function RevenuePanel({
   return (
     <PanelShell
       title="Revenue"
-      description="Subscription projection plus authoritative billing milestones."
+      description="Right now. Active excludes anything set to cancel at period end; those are counted as canceling instead."
     >
       {!result.ok ? (
         <Unavailable message={result.message} />
@@ -33,7 +37,21 @@ export async function RevenuePanel({
             <strong>{row.activeTrials}</strong>
           </div>
           <div>
-            <span>Started</span>
+            <span>MRR (list price)</span>
+            <strong>{dollars(row.mrrCents)}</strong>
+          </div>
+          <div>
+            <span>Canceling subs / trials</span>
+            <strong>
+              {row.cancelingSubscriptions} / {row.cancelingTrials}
+            </strong>
+          </div>
+          <div>
+            <span>Lifetime customers</span>
+            <strong>{row.lifetimeCustomers}</strong>
+          </div>
+          <div>
+            <span>Subscriptions started</span>
             <strong>{row.subscriptionsStarted}</strong>
           </div>
           <div>

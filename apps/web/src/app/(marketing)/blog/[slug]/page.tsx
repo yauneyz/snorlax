@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
+import { PRO_TRIAL_DAYS } from "@talysman/product";
+import { BlogCta } from "@/components/marketing/BlogCta";
 import { listPosts, getPost } from "@/lib/content/blog";
 import { MarkdownRenderer } from "@/components/content/MarkdownRenderer";
 import { config } from "@/lib/config";
@@ -54,6 +56,7 @@ export default async function BlogPost({ params }: PageProps) {
         </p>
       </header>
       <MarkdownRenderer html={html} />
+      <BlogCta slug={frontmatter.slug} trialDays={PRO_TRIAL_DAYS} />
     </article>
   );
 }

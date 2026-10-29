@@ -20,6 +20,10 @@ data class InsightsSummary(
     // Defaulted like visitorBreakdown above: cached JSON written before this field existed
     // (SharedPreferences in InsightsRepository) must still deserialize without it.
     val pmf: PmfSection = PmfSection(ok = true),
+    // Defaulted for the same reason; added with the blog channel (migration 0021).
+    val blogPosts: BlogPostsSection = BlogPostsSection(ok = true),
+    // The channel trail (migration 0022). Defaulted like the sections above.
+    val trail: TrailSection = TrailSection(ok = true),
 )
 
 @Serializable
@@ -78,6 +82,12 @@ data class RevenueData(
     val subscriptionsEnded: Long,
     val paymentsFailed: Long,
     val refunds: Long,
+    // Active subs/trials exclude cancel-at-period-end; these count the ones that are leaving.
+    // Defaulted so a server that predates them still parses.
+    val cancelingSubscriptions: Long = 0,
+    val cancelingTrials: Long = 0,
+    val lifetimeCustomers: Long = 0,
+    val mrrCents: Long = 0,
 )
 
 @Serializable
@@ -133,6 +143,63 @@ data class VisitorBreakdownRow(
     val label: String,
     val visitors: Long,
     val pctVisitors: Double = 0.0,
+)
+
+@Serializable
+data class BlogPostsSection(val ok: Boolean, val data: List<BlogPostRow>? = null, val message: String? = null)
+
+// One blog post's last 90 days. The linked* counts are people who read the post first or clicked
+// its CTA before converting; a hybrid "a → b" reader counts under both posts. The unprefixed
+// conversion counts (attributed, paired, ...) are first-read only and never overlap.
+@Serializable
+data class BlogPostRow(
+    val slug: String,
+    val views: Long = 0,
+    val views7d: Long = 0,
+    val visitors: Long = 0,
+    val entrances: Long = 0,
+    val ctaClickers: Long = 0,
+    val attributed: Long = 0,
+    val downloaded: Long = 0,
+    val installed: Long = 0,
+    val paired: Long = 0,
+    val activated: Long = 0,
+    val trials: Long = 0,
+    val paid: Long = 0,
+    val linked: Long = 0,
+    val linkedDownloaded: Long = 0,
+    val linkedPaired: Long = 0,
+    val linkedTrials: Long = 0,
+    val linkedPaid: Long = 0,
+)
+
+@Serializable
+data class TrailSection(val ok: Boolean, val data: TrailData? = null, val message: String? = null)
+
+// Each person on three layers at once — source (outside world), blog, affiliate — plus whole
+// journeys like "chatgpt → attention-armor (blog) → maya (affiliate)". All time. Rows arrive
+// ordered by what's paying now.
+@Serializable
+data class TrailData(
+    val sources: List<TrailRow> = emptyList(),
+    val blog: List<TrailRow> = emptyList(),
+    val affiliates: List<TrailRow> = emptyList(),
+    val journeys: List<TrailRow> = emptyList(),
+)
+
+@Serializable
+data class TrailRow(
+    val channel: String,
+    val kind: String = "",
+    val people: Long = 0,
+    val people30d: Long = 0,
+    val downloaded: Long = 0,
+    val paired: Long = 0,
+    val trials: Long = 0,
+    val paid: Long = 0,
+    val lifetime: Long = 0,
+    val activeTrials: Long = 0,
+    val activeSubs: Long = 0,
 )
 
 @Serializable

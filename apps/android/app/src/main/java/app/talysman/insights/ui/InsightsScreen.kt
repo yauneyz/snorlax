@@ -24,8 +24,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import app.talysman.insights.data.BlogPostRow
 import app.talysman.insights.data.ChannelRow
-import app.talysman.insights.data.RetentionRow
+import app.talysman.insights.data.TrailRow
 import app.talysman.insights.data.VisitorBreakdownRow
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -93,6 +94,23 @@ fun InsightsScreen(viewModel: InsightsViewModel = viewModel()) {
                 }
 
                 item {
+                    PanelCard("Revenue", "Right now · active excludes anything set to cancel at period end") {
+                        summary.revenue.data?.let { r ->
+                            KpiGrid(
+                                listOf(
+                                    "Active subs" to r.activeSubscriptions.toString(),
+                                    "Active trials" to r.activeTrials.toString(),
+                                    "MRR (list)" to "$" + "%,d".format(r.mrrCents / 100),
+                                    "Lifetime customers" to r.lifetimeCustomers.toString(),
+                                    "Canceling subs / trials" to "${r.cancelingSubscriptions} / ${r.cancelingTrials}",
+                                    "Payment failures" to r.paymentsFailed.toString(),
+                                ),
+                            )
+                        } ?: EmptyState(summary.revenue.ok, summary.revenue.message)
+                    }
+                }
+
+                item {
                     PanelCard("Acquisition channels", "First-touch funnel, device type, and OS · last 90 days") {
                         val rows = summary.channels.data
                         if (rows.isNullOrEmpty()) {
@@ -106,6 +124,20 @@ fun InsightsScreen(viewModel: InsightsViewModel = viewModel()) {
                             BreakdownTable("Operating system", breakdown.operatingSystems)
                         } else if (!summary.visitorBreakdown.ok) {
                             EmptyState(false, summary.visitorBreakdown.message)
+                        }
+                    }
+                }
+
+                item {
+                    PanelCard("Channel trail", "All time · every person on all three layers · Now = active trials / subs") {
+                        val trail = summary.trail.data
+                        if (trail == null) {
+                            EmptyState(summary.trail.ok, summary.trail.message)
+                        } else {
+                            TrailTable("Source", trail.sources)
+                            TrailTable("Blog", trail.blog)
+                            TrailTable("Affiliate", trail.affiliates)
+                            JourneyList(trail.journeys)
                         }
                     }
                 }
@@ -126,40 +158,13 @@ fun InsightsScreen(viewModel: InsightsViewModel = viewModel()) {
                 }
 
                 item {
-                    PanelCard("Revenue") {
-                        summary.revenue.data?.let { r ->
-                            KpiGrid(
-                                listOf(
-                                    "Active subs" to r.activeSubscriptions.toString(),
-                                    "Active trials" to r.activeTrials.toString(),
-                                    "Cancel intent / ended" to "${r.cancelIntents} / ${r.subscriptionsEnded}",
-                                    "Refunds" to r.refunds.toString(),
-                                ),
-                            )
-                        } ?: EmptyState(summary.revenue.ok, summary.revenue.message)
-                    }
-                }
-
-                item {
-                    PanelCard("Product-market fit", "Sean Ellis survey · % \"very disappointed\" without Talysman, 40% is the classic threshold") {
-                        summary.pmf.data?.takeIf { it.responses > 0 }?.let { p ->
-                            KpiGrid(
-                                listOf(
-                                    "Very disappointed" to (p.pctVeryDisappointed?.let { "$it%" } ?: "—"),
-                                    "Somewhat disappointed" to (p.pctSomewhatDisappointed?.let { "$it%" } ?: "—"),
-                                    "Not disappointed" to (p.pctNotDisappointed?.let { "$it%" } ?: "—"),
-                                    "Responses" to p.responses.toString(),
-                                ),
-                            )
-                        } ?: EmptyState(summary.pmf.ok, summary.pmf.message)
-                    }
-                }
-
-                item {
-                    PanelCard("Retention cohorts", "% protected-active at D1 / D7 / D30") {
-                        val rows = summary.retention.data
-                        if (rows.isNullOrEmpty()) EmptyState(summary.retention.ok, summary.retention.message)
-                        else RetentionTable(rows)
+                    PanelCard("Blog", "Per post · last 90 days · paired / trials / paid are people who read it first or clicked its CTA") {
+                        val rows = summary.blogPosts.data
+                        if (rows.isNullOrEmpty()) {
+                            EmptyState(summary.blogPosts.ok, summary.blogPosts.message)
+                        } else {
+                            BlogPostsTable(rows)
+                        }
                     }
                 }
             }
@@ -212,24 +217,6 @@ private fun Kpi(label: String, value: String, modifier: Modifier = Modifier) {
 }
 
 @Composable
-private fun RetentionTable(rows: List<RetentionRow>) {
-    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        TableHeader(listOf("Week", "Devices", "D1", "D7", "D30"))
-        rows.take(8).forEach { row ->
-            TableRow(
-                listOf(
-                    row.cohortWeek,
-                    row.devices.toString(),
-                    row.d1Pct?.let { "$it%" } ?: "—",
-                    row.d7Pct?.let { "$it%" } ?: "—",
-                    row.d30Pct?.let { "$it%" } ?: "—",
-                ),
-            )
-        }
-    }
-}
-
-@Composable
 private fun ChannelsTable(rows: List<ChannelRow>) {
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         TableHeader(listOf("Channel", "Visit", "Paired", "Acct", "Trial", "Paid"))
@@ -242,6 +229,71 @@ private fun ChannelsTable(rows: List<ChannelRow>) {
                     row.accounts.toString(),
                     row.trials.toString(),
                     row.paid.toString(),
+                ),
+            )
+        }
+    }
+}
+
+@Composable
+private fun TrailTable(title: String, rows: List<TrailRow>) {
+    if (rows.isEmpty()) return
+    Column(Modifier.padding(top = 10.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Text(title, color = TalysmanPalette.ForegroundStrong, fontWeight = FontWeight.SemiBold, fontSize = 12.sp)
+        TableHeader(listOf("Channel", "People", "Paired", "Trial", "Paid", "Now"))
+        rows.take(10).forEach { row ->
+            TableRow(
+                listOf(
+                    row.channel,
+                    row.people.toString(),
+                    row.paired.toString(),
+                    row.trials.toString(),
+                    (row.paid + row.lifetime).toString(),
+                    "${row.activeTrials} / ${row.activeSubs}",
+                ),
+            )
+        }
+    }
+}
+
+// Journeys are long ("chatgpt → attention-armor (blog) → maya (affiliate)"), so each gets its
+// own line above its numbers instead of a squeezed first column.
+@Composable
+private fun JourneyList(rows: List<TrailRow>) {
+    if (rows.isEmpty()) return
+    Column(Modifier.padding(top = 14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text("Journeys", color = TalysmanPalette.ForegroundStrong, fontWeight = FontWeight.SemiBold, fontSize = 12.sp)
+        TableHeader(listOf("People", "Paired", "Trial", "Paid", "Now"))
+        rows.take(12).forEach { row ->
+            Column {
+                Text(row.channel, color = TalysmanPalette.ForegroundStrong, fontSize = 11.sp, fontWeight = FontWeight.Medium)
+                TableRow(
+                    listOf(
+                        row.people.toString(),
+                        row.paired.toString(),
+                        row.trials.toString(),
+                        (row.paid + row.lifetime).toString(),
+                        "${row.activeTrials} / ${row.activeSubs}",
+                    ),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun BlogPostsTable(rows: List<BlogPostRow>) {
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        TableHeader(listOf("Post", "Views", "CTA", "Paired", "Trial", "Paid"))
+        rows.take(10).forEach { row ->
+            TableRow(
+                listOf(
+                    row.slug,
+                    row.views.toString(),
+                    row.ctaClickers.toString(),
+                    row.linkedPaired.toString(),
+                    row.linkedTrials.toString(),
+                    row.linkedPaid.toString(),
                 ),
             )
         }

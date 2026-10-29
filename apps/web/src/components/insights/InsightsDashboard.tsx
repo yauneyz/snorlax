@@ -3,6 +3,7 @@ import { Suspense } from "react";
 import type { AnalyticsAudience } from "@/server/analytics/audience";
 import { resolveTarget, type AnalyticsTarget } from "@/server/analytics/db";
 import { ActiveUsersPanel } from "./ActiveUsersPanel";
+import { BlogPostsPanel } from "./BlogPostsPanel";
 import { ChannelTablePanel } from "./ChannelTablePanel";
 import { EngagementPanel } from "./EngagementPanel";
 import { ErrorsPanel } from "./ErrorsPanel";
@@ -16,6 +17,7 @@ import { RawStreamPanel } from "./RawStreamPanel";
 import { RetentionPanel } from "./RetentionPanel";
 import { RevenuePanel } from "./RevenuePanel";
 import { TargetBanner } from "./TargetBanner";
+import { TrailPanel } from "./TrailPanel";
 
 // The workspace currently resolves two compatible React 19 type patch versions. This cast
 // keeps the runtime Suspense boundary while expressing it in the JSX namespace used by Next.
@@ -24,15 +26,18 @@ const SuspenseBoundary = Suspense as unknown as (props: {
   fallback: React.ReactNode;
 }) => React.ReactElement;
 
+// Revenue and the channel trail lead: what's paying, and which channels and paths produce it.
 const panels = [
+  ["Revenue", RevenuePanel],
   ["Funnel", FunnelPanel],
+  ["Channel trail", TrailPanel],
+  ["Blog", BlogPostsPanel],
   ["Channels", ChannelTablePanel],
   ["Landing pages", LandingPagesPanel],
   ["Active users", ActiveUsersPanel],
   ["Engagement", EngagementPanel],
   ["Retention", RetentionPanel],
   ["Install health", InstallHealthPanel],
-  ["Revenue", RevenuePanel],
   ["Product-market fit", PmfPanel],
   ["Errors", ErrorsPanel],
   ["Raw stream", RawStreamPanel],

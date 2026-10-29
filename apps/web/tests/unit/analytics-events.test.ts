@@ -27,6 +27,12 @@ describe("the event allowlist", () => {
 });
 
 describe("parseEventProps", () => {
+  it("requires a slug-shaped slug on blog_cta_clicked", () => {
+    expect(parseEventProps("blog_cta_clicked", { slug: "attention-armor" }).ok).toBe(true);
+    expect(parseEventProps("blog_cta_clicked", {}).ok).toBe(false);
+    expect(parseEventProps("blog_cta_clicked", { slug: "../x" }).ok).toBe(false);
+  });
+
   it("accepts a valid payload for a declared event", () => {
     const result = parseEventProps("download_clicked", { platform: "linux" });
     expect(result.ok).toBe(true);

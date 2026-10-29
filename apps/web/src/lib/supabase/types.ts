@@ -358,6 +358,37 @@ export type AnalyticsLandingFunnelRow = {
   cta_downloads: number;
 };
 
+export type AnalyticsBlogTouchRow = {
+  person_id: string;
+  first_slug: string;
+  first_at: string;
+  cta_slug: string | null;
+  cta_at: string | null;
+  /** `first-slug`, or `first-slug → cta-slug` when the CTA was clicked on a different post. */
+  channel: string;
+};
+
+export type AnalyticsBlogPostRow = {
+  slug: string;
+  views: number;
+  views_7d: number;
+  visitors: number;
+  entrances: number;
+  cta_clickers: number;
+  attributed: number;
+  downloaded: number;
+  installed: number;
+  paired: number;
+  activated: number;
+  trials: number;
+  paid: number;
+  linked: number;
+  linked_downloaded: number;
+  linked_paired: number;
+  linked_trials: number;
+  linked_paid: number;
+};
+
 export type AnalyticsVisitorBreakdownRow = {
   dimension: "device_type" | "os";
   value: string;
@@ -410,4 +441,27 @@ export type AnalyticsRevenueSummaryRow = {
   payments_failed: number;
   refunds: number;
   tracked_revenue: number;
+  canceling_subscriptions: number;
+  canceling_trials: number;
+  lifetime_customers: number;
+  /** Active, not-canceling paid subscriptions keyed by Stripe price id. */
+  active_by_price: Record<string, number>;
+};
+
+export type AnalyticsTrailLayer = "source" | "blog" | "affiliate" | "journey";
+
+export type AnalyticsTrailOutcomeRow = {
+  layer: AnalyticsTrailLayer;
+  channel: string;
+  kind: string;
+  people: number;
+  people_30d: number;
+  downloaded: number;
+  installed: number;
+  paired: number;
+  trials: number;
+  paid: number;
+  lifetime: number;
+  active_trials: number;
+  active_subs: number;
 };

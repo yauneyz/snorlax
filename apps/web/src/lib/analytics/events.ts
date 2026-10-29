@@ -19,6 +19,7 @@ export const ANALYTICS_EVENT_NAMES = [
   "account_created",
   "signed_in",
   "download_clicked",
+  "blog_cta_clicked",
 
   // --- Desktop -------------------------------------------------------------
   "app_installed",
@@ -107,6 +108,11 @@ export const ANALYTICS_EVENT_PROPS = {
     app_version: z.string().max(64).optional(),
     /** The search page whose CTA led here (/download?from=<slug>). */
     from: z.string().regex(/^[a-z0-9-]{1,128}$/).optional(),
+  }),
+  // The universal CTA at the bottom of every blog post. Which post it was clicked on decides
+  // a hybrid blog channel (analytics_blog_touch, migration 0021).
+  blog_cta_clicked: z.object({
+    slug: z.string().regex(/^[a-z0-9-]{1,128}$/),
   }),
   service_install_failed: z.object({
     platform: analyticsPlatform,

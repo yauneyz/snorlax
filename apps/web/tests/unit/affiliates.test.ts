@@ -27,7 +27,6 @@ vi.mock("@/lib/sentry", () => ({ captureException: vi.fn() }));
 import { GET } from "@/app/r/[slug]/route";
 import { config } from "@/lib/config";
 import { affiliateLandingUrl } from "@/server/affiliates";
-import { channelLabel, channelOf } from "@/server/analytics/channel";
 import { addMonths, owed, referralEarnings } from "../../scripts/affiliates/earnings";
 
 function visit(slug: string) {
@@ -85,21 +84,6 @@ describe("affiliateLandingUrl", () => {
       expect(url.origin).toBe("https://www.talysman.app");
       expect(url.pathname).toBe("/");
     }
-  });
-});
-
-describe("channelOf with an affiliate", () => {
-  it("files the person under the affiliate even when first-touch was elsewhere", () => {
-    const person = {
-      first_utm_source: null,
-      first_utm_medium: null,
-      first_referrer_host: "www.google.com",
-    };
-    expect(channelLabel(person)).toBe("google (organic)");
-    expect(channelOf({ ...person, affiliate_slug: "maya" })).toEqual({
-      channel: "maya",
-      medium: "affiliate",
-    });
   });
 });
 

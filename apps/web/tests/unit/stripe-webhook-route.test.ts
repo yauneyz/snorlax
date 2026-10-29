@@ -9,6 +9,8 @@ const state = vi.hoisted(() => ({
 const mocks = vi.hoisted(() => ({
   constructEvent: vi.fn(),
   retrieveSubscription: vi.fn(),
+  updateSubscription: vi.fn(),
+  updateCustomer: vi.fn(),
   syncSubscription: vi.fn(),
   sendEmail: vi.fn(),
   captureException: vi.fn(),
@@ -25,7 +27,8 @@ vi.mock("@/lib/stripe/lifetime", () => ({
 vi.mock("@/lib/stripe/client", () => ({
   getStripe: () => ({
     webhooks: { constructEvent: mocks.constructEvent },
-    subscriptions: { retrieve: mocks.retrieveSubscription },
+    subscriptions: { retrieve: mocks.retrieveSubscription, update: mocks.updateSubscription },
+    customers: { update: mocks.updateCustomer },
   }),
 }));
 
@@ -215,6 +218,8 @@ describe("POST /api/stripe/webhook", () => {
       to: "billing@example.com",
       template: "PaymentFailed",
       props: expect.objectContaining({
+        updateCardUrl: expect.stringMatching(/\/account\/billing\/update-card$/),
+        cancelUrl: expect.stringMatching(/\/account\/cancel$/),
         invoiceUrl: "https://invoice.test/i_123",
         amount: 1000,
         currency: "usd",
@@ -225,6 +230,46 @@ describe("POST /api/stripe/webhook", () => {
       template: "RefundIssued",
       props: expect.objectContaining({ amount: 725, currency: "usd" }),
     });
+  });
+
+  it("emails only on an invoice's first failed attempt", async () => {
+    const failed = await POST(
+      request(
+        event("invoice.payment_failed", "evt_failed_retry", {
+          customer: "cus_123",
+          attempt_count: 2,
+          amount_due: 1000,
+          currency: "usd",
+        }),
+      ),
+    );
+    expect(failed.status).toBe(200);
+    expect(mocks.sendEmail).not.toHaveBeenCalled();
+  });
+
+  it("moves a subscription's own card to the customer default", async () => {
+    mocks.retrieveSubscription.mockResolvedValueOnce({
+      ...subscription,
+      status: "active",
+      default_payment_method: "pm_checkout",
+    });
+    const res = await POST(
+      request(event("customer.subscription.created", "evt_sub_created", { id: "sub_123" })),
+    );
+    expect(res.status).toBe(200);
+    expect(mocks.updateCustomer).toHaveBeenCalledWith("cus_123", {
+      invoice_settings: { default_payment_method: "pm_checkout" },
+    });
+    expect(mocks.updateSubscription).toHaveBeenCalledWith("sub_123", { default_payment_method: "" });
+  });
+
+  it("leaves a subscription without its own card alone", async () => {
+    const res = await POST(
+      request(event("customer.subscription.updated", "evt_sub_updated", { id: "sub_123" })),
+    );
+    expect(res.status).toBe(200);
+    expect(mocks.updateCustomer).not.toHaveBeenCalled();
+    expect(mocks.updateSubscription).not.toHaveBeenCalled();
   });
 
   it("retries a refund event if lifetime access could not be updated", async () => {

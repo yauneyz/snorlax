@@ -161,6 +161,7 @@ body {
 .insights-kpis strong { display: block; color: var(--fg-0); font-size: 1.35rem; }
 
 .insights-table-wrap { width: 100%; overflow: auto; }
+.insights-trail-layer + .insights-trail-layer { margin-top: 22px; }
 .insights-table { width: 100%; border-collapse: collapse; font-size: 0.78rem; white-space: nowrap; }
 .insights-table th { color: var(--fg-4); font-size: 0.68rem; font-weight: 500; text-align: left; }
 .insights-table th, .insights-table td { padding: 8px 9px; border-bottom: 1px solid var(--border); }
@@ -2665,6 +2666,11 @@ input:-webkit-autofill:focus {
   font-size: clamp(2.1rem, 2.6vw + 1.1rem, 2.65rem);
   letter-spacing: -0.02em;
   line-height: 1.14;
+}
+
+/* The universal post CTA: same band as the landing pages, set off from the last paragraph. */
+.blog-post .blog-cta {
+  margin-top: 3.5rem;
 }
 
 .blog-post__meta,

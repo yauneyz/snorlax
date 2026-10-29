@@ -27,6 +27,9 @@ import type {
   AnalyticsUsageDailyRow,
   AnalyticsUsageResolvedRow,
   AnalyticsLandingFunnelRow,
+  AnalyticsBlogPostRow,
+  AnalyticsBlogTouchRow,
+  AnalyticsTrailOutcomeRow,
   AnalyticsVisitorBreakdownRow,
   CompCodeRow,
   EntitlementGrantRow,
@@ -260,6 +263,44 @@ export type Database = {
       };
       analytics_dev_landing_funnel: {
         Row: AnalyticsLandingFunnelRow;
+        Relationships: [];
+      };
+      analytics_blog_touch: {
+        Row: AnalyticsBlogTouchRow;
+        Relationships: [];
+      };
+      analytics_blog_posts: {
+        Row: AnalyticsBlogPostRow;
+        Relationships: [];
+      };
+      analytics_dev_blog_posts: {
+        Row: AnalyticsBlogPostRow;
+        Relationships: [];
+      };
+      analytics_person_trail: {
+        Row: {
+          person_id: string;
+          user_id: string | null;
+          first_seen_at: string;
+          source: string;
+          source_kind: string;
+          landing_path: string | null;
+          blog: string | null;
+          blog_first: string | null;
+          blog_cta: string | null;
+          blog_at: string | null;
+          affiliate: string | null;
+          affiliate_at: string | null;
+          journey: string;
+        };
+        Relationships: [];
+      };
+      analytics_trail_outcomes: {
+        Row: AnalyticsTrailOutcomeRow;
+        Relationships: [];
+      };
+      analytics_dev_trail_outcomes: {
+        Row: AnalyticsTrailOutcomeRow;
         Relationships: [];
       };
       analytics_visitor_breakdown: {

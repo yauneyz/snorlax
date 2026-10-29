@@ -28,7 +28,7 @@ type SendArgs<K extends keyof TemplateMap> = {
 
 const subjects: Record<keyof TemplateMap, (p: TemplateMap[keyof TemplateMap]) => string> = {
   Welcome: () => `Welcome to ${config.app.name}`,
-  PaymentFailed: () => `Payment failed — action required`,
+  PaymentFailed: () => `Your ${config.app.name} Pro renewal didn't go through`,
   SubscriptionCancelled: () => `Your subscription was cancelled`,
   RefundIssued: () => `Refund issued`,
   TrialEnding: () => `Your ${config.app.name} Pro trial ends soon`,

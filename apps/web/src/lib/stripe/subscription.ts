@@ -1,6 +1,7 @@
 import "server-only";
 import {
   cancelCurrentSubscription,
+  cancelSubscriptionAtCustomerRequest,
   getSubscriptionDetail,
   isEligibleForTrial,
   setCancelAtPeriodEnd,
@@ -50,6 +51,15 @@ export async function setSubscriptionCancelAtPeriodEnd(userId: string, cancel: b
  */
 export async function cancelPaidSubscriptionForComp(userId: string): Promise<boolean> {
   return cancelCurrentSubscription({
+    db: supabaseAdmin(),
+    stripe: getStripe(),
+    userId,
+  });
+}
+
+/** The failed-payment email's cancel link; see `cancelSubscriptionAtCustomerRequest`. */
+export async function cancelSubscriptionForUser(userId: string) {
+  return cancelSubscriptionAtCustomerRequest({
     db: supabaseAdmin(),
     stripe: getStripe(),
     userId,

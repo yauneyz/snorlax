@@ -1,5 +1,7 @@
 import "server-only";
 import { cache } from "react";
+import { PRO_PRICE_CENTS } from "@talysman/product";
+import { config } from "@/lib/config";
 import type { AnalyticsRevenueSummaryRow } from "@/lib/supabase/types";
 import { audienceView, type AnalyticsAudience } from "@/server/analytics/audience";
 import type { AnalyticsTarget } from "@/server/analytics/db";
@@ -20,7 +22,24 @@ export const queryRevenueFromDb = cache(
     }),
 );
 
-function toMetrics(row: AnalyticsRevenueSummaryRow): RevenueMetrics {
+/**
+ * MRR at list price from active subscription counts by Stripe price id. A price id this
+ * deployment doesn't know (an old price, a hand-made one) adds nothing rather than a guess.
+ */
+export function mrrCents(
+  activeByPrice: Record<string, number> | null | undefined,
+  prices: { monthly: string; yearly: string } = {
+    monthly: config.stripe.priceMonthly,
+    yearly: config.stripe.priceYearly,
+  },
+): number {
+  const count = (id: string) => (id ? (activeByPrice?.[id] ?? 0) : 0);
+  return Math.round(
+    count(prices.monthly) * PRO_PRICE_CENTS.monthly + (count(prices.yearly) * PRO_PRICE_CENTS.yearly) / 12,
+  );
+}
+
+export function toRevenueMetrics(row: AnalyticsRevenueSummaryRow): RevenueMetrics {
   return {
     activeSubscriptions: row.active_subscriptions,
     activeTrials: row.active_trials,
@@ -29,6 +48,10 @@ function toMetrics(row: AnalyticsRevenueSummaryRow): RevenueMetrics {
     subscriptionsEnded: row.subscriptions_ended,
     paymentsFailed: row.payments_failed,
     refunds: row.refunds,
+    cancelingSubscriptions: row.canceling_subscriptions,
+    cancelingTrials: row.canceling_trials,
+    lifetimeCustomers: row.lifetime_customers,
+    mrrCents: mrrCents(row.active_by_price),
   };
 }
 
@@ -42,6 +65,6 @@ export const queryRevenue = cache(
       return pickSection(await fetchProdSummary(), (s) => s.revenue);
     }
     const result = await queryRevenueFromDb(target, audience);
-    return result.ok ? { ok: true, rows: result.rows ? toMetrics(result.rows) : null } : result;
+    return result.ok ? { ok: true, rows: result.rows ? toRevenueMetrics(result.rows) : null } : result;
   },
 );

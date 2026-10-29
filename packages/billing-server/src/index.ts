@@ -217,13 +217,21 @@ export async function createCheckoutSession(args: {
   return { url: session.url };
 }
 
+/**
+ * A portal deep link. `update_card` lands directly on the payment-method form, so the
+ * card a customer enters becomes the one every future invoice charges — unlike the
+ * hosted invoice page, which only settles the invoice in front of them.
+ */
+export type PortalFlow = 'update_card';
+
 export async function createPortalSession(args: {
   db: SupabaseTableClient;
   stripe: Stripe;
   config: Pick<BillingConfig, 'appUrl' | 'portalConfigId'>;
   userId: string;
+  flow?: PortalFlow;
 }): Promise<{ url: string }> {
-  const { db, stripe, config, userId } = args;
+  const { db, stripe, config, userId, flow } = args;
 
   const { data: rawProfile, error } = await db
     .from('profiles')
@@ -239,8 +247,56 @@ export async function createPortalSession(args: {
     customer: profile.stripe_customer_id,
     return_url: `${config.appUrl}/account`,
     ...(config.portalConfigId ? { configuration: config.portalConfigId } : {}),
+    ...(flow === 'update_card'
+      ? {
+          flow_data: {
+            type: 'payment_method_update' as const,
+            after_completion: {
+              type: 'redirect' as const,
+              redirect: { return_url: `${config.appUrl}/account` },
+            },
+          },
+        }
+      : {}),
   });
   return { url: session.url };
+}
+
+/**
+ * Keep the customer's default card as the only card a subscription bills.
+ *
+ * Checkout saves the card on the subscription itself, and a subscription's own
+ * `default_payment_method` outranks the customer's. The billing portal edits the
+ * customer's default, so without this a customer who switches cards in the portal sees
+ * the new card marked "default" while renewals keep charging the old one. Moving the card
+ * to the customer and clearing it from the subscription leaves one place to choose a card,
+ * and it is the one the customer can see.
+ *
+ * A card on the subscription is always the newest choice (Checkout just collected it),
+ * so it is safe to promote. Returns whether anything changed; a no-op is the common case,
+ * including the `subscription.updated` event this function itself causes.
+ */
+export async function adoptSubscriptionPaymentMethod(args: {
+  stripe: Stripe;
+  subscription: Stripe.Subscription;
+}): Promise<boolean> {
+  const { stripe, subscription } = args;
+  const pm = subscription.default_payment_method;
+  const paymentMethodId = typeof pm === 'string' ? pm : pm?.id;
+  if (!paymentMethodId) return false;
+  if (subscription.status === 'canceled' || subscription.status === 'incomplete_expired') {
+    return false;
+  }
+
+  const customerId =
+    typeof subscription.customer === 'string' ? subscription.customer : subscription.customer.id;
+  // Customer first: if clearing the subscription then fails, both still point at the
+  // same card, and the retried webhook finishes the job.
+  await stripe.customers.update(customerId, {
+    invoice_settings: { default_payment_method: paymentMethodId },
+  });
+  await stripe.subscriptions.update(subscription.id, { default_payment_method: '' });
+  return true;
 }
 
 export async function syncSubscription(args: {
@@ -607,6 +663,38 @@ export async function cancelCurrentSubscription(args: {
   await syncSubscription({ db, subscription: canceled });
   return true;
 }
+
+/**
+ * Cancel because the customer asked to — from the failed-payment email's cancel link.
+ *
+ * A subscription in good standing cancels at period end, keeping the time already paid
+ * for. One whose renewal never went through has no paid time to keep, so it ends now and
+ * its open invoices are voided: a customer who said "stop" should not be retried for, or
+ * owe, the period they declined.
+ */
+export async function cancelSubscriptionAtCustomerRequest(args: {
+  db: SupabaseTableClient;
+  stripe: Stripe;
+  userId: string;
+}): Promise<'at_period_end' | 'immediately'> {
+  const { db, stripe, userId } = args;
+  const sub = await findCurrentSubscription(db, userId);
+  if (!sub) throw new NoActiveSubscriptionError();
+
+  if (!UNPAID_SUBSCRIPTION_STATUSES.includes(sub.status)) {
+    const updated = await stripe.subscriptions.update(sub.id, { cancel_at_period_end: true });
+    await syncSubscription({ db, subscription: updated });
+    return 'at_period_end';
+  }
+
+  await cancelCurrentSubscription({ db, stripe, userId });
+  for await (const invoice of stripe.invoices.list({ subscription: sub.id, status: 'open' })) {
+    if (invoice.id) await stripe.invoices.voidInvoice(invoice.id);
+  }
+  return 'immediately';
+}
+
+const UNPAID_SUBSCRIPTION_STATUSES: readonly string[] = ['past_due', 'unpaid', 'incomplete'];
 
 async function resolveUserId(
   db: SupabaseTableClient,

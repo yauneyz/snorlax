@@ -3,6 +3,7 @@ import { cache } from "react";
 import { config } from "@/lib/config";
 import type {
   ActiveUsersMetrics,
+  BlogPostMetrics,
   ChannelMetrics,
   EngagementMetrics,
   FunnelMetrics,
@@ -11,6 +12,7 @@ import type {
   PanelData,
   RetentionCohortMetrics,
   RevenueMetrics,
+  TrailMetrics,
   VisitorBreakdownMetrics,
 } from "./queries/types";
 
@@ -31,6 +33,8 @@ interface WidgetSummary {
   channels: Section<ChannelMetrics[]>;
   visitorBreakdown: Section<VisitorBreakdownMetrics>;
   landingPages: Section<LandingPageMetrics[]>;
+  blogPosts: Section<BlogPostMetrics[]>;
+  trail: Section<TrailMetrics>;
 }
 
 type FetchResult = { ok: true; summary: WidgetSummary } | { ok: false; message: string };

@@ -27,7 +27,6 @@ import {
   type AnalyticsSource,
 } from "@/lib/analytics/events";
 import { sendInsightsPush, type InsightsPush } from "@/server/insights/push";
-import { channelLabel } from "./channel";
 
 /** Caps app_error pushes at one per device+event in this window during a crash loop. Every
  * occurrence still lands in analytics_events — this only throttles the notification. */
@@ -313,7 +312,8 @@ export async function track(input: TrackInput): Promise<void> {
   }
 }
 
-/** The person's first-touch channel rides along, so the notification says where they came from.
+/** The person's journey rides along ("chatgpt → attention-armor (blog)"), read from the same trail
+ * the dashboard reports (analytics_person_trail, migration 0022), so the two can never disagree.
  * A failed lookup still pushes, labelled "unknown" — the event is the news, the channel is detail. */
 async function pushMilestone(
   db: ReturnType<typeof supabaseAdmin>,
@@ -324,18 +324,12 @@ async function pushMilestone(
   if (personId) {
     try {
       const { data, error } = await db
-        .from("analytics_persons")
-        .select("first_utm_source, first_utm_medium, first_referrer_host, affiliate_id")
-        .eq("id", personId)
+        .from("analytics_person_trail")
+        .select("journey")
+        .eq("person_id", personId)
         .maybeSingle();
-      if (error) throw new Error(`channel lookup failed: ${error.message}`);
-      if (data) {
-        const affiliate = data.affiliate_id
-          ? (await db.from("affiliates").select("slug").eq("id", data.affiliate_id).maybeSingle())
-              .data
-          : null;
-        channel = channelLabel({ ...data, affiliate_slug: affiliate?.slug });
-      }
+      if (error) throw new Error(`journey lookup failed: ${error.message}`);
+      if (data) channel = data.journey;
     } catch (err) {
       await captureException(err, { scope: "analytics.pushMilestone", event: input.event });
     }
