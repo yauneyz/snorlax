@@ -18,4 +18,8 @@ firstEnabledLocalDate: string | null,
 /**
  * Bumped whenever the effective (enforced) policy changes.
  */
-generation: number, };
+generation: number, 
+/**
+ * Minutes after local midnight when pool unlock counts reset (0 = midnight). Key-gated.
+ */
+poolResetMinute: number, };

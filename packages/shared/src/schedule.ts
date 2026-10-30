@@ -19,6 +19,11 @@ export function parseHm(hm: string): number | null {
   return h <= 23 && m <= 59 ? h * 60 + m : null;
 }
 
+/** Minutes after midnight → "HH:MM". */
+export function formatHm(minutes: number): string {
+  return `${String(Math.floor(minutes / 60)).padStart(2, '0')}:${String(minutes % 60).padStart(2, '0')}`;
+}
+
 /** Window length in minutes; windows ending at or before their start run past midnight. */
 export function windowMinutes(start: string, end: string): number {
   const s = parseHm(start);

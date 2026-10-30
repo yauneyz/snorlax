@@ -55,6 +55,9 @@ pub struct EngineState {
     #[serde(default)]
     #[cfg_attr(feature = "ts", ts(type = "number"))]
     pub generation: u64,
+    /// Minutes after local midnight when pool unlock counts reset (0 = midnight). Key-gated.
+    #[serde(default)]
+    pub pool_reset_minute: u16,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
@@ -349,8 +352,8 @@ pub struct PoolRef {
 pub struct PoolUsage {
     pub profile_id: ProfileId,
     pub pool_id: String,
-    /// Local date the counter belongs to ("YYYY-MM-DD"); an unlock counts against the day it
-    /// started.
+    /// Pool day the counter belongs to ("YYYY-MM-DD", see [`EngineState::pool_reset_minute`]); an
+    /// unlock counts against the day it started.
     pub local_date: String,
     pub used: u8,
     #[serde(default)]
@@ -411,6 +414,7 @@ pub enum JournalKind {
     EmergencyUsed,
     KeyPaired,
     KeyUnpaired,
+    PoolResetChanged { minute: u16 },
     /// Written once when upgrading from a v5 state file.
     Migration,
 }
@@ -448,6 +452,7 @@ impl EngineState {
             last_evaluated_ms: 0,
             first_enabled_local_date: None,
             generation: 0,
+            pool_reset_minute: 0,
         }
     }
 

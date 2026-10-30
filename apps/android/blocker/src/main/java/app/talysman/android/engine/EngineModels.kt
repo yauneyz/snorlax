@@ -70,6 +70,7 @@ data class PoolStatus(
     val unlockMinutes: Int,
     val friction: Friction,
     val activeUntilMs: Long? = null,
+    val resetsAtMs: Long? = null,
 )
 
 @Serializable

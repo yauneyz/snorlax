@@ -14,7 +14,7 @@ use crate::policy::AppRef;
 use crate::restrictive;
 use crate::schedule;
 use crate::streak::{self, Streak};
-use crate::time::{LocalNow, HOUR_MS};
+use crate::time::{LocalNow, HOUR_MS, MINUTES_PER_DAY};
 
 /// Error codes, mirrored in packages/shared/src/constants.ts.
 pub mod codes {
@@ -161,6 +161,8 @@ pub enum Command {
     /// Record a key pairing (the platform stores the key). Key-gated while a profile is active.
     PairKey,
     UnpairKey,
+    /// When pool unlock counts reset, in minutes after local midnight. Always key-gated.
+    SetPoolResetTime { minute: u16 },
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
@@ -178,6 +180,8 @@ pub enum EngineEvent {
     PoolUnlockExpired { pool: PoolRef },
     #[serde(rename_all = "camelCase")]
     ScheduleFired { profile_id: String, action: OnOff },
+    /// A new pool day began and the previous day's unlock counts were cleared.
+    PoolsReset,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
@@ -212,6 +216,9 @@ pub struct PoolStatus {
     pub friction: Friction,
     #[cfg_attr(feature = "ts", ts(type = "number | null"))]
     pub active_until_ms: Option<i64>,
+    /// When `left_today` next goes back to `unlocks_per_day`.
+    #[cfg_attr(feature = "ts", ts(type = "number"))]
+    pub resets_at_ms: i64,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
@@ -264,6 +271,8 @@ pub struct EngineSnapshot {
     pub streak: Streak,
     pub emergency_left: u8,
     pub next_events: Vec<UpcomingEvent>,
+    /// Minutes after local midnight when pool unlock counts reset.
+    pub pool_reset_minute: u16,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
@@ -348,8 +357,9 @@ impl Engine {
         self.state.profile(id).map(|p| activation::activation(&self.state, p, now))
     }
 
+    /// The current pool day: the local date of the most recent reset.
     fn today(&self, now: &LocalNow) -> String {
-        now.date_string()
+        now.date_string_from(self.state.pool_reset_minute)
     }
 
     fn usage(&self, r: &PoolRef, now: &LocalNow) -> Option<&PoolUsage> {
@@ -378,6 +388,7 @@ impl Engine {
             unlock_minutes: pool.unlock_minutes,
             friction: pool.friction.clone(),
             active_until_ms,
+            resets_at_ms: now.next_minute_of_day(self.state.pool_reset_minute),
         })
     }
 
@@ -549,6 +560,15 @@ impl Engine {
                 }
             }
             Command::UnpairKey => Gate::NeedsKey { relaxations: Vec::new(), locked_profiles: Vec::new() },
+            Command::SetPoolResetTime { minute } => {
+                if *minute >= MINUTES_PER_DAY {
+                    return denied(codes::BAD_REQUEST, "Pick a time of day.");
+                }
+                if !ctx.has_paired_keys {
+                    return denied(codes::NO_PAIRED_KEY, "Pair a key before changing when unlocks reset.");
+                }
+                Gate::NeedsKey { relaxations: Vec::new(), locked_profiles: Vec::new() }
+            }
         }
     }
 
@@ -835,7 +855,35 @@ impl Engine {
             Command::UnpairKey => {
                 self.push_journal(now, false, JournalKind::KeyUnpaired);
             }
+            Command::SetPoolResetTime { minute } => {
+                // Today's counts follow the boundary, so moving it never hands out extra unlocks.
+                let from = self.today(now);
+                self.state.pool_reset_minute = minute;
+                self.move_pool_day(&from, &self.today(now));
+                self.push_journal(now, false, JournalKind::PoolResetChanged { minute });
+            }
         }
+    }
+
+    fn move_pool_day(&mut self, from: &str, to: &str) {
+        if from == to {
+            return;
+        }
+        let (moved, mut kept): (Vec<PoolUsage>, Vec<PoolUsage>) =
+            std::mem::take(&mut self.state.pool_usage).into_iter().partition(|u| u.local_date == from);
+        for mut u in moved {
+            match kept.iter_mut().find(|k| k.profile_id == u.profile_id && k.pool_id == u.pool_id && k.local_date == to) {
+                Some(k) => {
+                    k.used = k.used.saturating_add(u.used);
+                    k.active_until_ms = k.active_until_ms.max(u.active_until_ms);
+                }
+                None => {
+                    u.local_date = to.to_string();
+                    kept.push(u);
+                }
+            }
+        }
+        self.state.pool_usage = kept;
     }
 
     fn unlock_pools(&mut self, pools: &[PoolRef], now: &LocalNow) {
@@ -934,12 +982,18 @@ impl Engine {
 
         // Expiry.
         let t = now.epoch_ms;
-        let today = now.date_string();
+        let today = self.today(now);
         for u in &mut self.state.pool_usage {
             if u.active_until_ms.is_some_and(|until| until <= t) {
                 u.active_until_ms = None;
                 events.push(EngineEvent::PoolUnlockExpired { pool: PoolRef { profile_id: u.profile_id.clone(), pool_id: u.pool_id.clone() } });
             }
+        }
+        // Announce a new pool day once (the first evaluation past the reset), even while an
+        // unlock started yesterday keeps its row alive.
+        let new_day = last > 0 && self.today(&now.at(last)) != today;
+        if new_day && self.state.pool_usage.iter().any(|u| u.local_date != today) {
+            events.push(EngineEvent::PoolsReset);
         }
         self.state.pool_usage.retain(|u| u.local_date == today || u.active_until_ms.is_some());
         self.state.pending_unlocks.retain(|p| p.ready_ms + PENDING_UNLOCK_TTL_MS > t);
@@ -1038,6 +1092,9 @@ impl Engine {
                     consider(e.at_ms.max(t + 1));
                 }
             }
+        }
+        if !self.state.pool_usage.is_empty() {
+            consider(now.next_minute_of_day(self.state.pool_reset_minute));
         }
         for u in &self.state.pool_usage {
             if let Some(until) = u.active_until_ms {
@@ -1170,6 +1227,7 @@ impl Engine {
             streak: self.streak(ctx),
             emergency_left: self.emergency_left(),
             next_events: self.upcoming(now),
+            pool_reset_minute: self.state.pool_reset_minute,
         }
     }
 

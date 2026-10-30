@@ -82,6 +82,13 @@ export function formatClock(ms: number, now = Date.now()): string {
   return `${date.toLocaleDateString([], { weekday: 'short' })} ${time}`;
 }
 
+/** "midnight" or "3:00 AM": when group unlocks next reset. */
+export function formatResetTime(ms: number): string {
+  const date = new Date(ms);
+  if (date.getHours() === 0 && date.getMinutes() === 0) return 'midnight';
+  return date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+}
+
 /** "12 min", "1 h 5 min", "45 s". */
 export function formatDuration(ms: number): string {
   const total = Math.max(0, Math.round(ms / 1000));

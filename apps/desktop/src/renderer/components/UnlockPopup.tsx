@@ -7,7 +7,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import type { PoolRef, PopupInfo, PopupTarget } from '@talysman/shared';
 import { onEvent, request, closePopup, openOverrides } from '../lib/bridge.js';
-import { formatClock } from '../lib/engine.js';
+import { formatClock, formatResetTime } from '../lib/engine.js';
 import { cx } from '../lib/utils.js';
 import { Button, ProfileDot } from './ui/index.js';
 import { StreakBadge } from './StreakBadge.js';
@@ -55,6 +55,7 @@ export function UnlockPopup({ target }: { target: PopupTarget }) {
   const minutes = Math.max(0, ...info.pools.map((p) => p.unlockMinutes));
   const left = Math.min(...info.pools.map((p) => p.leftToday));
   const perDay = Math.min(...info.pools.map((p) => p.unlocksPerDay));
+  const resetsAtMs = Math.max(0, ...info.pools.map((p) => p.resetsAtMs));
   const unblocked = info.verdict.kind === 'allow';
 
   async function run(command: 'requestPoolUnlock' | 'confirmPoolUnlock') {
@@ -109,7 +110,7 @@ export function UnlockPopup({ target }: { target: PopupTarget }) {
               Also blocked by a mode with no unlocks for this.
             </div>
           )}
-          {left === 0 && <div className="mt-1 text-caption text-warn">Resets at midnight.</div>}
+          {left === 0 && <div className="mt-1 text-caption text-warn">Resets at {formatResetTime(resetsAtMs)}.</div>}
         </div>
       ) : (
         <p className="text-body text-slate-400">This isn’t in an unlock group.</p>

@@ -73,6 +73,14 @@ function sendMessage(message) {
   });
 }
 
+// "midnight" or "3:00 AM": when the group's unlocks next reset (midnight from older services).
+function resetLabel(pools) {
+  const ms = Math.max(0, ...pools.map((p) => p.resetsAtMs ?? 0));
+  const date = new Date(ms);
+  if (!ms || (date.getHours() === 0 && date.getMinutes() === 0)) return 'midnight';
+  return date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+}
+
 function service(method, params) {
   return sendMessage({ type: 'talysman:service', method, params });
 }
@@ -96,7 +104,7 @@ function renderUnlock() {
   unlockTitle.textContent = `${info.pools.map((p) => p.name).join(' + ')} · ${left} of ${perDay} unlocks left today`;
   let detail = `Each unlock: ${minutes} minutes.`;
   if (info.unpooledProfiles.length) detail += ' Another mode blocks this with no unlocks.';
-  else if (left === 0) detail += ' Resets at midnight.';
+  else if (left === 0) detail += ` Resets at ${resetLabel(info.pools)}.`;
   unlockDetail.textContent = detail;
 
   const remaining = info.pending ? Math.max(0, Math.ceil((info.pending.readyMs - Date.now()) / 1000)) : 0;

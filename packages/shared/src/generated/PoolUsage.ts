@@ -2,7 +2,7 @@
 
 export type PoolUsage = { profileId: string, poolId: string, 
 /**
- * Local date the counter belongs to ("YYYY-MM-DD"); an unlock counts against the day it
- * started.
+ * Pool day the counter belongs to ("YYYY-MM-DD", see [`EngineState::pool_reset_minute`]); an
+ * unlock counts against the day it started.
  */
 localDate: string, used: number, activeUntilMs: number | null, };

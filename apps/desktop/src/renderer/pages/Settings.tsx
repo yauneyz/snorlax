@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { productFeaturesForEnvironment } from '@talysman/product';
-import { CONFIRM_MESSAGE_MAX, DEFAULT_CONFIRM_MESSAGE } from '@talysman/shared';
+import { CONFIRM_MESSAGE_MAX, DEFAULT_CONFIRM_MESSAGE, ErrorCode, formatHm, parseHm } from '@talysman/shared';
 import { useFocusStore } from '../store/useFocusStore.js';
 import {
   checkForUpdates,
@@ -16,6 +16,7 @@ import {
 } from '../lib/bridge.js';
 import { Badge, Button, Card, CardTitle, Input } from '../components/ui/index.js';
 import { EmergencyConfirm } from '../components/EmergencyConfirm.js';
+import { runCommand } from '../lib/engine.js';
 import { cx } from '../lib/utils.js';
 
 const SMART_FILTERING_ENABLED = productFeaturesForEnvironment(
@@ -51,6 +52,11 @@ export function Settings() {
   const replayOnboarding = useFocusStore((s) => s.replayOnboarding);
   const platform = useFocusStore((s) => s.platform);
   const emergencyLeft = useFocusStore((s) => s.engine.emergencyLeft);
+  const poolResetMinute = useFocusStore((s) => s.engine.poolResetMinute);
+  const hasPairedKeys = useFocusStore((s) => s.pairedKeys.length > 0);
+  const [resetDraft, setResetDraft] = useState(formatHm(poolResetMinute));
+  const [resetBusy, setResetBusy] = useState(false);
+  const [resetError, setResetError] = useState<string | null>(null);
   const [emergencyOpen, setEmergencyOpen] = useState(false);
   const [firstRunError, setFirstRunError] = useState<string | null>(null);
   const [confirmingUninstall, setConfirmingUninstall] = useState(false);
@@ -179,6 +185,22 @@ export function Settings() {
   }
 
   useEffect(() => setConfirmDraft(confirmMessage), [confirmMessage]);
+  useEffect(() => setResetDraft(formatHm(poolResetMinute)), [poolResetMinute]);
+
+  async function saveResetTime() {
+    const minute = parseHm(resetDraft);
+    if (minute === null) return;
+    setResetBusy(true);
+    setResetError(null);
+    try {
+      await runCommand({ type: 'setPoolResetTime', minute });
+    } catch (e) {
+      const code = (e as { code?: string }).code;
+      setResetError(code === ErrorCode.KEY_REQUIRED ? 'Insert your paired USB key to change this.' : (e as Error).message);
+    } finally {
+      setResetBusy(false);
+    }
+  }
 
   async function saveConfirm(enabled: boolean, message: string) {
     setConfirmBusy(true);
@@ -454,6 +476,35 @@ export function Settings() {
             </Button>
           </div>
           {streakError && <p className="text-body text-warn">{streakError}</p>}
+        </div>
+      </Card>
+
+      <Card>
+        <CardTitle hint="You can only change this using your paired USB key.">Daily unlock reset</CardTitle>
+        <div className="flex flex-col gap-3 text-body text-slate-300">
+          <p className="text-slate-400">
+            When your unlock groups get their unlocks back each day. Unlocks used before this time count
+            toward the previous day.
+          </p>
+          <label className="text-caption text-slate-300">
+            Reset time
+            <div className="mt-1 flex gap-2">
+              <Input type="time" value={resetDraft} onChange={(e) => setResetDraft(e.target.value)} />
+              <Button
+                variant="ghost"
+                disabled={resetBusy || !keyPresent || parseHm(resetDraft) === null || parseHm(resetDraft) === poolResetMinute}
+                onClick={() => saveResetTime()}
+              >
+                Save
+              </Button>
+            </div>
+          </label>
+          {!keyPresent && (
+            <p className="text-caption text-slate-500">
+              {hasPairedKeys ? 'Insert your paired USB key to change this.' : 'Pair a USB key to change this.'}
+            </p>
+          )}
+          {resetError && <p className="text-body text-warn">{resetError}</p>}
         </div>
       </Card>
 

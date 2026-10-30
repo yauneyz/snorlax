@@ -44,6 +44,7 @@ import app.talysman.android.engine.EngineRefusal
 import app.talysman.android.engine.PoolRef
 import app.talysman.android.engine.PopupInfo
 import app.talysman.android.ui.MainActivity
+import app.talysman.android.ui.formatResetTime
 import app.talysman.android.ui.theme.ProfileDot
 import app.talysman.android.ui.theme.StreakBadge
 import app.talysman.android.ui.theme.TalysmanPalette
@@ -212,7 +213,7 @@ private fun BlockScreen(
                 if (info.unpooledProfiles.isNotEmpty()) {
                     Text("Another profile blocks this with no unlocks.", color = TalysmanPalette.Warning)
                 } else if (left == 0) {
-                    Text("Resets at midnight.", color = TalysmanPalette.Warning)
+                    Text("Resets at ${formatResetTime(info.pools.mapNotNull { it.resetsAtMs }.maxOrNull())}.", color = TalysmanPalette.Warning)
                 }
                 val pending = info.pending
                 val remaining = if (pending != null) ((pending.readyMs - now + 999) / 1000).coerceAtLeast(0) else 0

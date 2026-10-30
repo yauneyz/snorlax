@@ -13,4 +13,8 @@ export type EngineSnapshot = { nowMs: number, generation: number, profiles: Arra
 /**
  * "Re-enable all" should be offered.
  */
-overridden: boolean, pools: Array<PoolStatus>, pendingUnlocks: Array<PendingPoolUnlock>, streak: Streak, emergencyLeft: number, nextEvents: Array<UpcomingEvent>, };
+overridden: boolean, pools: Array<PoolStatus>, pendingUnlocks: Array<PendingPoolUnlock>, streak: Streak, emergencyLeft: number, nextEvents: Array<UpcomingEvent>, 
+/**
+ * Minutes after local midnight when pool unlock counts reset.
+ */
+poolResetMinute: number, };

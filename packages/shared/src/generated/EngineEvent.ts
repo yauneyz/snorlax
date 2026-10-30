@@ -3,4 +3,4 @@ import type { OnOff } from "./OnOff";
 import type { OverrideKind } from "./OverrideKind";
 import type { PoolRef } from "./PoolRef";
 
-export type EngineEvent = { "kind": "profileActivated", profileId: string, } | { "kind": "profileDeactivated", profileId: string, } | { "kind": "effectiveChanged" } | { "kind": "overrideEnded", override: OverrideKind, } | { "kind": "poolUnlockExpired", pool: PoolRef, } | { "kind": "scheduleFired", profileId: string, action: OnOff, };
+export type EngineEvent = { "kind": "profileActivated", profileId: string, } | { "kind": "profileDeactivated", profileId: string, } | { "kind": "effectiveChanged" } | { "kind": "overrideEnded", override: OverrideKind, } | { "kind": "poolUnlockExpired", pool: PoolRef, } | { "kind": "scheduleFired", profileId: string, action: OnOff, } | { "kind": "poolsReset" };

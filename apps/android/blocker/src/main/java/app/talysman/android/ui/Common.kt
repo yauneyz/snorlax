@@ -48,6 +48,14 @@ fun formatClock(ms: Long, now: Long = System.currentTimeMillis()): String {
     return "${android.text.format.DateFormat.format("EEE", a)} $time"
 }
 
+/** "midnight" or "3:00 AM": when group unlocks next reset (midnight from engines that don't say). */
+fun formatResetTime(ms: Long?): String {
+    if (ms == null) return "midnight"
+    val c = Calendar.getInstance().apply { timeInMillis = ms }
+    if (c.get(Calendar.HOUR_OF_DAY) == 0 && c.get(Calendar.MINUTE) == 0) return "midnight"
+    return DateFormat.getTimeInstance(DateFormat.SHORT).format(Date(ms))
+}
+
 fun formatDuration(ms: Long): String {
     val total = (ms / 1000).coerceAtLeast(0)
     if (total < 60) return "$total s"

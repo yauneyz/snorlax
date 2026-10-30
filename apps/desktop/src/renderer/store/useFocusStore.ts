@@ -141,6 +141,7 @@ const EMPTY_SNAPSHOT: EngineSnapshot = {
   streak: { currentDays: 0, bestDays: 0, lastBreakLocalDate: null },
   emergencyLeft: 5,
   nextEvents: [],
+  poolResetMinute: 0,
 };
 
 export const useFocusStore = create<FocusStore>((set, get) => ({

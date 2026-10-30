@@ -111,6 +111,17 @@ impl LocalNow {
     pub fn next_midnight(&self) -> i64 {
         self.epoch_of_day(self.day() + 1)
     }
+
+    /// The day that started at `minute` past local midnight, as "YYYY-MM-DD" (pools reset here).
+    pub fn date_string_from(&self, minute: u16) -> String {
+        date_string((self.local_ms() - minute as i64 * MINUTE_MS).div_euclid(DAY_MS))
+    }
+
+    /// Epoch ms of the next time the local clock reads `minute` past midnight.
+    pub fn next_minute_of_day(&self, minute: u16) -> i64 {
+        let today = self.epoch_at(self.day(), minute);
+        if today > self.epoch_ms { today } else { self.epoch_at(self.day() + 1, minute) }
+    }
 }
 
 /// 1970-01-01 was a Thursday.
@@ -203,6 +214,10 @@ mod tests {
         assert_eq!(now.weekday(), Weekday::Wed);
         assert_eq!(now.epoch_at(now.day(), 19 * 60 + 30), utc);
         assert_eq!(now.next_midnight(), utc + 4 * HOUR_MS + 30 * MINUTE_MS);
+        assert_eq!(now.date_string_from(0), "2026-09-23");
+        assert_eq!(now.date_string_from(20 * 60), "2026-09-22");
+        assert_eq!(now.next_minute_of_day(3 * 60), utc + 7 * HOUR_MS + 30 * MINUTE_MS);
+        assert_eq!(now.next_minute_of_day(19 * 60 + 30), utc + DAY_MS);
     }
 
     #[test]

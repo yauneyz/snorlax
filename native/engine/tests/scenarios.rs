@@ -2,7 +2,7 @@
 //! (§3.6), emergency unlocks (§3.7), the streak (§3.8), schedules (§3.9), and the worked examples
 //! of the decision table (§3.2), each as a literal test.
 
-use talysman_engine::engine::{codes, PopupTarget, ProfileInput};
+use talysman_engine::engine::{codes, EngineEvent, PopupTarget, ProfileInput};
 use talysman_engine::model::*;
 use talysman_engine::policy::{AppRef, Policy, RuleAction, SiteRule};
 use talysman_engine::time::{days_from_civil, Weekday, DAY_MS, HOUR_MS, MINUTE_MS};
@@ -371,6 +371,67 @@ fn pools_run_out_and_reset_at_local_midnight() {
     let tomorrow = at(24 + 1, 0);
     e.tick(&tomorrow);
     e.apply(Command::RequestPoolUnlock { pools }, Auth::None, &tomorrow).unwrap();
+}
+
+#[test]
+fn pools_reset_at_the_configured_time() {
+    let ctx = at(10, 0);
+    let mut e = engine_with(vec![("a", pooled_instagram(1, Friction::None))], &ctx);
+    on(&mut e, "a", &ctx);
+    e.apply(Command::SetPoolResetTime { minute: 3 * 60 }, KEY(), &ctx).unwrap();
+    assert_eq!(e.snapshot(&ctx).pool_reset_minute, 180);
+    let pools = vec![pool_ref("a", "social")];
+    e.apply(Command::RequestPoolUnlock { pools: pools.clone() }, Auth::None, &at(23, 0)).unwrap();
+    assert_eq!(e.snapshot(&at(23, 0)).pools[0].resets_at_ms, at(24 + 3, 0).now.epoch_ms);
+    let after_midnight = at(24 + 2, 0);
+    assert!(e.tick(&after_midnight).events.iter().all(|ev| *ev != EngineEvent::PoolsReset));
+    assert_eq!(err_code(e.apply(Command::RequestPoolUnlock { pools: pools.clone() }, Auth::None, &after_midnight)), codes::POOL_EXHAUSTED);
+    let past_reset = at(24 + 3, 1);
+    e.tick(&past_reset);
+    e.apply(Command::RequestPoolUnlock { pools }, Auth::None, &past_reset).unwrap();
+}
+
+#[test]
+fn a_new_pool_day_is_announced_once_and_woken_for() {
+    let ctx = at(22, 0);
+    let mut e = engine_with(vec![("a", pooled_instagram(3, Friction::None))], &ctx);
+    on(&mut e, "a", &ctx);
+    let idle = e.tick(&ctx);
+    assert!(idle.next_wake_ms <= at(23, 0).now.epoch_ms, "nothing to reset: the usual hourly wake");
+    // An unlock that runs past midnight keeps its row alive; the reset still fires at midnight.
+    e.apply(Command::RequestPoolUnlock { pools: vec![pool_ref("a", "social")] }, Auth::None, &at(23, 55)).unwrap();
+    let before = e.tick(&at(23, 56));
+    assert_eq!(before.next_wake_ms, at(24, 0).now.epoch_ms, "wakes for the reset");
+    let reset = e.tick(&at(24, 0));
+    assert_eq!(reset.events.iter().filter(|ev| **ev == EngineEvent::PoolsReset).count(), 1);
+    assert_eq!(e.snapshot(&at(24, 0)).pools[0].left_today, 3);
+    let later = e.tick(&at(24, 6));
+    assert!(later.events.iter().all(|ev| *ev != EngineEvent::PoolsReset), "announced once");
+    assert!(later.events.iter().any(|ev| matches!(ev, EngineEvent::PoolUnlockExpired { .. })));
+    assert!(e.state.pool_usage.is_empty());
+}
+
+#[test]
+fn changing_the_reset_time_needs_the_key_and_refunds_nothing() {
+    let mut ctx = at(24 + 2, 0);
+    let mut e = engine_with(vec![("a", pooled_instagram(1, Friction::None))], &ctx);
+    let set = |minute| Command::SetPoolResetTime { minute };
+    assert_eq!(err_code(e.apply(set(180), Auth::None, &ctx)), codes::KEY_REQUIRED);
+    assert_eq!(err_code(e.apply(set(24 * 60), KEY(), &ctx)), codes::BAD_REQUEST);
+    ctx.has_paired_keys = false;
+    assert_eq!(err_code(e.apply(set(180), KEY(), &ctx)), codes::NO_PAIRED_KEY);
+    ctx.has_paired_keys = true;
+
+    // Used today's only unlock at 02:00; moving the reset to 03:00 makes 02:00 part of yesterday.
+    on(&mut e, "a", &ctx);
+    let pools = vec![pool_ref("a", "social")];
+    e.apply(Command::RequestPoolUnlock { pools: pools.clone() }, Auth::None, &ctx).unwrap();
+    e.apply(set(180), KEY(), &at(24 + 2, 30)).unwrap();
+    assert_eq!(err_code(e.apply(Command::RequestPoolUnlock { pools: pools.clone() }, Auth::None, &at(24 + 2, 40))), codes::POOL_EXHAUSTED);
+    assert_eq!(e.state.journal.last().unwrap().kind, JournalKind::PoolResetChanged { minute: 180 });
+    assert!(!e.state.journal.last().unwrap().breaks_streak);
+    e.tick(&at(24 + 3, 0));
+    e.apply(Command::RequestPoolUnlock { pools }, Auth::None, &at(24 + 3, 0)).unwrap();
 }
 
 #[test]
