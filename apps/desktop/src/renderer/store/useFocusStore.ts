@@ -140,6 +140,7 @@ const EMPTY_SNAPSHOT: EngineSnapshot = {
   pendingUnlocks: [],
   streak: { currentDays: 0, bestDays: 0, lastBreakLocalDate: null },
   emergencyLeft: 5,
+  emergencyRefillAtMs: null,
   nextEvents: [],
   poolResetMinute: 0,
 };

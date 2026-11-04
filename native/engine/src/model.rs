@@ -8,7 +8,10 @@ use crate::policy::{AppRef, Policy};
 use crate::time::Weekday;
 
 pub const SCHEMA_VERSION: u32 = 6;
-pub const EMERGENCY_LIFETIME_LIMIT: u8 = 5;
+/// Most emergency unlocks a device can hold; they come back one per [`EMERGENCY_REFILL_MS`].
+pub const EMERGENCY_UNLOCK_CAP: u8 = 5;
+/// One emergency unlock comes back this long after the refill clock starts (≈ a month).
+pub const EMERGENCY_REFILL_MS: i64 = 30 * 24 * 60 * 60_000;
 pub const MAX_PROFILE_NAME_LENGTH: usize = 40;
 pub const MAX_POOL_UNLOCKS_PER_DAY: u8 = 20;
 pub const MAX_POOL_UNLOCK_MINUTES: u16 = 120;

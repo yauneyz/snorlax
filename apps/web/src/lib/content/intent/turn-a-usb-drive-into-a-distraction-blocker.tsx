@@ -1,4 +1,4 @@
-import { EMERGENCY_LIFETIME_LIMIT } from "@talysman/shared";
+import { EMERGENCY_UNLOCK_CAP } from "@talysman/shared";
 import Link from "next/link";
 import { FREE_BLOCKED_SITE_LIMIT, PRO_TRIAL_DAYS } from "@talysman/product";
 import { config } from "@/lib/config";
@@ -268,7 +268,7 @@ export const turnAUsbDriveIntoADistractionBlocker: IntentPage = {
     ],
     notes: [
       "Any USB drive works. It's identified by the serial or volume ID it already reports — normally nothing is written to it.",
-      `Pair a spare. If every key is lost, each computer has ${EMERGENCY_LIFETIME_LIMIT} keyless emergency unlocks, for life.`,
+      `Pair a spare. If every key is lost, each computer holds up to ${EMERGENCY_UNLOCK_CAP} keyless emergency unlocks, with one coming back each month.`,
     ],
   },
   related: [

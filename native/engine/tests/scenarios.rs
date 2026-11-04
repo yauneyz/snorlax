@@ -279,10 +279,10 @@ fn locked_windows_refuse_key_overrides_but_not_emergency() {
     // Relaxing the locked profile's config is Locked too.
     assert!(matches!(e.gate(&Command::UpsertProfile { profile: input("a", blocks(&[])) }, &ctx), Gate::Locked { .. }));
     // Emergency: everything off, locked window included, without a key.
-    assert_eq!(e.emergency_left(), 5);
+    assert_eq!(e.emergency_left(&ctx), 5);
     e.apply(Command::EmergencyUnlock, Auth::None, &ctx).unwrap();
     assert!(!e.effective(&ctx).active());
-    assert_eq!(e.emergency_left(), 4);
+    assert_eq!(e.emergency_left(&ctx), 4);
     // The bypass is for this occurrence only: tomorrow's window starts normally.
     e.tick(&at(17, 0));
     let tomorrow = at(24 + 9, 0);
@@ -291,15 +291,22 @@ fn locked_windows_refuse_key_overrides_but_not_emergency() {
 }
 
 #[test]
-fn emergency_unlocks_run_out() {
+fn emergency_unlocks_run_out_then_refill_monthly() {
     let ctx = at(10, 0);
     let mut e = engine_with(vec![("a", blocks(&["reddit.com"]))], &ctx);
-    for _ in 0..EMERGENCY_LIFETIME_LIMIT {
+    for _ in 0..EMERGENCY_UNLOCK_CAP {
         on(&mut e, "a", &ctx);
         e.apply(Command::EmergencyUnlock, Auth::None, &ctx).unwrap();
     }
-    assert_eq!(e.emergency_left(), 0);
+    assert_eq!(e.emergency_left(&ctx), 0);
+    assert_eq!(e.snapshot(&ctx).emergency_refill_at_ms, Some(ctx.now.epoch_ms + EMERGENCY_REFILL_MS));
     assert_eq!(err_code(e.apply(Command::EmergencyUnlock, Auth::None, &ctx)), codes::NO_EMERGENCY_LEFT);
+    let later = at(30 * 24 + 10, 0);
+    e.tick(&later);
+    assert_eq!(e.emergency_left(&later), 1);
+    on(&mut e, "a", &later);
+    e.apply(Command::EmergencyUnlock, Auth::None, &later).unwrap();
+    assert_eq!(e.emergency_left(&later), 0);
 }
 
 #[test]

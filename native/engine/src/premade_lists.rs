@@ -115,6 +115,19 @@ mod tests {
     }
 
     #[test]
+    fn no_list_ever_blocks_google_search() {
+        use PremadeListId::*;
+        let all = [
+            Nsfw, Shopping, Social, Gambling, Press, Games, Sports, Forums, Webemail, Blog,
+            Streaming,
+        ];
+        assert_eq!(all.len(), PREMADE_LIST_COUNT);
+        for host in ["google.com", "www.google.com", "google.de", "www.gstatic.com"] {
+            assert!(!is_blocked_by_premade(&all, host), "{host} is blocked");
+        }
+    }
+
+    #[test]
     fn is_blocked_by_premade_checks_every_enabled_list() {
         assert!(is_blocked_by_premade(
             &[PremadeListId::Social],

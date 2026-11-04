@@ -38,13 +38,13 @@ export const PREMADE_LISTS: PremadeListMeta[] = [
     "id": "press",
     "label": "Press",
     "description": "News and press sites.",
-    "domainCount": 4633
+    "domainCount": 4632
   },
   {
     "id": "games",
     "label": "Games",
     "description": "Online games and game distribution sites.",
-    "domainCount": 32914
+    "domainCount": 32912
   },
   {
     "id": "sports",
@@ -62,18 +62,18 @@ export const PREMADE_LISTS: PremadeListMeta[] = [
     "id": "webemail",
     "label": "Email",
     "description": "Webmail and internet email services.",
-    "domainCount": 340
+    "domainCount": 339
   },
   {
     "id": "blog",
     "label": "Blog",
     "description": "Blog hosting and publishing sites.",
-    "domainCount": 1421
+    "domainCount": 1420
   },
   {
     "id": "streaming",
     "label": "Streaming",
     "description": "Audio and video streaming sites.",
-    "domainCount": 3352
+    "domainCount": 3343
   }
 ];

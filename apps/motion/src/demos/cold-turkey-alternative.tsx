@@ -1,5 +1,5 @@
 import React from 'react';
-import { EMERGENCY_LIFETIME_LIMIT } from '@talysman/shared';
+import { EMERGENCY_UNLOCK_CAP } from '@talysman/shared';
 import { Points } from '../ui/Cards';
 import { Locks } from '../ui/Locks';
 import { End, Intro, KeyAway, KeyLeaves, Refusal } from '../ui/Moments';
@@ -33,7 +33,7 @@ function Video() {
           points={[
             { label: 'The key', text: 'Plug it in and turn off — any time, no wait.', tone: 'ok' },
             { label: 'A spare key', text: 'Pair a second drive for the day you lose the first.', tone: 'ok' },
-            { label: 'Emergency unlocks', text: `${EMERGENCY_LIFETIME_LIMIT} per computer, ever — no key needed.`, tone: 'ok' },
+            { label: 'Emergency unlocks', text: `Up to ${EMERGENCY_UNLOCK_CAP} per computer, one back each month — no key needed.`, tone: 'ok' },
           ]}
         />
       </Scene>

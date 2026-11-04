@@ -12510,7 +12510,6 @@ goodsol.com
 goodwargames.com
 goodworld.ca
 goofcentral.tk
-google.com
 googlegames.cz
 googlemaps.com
 googleminigames.com
@@ -12519,7 +12518,6 @@ googlepages.com
 googleplay-apk.com
 googleplay.com
 googleplaymusicdesktopplayer.com
-googleusercontent.com
 goonhammer.com
 goons.io
 goonstudios.com

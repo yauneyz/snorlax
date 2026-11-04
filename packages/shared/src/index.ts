@@ -11,4 +11,4 @@ export * from './judge.js';
 export type * from './generated/index.js';
 // Both the premade-list module and the engine define this union; they're checked equal in tests.
 export type { PremadeListId } from './policy.js';
-export { EMERGENCY_LIFETIME_LIMIT } from './engineConstants.js';
+export { EMERGENCY_REFILL_DAYS, EMERGENCY_UNLOCK_CAP, emergencyRefillIn } from './engineConstants.js';

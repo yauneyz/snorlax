@@ -1,6 +1,14 @@
 import React, { useEffect, useState } from 'react';
 import { productFeaturesForEnvironment } from '@talysman/product';
-import { CONFIRM_MESSAGE_MAX, DEFAULT_CONFIRM_MESSAGE, ErrorCode, formatHm, parseHm } from '@talysman/shared';
+import {
+  CONFIRM_MESSAGE_MAX,
+  DEFAULT_CONFIRM_MESSAGE,
+  EMERGENCY_UNLOCK_CAP,
+  ErrorCode,
+  emergencyRefillIn,
+  formatHm,
+  parseHm,
+} from '@talysman/shared';
 import { useFocusStore } from '../store/useFocusStore.js';
 import {
   checkForUpdates,
@@ -52,6 +60,7 @@ export function Settings() {
   const replayOnboarding = useFocusStore((s) => s.replayOnboarding);
   const platform = useFocusStore((s) => s.platform);
   const emergencyLeft = useFocusStore((s) => s.engine.emergencyLeft);
+  const emergencyRefillAtMs = useFocusStore((s) => s.engine.emergencyRefillAtMs);
   const poolResetMinute = useFocusStore((s) => s.engine.poolResetMinute);
   const hasPairedKeys = useFocusStore((s) => s.pairedKeys.length > 0);
   const [resetDraft, setResetDraft] = useState(formatHm(poolResetMinute));
@@ -571,17 +580,22 @@ export function Settings() {
       )}
 
       <Card>
-        <CardTitle hint="Keyless, five per device for life. Use it when your key is lost or broken.">
+        <CardTitle hint="Keyless. Each device holds up to five, and one comes back every month. Use it when your key is lost or broken.">
           Emergency unlock
         </CardTitle>
         <div className="flex flex-col gap-3 text-body text-slate-300">
           <p className="text-slate-400">
             Turns everything off — even locked windows — until you or a schedule turn it back on. Resets your
-            streak. You can never get an emergency unlock back.
+            streak. You get one back every 30 days, up to {EMERGENCY_UNLOCK_CAP}.
           </p>
           <div className="flex items-center justify-between gap-3">
             <span className="font-medium text-slate-200">
               Left: <Badge tone={emergencyLeft === 0 ? 'danger' : 'neutral'}>{emergencyLeft}</Badge>
+              {emergencyRefillAtMs !== null && (
+                <span className="ml-2 text-caption font-normal text-slate-400">
+                  Next one {emergencyRefillIn(emergencyRefillAtMs, Date.now())}
+                </span>
+              )}
             </span>
             <Button variant="danger" disabled={emergencyLeft === 0} onClick={() => setEmergencyOpen(true)}>
               Use emergency unlock…

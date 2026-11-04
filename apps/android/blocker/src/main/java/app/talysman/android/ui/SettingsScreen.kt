@@ -87,7 +87,7 @@ fun SettingsScreen(app: TalysmanApp) {
     }
 }
 
-/** Keyless, five per device for life (spec §3.7): everything off, even locked schedules. */
+/** Keyless, up to five per device with one back each month (spec §3.7): everything off, even locked schedules. */
 @Composable
 private fun EmergencyUnlock(app: TalysmanApp) {
     val snapshot by app.engine.snapshot.collectAsStateWithLifecycle()
@@ -95,7 +95,8 @@ private fun EmergencyUnlock(app: TalysmanApp) {
     Row(verticalAlignment = Alignment.CenterVertically) {
         Column(Modifier.weight(1f)) {
             Text("${snapshot.emergencyLeft} left", color = TalysmanPalette.ForegroundStrong)
-            Muted("For a lost or broken key. Turns everything off and resets your streak.")
+            Muted("For a lost or broken key. Turns everything off and resets your streak. You hold up to 5; one comes back every 30 days.")
+            snapshot.emergencyRefillAtMs?.let { Muted("Next one ${refillIn(it, snapshot.nowMs)}.") }
         }
         OutlinedButton(onClick = { confirming = true }, enabled = snapshot.emergencyLeft > 0) { Text("Use…") }
     }
@@ -108,7 +109,7 @@ private fun EmergencyUnlock(app: TalysmanApp) {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(
                         "Use 1 of your ${snapshot.emergencyLeft} remaining emergency unlocks? Everything turns off — even locked " +
-                            "schedules — until you or a schedule turn it back on. You can never get this unlock back." +
+                            "schedules — until you or a schedule turn it back on. You get one back every 30 days." +
                             if (snapshot.streak.currentDays > 0) " Your ${snapshot.streak.currentDays}-day streak resets." else "",
                     )
                     Muted("Lost your key? Afterwards you can pair a new one on the Keys tab.")
@@ -127,6 +128,17 @@ private fun EmergencyUnlock(app: TalysmanApp) {
             },
             dismissButton = { TextButton(onClick = { confirming = false }) { Text("Cancel") } },
         )
+    }
+}
+
+/** "in 12 days" / "tomorrow" / "today" until the next emergency unlock comes back. */
+private fun refillIn(refillAtMs: Long, nowMs: Long): String {
+    val ms = refillAtMs - nowMs
+    val days = if (ms <= 0) 0L else (ms + 86_399_999L) / 86_400_000L
+    return when {
+        days <= 0 -> "today"
+        days == 1L -> "tomorrow"
+        else -> "in $days days"
     }
 }
 

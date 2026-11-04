@@ -54,7 +54,7 @@ export const ErrorCode = {
   BAD_REQUEST: 'BAD_REQUEST',
   /** Service-internal failure. */
   INTERNAL: 'INTERNAL',
-  /** Emergency unlock refused: all lifetime emergency unlocks are used. */
+  /** Emergency unlock refused: none left until the next monthly refill. */
   NO_EMERGENCY_LEFT: 'NO_EMERGENCY_LEFT',
   /** Pool unlock refused: no unlocks left in the pool today. */
   POOL_EXHAUSTED: 'POOL_EXHAUSTED',

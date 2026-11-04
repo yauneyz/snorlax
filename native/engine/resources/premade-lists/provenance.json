@@ -82,8 +82,8 @@
       ]
     },
     "press": {
-      "domainCount": 4633,
-      "sha256": "fd20b1c2a7c40447da4ec9a1cfdd7934fa7c6d0137b7a53c663206efabb0ff56",
+      "domainCount": 4632,
+      "sha256": "b2b8d6bb135e7f4d64388ff0e8a34c42e8741178782a802f857ea1fd6f42700d",
       "sources": [
         {
           "id": "ut1-press",
@@ -97,8 +97,8 @@
       ]
     },
     "games": {
-      "domainCount": 32914,
-      "sha256": "8be6e4ecf1a05f0e49c5b42a5c9268c203ed51ea97362b1fc270f1969b72401b",
+      "domainCount": 32912,
+      "sha256": "9e132ca4de3ab9791f3f6da7f2fe33976a3f733ca212b08f7c6769df6d647d42",
       "sources": [
         {
           "id": "ut1-games",
@@ -151,8 +151,8 @@
       ]
     },
     "webemail": {
-      "domainCount": 340,
-      "sha256": "0bf55d75c681bc349f916c6fcb8ea9eb2e07e59f61e762feaa183e97908c5ecc",
+      "domainCount": 339,
+      "sha256": "8787566297c2b5eb7ea492c9428cbb5f62b2d8de44a914c47d3f27995b5773bc",
       "sources": [
         {
           "id": "ut1-webmail",
@@ -166,8 +166,8 @@
       ]
     },
     "blog": {
-      "domainCount": 1421,
-      "sha256": "b808451b275b56e3804981392eb6849eef0560f884506c8c0db892c9b8bca0e8",
+      "domainCount": 1420,
+      "sha256": "9d6e60808a20b4fcd658d231d24c4a6bbbdf168bb3a13bb0e9360576da68927d",
       "sources": [
         {
           "id": "ut1-blog",
@@ -181,8 +181,8 @@
       ]
     },
     "streaming": {
-      "domainCount": 3352,
-      "sha256": "732f5d9072a4f86a86ff07dbc63ff0bb78b32b8ede60188c4356ed0b5451a9da",
+      "domainCount": 3343,
+      "sha256": "f55c7ed2915f1d626dffe75776340440fb6df0aca078e72783189cbac15069e6",
       "sources": [
         {
           "id": "ut1-audio-video",

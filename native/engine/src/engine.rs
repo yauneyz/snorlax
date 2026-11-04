@@ -156,7 +156,7 @@ pub enum Command {
     StartOverrideExempt { items: Vec<ItemRef>, profiles: Vec<String> },
     StartOverrideTimed { minutes: u16 },
     ReenableAll,
-    /// Keyless, 5 per device lifetime: everything off, including locked windows.
+    /// Keyless, up to 5 held per device (one back each month): everything off, including locked windows.
     EmergencyUnlock,
     /// Record a key pairing (the platform stores the key). Key-gated while a profile is active.
     PairKey,
@@ -270,6 +270,9 @@ pub struct EngineSnapshot {
     pub pending_unlocks: Vec<PendingPoolUnlock>,
     pub streak: Streak,
     pub emergency_left: u8,
+    /// When the next emergency unlock comes back; null while all are available.
+    #[cfg_attr(feature = "ts", ts(type = "number | null"))]
+    pub emergency_refill_at_ms: Option<i64>,
     pub next_events: Vec<UpcomingEvent>,
     /// Minutes after local midnight when pool unlock counts reset.
     pub pool_reset_minute: u16,
@@ -547,7 +550,7 @@ impl Engine {
                 Gate::NeedsKey { relaxations: Vec::new(), locked_profiles: locked }
             }
             Command::EmergencyUnlock => {
-                if streak::emergency_left(&self.state) == 0 {
+                if streak::emergency_left(&self.state, now.epoch_ms) == 0 {
                     return denied(codes::NO_EMERGENCY_LEFT, "No emergency unlocks left.");
                 }
                 Gate::Free
@@ -1145,8 +1148,8 @@ impl Engine {
         streak::streak(&self.state, &ctx.now)
     }
 
-    pub fn emergency_left(&self) -> u8 {
-        streak::emergency_left(&self.state)
+    pub fn emergency_left(&self, ctx: &Ctx) -> u8 {
+        streak::emergency_left(&self.state, ctx.now.epoch_ms)
     }
 
     fn upcoming(&self, now: &LocalNow) -> Vec<UpcomingEvent> {
@@ -1214,6 +1217,7 @@ impl Engine {
             .filter_map(|r| self.pool_status(&r, now))
             .collect();
         let o = &self.state.overrides;
+        let emergency = streak::emergency_budget(&self.state, now.epoch_ms);
         EngineSnapshot {
             now_ms: now.epoch_ms,
             generation: self.state.generation,
@@ -1225,7 +1229,8 @@ impl Engine {
             pools,
             pending_unlocks: self.state.pending_unlocks.clone(),
             streak: self.streak(ctx),
-            emergency_left: self.emergency_left(),
+            emergency_left: emergency.left,
+            emergency_refill_at_ms: emergency.refill_at_ms,
             next_events: self.upcoming(now),
             pool_reset_minute: self.state.pool_reset_minute,
         }
@@ -1278,7 +1283,7 @@ impl Engine {
             unpooled_profiles: unpooled,
             friction,
             streak: self.streak(ctx),
-            emergency_left: self.emergency_left(),
+            emergency_left: self.emergency_left(ctx),
         }
     }
 }

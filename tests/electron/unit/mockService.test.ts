@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { Command, ProfileConfig } from '@talysman/shared';
 import {
   DEFAULT_PROFILE_ID,
-  EMERGENCY_LIFETIME_LIMIT,
+  EMERGENCY_UNLOCK_CAP,
   EMPTY_POLICY,
   ErrorCode,
   emptyProfileConfig,
@@ -120,7 +120,7 @@ describe('MockServiceConnection — blocking profiles (engine-backed)', () => {
     expect(state.engine.profiles).toHaveLength(1);
     expect(state.engine.defaultProfileId).toBe(DEFAULT_PROFILE_ID);
     expect(state.focusActive).toBe(false);
-    expect(state.engine.emergencyLeft).toBe(EMERGENCY_LIFETIME_LIMIT);
+    expect(state.engine.emergencyLeft).toBe(EMERGENCY_UNLOCK_CAP);
   });
 
   it('runs several profiles at once and enforces their union', async () => {
@@ -255,7 +255,7 @@ describe('MockServiceConnection — pools, overrides, emergency', () => {
     await apply(svc, { type: 'emergencyUnlock' });
     const state = await svc.request('getState', undefined);
     expect(state.focusActive).toBe(false);
-    expect(state.engine.emergencyLeft).toBe(EMERGENCY_LIFETIME_LIMIT - 1);
+    expect(state.engine.emergencyLeft).toBe(EMERGENCY_UNLOCK_CAP - 1);
     expect(state.engine.overridden).toBe(true);
   });
 

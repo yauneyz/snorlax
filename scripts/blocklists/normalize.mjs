@@ -16,11 +16,45 @@
 
 import { readFileSync, existsSync } from 'node:fs';
 import { domainToASCII } from 'node:url';
-import { getDomain } from 'tldts';
+import { getDomain, getDomainWithoutSuffix } from 'tldts';
 
 // Infrastructure whose tenant boundary is not represented by the public/private suffix lists.
 // Reducing any tenant hostname to one of these would block unrelated customers.
 const SHARED_INFRASTRUCTURE_DOMAINS = new Set(['amazonaws.com']);
+
+// Google search and the infrastructure behind its services must never appear in any premade
+// list: too much of the web (sign-in, fonts, APIs, captchas, Docs) depends on it. This is a
+// build-time filter, not a user-visible exemption. Destination products that are the point of a
+// category (youtube.com, gmail.com, blogger.com/blogspot.*) are deliberately not listed here.
+const GOOGLE_INFRASTRUCTURE_DOMAINS = new Set([
+  '1e100.net',
+  'g.co',
+  'g.page',
+  'ggpht.com',
+  'goo.gl',
+  'google-analytics.com',
+  'googleadservices.com',
+  'googleapis.com',
+  'googleblog.com',
+  'googledomains.com',
+  'googlesyndication.com',
+  'googletagmanager.com',
+  'googleusercontent.com',
+  'gstatic.com',
+  'gvt1.com',
+  'gvt2.com',
+  'gvt3.com',
+  'recaptcha.net',
+  'withgoogle.com',
+]);
+
+function isGoogleInfrastructure(domain) {
+  // Every country search domain: google.com, google.de, google.co.uk, ...
+  return (
+    getDomainWithoutSuffix(domain, { allowPrivateDomains: true }) === 'google' ||
+    GOOGLE_INFRASTRUCTURE_DOMAINS.has(domain)
+  );
+}
 
 export function toRegistrableDomain(hostname) {
   const host = domainToASCII(hostname.trim().toLowerCase().replace(/^\*\.|^www\./, ''));
@@ -28,7 +62,10 @@ export function toRegistrableDomain(hostname) {
   // Private suffixes matter for hosted sites: alice.github.io and bob.github.io are separate
   // owners. Collapsing either to github.io would block every tenant in the browser.
   const domain = getDomain(host, { allowPrivateDomains: true });
-  return domain && !SHARED_INFRASTRUCTURE_DOMAINS.has(domain) ? domain : null;
+  if (!domain || SHARED_INFRASTRUCTURE_DOMAINS.has(domain) || isGoogleInfrastructure(domain)) {
+    return null;
+  }
+  return domain;
 }
 
 export function loadOverrides(overridesPath) {

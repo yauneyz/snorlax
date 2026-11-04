@@ -108,6 +108,7 @@ data class EngineSnapshot(
     val pendingUnlocks: List<PendingPoolUnlock> = emptyList(),
     val streak: Streak = Streak(),
     val emergencyLeft: Int = 5,
+    val emergencyRefillAtMs: Long? = null,
     val nextEvents: List<UpcomingEvent> = emptyList(),
 )
 
