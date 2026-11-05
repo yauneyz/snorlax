@@ -83,7 +83,7 @@ fun ProfileDot(color: String, modifier: Modifier = Modifier) {
 }
 
 @Composable
-fun StreakBadge(days: Int, best: Int) {
+fun StreakBadge(days: Int, best: Int, name: String? = null) {
     Row(
         Modifier
             .background(TalysmanPalette.Warning.copy(alpha = 0.10f), RoundedCornerShape(50))
@@ -91,7 +91,8 @@ fun StreakBadge(days: Int, best: Int) {
             .padding(horizontal = 12.dp, vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
+        val nameText = name?.let { " · $it" } ?: ""
         val bestText = if (best > days) " · best $best" else ""
-        Text("🔥 $days-day streak$bestText", color = TalysmanPalette.Warning, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+        Text("🔥 $days-day streak$nameText$bestText", color = TalysmanPalette.Warning, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
     }
 }

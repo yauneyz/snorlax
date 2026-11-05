@@ -1,38 +1,106 @@
-//! Streak and emergency-unlock accounting. Both are pure functions of the journal (and the clock),
-//! so merging journals from several devices (a future account sync) yields the right numbers for free.
+//! Per-profile streaks and emergency-unlock accounting. Emergency unlocks are a pure function of
+//! the journal (and the clock); streaks are runs kept in [`EngineState::streaks`], so a profile
+//! kept on for good accumulates its own streak while another is toggled freely.
 
 use serde::{Deserialize, Serialize};
 
-use crate::model::{EngineState, JournalKind, EMERGENCY_REFILL_MS, EMERGENCY_UNLOCK_CAP};
+use crate::model::{EngineState, JournalKind, ProfileStreak, EMERGENCY_REFILL_MS, EMERGENCY_UNLOCK_CAP};
 use crate::time::{parse_date, LocalNow};
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
 #[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub struct Streak {
-    /// Whole local days since the last breaking event (0 on the day of a break). Counted from the
-    /// first day a profile was active until the first break; 0 before that.
+    /// The profile this streak belongs to; `None` when no profile has one.
+    pub profile_id: Option<String>,
+    /// Whole local days since the run started (0 on the day of a break, or while the profile
+    /// isn't committed).
     pub current_days: u32,
     pub best_days: u32,
     pub last_break_local_date: Option<String>,
 }
 
-pub fn streak(state: &EngineState, now: &LocalNow) -> Streak {
-    let today = now.day();
-    let mut breaks: Vec<i64> = state
-        .journal
-        .iter()
-        .filter(|e| e.breaks_streak)
-        .filter_map(|e| parse_date(&e.local_date))
-        .collect();
+fn days_between(from: &str, to_day: i64) -> u32 {
+    parse_date(from).map_or(0, |d| (to_day - d).max(0) as u32)
+}
+
+pub fn profile_streak(state: &EngineState, profile_id: &str, now: &LocalNow) -> Streak {
+    let Some(run) = state.streaks.iter().find(|s| s.profile_id == profile_id) else {
+        return Streak { profile_id: Some(profile_id.to_string()), ..Streak::default() };
+    };
+    let current = run.since_local_date.as_deref().map_or(0, |since| days_between(since, now.day()));
+    Streak {
+        profile_id: Some(profile_id.to_string()),
+        current_days: current,
+        best_days: run.best_days.max(current),
+        last_break_local_date: run.last_break_local_date.clone(),
+    }
+}
+
+/// The longest current streak among `profile_ids` (the headline badge).
+pub fn longest<'a>(state: &EngineState, profile_ids: impl IntoIterator<Item = &'a str>, now: &LocalNow) -> Streak {
+    profile_ids
+        .into_iter()
+        .map(|id| profile_streak(state, id, now))
+        .max_by_key(|s| (s.current_days, s.best_days))
+        .unwrap_or_default()
+}
+
+fn run_mut<'a>(state: &'a mut EngineState, profile_id: &str) -> &'a mut ProfileStreak {
+    match state.streaks.iter().position(|s| s.profile_id == profile_id) {
+        Some(i) => &mut state.streaks[i],
+        None => {
+            state.streaks.push(ProfileStreak { profile_id: profile_id.to_string(), ..ProfileStreak::default() });
+            state.streaks.last_mut().unwrap()
+        }
+    }
+}
+
+fn finish(run: &mut ProfileStreak, now: &LocalNow) {
+    if let Some(since) = run.since_local_date.take() {
+        run.best_days = run.best_days.max(days_between(&since, now.day()));
+    }
+}
+
+/// A break: each profile's run restarts today.
+pub fn break_runs(state: &mut EngineState, profile_ids: &[String], now: &LocalNow) {
+    for id in profile_ids {
+        let run = run_mut(state, id);
+        finish(run, now);
+        run.since_local_date = Some(now.date_string());
+        run.last_break_local_date = Some(now.date_string());
+    }
+}
+
+/// Start runs for newly committed profiles and end those of profiles no longer committed.
+pub fn update_runs(state: &mut EngineState, committed: &[(String, bool)], now: &LocalNow) {
+    if !state.streaks_seeded {
+        seed_from_device_streak(state, committed);
+    }
+    for (id, is_committed) in committed {
+        if *is_committed {
+            let run = run_mut(state, id);
+            if run.since_local_date.is_none() {
+                run.since_local_date = Some(now.date_string());
+            }
+        } else if let Some(run) = state.streaks.iter_mut().find(|s| s.profile_id == *id) {
+            finish(run, now);
+        }
+    }
+    state.streaks.retain(|s| committed.iter().any(|(id, _)| *id == s.profile_id));
+}
+
+/// State from before streaks were per profile had one device-wide streak, counted from the first
+/// day any profile was active to the last breaking journal entry. Profiles committed at upgrade
+/// carry it on.
+fn seed_from_device_streak(state: &mut EngineState, committed: &[(String, bool)]) {
+    state.streaks_seeded = true;
+    let mut breaks: Vec<i64> = state.journal.iter().filter(|e| e.breaks_streak).filter_map(|e| parse_date(&e.local_date)).collect();
     breaks.sort();
     breaks.dedup();
     let start = state.first_enabled_local_date.as_deref().and_then(parse_date);
-    let Some(anchor) = breaks.last().copied().or(start) else {
-        return Streak::default();
-    };
-    let current = (today - anchor).max(0) as u32;
-    let mut best = current;
+    let Some(anchor) = breaks.last().copied().or(start) else { return };
+    let mut best = 0;
     let mut previous = start;
     for day in &breaks {
         if let Some(prev) = previous {
@@ -40,10 +108,15 @@ pub fn streak(state: &EngineState, now: &LocalNow) -> Streak {
         }
         previous = Some(*day);
     }
-    Streak {
-        current_days: current,
-        best_days: best,
-        last_break_local_date: breaks.last().map(|d| crate::time::date_string(*d)),
+    for (id, is_committed) in committed {
+        if *is_committed && !state.streaks.iter().any(|s| s.profile_id == *id) {
+            state.streaks.push(ProfileStreak {
+                profile_id: id.clone(),
+                since_local_date: Some(crate::time::date_string(anchor)),
+                best_days: best,
+                last_break_local_date: breaks.last().map(|d| crate::time::date_string(*d)),
+            });
+        }
     }
 }
 
@@ -101,36 +174,69 @@ mod tests {
         LocalNow::new(parse_date(date).unwrap() * DAY_MS + 3_600_000, 0)
     }
 
+    fn committed(ids: &[(&str, bool)]) -> Vec<(String, bool)> {
+        ids.iter().map(|(id, c)| (id.to_string(), *c)).collect()
+    }
+
+    fn seeded() -> EngineState {
+        let mut s = EngineState::new("d");
+        s.streaks_seeded = true;
+        s
+    }
+
     #[test]
     fn no_history_means_no_streak() {
-        assert_eq!(streak(&EngineState::new("d"), &on("2026-09-24")), Streak::default());
+        let s = seeded();
+        assert_eq!(profile_streak(&s, "a", &on("2026-09-24")).current_days, 0);
+        assert_eq!(longest(&s, [], &on("2026-09-24")), Streak::default());
     }
 
     #[test]
-    fn counts_from_first_enable_then_from_the_last_break() {
-        let mut s = EngineState::new("d");
-        s.first_enabled_local_date = Some("2026-09-01".into());
-        assert_eq!(streak(&s, &on("2026-09-24")).current_days, 23);
-        s.journal.push(entry("2026-09-10", true, JournalKind::EmergencyUsed));
-        s.journal.push(entry("2026-09-12", false, JournalKind::KeyPaired));
-        let st = streak(&s, &on("2026-09-24"));
-        assert_eq!(st.current_days, 14);
-        assert_eq!(st.best_days, 14);
-        assert_eq!(st.last_break_local_date.as_deref(), Some("2026-09-10"));
-        assert_eq!(streak(&s, &on("2026-09-10")).current_days, 0);
-        assert_eq!(emergency_left(&s, 0), EMERGENCY_UNLOCK_CAP - 1);
-        assert_eq!(days_from_civil(2026, 9, 10), parse_date("2026-09-10").unwrap());
+    fn each_profile_keeps_its_own_run() {
+        let mut s = seeded();
+        update_runs(&mut s, &committed(&[("keep", true), ("toggle", true)]), &on("2026-09-01"));
+        // Turning "toggle" off ends only its run.
+        update_runs(&mut s, &committed(&[("keep", true), ("toggle", false)]), &on("2026-09-05"));
+        assert_eq!(profile_streak(&s, "toggle", &on("2026-09-24")).current_days, 0);
+        assert_eq!(profile_streak(&s, "toggle", &on("2026-09-24")).best_days, 4);
+        assert_eq!(profile_streak(&s, "keep", &on("2026-09-24")).current_days, 23);
+        // Back on later: a fresh run from that day, not from the old start.
+        update_runs(&mut s, &committed(&[("keep", true), ("toggle", true)]), &on("2026-09-20"));
+        assert_eq!(profile_streak(&s, "toggle", &on("2026-09-24")).current_days, 4);
+        // A break on "toggle" leaves "keep" alone.
+        break_runs(&mut s, &["toggle".into()], &on("2026-09-24"));
+        let toggle = profile_streak(&s, "toggle", &on("2026-09-24"));
+        assert_eq!((toggle.current_days, toggle.best_days), (0, 4));
+        assert_eq!(toggle.last_break_local_date.as_deref(), Some("2026-09-24"));
+        let headline = longest(&s, ["keep", "toggle"], &on("2026-09-24"));
+        assert_eq!((headline.profile_id.as_deref(), headline.current_days), (Some("keep"), 23));
     }
 
     #[test]
-    fn best_remembers_an_earlier_longer_run() {
+    fn deleted_profiles_drop_their_runs() {
+        let mut s = seeded();
+        update_runs(&mut s, &committed(&[("a", true), ("b", true)]), &on("2026-09-01"));
+        update_runs(&mut s, &committed(&[("a", true)]), &on("2026-09-02"));
+        assert_eq!(s.streaks.len(), 1);
+    }
+
+    #[test]
+    fn upgrade_carries_the_device_streak_onto_committed_profiles() {
         let mut s = EngineState::new("d");
         s.first_enabled_local_date = Some("2026-01-01".into());
         s.journal.push(entry("2026-03-01", true, JournalKind::ReenabledAll));
         s.journal.push(entry("2026-03-05", true, JournalKind::ReenabledAll));
-        let st = streak(&s, &on("2026-03-07"));
-        assert_eq!(st.current_days, 2);
-        assert_eq!(st.best_days, 59);
+        s.journal.push(entry("2026-03-06", false, JournalKind::KeyPaired));
+        update_runs(&mut s, &committed(&[("on", true), ("off", false)]), &on("2026-03-07"));
+        let st = profile_streak(&s, "on", &on("2026-03-07"));
+        assert_eq!((st.current_days, st.best_days), (2, 59));
+        assert_eq!(st.last_break_local_date.as_deref(), Some("2026-03-05"));
+        assert_eq!(profile_streak(&s, "off", &on("2026-03-07")).current_days, 0);
+        // Seeding happens once; a profile committed later starts from that day.
+        update_runs(&mut s, &committed(&[("on", true), ("off", true)]), &on("2026-03-10"));
+        assert_eq!(profile_streak(&s, "off", &on("2026-03-12")).current_days, 2);
+        assert_eq!(emergency_left(&s, 0), EMERGENCY_UNLOCK_CAP);
+        assert_eq!(days_from_civil(2026, 3, 5), parse_date("2026-03-05").unwrap());
     }
 
     #[test]

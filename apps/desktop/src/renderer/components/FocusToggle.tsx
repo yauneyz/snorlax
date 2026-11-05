@@ -9,7 +9,7 @@
 import React, { useEffect, useState } from 'react';
 import { ErrorCode, palette } from '@talysman/shared';
 import { useFocusStore } from '../store/useFocusStore.js';
-import { formatClock, formatDuration, runCommand } from '../lib/engine.js';
+import { formatClock, formatDuration, runCommand, streakOwner } from '../lib/engine.js';
 import { cx, profileSummary } from '../lib/utils.js';
 import { Button, Modal, ProfileDot } from './ui/index.js';
 import { TalysmanMark } from './TalysmanMark.js';
@@ -185,7 +185,7 @@ export function FocusToggle() {
             </button>
           </div>
         )}
-        {showStreak && <StreakBadge streak={engine.streak} />}
+        {showStreak && <StreakBadge streak={engine.streak} name={streakOwner(engine.streak, engine.profiles)} />}
         {pairedKeyRequired && <p className="text-caption text-warn">pair a key to turn on focus</p>}
         {pausedUntil && <p className="text-caption text-slate-400">Paused until {formatClock(pausedUntil)}</p>}
         {lockedUntil > 0 && !message && (

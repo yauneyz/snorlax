@@ -47,6 +47,7 @@ export type { Profile } from './Profile';
 export type { ProfileConfig } from './ProfileConfig';
 export type { ProfileInput } from './ProfileInput';
 export type { ProfileStatus } from './ProfileStatus';
+export type { ProfileStreak } from './ProfileStreak';
 export type { ProfileSummary } from './ProfileSummary';
 export type { RuleAction } from './RuleAction';
 export type { ScheduleRule } from './ScheduleRule';

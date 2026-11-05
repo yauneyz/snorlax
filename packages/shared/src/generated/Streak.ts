@@ -2,7 +2,11 @@
 
 export type Streak = { 
 /**
- * Whole local days since the last breaking event (0 on the day of a break). Counted from the
- * first day a profile was active until the first break; 0 before that.
+ * The profile this streak belongs to; `None` when no profile has one.
+ */
+profileId: string | null, 
+/**
+ * Whole local days since the run started (0 on the day of a break, or while the profile
+ * isn't committed).
  */
 currentDays: number, bestDays: number, lastBreakLocalDate: string | null, };

@@ -22,4 +22,8 @@ pools: Array<PoolStatus>,
 /**
  * Blocking profiles with no pool for this item (no keyless unlock possible).
  */
-unpooledProfiles: Array<string>, unlockAvailable: boolean, friction: Friction, pending: PendingPoolUnlock | null, streak: Streak, emergencyLeft: number, lockedUntilMs: number | null, };
+unpooledProfiles: Array<string>, unlockAvailable: boolean, friction: Friction, pending: PendingPoolUnlock | null, 
+/**
+ * The longest current streak among the blocking profiles.
+ */
+streak: Streak, emergencyLeft: number, lockedUntilMs: number | null, };

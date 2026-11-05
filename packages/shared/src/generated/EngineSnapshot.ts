@@ -13,7 +13,11 @@ export type EngineSnapshot = { nowMs: number, generation: number, profiles: Arra
 /**
  * "Re-enable all" should be offered.
  */
-overridden: boolean, pools: Array<PoolStatus>, pendingUnlocks: Array<PendingPoolUnlock>, streak: Streak, emergencyLeft: number, 
+overridden: boolean, pools: Array<PoolStatus>, pendingUnlocks: Array<PendingPoolUnlock>, 
+/**
+ * The longest current profile streak (each profile's own is on its [`ProfileStatus`]).
+ */
+streak: Streak, emergencyLeft: number, 
 /**
  * When the next emergency unlock comes back; null while all are available.
  */

@@ -1,7 +1,7 @@
 /**
  * Every profile with its own switch (spec §5.5). Several can be on at once; what's enforced is
  * the union. Turning one on is free; turning one off is an override (it needs the key and breaks
- * the streak), so the switch runs an override scoped to that profile.
+ * that profile's streak), so the switch runs an override scoped to that profile.
  */
 import React, { useState } from 'react';
 import { ErrorCode } from '@talysman/shared';
@@ -37,6 +37,7 @@ export function ProfileList({ onClose }: { onClose: () => void }) {
   const engine = useFocusStore((s) => s.engine);
   const pairedKeys = useFocusStore((s) => s.pairedKeys);
   const aiMode = useFocusStore((s) => s.aiMode);
+  const showStreak = useFocusStore((s) => s.settings.streakBadgeEnabled);
   const [error, setError] = useState<string | null>(null);
 
   async function turnOn(profileId: string) {
@@ -86,6 +87,9 @@ export function ProfileList({ onClose }: { onClose: () => void }) {
                   </div>
                   <div className="text-caption text-slate-400">
                     {activationLabel(status)} · {profileSummary(profile, aiMode)}
+                    {showStreak && status.streak.currentDays > 0 && (
+                      <span className="text-warn"> · 🔥 {status.streak.currentDays}d</span>
+                    )}
                   </div>
                 </div>
                 <StatusLabel on={on} tone="success" />

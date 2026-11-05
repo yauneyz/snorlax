@@ -95,7 +95,13 @@ export function UnlockPopup({ target }: { target: PopupTarget }) {
         )}
       </div>
 
-      {info.showStreak && <StreakBadge streak={info.streak} className="self-start" />}
+      {info.showStreak && (
+        <StreakBadge
+          streak={info.streak}
+          name={info.blockingProfiles.length > 1 ? info.blockingProfiles.find((p) => p.id === info.streak.profileId)?.name : undefined}
+          className="self-start"
+        />
+      )}
 
       {unblocked ? (
         <p className="text-body text-okInk">Unlocked — you can open it now.</p>

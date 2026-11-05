@@ -3,10 +3,11 @@ import type { JournalKind } from "./JournalKind";
 
 /**
  * Append-only, sync-ready event log. Ids are globally unique (`<deviceId>:<seq>`) so a future
- * account sync is a union merge; streak and emergency counts are pure functions of it.
+ * account sync is a union merge; emergency counts are a pure function of it.
  */
 export type JournalEntry = { id: string, deviceId: string, seq: number, atMs: number, localDate: string, 
 /**
- * Whether this entry resets the streak (key overrides, relaxations, emergency unlocks).
+ * Whether this entry resets a streak (key overrides, relaxations, emergency unlocks). Which
+ * profiles' streaks it reset is recorded in [`EngineState::streaks`].
  */
 breaksStreak: boolean, kind: JournalKind, };

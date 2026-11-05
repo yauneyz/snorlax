@@ -89,7 +89,9 @@
       by.hidden = false;
     }
     var streak = info.streak;
-    if (info.showStreak !== false) show('streak', '🔥 ' + streak.currentDays + '-day streak' + (streak.bestDays > streak.currentDays ? ' · best ' + streak.bestDays : ''));
+    // Each profile keeps its own streak; name it when more than one is blocking.
+    var owner = (info.blockingProfiles || []).length > 1 ? info.blockingProfiles.filter(function (p) { return p.id === streak.profileId; })[0] : null;
+    if (info.showStreak !== false) show('streak', '🔥 ' + streak.currentDays + '-day streak' + (owner ? ' · ' + owner.name : '') + (streak.bestDays > streak.currentDays ? ' · best ' + streak.bestDays : ''));
     else hide('streak');
 
     var button = el('unlock-button');

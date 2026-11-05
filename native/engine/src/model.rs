@@ -50,10 +50,16 @@ pub struct EngineState {
     #[serde(default)]
     #[cfg_attr(feature = "ts", ts(type = "number"))]
     pub last_evaluated_ms: i64,
-    /// Local date ("YYYY-MM-DD") a profile was first ever active; the streak counts from here
-    /// until the first break.
+    /// Local date ("YYYY-MM-DD") a profile was first ever active. The pre-per-profile streak
+    /// counted from here; it now only seeds [`EngineState::streaks`] on upgrade.
     #[serde(default)]
     pub first_enabled_local_date: Option<String>,
+    /// Each profile's streak run. A profile with no entry has never been committed.
+    #[serde(default)]
+    pub streaks: Vec<ProfileStreak>,
+    /// Set once `streaks` has been seeded from the old device-wide streak.
+    #[serde(default)]
+    pub streaks_seeded: bool,
     /// Bumped whenever the effective (enforced) policy changes.
     #[serde(default)]
     #[cfg_attr(feature = "ts", ts(type = "number"))]
@@ -422,8 +428,26 @@ pub enum JournalKind {
     Migration,
 }
 
+/// One profile's streak: a run starts when the profile is committed (on or scheduled), restarts
+/// on the day of a break (a key override, relaxation, or emergency unlock touching it), and ends
+/// when the profile is no longer committed (turned off with nothing scheduled).
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+#[serde(rename_all = "camelCase")]
+pub struct ProfileStreak {
+    pub profile_id: ProfileId,
+    /// Local date the current run started; `None` while the profile isn't committed.
+    #[serde(default)]
+    pub since_local_date: Option<String>,
+    /// Longest finished run, in days.
+    #[serde(default)]
+    pub best_days: u32,
+    #[serde(default)]
+    pub last_break_local_date: Option<String>,
+}
+
 /// Append-only, sync-ready event log. Ids are globally unique (`<deviceId>:<seq>`) so a future
-/// account sync is a union merge; streak and emergency counts are pure functions of it.
+/// account sync is a union merge; emergency counts are a pure function of it.
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
@@ -435,7 +459,8 @@ pub struct JournalEntry {
     #[cfg_attr(feature = "ts", ts(type = "number"))]
     pub at_ms: i64,
     pub local_date: String,
-    /// Whether this entry resets the streak (key overrides, relaxations, emergency unlocks).
+    /// Whether this entry resets a streak (key overrides, relaxations, emergency unlocks). Which
+    /// profiles' streaks it reset is recorded in [`EngineState::streaks`].
     pub breaks_streak: bool,
     pub kind: JournalKind,
 }
@@ -454,6 +479,8 @@ impl EngineState {
             journal_seq: 0,
             last_evaluated_ms: 0,
             first_enabled_local_date: None,
+            streaks: Vec::new(),
+            streaks_seeded: false,
             generation: 0,
             pool_reset_minute: 0,
         }

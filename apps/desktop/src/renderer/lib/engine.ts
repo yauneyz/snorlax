@@ -12,6 +12,7 @@ import {
   type Profile,
   type ProfileConfig,
   type ProfileStatus,
+  type Streak,
 } from '@talysman/shared';
 import { request, type BridgeError } from './bridge.js';
 import { useFocusStore } from '../store/useFocusStore.js';
@@ -72,6 +73,12 @@ export function saveProfile(profile: Pick<Profile, 'id' | 'name' | 'color'> & { 
 
 export function statusOf(profileId: string): ProfileStatus | undefined {
   return useFocusStore.getState().engine.profiles.find((p) => p.profile.id === profileId);
+}
+
+/** Whose streak `streak` is, for labelling it — only worth saying when there's more than one mode. */
+export function streakOwner(streak: Streak, profiles: ProfileStatus[]): string | undefined {
+  if (profiles.length < 2) return undefined;
+  return profiles.find((p) => p.profile.id === streak.profileId)?.profile.name;
 }
 
 /** "9:30 AM" (today) or "Tue 9:30 AM" (another day). */

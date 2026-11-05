@@ -76,7 +76,11 @@ fun HomeScreen(app: TalysmanApp, snapshot: EngineSnapshot, onOverrides: () -> Un
             fontWeight = FontWeight.Bold,
             color = if (snapshot.anyActive) TalysmanPalette.Success else TalysmanPalette.ForegroundStrong,
         )
-        StreakBadge(snapshot.streak.currentDays, snapshot.streak.bestDays)
+        StreakBadge(
+            snapshot.streak.currentDays,
+            snapshot.streak.bestDays,
+            snapshot.profiles.takeIf { it.size > 1 }?.find { it.profile.id == snapshot.streak.profileId }?.profile?.name,
+        )
         snapshot.overrides.timed?.let { Muted("Paused until ${formatClock(it.untilMs, now)}") }
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
             if (snapshot.anyActive) {

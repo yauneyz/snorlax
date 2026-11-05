@@ -4,6 +4,7 @@ import type { Overrides } from "./Overrides";
 import type { PendingPoolUnlock } from "./PendingPoolUnlock";
 import type { PoolUsage } from "./PoolUsage";
 import type { Profile } from "./Profile";
+import type { ProfileStreak } from "./ProfileStreak";
 
 export type EngineState = { schema: number, deviceId: string, profiles: Array<Profile>, 
 /**
@@ -11,10 +12,18 @@ export type EngineState = { schema: number, deviceId: string, profiles: Array<Pr
  */
 defaultProfileId: string | null, overrides: Overrides, poolUsage: Array<PoolUsage>, pendingUnlocks: Array<PendingPoolUnlock>, journal: Array<JournalEntry>, journalSeq: number, lastEvaluatedMs: number, 
 /**
- * Local date ("YYYY-MM-DD") a profile was first ever active; the streak counts from here
- * until the first break.
+ * Local date ("YYYY-MM-DD") a profile was first ever active. The pre-per-profile streak
+ * counted from here; it now only seeds [`EngineState::streaks`] on upgrade.
  */
 firstEnabledLocalDate: string | null, 
+/**
+ * Each profile's streak run. A profile with no entry has never been committed.
+ */
+streaks: Array<ProfileStreak>, 
+/**
+ * Set once `streaks` has been seeded from the old device-wide streak.
+ */
+streaksSeeded: boolean, 
 /**
  * Bumped whenever the effective (enforced) policy changes.
  */

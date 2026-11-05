@@ -7,7 +7,7 @@
 import React, { useEffect, useState } from 'react';
 import type { PoolRef, PoolStatus } from '@talysman/shared';
 import { useFocusStore } from '../store/useFocusStore.js';
-import { formatClock, runCommand } from '../lib/engine.js';
+import { formatClock, runCommand, streakOwner } from '../lib/engine.js';
 import { cx } from '../lib/utils.js';
 import { Button, Modal } from './ui/index.js';
 import { StreakBadge } from './StreakBadge.js';
@@ -67,6 +67,7 @@ function useRun(onClose: () => void) {
 
 function PauseUntil({ onClose }: { onClose: () => void }) {
   const streak = useFocusStore((s) => s.engine.streak);
+  const profiles = useFocusStore((s) => s.engine.profiles);
   const showStreak = useFocusStore((s) => s.settings.streakBadgeEnabled);
   const [minutes, setMinutes] = useState(30);
   const [custom, setCustom] = useState('');
@@ -77,7 +78,7 @@ function PauseUntil({ onClose }: { onClose: () => void }) {
 
   return (
     <Modal title="Pause until…" onClose={onClose} width={420}>
-      {showStreak && <StreakBadge streak={streak} />}
+      {showStreak && <StreakBadge streak={streak} name={streakOwner(streak, profiles)} />}
       <div className="mt-4 flex flex-wrap items-center gap-1.5">
         {PAUSE_PRESETS.map((m) => (
           <button

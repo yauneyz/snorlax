@@ -138,7 +138,7 @@ const EMPTY_SNAPSHOT: EngineSnapshot = {
   overridden: false,
   pools: [],
   pendingUnlocks: [],
-  streak: { currentDays: 0, bestDays: 0, lastBreakLocalDate: null },
+  streak: { profileId: null, currentDays: 0, bestDays: 0, lastBreakLocalDate: null },
   emergencyLeft: 5,
   emergencyRefillAtMs: null,
   nextEvents: [],

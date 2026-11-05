@@ -249,6 +249,7 @@ pub struct ProfileStatus {
     pub activation: Activation,
     /// Could become active without further user action (relaxing it needs the key).
     pub committed: bool,
+    pub streak: Streak,
 }
 
 /// Everything a UI renders.
@@ -268,6 +269,7 @@ pub struct EngineSnapshot {
     pub overridden: bool,
     pub pools: Vec<PoolStatus>,
     pub pending_unlocks: Vec<PendingPoolUnlock>,
+    /// The longest current profile streak (each profile's own is on its [`ProfileStatus`]).
     pub streak: Streak,
     pub emergency_left: u8,
     /// When the next emergency unlock comes back; null while all are available.
@@ -306,6 +308,7 @@ pub struct PopupInfo {
     pub unlock_available: bool,
     pub friction: Friction,
     pub pending: Option<PendingPoolUnlock>,
+    /// The longest current streak among the blocking profiles.
     pub streak: Streak,
     pub emergency_left: u8,
     #[cfg_attr(feature = "ts", ts(type = "number | null"))]
@@ -689,6 +692,7 @@ impl Engine {
                         p.color = profile.color;
                         p.config = profile.config;
                         if keyed {
+                            streak::break_runs(&mut self.state, std::slice::from_ref(&profile.id), now);
                             self.push_journal(now, true, JournalKind::Relaxed { profile_id: profile.id, summary: relaxed });
                         }
                     }
@@ -759,6 +763,10 @@ impl Engine {
                         p.latch = Latch::Off;
                     }
                     self.suppress_live(&profile_id, now, false);
+                    // Unkeyed, the run just ends if nothing else keeps the profile committed.
+                    if keyed {
+                        streak::break_runs(&mut self.state, std::slice::from_ref(&profile_id), now);
+                    }
                     self.push_journal(now, keyed, JournalKind::ProfileOff { profile_id, source: ChangeSource::User });
                 }
             }
@@ -789,14 +797,24 @@ impl Engine {
                 self.state.pending_unlocks.retain(|p| p.pools != pools);
             }
             Command::StartOverrideAll => {
-                if !self.activations(now).iter().any(|a| a.active) {
+                let acts = self.activations(now);
+                if !acts.iter().any(|a| a.active) {
                     return;
                 }
+                let affected: Vec<String> = acts.into_iter().filter(|a| a.active && !a.locked()).map(|a| a.profile_id).collect();
+                streak::break_runs(&mut self.state, &affected, now);
                 self.all_off(now, false);
                 self.push_journal(now, true, JournalKind::OverrideStarted { r#override: OverrideKind::AllOff });
             }
             Command::StartOverrideExempt { items, profiles } => {
                 let acts = self.activations(now);
+                // Exempting an item loosens every active profile; exempting a profile, just it.
+                let affected: Vec<String> = acts
+                    .iter()
+                    .filter(|a| a.active && (!items.is_empty() || (profiles.contains(&a.profile_id) && !a.locked())))
+                    .map(|a| a.profile_id.clone())
+                    .collect();
+                streak::break_runs(&mut self.state, &affected, now);
                 let mut exempt = self.state.overrides.exempt.take().unwrap_or(Exempt {
                     since_ms: now.epoch_ms,
                     items: Vec::new(),
@@ -824,6 +842,8 @@ impl Engine {
                 self.push_journal(now, true, JournalKind::OverrideStarted { r#override: OverrideKind::Exempt });
             }
             Command::StartOverrideTimed { minutes } => {
+                let affected: Vec<String> = self.activations(now).into_iter().filter(|a| a.active && !a.locked()).map(|a| a.profile_id).collect();
+                streak::break_runs(&mut self.state, &affected, now);
                 self.state.overrides.timed = Some(TimedOff { since_ms: now.epoch_ms, until_ms: now.epoch_ms + minutes as i64 * 60_000 });
                 self.push_journal(now, true, JournalKind::OverrideStarted { r#override: OverrideKind::Timed });
             }
@@ -848,6 +868,8 @@ impl Engine {
                 }
             }
             Command::EmergencyUnlock => {
+                let affected: Vec<String> = self.activations(now).into_iter().filter(|a| a.active).map(|a| a.profile_id).collect();
+                streak::break_runs(&mut self.state, &affected, now);
                 self.all_off(now, true);
                 self.state.overrides.timed = None;
                 self.push_journal(now, true, JournalKind::EmergencyUsed);
@@ -1051,6 +1073,9 @@ impl Engine {
         if !active.is_empty() && self.state.first_enabled_local_date.is_none() {
             self.state.first_enabled_local_date = Some(now.date_string());
         }
+        let committed: Vec<(String, bool)> =
+            self.state.profiles.iter().map(|p| (p.id.clone(), activation::is_committed(&self.state, p, now))).collect();
+        streak::update_runs(&mut self.state, &committed, now);
         let mut events = Vec::new();
         for id in &active {
             if !self.last_active.contains(id) {
@@ -1144,8 +1169,13 @@ impl Engine {
         effective::decide_url(&self.effective(ctx), url, extension_capable)
     }
 
+    /// The longest current profile streak.
     pub fn streak(&self, ctx: &Ctx) -> Streak {
-        streak::streak(&self.state, &ctx.now)
+        streak::longest(&self.state, self.state.profiles.iter().map(|p| p.id.as_str()), &ctx.now)
+    }
+
+    pub fn profile_streak(&self, profile_id: &str, ctx: &Ctx) -> Streak {
+        streak::profile_streak(&self.state, profile_id, &ctx.now)
     }
 
     pub fn emergency_left(&self, ctx: &Ctx) -> u8 {
@@ -1205,6 +1235,7 @@ impl Engine {
             .zip(acts)
             .map(|(profile, activation)| ProfileStatus {
                 committed: activation::is_committed(&self.state, profile, now),
+                streak: streak::profile_streak(&self.state, &profile.id, now),
                 profile: profile.clone(),
                 activation,
             })
@@ -1282,7 +1313,7 @@ impl Engine {
             pools,
             unpooled_profiles: unpooled,
             friction,
-            streak: self.streak(ctx),
+            streak: streak::longest(&self.state, decision.blocking_profiles.iter().map(String::as_str), now),
             emergency_left: self.emergency_left(ctx),
         }
     }

@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import type { JournalEntry, StatsData } from '@talysman/shared';
 import { useFocusStore } from '../store/useFocusStore.js';
 import { request } from '../lib/bridge.js';
+import { streakOwner } from '../lib/engine.js';
 import { Button, Card, CardTitle, Kicker } from '../components/ui/index.js';
 import { cx } from '../lib/utils.js';
 import { formatHours, percentChange, summarize, type RangeDays, type StatsSummary } from '../lib/stats.js';
@@ -114,7 +115,10 @@ function Tile({ label, value, detail }: { label: string; value: string; detail?:
 
 function Tiles({ summary, range }: { summary: StatsSummary; range: RangeDays }) {
   const streak = useFocusStore((s) => s.engine.streak);
+  const profiles = useFocusStore((s) => s.engine.profiles);
   const showStreak = useFocusStore((s) => s.settings.streakBadgeEnabled);
+  const owner = streakOwner(streak, profiles);
+  const best = streak.bestDays > streak.currentDays ? `best ${streak.bestDays}` : streak.currentDays > 0 ? 'your best yet' : undefined;
   return (
     <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
       <Tile
@@ -132,7 +136,7 @@ function Tiles({ summary, range }: { summary: StatsSummary; range: RangeDays }) 
         <Tile
           label="Streak"
           value={`${streak.currentDays} ${streak.currentDays === 1 ? 'day' : 'days'}`}
-          detail={streak.bestDays > streak.currentDays ? `best ${streak.bestDays}` : streak.currentDays > 0 ? 'your best yet' : undefined}
+          detail={[owner, best].filter(Boolean).join(' · ') || undefined}
         />
       ) : (
         <Tile label="Sessions" value={String(summary.sessions)} />

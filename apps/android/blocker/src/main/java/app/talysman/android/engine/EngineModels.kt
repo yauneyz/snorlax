@@ -54,7 +54,7 @@ data class Activation(
 )
 
 @Serializable
-data class ProfileStatus(val profile: Profile, val activation: Activation, val committed: Boolean)
+data class ProfileStatus(val profile: Profile, val activation: Activation, val committed: Boolean, val streak: Streak = Streak())
 
 @Serializable
 data class Friction(val kind: String, val secs: Int = 0)
@@ -79,8 +79,9 @@ data class PoolRef(val profileId: String, val poolId: String)
 @Serializable
 data class PendingPoolUnlock(val pools: List<PoolRef>, val requestedMs: Long, val readyMs: Long)
 
+/** One profile's streak; the snapshot's and popup's are the longest among the relevant profiles. */
 @Serializable
-data class Streak(val currentDays: Int = 0, val bestDays: Int = 0, val lastBreakLocalDate: String? = null)
+data class Streak(val profileId: String? = null, val currentDays: Int = 0, val bestDays: Int = 0, val lastBreakLocalDate: String? = null)
 
 @Serializable
 data class TimedOff(val sinceMs: Long, val untilMs: Long)

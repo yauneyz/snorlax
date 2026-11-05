@@ -515,6 +515,51 @@ fn worked_example_2_app_whitelist_with_a_soft_rule() {
     assert_eq!(e.decide_app(&game, &ctx).verdict, Verdict::Hard);
 }
 
+// --- §3.8 streaks ----------------------------------------------------------------------------
+
+#[test]
+fn streaks_are_per_profile_so_a_toggled_one_never_resets_the_kept_one() {
+    let ctx = at(10, 0);
+    let mut e = engine_with(vec![("keep", blocks(&["reddit.com"])), ("toggle", blocks(&["x.com"]))], &ctx);
+    on(&mut e, "keep", &ctx);
+    on(&mut e, "toggle", &ctx);
+    let day = |n: i64| at(24 * n + 10, 0);
+    e.tick(&day(3));
+    // Turning "toggle" off with the key ends its run; "keep" carries on.
+    e.apply(Command::SetLatch { profile_id: "toggle".into(), on: false }, KEY(), &day(3)).unwrap();
+    let snap = e.snapshot(&day(5));
+    let streak_of = |id: &str| snap.profiles.iter().find(|p| p.profile.id == id).unwrap().streak.clone();
+    assert_eq!(streak_of("keep").current_days, 5);
+    assert_eq!((streak_of("toggle").current_days, streak_of("toggle").best_days), (0, 3));
+    assert_eq!(snap.streak.profile_id.as_deref(), Some("keep"));
+    // Back on two days later: its run starts then.
+    on(&mut e, "toggle", &day(5));
+    assert_eq!(e.profile_streak("toggle", &day(7)).current_days, 2);
+    // An "everything off" override breaks both; a timed one only what it pauses.
+    e.apply(Command::StartOverrideTimed { minutes: 30 }, KEY(), &day(7)).unwrap();
+    assert_eq!(e.profile_streak("keep", &day(7)).current_days, 0);
+    assert_eq!(e.profile_streak("keep", &day(7)).best_days, 7);
+    // The popup shows the streak of whatever is doing the blocking.
+    e.tick(&day(9));
+    let info = e.popup_info(&PopupTarget::Url { url: "https://x.com/".into() }, &day(9));
+    assert_eq!((info.streak.profile_id.as_deref(), info.streak.current_days), (Some("toggle"), 2));
+}
+
+#[test]
+fn turning_a_profile_off_without_the_key_just_ends_its_run() {
+    let mut ctx = at(10, 0);
+    let mut e = engine_with(vec![("a", blocks(&["reddit.com"])), ("b", blocks(&["x.com"]))], &ctx);
+    on(&mut e, "a", &ctx);
+    on(&mut e, "b", &ctx);
+    ctx = at(24 * 4 + 10, 0);
+    ctx.has_paired_keys = false;
+    e.tick(&ctx);
+    e.apply(Command::SetLatch { profile_id: "b".into(), on: false }, Auth::None, &ctx).unwrap();
+    assert_eq!(e.profile_streak("a", &ctx).current_days, 4);
+    let b = e.profile_streak("b", &ctx);
+    assert_eq!((b.current_days, b.best_days, b.last_break_local_date), (0, 4, None));
+}
+
 // --- §3.9 schedules --------------------------------------------------------------------------
 
 #[test]

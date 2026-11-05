@@ -197,7 +197,11 @@ private fun BlockScreen(
             if (info.verdict.kind == "pageBlocked" && info.verdict.feature != null) {
                 Text("This part of the site is hidden: ${info.verdict.feature}.", color = TalysmanPalette.Foreground)
             }
-            StreakBadge(info.streak.currentDays, info.streak.bestDays)
+            StreakBadge(
+                info.streak.currentDays,
+                info.streak.bestDays,
+                info.blockingProfiles.takeIf { it.size > 1 }?.find { it.id == info.streak.profileId }?.name,
+            )
             if (info.pools.isEmpty()) {
                 Text("This isn’t in an unlock group.", color = TalysmanPalette.ForegroundMuted)
             } else {

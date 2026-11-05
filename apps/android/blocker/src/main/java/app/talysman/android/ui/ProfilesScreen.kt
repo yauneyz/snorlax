@@ -43,7 +43,8 @@ fun ProfilesScreen(app: TalysmanApp, snapshot: EngineSnapshot, onEdit: (String) 
                         val config = status.profile.config
                         Muted(
                             "${activationLabel(status)} · ${ConfigEdits.blockedPackages(config).size} apps · " +
-                                "${ConfigEdits.blockedDomains(config).size} sites · ${ConfigEdits.softRules(config).size} soft blocks",
+                                "${ConfigEdits.blockedDomains(config).size} sites · ${ConfigEdits.softRules(config).size} soft blocks" +
+                                if (status.streak.currentDays > 0) " · 🔥 ${status.streak.currentDays}d" else "",
                         )
                     }
                 }
