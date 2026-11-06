@@ -1,13 +1,20 @@
-As a hacker my work lives on my computer. I can put my phone in another room if it is too distracting, or I can use Brick or something like that for my phone.
+We are going to build an app for Android, specifically the Pixel 8 Pro and Pixel 10 Pro XL. In cases where capabilities differ, we will default to the more capable with a fallback for the less capable.
 
-But my computer has a browser, and that browser has Reddit, Hacker News, all the distracting stuff. It makes it really hard to get stuff done sometimes, especially because I have ADHD.
+We want to be able to do the following things:
 
-It was so bad that out of desperation I ended up building a distraction blocker app where you can only turn off the blocker if a specific USB device is inserted.
+- speech recognition, tts, and LLM responses will all be handled by a server.
+- config and security will be handled by a file that gets shipped with the app (which only I will have the apk for, I won't post it online). This file tells the app both what url to use and also give it an auth token, so that I can securely expose the endpoint to the internet for remote use
 
-You see, I had used other blockers in the past for both my phone and my computer and the problem was that I would always just use the "temporary override" button whenever I felt the urge to be distracted.
+- the app sends audio to the backend, the backend processes it and sends it back as speech.
+- A file detailing the backend we are a client of:
+  <insert filename here>
 
-Physically separating the "off switch" from the distraction device makes all the difference. I can actually get things done now!
+- a WearOS app that connects and functions as the "remote control" so that we don't have to touch our phone to use the app.
+  - pairs to the phone app somehow
+  - long presses are push-to-talk
+  - short taps turn recording on/off
+  - the entire watchface is the touch target when this is active, so that we can touch it without looking at the screen
+  - the watch can interface with the app even with the phone locked and in the pocket
 
-It was so helpful for me personally that I turned it into an app that other people can download and use. And it works on Windows, MacOS, *and LInux.*
 
-Hope somebody gets some use out of it. It is called Talysman, you can check it out at talysman.app
+- we want to be able to upload PDFs of recipes and have the llm walk the user through cooking with the recipe.

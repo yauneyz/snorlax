@@ -382,6 +382,25 @@ function DomainListEditor({
   );
 }
 
+const LAST_PROFILE_KEY = 'talysman.lastBlocklist';
+
+function readLastProfile(): string | null {
+  try {
+    return window.localStorage.getItem(LAST_PROFILE_KEY);
+  } catch {
+    return null;
+  }
+}
+
+function writeLastProfile(id: string | null) {
+  try {
+    if (id) window.localStorage.setItem(LAST_PROFILE_KEY, id);
+    else window.localStorage.removeItem(LAST_PROFILE_KEY);
+  } catch {
+    // Remembering the choice is a convenience; nothing breaks without it.
+  }
+}
+
 export function Blocklists({ onUpgrade }: { onUpgrade: () => void }) {
   const profiles = useFocusStore((s) => s.profiles);
   const engine = useFocusStore((s) => s.engine);
@@ -390,8 +409,13 @@ export function Blocklists({ onUpgrade }: { onUpgrade: () => void }) {
   const keyPresent = useFocusStore((s) => s.keyPresent);
   const productLimits = useFocusStore((s) => s.productLimits);
   const aiMode = useFocusStore((s) => s.aiMode);
-  // Which profile the editor is pointed at. `null` shows the default profile.
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  // Which profile the editor is pointed at. `null` shows the default profile. Remembered across
+  // visits; a stale id (deleted profile) falls through to the default below.
+  const [selectedId, setSelectedIdState] = useState<string | null>(readLastProfile);
+  const setSelectedId = (id: string | null) => {
+    setSelectedIdState(id);
+    writeLastProfile(id);
+  };
   const [menuOpen, setMenuOpen] = useState(false);
   const [openSection, setOpenSection] = useState<SectionId | null>(null);
   const [renamingId, setRenamingId] = useState<string | null>(null);
