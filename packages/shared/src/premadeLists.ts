@@ -14,7 +14,7 @@ export const PREMADE_LISTS: PremadeListMeta[] = [
     "id": "nsfw",
     "label": "NSFW",
     "description": "Pornography and adult content sites.",
-    "domainCount": 428013
+    "domainCount": 428012
   },
   {
     "id": "shopping",

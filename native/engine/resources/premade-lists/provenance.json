@@ -4,8 +4,8 @@
   "generatedAt": "2026-09-15T09:04:35.378Z",
   "categories": {
     "nsfw": {
-      "domainCount": 428013,
-      "sha256": "25dfa37094443bc8643795f1ef163637efb4f793933d6aee2940e97a0e430173",
+      "domainCount": 428012,
+      "sha256": "c092a294c1b496cfe5d5e935e19446323fc7112cef42689c5a68b62bd28c5c3f",
       "sources": [
         {
           "id": "bon-appetit-nsfw",
