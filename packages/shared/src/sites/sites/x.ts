@@ -13,6 +13,7 @@ export default defineSite({
     { id: 'notifications', label: 'Notifications', default: 'allow' },
     { id: 'compose', label: 'Posting', default: 'allow' },
     { id: 'feed', label: 'Home timeline & Explore', description: 'The timelines themselves. Home and Explore stay usable for posting and search.', default: 'block' },
+    { id: 'news', label: "Today's News", description: 'Grok-written news stories in the sidebar, and the story pages they open.', default: 'block' },
     { id: 'recommendations', label: 'Trends & who to follow', description: 'Trends, suggested accounts, and "Discover more" under a post.', default: 'block' },
     { id: 'profiles', label: 'Profiles', default: 'block' },
     { id: 'essentials', label: 'Sign-in & settings', default: 'allow', locked: true },
@@ -24,6 +25,8 @@ export default defineSite({
     { feature: 'notifications', path: '^/(?:i/)?notifications(?:/.*)?$' },
     { feature: 'compose', path: '^/compose/post$' },
     { feature: 'essentials', path: '^/(?:i/flow/[^/]+|settings(?:/.*)?|login|logout)$' },
+    // A Today's News story: a Grok summary over a timeline of posts about it.
+    { feature: 'news', path: '^/i/trending/[0-9]+$' },
     { feature: 'feed', path: '^/(?:home|explore|search|i/.*)(?:/.*)?$' },
     { feature: 'profiles', path: '^/[a-z0-9_]{1,15}(?:/(?:with_replies|media|likes|highlights|articles|followers|following))?$' },
   ],
@@ -32,8 +35,12 @@ export default defineSite({
     // A timeline is a `section[role=region]` in the primary column; the composer, tab bar, and
     // search box sit outside it.
     { feature: 'feed', selector: '[data-testid="primaryColumn"] section[role="region"]', on: ['feed', 'compose'] },
-    // The sidebar's search box isn't in a section/aside, so it stays.
-    { feature: 'recommendations', selector: '[data-testid="sidebarColumn"] :is(section, aside), [data-testid="trend"]' },
+    // The sidebar's search box isn't in a section/aside, so it stays. Today's News is the sidebar
+    // module whose stories link to /i/trending/<id>; it belongs to `news`, not here.
+    { feature: 'recommendations', selector: '[data-testid="sidebarColumn"] :is(section, aside):not(:has(a[href^="/i/trending/"])), [data-testid="trend"]' },
+    { feature: 'news', selector: '[data-testid="sidebarColumn"] :is(section, aside):has(a[href^="/i/trending/"])' },
+    // The story page's summary sits above its timeline, so hide the whole column.
+    { feature: 'news', selector: '[data-testid="primaryColumn"]', on: ['news'] },
     // Suggested accounts, and the "Discover more" block (a heading cell and everything after it).
     { feature: 'recommendations', selector: '[data-testid="UserCell"], [data-testid="cellInnerDiv"]:has(h2), [data-testid="cellInnerDiv"]:has(h2) ~ [data-testid="cellInnerDiv"]', on: ['content'] },
     { feature: 'content', selector: '[data-testid="primaryColumn"] section[role="region"]', on: ['content'] },
@@ -48,6 +55,7 @@ export default defineSite({
     ['https://x.com/home', 'feed'],
     ['https://x.com/', 'feed'],
     ['https://x.com/explore/tabs/trending', 'feed'],
+    ['https://x.com/i/trending/2118828141745668231', 'news'],
     ['https://x.com/ada/status/123', 'content'],
     ['https://x.com/ada/status/123/photo/1', 'content'],
     ['https://twitter.com/ada/status/123', 'content'],

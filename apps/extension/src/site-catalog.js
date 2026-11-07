@@ -339,6 +339,11 @@ export const SITE_CATALOG = {
         "default": "block"
       },
       {
+        "id": "news",
+        "label": "Today's News",
+        "default": "block"
+      },
+      {
         "id": "recommendations",
         "label": "Trends & who to follow",
         "default": "block"
@@ -387,6 +392,10 @@ export const SITE_CATALOG = {
         "path": "^/(?:i/flow/[^/]+|settings(?:/.*)?|login|logout)$"
       },
       {
+        "feature": "news",
+        "path": "^/i/trending/[0-9]+$"
+      },
+      {
         "feature": "feed",
         "path": "^/(?:home|explore|search|i/.*)(?:/.*)?$"
       },
@@ -407,7 +416,18 @@ export const SITE_CATALOG = {
       },
       {
         "feature": "recommendations",
-        "selector": "[data-testid=\"sidebarColumn\"] :is(section, aside), [data-testid=\"trend\"]"
+        "selector": "[data-testid=\"sidebarColumn\"] :is(section, aside):not(:has(a[href^=\"/i/trending/\"])), [data-testid=\"trend\"]"
+      },
+      {
+        "feature": "news",
+        "selector": "[data-testid=\"sidebarColumn\"] :is(section, aside):has(a[href^=\"/i/trending/\"])"
+      },
+      {
+        "feature": "news",
+        "selector": "[data-testid=\"primaryColumn\"]",
+        "on": [
+          "news"
+        ]
       },
       {
         "feature": "recommendations",

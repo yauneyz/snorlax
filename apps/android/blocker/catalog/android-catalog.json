@@ -102,6 +102,11 @@
           "default": "block"
         },
         {
+          "id": "news",
+          "label": "Today's News",
+          "default": "block"
+        },
+        {
           "id": "recommendations",
           "label": "Trends & who to follow",
           "default": "block"

@@ -372,6 +372,12 @@
           "locked": false
         },
         {
+          "id": "news",
+          "label": "Today's News",
+          "default": "block",
+          "locked": false
+        },
+        {
           "id": "recommendations",
           "label": "Trends & who to follow",
           "default": "block",
@@ -419,6 +425,10 @@
           "path": "^/(?:i/flow/[^/]+|settings(?:/.*)?|login|logout)$"
         },
         {
+          "feature": "news",
+          "path": "^/i/trending/[0-9]+$"
+        },
+        {
           "feature": "feed",
           "path": "^/(?:home|explore|search|i/.*)(?:/.*)?$"
         },
@@ -443,6 +453,10 @@
         [
           "https://x.com/explore/tabs/trending",
           "feed"
+        ],
+        [
+          "https://x.com/i/trending/2118828141745668231",
+          "news"
         ],
         [
           "https://x.com/ada/status/123",

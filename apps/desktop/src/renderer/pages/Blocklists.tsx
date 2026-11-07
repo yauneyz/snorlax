@@ -839,8 +839,9 @@ export function Blocklists({ onUpgrade }: { onUpgrade: () => void }) {
   const proBadge = <Badge tone="neutral">Pro</Badge>;
 
   return (
-    <div className="flex min-h-full flex-col pt-3">
-      <div className="flex items-center gap-3">
+    <div className="flex min-h-full flex-col">
+      {/* Stays pinned while the editor scrolls, so the mode switcher is always one click away. */}
+      <div className="sticky top-0 z-30 -mx-5 flex items-center gap-3 bg-bg px-5 py-3">
         {/* The profile is the page's subject, so it doubles as the heading and the switcher. */}
         <div className="relative">
           <button
