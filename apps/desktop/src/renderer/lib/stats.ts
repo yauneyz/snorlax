@@ -115,10 +115,14 @@ function hourGrid(intervals: readonly Interval[], from: number, to: number): num
     let cursor = Math.max(i.start, from);
     const end = Math.min(i.end, to);
     while (cursor < end) {
+      // Step to the next hour boundary by subtracting the elapsed part of this local hour. Don't
+      // round via `setMinutes(0, 0, 0)`: in the repeated hour at a DST fall-back, it resolves the
+      // ambiguous local time to the *earlier* instance, so the "next hour" never passes the
+      // cursor and the loop spins forever.
       const d = new Date(cursor);
-      d.setMinutes(0, 0, 0);
-      const hourEnd = Math.min(d.getTime() + HOUR_MS, end);
-      grid[weekdayIndex(cursor)]![new Date(cursor).getHours()]! += hourEnd - cursor;
+      const intoHour = (d.getMinutes() * 60 + d.getSeconds()) * 1000 + d.getMilliseconds();
+      const hourEnd = Math.min(cursor - intoHour + HOUR_MS, end);
+      grid[weekdayIndex(cursor)]![d.getHours()]! += hourEnd - cursor;
       cursor = hourEnd;
     }
   }
