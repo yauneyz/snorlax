@@ -257,7 +257,10 @@ export class MockServiceConnection implements ServiceConnection {
 
       case 'applyCommand': {
         const { command, dryRun } = params as Params<'applyCommand'>;
-        if (dryRun) return { gate: this.engine.gate(command, this.ctx()) } as Result<M>;
+        if (dryRun) {
+          const ctx = this.ctx();
+          return { gate: this.engine.gate(command, ctx), arming: this.engine.arming(command, ctx) } as Result<M>;
+        }
         this.run(command);
         return OK;
       }

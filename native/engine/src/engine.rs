@@ -578,6 +578,82 @@ impl Engine {
         }
     }
 
+    /// What `cmd` would commit the user to that only the key (or a locked window ending, or an
+    /// emergency unlock) could undo: turning a mode on, tightening a committed mode, ending an
+    /// override. Empty when the command is freely reversible, or isn't free to run in the first
+    /// place (the key prompt covers those). Pure: UIs show it as an "are you sure?" when no key is
+    /// present, so a misclick can't arm something the user can't take back.
+    pub fn arming(&self, cmd: &Command, ctx: &Ctx) -> Vec<String> {
+        if self.gate(cmd, ctx) != Gate::Free {
+            return Vec::new();
+        }
+        let now = &ctx.now;
+        match cmd {
+            Command::UpsertProfile { profile } => {
+                let name = profile.name.trim();
+                match self.state.profile(&profile.id) {
+                    Some(prev) => {
+                        let next = Profile { name: name.to_string(), config: profile.config.clone(), ..prev.clone() };
+                        if !activation::is_committed(&self.state, &next, now) {
+                            return Vec::new();
+                        }
+                        let mut out = restrictive::tightenings(&prev.config, &profile.config, now.epoch_ms);
+                        if out.is_empty() && !activation::is_committed(&self.state, prev, now) {
+                            out.push(format!("Puts {name} on a schedule"));
+                        }
+                        out
+                    }
+                    None => {
+                        let next = Profile {
+                            id: profile.id.clone(),
+                            name: name.to_string(),
+                            color: profile.color.clone(),
+                            created_at_ms: now.epoch_ms,
+                            config: profile.config.clone(),
+                            latch: Latch::Off,
+                        };
+                        if activation::is_committed(&self.state, &next, now) {
+                            vec![format!("Adds {name} with a schedule")]
+                        } else {
+                            Vec::new()
+                        }
+                    }
+                }
+            }
+            Command::DuplicateProfile { profile_id, .. } => {
+                let Some(source) = self.state.profile(profile_id) else { return Vec::new() };
+                let copy = Profile { latch: Latch::Off, ..source.clone() };
+                if activation::is_committed(&self.state, &copy, now) {
+                    vec![format!("Adds a copy of {} with the same schedule", source.name)]
+                } else {
+                    Vec::new()
+                }
+            }
+            Command::SetLatch { profile_id, on: true } => {
+                let (Some(profile), Some(a)) = (self.state.profile(profile_id), self.activation_of(profile_id, now)) else {
+                    return Vec::new();
+                };
+                if a.latched {
+                    Vec::new()
+                } else if a.active {
+                    vec![format!("Keeps {} on after its schedule ends", profile.name)]
+                } else {
+                    vec![format!("Turns on {}", profile.name)]
+                }
+            }
+            Command::ReenableAll => {
+                let o = &self.state.overrides;
+                let unlocked = self.state.pool_usage.iter().any(|u| u.active_until_ms.is_some_and(|until| until > now.epoch_ms));
+                if o.any() || !o.suppressed.is_empty() || unlocked {
+                    vec!["Ends your break and turns blocking back on".into()]
+                } else {
+                    Vec::new()
+                }
+            }
+            _ => Vec::new(),
+        }
+    }
+
     fn gate_new_profile(&self, ctx: &Ctx) -> Gate {
         if let Some(max) = ctx.limits.max_profiles {
             if self.state.profiles.len() as u32 >= max {

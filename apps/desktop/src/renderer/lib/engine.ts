@@ -16,6 +16,7 @@ import {
 } from '@talysman/shared';
 import { request, type BridgeError } from './bridge.js';
 import { useFocusStore } from '../store/useFocusStore.js';
+import { confirmArming } from './armConfirm.js';
 
 function bridgeError(code: string, message: string): BridgeError {
   const e = new Error(message) as BridgeError;
@@ -47,10 +48,33 @@ export function gateMessage(gate: Gate, streakDays: number): string {
 }
 
 /**
- * Run a command. On KEY_REQUIRED / LOCKED the error message is rewritten from the engine's gate
- * so the user sees exactly what is being loosened.
+ * What `command` would commit the user to that only the key could undo (a dry run). Empty when
+ * it's freely reversible — or the service is too old to say, or the dry run fails (the real run
+ * will report that failure itself).
+ */
+export async function armingOf(command: Command): Promise<string[]> {
+  try {
+    const result = await request('applyCommand', { command, dryRun: true });
+    return result.arming ?? [];
+  } catch {
+    return [];
+  }
+}
+
+/** Thrown when the user declines the no-key "are you sure?". Empty message: nothing to show. */
+export const CANCELLED = 'CANCELLED';
+
+/**
+ * Run a command. Without the key inserted, anything that would arm blocking the user couldn't
+ * then undo asks first (and throws CANCELLED if they back out). On KEY_REQUIRED / LOCKED the
+ * error message is rewritten from the engine's gate so the user sees exactly what is being
+ * loosened.
  */
 export async function runCommand(command: Command): Promise<void> {
+  if (!useFocusStore.getState().keyPresent) {
+    const arming = await armingOf(command);
+    if (arming.length > 0 && !(await confirmArming(arming))) throw bridgeError(CANCELLED, '');
+  }
   try {
     await request('applyCommand', { command });
   } catch (e) {

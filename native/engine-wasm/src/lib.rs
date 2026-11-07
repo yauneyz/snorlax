@@ -59,6 +59,13 @@ impl WasmEngine {
         Ok(to_json(&self.inner.gate(&command, &ctx)))
     }
 
+    /// What `command` would commit the user to that only the key could undo (see `Engine::arming`).
+    pub fn arming(&self, command_json: &str, ctx_json: &str) -> Result<String, JsError> {
+        let command: Command = parse(command_json, "command")?;
+        let ctx: Ctx = parse(ctx_json, "ctx")?;
+        Ok(to_json(&self.inner.arming(&command, &ctx)))
+    }
+
     pub fn apply(&mut self, command_json: &str, auth_json: &str, ctx_json: &str) -> Result<String, JsError> {
         let command: Command = parse(command_json, "command")?;
         let auth: Auth = parse(auth_json, "auth")?;

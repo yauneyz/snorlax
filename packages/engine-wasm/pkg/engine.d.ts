@@ -5,6 +5,10 @@ export class WasmEngine {
     free(): void;
     [Symbol.dispose](): void;
     apply(command_json: string, auth_json: string, ctx_json: string): string;
+    /**
+     * What `command` would commit the user to that only the key could undo (see `Engine::arming`).
+     */
+    arming(command_json: string, ctx_json: string): string;
     decideUrl(url: string, extension_capable: boolean, ctx_json: string): string;
     effective(ctx_json: string): string;
     /**
@@ -54,6 +58,7 @@ export interface InitOutput {
     readonly relaxations: (a: number, b: number, c: number, d: number, e: number, f: number) => void;
     readonly validateConfig: (a: number, b: number, c: number) => void;
     readonly wasmengine_apply: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number) => void;
+    readonly wasmengine_arming: (a: number, b: number, c: number, d: number, e: number, f: number) => void;
     readonly wasmengine_decideUrl: (a: number, b: number, c: number, d: number, e: number, f: number, g: number) => void;
     readonly wasmengine_effective: (a: number, b: number, c: number, d: number) => void;
     readonly wasmengine_empty: (a: number, b: number) => number;

@@ -119,10 +119,13 @@ export interface RequestMap {
    * overrides, emergency unlocks. The service asks for the USB key itself when the engine's gate
    * says so (KEY_REQUIRED / LOCKED otherwise). With `dryRun` nothing changes and the gate is
    * returned instead, so the UI can show the key prompt (and what's being loosened) up front.
+   * A dry run also returns `arming`: what the command would commit the user to that only the key
+   * could undo (turning a mode on, tightening an active one), so the UI can confirm it first when
+   * no key is inserted. Older services omit it.
    */
   applyCommand: {
     params: { command: Command; dryRun?: boolean };
-    result: { gate?: Gate; ok?: true; journal?: JournalEntry[] };
+    result: { gate?: Gate; arming?: string[]; ok?: true; journal?: JournalEntry[] };
   };
   /** What the block/unlock popup shows for a URL or app. */
   /** `showStreak` mirrors `settings.streakBadgeEnabled` so the extension's blocked page can honor it. */

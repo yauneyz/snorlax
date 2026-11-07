@@ -861,8 +861,10 @@ impl Core {
             "applyCommand" => {
                 let command: Command = parse_field(params, "command")?;
                 if params.get("dryRun").and_then(Value::as_bool) == Some(true) {
-                    let gate = self.engine.gate(&command, &self.ctx());
-                    return Ok(json!({ "gate": gate }));
+                    let ctx = self.ctx();
+                    let gate = self.engine.gate(&command, &ctx);
+                    let arming = self.engine.arming(&command, &ctx);
+                    return Ok(json!({ "gate": gate, "arming": arming }));
                 }
                 let applied = self.run_command(command)?;
                 Ok(json!({ "ok": true, "journal": applied.journal }))
@@ -1240,6 +1242,15 @@ mod dispatch_tests {
         core.test_present_key = Some("k".into());
         apply(&mut core, upsert).unwrap_or_else(|e| panic!("{}", e.message));
         assert!(core.network_policy.blocked_domains.is_empty());
+    }
+
+    #[test]
+    fn dry_run_reports_what_tightening_an_active_mode_arms() {
+        let (mut core, _rx) = core_with(blocks(&["reddit.com"]), true);
+        let upsert = json!({ "type": "upsertProfile", "profile": input("p", blocks(&["reddit.com", "x.com"])) });
+        let dry = core.dispatch("applyCommand", &json!({ "command": upsert, "dryRun": true })).unwrap_or_else(|_| panic!());
+        assert_eq!(dry["gate"]["kind"], "free");
+        assert_eq!(dry["arming"], json!(["Blocks x.com"]));
     }
 
     #[test]

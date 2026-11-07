@@ -25,6 +25,7 @@ import {
 import { Badge, Button, Card, CardTitle, Input } from '../components/ui/index.js';
 import { EmergencyConfirm } from '../components/EmergencyConfirm.js';
 import { runCommand } from '../lib/engine.js';
+import { confirmArming } from '../lib/armConfirm.js';
 import { cx } from '../lib/utils.js';
 
 const SMART_FILTERING_ENABLED = productFeaturesForEnvironment(
@@ -151,6 +152,11 @@ export function Settings() {
   }
 
   async function toggleHandshake() {
+    // Turning this off always needs the key, so turning it on without one is a one-way door.
+    if (!handshakeEnabled && !useFocusStore.getState().keyPresent) {
+      const ok = await confirmArming(['Turns on Strict Mode']);
+      if (!ok) return;
+    }
     setHandshakeBusy(true);
     setHandshakeError(null);
     try {

@@ -657,3 +657,52 @@ fn reenable_all_ends_temporary_unlocks_without_refunding_usage() {
     assert_eq!(status.active_until_ms, None);
     assert_eq!(status.left_today, 2);
 }
+
+// --- arming: what a no-key "are you sure?" warns about -------------------------------------------
+
+fn arming(e: &Engine, cmd: Command, ctx: &Ctx) -> Vec<String> {
+    e.arming(&cmd, ctx)
+}
+
+#[test]
+fn turning_on_arms_but_editing_an_off_mode_does_not() {
+    let ctx = at(10, 0);
+    let mut e = engine_with(vec![("a", blocks(&["reddit.com"]))], &ctx);
+    let everything = ProfileConfig { policy: Policy { default_action: RuleAction::Block, ..Default::default() }, ..Default::default() };
+    // Off and unscheduled: freely reversible, no warning.
+    assert!(arming(&e, Command::UpsertProfile { profile: input("a", everything.clone()) }, &ctx).is_empty());
+    assert_eq!(arming(&e, Command::SetLatch { profile_id: "a".into(), on: true }, &ctx), vec!["Turns on a".to_string()]);
+    on(&mut e, "a", &ctx);
+    assert!(arming(&e, Command::SetLatch { profile_id: "a".into(), on: true }, &ctx).is_empty(), "already on");
+}
+
+#[test]
+fn blocking_the_whole_internet_on_an_active_mode_arms() {
+    let ctx = at(10, 0);
+    let mut e = engine_with(vec![("a", blocks(&["reddit.com"]))], &ctx);
+    on(&mut e, "a", &ctx);
+    let mut everything = blocks(&["reddit.com"]);
+    everything.policy.default_action = RuleAction::Block;
+    assert_eq!(arming(&e, Command::UpsertProfile { profile: input("a", everything) }, &ctx), vec!["Blocks the entire internet".to_string()]);
+    assert_eq!(
+        arming(&e, Command::UpsertProfile { profile: input("a", blocks(&["reddit.com", "x.com"])) }, &ctx),
+        vec!["Blocks x.com".to_string()],
+    );
+    // Loosening is the key prompt's job, not this one.
+    assert!(arming(&e, Command::UpsertProfile { profile: input("a", blocks(&[])) }, &ctx).is_empty());
+}
+
+#[test]
+fn adding_a_schedule_and_ending_a_break_arm() {
+    let ctx = at(10, 0);
+    let mut e = engine_with(vec![("a", blocks(&["reddit.com"]))], &ctx);
+    let mut scheduled = blocks(&["reddit.com"]);
+    scheduled.schedule = vec![window("w", "09:00", "17:00", false)];
+    assert!(!arming(&e, Command::UpsertProfile { profile: input("a", scheduled.clone()) }, &ctx).is_empty());
+    assert_eq!(arming(&e, Command::UpsertProfile { profile: input("b", scheduled) }, &ctx), vec!["Adds b with a schedule".to_string()]);
+
+    assert!(arming(&e, Command::ReenableAll, &ctx).is_empty(), "no break to end");
+    on(&mut e, "a", &ctx);
+    e.apply(Command::StartOverrideTimed { minutes: 10 }, KEY(), &ctx).unwrap();
+    assert_eq!(arming(&e, Command::ReenableAll, &ctx), vec!["Ends your break and turns blocking back on".to_string()]);
+}

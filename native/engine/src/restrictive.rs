@@ -172,6 +172,60 @@ pub fn relaxations(prev: &ProfileConfig, next: &ProfileConfig, now_ms: i64) -> V
     out
 }
 
+/// Every way `next` is stricter than `prev`, worded as what the edit does — the mirror image of
+/// [`relaxations`] (each tightening is a relaxation of going back). Used to warn before a change
+/// that only the key could undo.
+pub fn tightenings(prev: &ProfileConfig, next: &ProfileConfig, now_ms: i64) -> Vec<String> {
+    let mut out: Vec<String> = Vec::new();
+    for undo in relaxations(next, prev, now_ms) {
+        let text = invert(&undo, next);
+        if !out.contains(&text) {
+            out.push(text);
+        }
+    }
+    out
+}
+
+/// Turn one relaxation of `next → prev` into what `prev → next` does.
+fn invert(undo: &str, next: &ProfileConfig) -> String {
+    use crate::policy::RuleAction;
+    let rest = |prefix: &str| undo.strip_prefix(prefix).map(str::to_string);
+    if undo == "Loosens the default for other websites" {
+        return match next.policy.default_action {
+            RuleAction::Block if next.policy.allowed_domains.is_empty() => "Blocks the entire internet".into(),
+            RuleAction::Block => "Blocks every website that isn't on your allow list".into(),
+            _ => "Tightens the default for other websites".into(),
+        };
+    }
+    let mapped = match undo {
+        "Turns off universal soft block" => Some("Turns on universal soft block".to_string()),
+        "Removes AI filtering" => Some("Turns on AI filtering".into()),
+        "Loosens website rules" => Some("Tightens website rules".into()),
+        "Switches apps from allow-list to block-list" => Some("Blocks every app that isn't on your allow list".into()),
+        "Shortens or removes a scheduled window" => Some("Adds or lengthens a scheduled window".into()),
+        "Unlocks a locked window" => Some("Locks a scheduled window".into()),
+        "Adds a scheduled \"off\"" => Some("Removes a scheduled \"off\"".into()),
+        "Removes a scheduled \"on\"" => Some("Adds a scheduled \"on\"".into()),
+        "Adds a one-time \"off\"" => Some("Removes a one-time \"off\"".into()),
+        "Removes a one-time \"on\"" => Some("Adds a one-time \"on\"".into()),
+        _ => None,
+    };
+    mapped
+        .or_else(|| rest("Unblocks the ").map(|r| format!("Blocks the {r}")))
+        .or_else(|| rest("Unblocks ").map(|r| format!("Blocks {r}")))
+        .or_else(|| rest("Allows the ").map(|r| format!("Stops allowing the {r}")))
+        .or_else(|| rest("Allows ").map(|r| format!("Stops allowing {r}")))
+        .or_else(|| rest("Removes the ").map(|r| format!("Adds the {r}")))
+        .or_else(|| rest("Loosens the ").map(|r| format!("Tightens the {r}")))
+        .or_else(|| rest("Turns off the ").map(|r| format!("Turns on the {r}")))
+        .or_else(|| rest("Adds items to the ").map(|r| format!("Takes items out of the {r}")))
+        .or_else(|| rest("Adds the ").map(|r| format!("Removes the {r}")))
+        .or_else(|| rest("Raises ").map(|r| format!("Lowers {r}")))
+        .or_else(|| rest("Lengthens ").map(|r| format!("Shortens {r}")))
+        .or_else(|| rest("Shortens the ").map(|r| format!("Lengthens the {r}")))
+        .unwrap_or_else(|| "Makes this mode stricter".into())
+}
+
 /// Validation applied to configs arriving from a UI (never to persisted state).
 pub fn validate(config: &ProfileConfig) -> Result<(), String> {
     use crate::model::*;

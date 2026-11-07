@@ -16,6 +16,7 @@ import { FirstRun } from './components/FirstRun.js';
 import { TalysmanMark } from './components/TalysmanMark.js';
 import { ProfileDot } from './components/ui/index.js';
 import { OverrideDialog } from './components/OverrideDialog.js';
+import { ArmConfirm } from './components/ArmConfirm.js';
 import { AppMessageBanners } from './components/AppMessageBanners.js';
 import { cx, effectiveAction } from './lib/utils.js';
 
@@ -100,6 +101,7 @@ export default function App({ initialRoute = 'dashboard' }: { initialRoute?: Rou
     >
       {showFirstRun && <FirstRun onDone={() => setRoute('dashboard')} />}
       {ready && overridesOpen && <OverrideDialog onClose={() => setOverridesOpen(false)} />}
+      <ArmConfirm />
 
       {/* Nav rail. */}
       <aside className="desktop-sidebar relative flex w-44 shrink-0 flex-col border-r border-white/[0.07] backdrop-blur-xl">

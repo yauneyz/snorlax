@@ -147,6 +147,7 @@
       },
       "result": {
         "gate": "Gate?",
+        "arming": "string[]?",
         "ok": "true?",
         "journal": "JournalEntry[]?"
       },

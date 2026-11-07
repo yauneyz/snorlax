@@ -120,6 +120,11 @@ export class Engine {
     return call(() => this.inner.gate(JSON.stringify(command), JSON.stringify(ctx)));
   }
 
+  /** What `command` would commit the user to that only the key could undo. */
+  arming(command: Command, ctx: Ctx): string[] {
+    return call(() => this.inner.arming(JSON.stringify(command), JSON.stringify(ctx)));
+  }
+
   /** Throws `EngineCallError` (KEY_REQUIRED, LOCKED, POOL_EXHAUSTED, …) when refused. */
   apply(command: Command, auth: Auth, ctx: Ctx): Applied {
     return call(() => this.inner.apply(JSON.stringify(command), JSON.stringify(auth), JSON.stringify(ctx)));
