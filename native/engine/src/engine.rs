@@ -29,6 +29,7 @@ pub mod codes {
     pub const POOL_ITEM_CONFLICT: &str = "POOL_ITEM_CONFLICT";
     pub const LIMIT_EXCEEDED: &str = "LIMIT_EXCEEDED";
     pub const NOT_BLOCKED: &str = "NOT_BLOCKED";
+    pub const EMERGENCY_DISABLED: &str = "EMERGENCY_DISABLED";
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
@@ -163,6 +164,8 @@ pub enum Command {
     UnpairKey,
     /// When pool unlock counts reset, in minutes after local midnight. Always key-gated.
     SetPoolResetTime { minute: u16 },
+    /// Switch emergency unlocks on or off. Always key-gated (both directions) once a key is paired.
+    SetEmergencyUnlocksEnabled { enabled: bool },
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
@@ -275,6 +278,8 @@ pub struct EngineSnapshot {
     /// When the next emergency unlock comes back; null while all are available.
     #[cfg_attr(feature = "ts", ts(type = "number | null"))]
     pub emergency_refill_at_ms: Option<i64>,
+    /// False once the user has switched emergency unlocks off.
+    pub emergency_enabled: bool,
     pub next_events: Vec<UpcomingEvent>,
     /// Minutes after local midnight when pool unlock counts reset.
     pub pool_reset_minute: u16,
@@ -553,6 +558,9 @@ impl Engine {
                 Gate::NeedsKey { relaxations: Vec::new(), locked_profiles: locked }
             }
             Command::EmergencyUnlock => {
+                if self.state.emergency_disabled {
+                    return denied(codes::EMERGENCY_DISABLED, "Emergency unlocks are turned off.");
+                }
                 if streak::emergency_left(&self.state, now.epoch_ms) == 0 {
                     return denied(codes::NO_EMERGENCY_LEFT, "No emergency unlocks left.");
                 }
@@ -572,6 +580,17 @@ impl Engine {
                 }
                 if !ctx.has_paired_keys {
                     return denied(codes::NO_PAIRED_KEY, "Pair a key before changing when unlocks reset.");
+                }
+                Gate::NeedsKey { relaxations: Vec::new(), locked_profiles: Vec::new() }
+            }
+            Command::SetEmergencyUnlocksEnabled { enabled } => {
+                if *enabled == !self.state.emergency_disabled {
+                    return Gate::Free;
+                }
+                if !ctx.has_paired_keys {
+                    // Turning them off without a key would leave no way out at all. Turning them
+                    // back on stays possible so a device whose keys were all unpaired isn't stuck.
+                    return if *enabled { Gate::Free } else { denied(codes::NO_PAIRED_KEY, "Pair a key before turning emergency unlocks off.") };
                 }
                 Gate::NeedsKey { relaxations: Vec::new(), locked_profiles: Vec::new() }
             }
@@ -963,6 +982,12 @@ impl Engine {
                 self.move_pool_day(&from, &self.today(now));
                 self.push_journal(now, false, JournalKind::PoolResetChanged { minute });
             }
+            Command::SetEmergencyUnlocksEnabled { enabled } => {
+                if self.state.emergency_disabled == enabled {
+                    self.state.emergency_disabled = !enabled;
+                    self.push_journal(now, false, JournalKind::EmergencyUnlocksChanged { enabled });
+                }
+            }
         }
     }
 
@@ -1338,6 +1363,7 @@ impl Engine {
             streak: self.streak(ctx),
             emergency_left: emergency.left,
             emergency_refill_at_ms: emergency.refill_at_ms,
+            emergency_enabled: !self.state.emergency_disabled,
             next_events: self.upcoming(now),
             pool_reset_minute: self.state.pool_reset_minute,
         }

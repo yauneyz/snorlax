@@ -379,7 +379,7 @@ export function LandingPage({ variantOverride }: { variantOverride?: VariantKey 
         </p>
         <p className="cta-band__community">
           <a
-            href="https://discord.gg/QZzrM3gpt"
+            href="https://discord.gg/HGJbj49KSh"
             target="_blank"
             rel="noopener noreferrer"
             className="discord-cta"

@@ -3,10 +3,12 @@
  * lib/armConfirm.ts). Cancel is the default action: Escape, the backdrop and Close all decline.
  */
 import { answerArming, useArmConfirm } from '../lib/armConfirm.js';
+import { useFocusStore } from '../store/useFocusStore.js';
 import { Button, Modal } from './ui/index.js';
 
 export function ArmConfirm() {
   const pending = useArmConfirm((s) => s.pending);
+  const emergencyEnabled = useFocusStore((s) => s.engine.emergencyEnabled);
   if (!pending) return null;
   const decline = () => answerArming(false);
   return (
@@ -18,7 +20,9 @@ export function ArmConfirm() {
         ))}
       </ul>
       <p className="mt-3 text-body leading-relaxed text-slate-300">
-        Without your key you won’t be able to undo it — only an emergency unlock gets you out.
+        {emergencyEnabled
+          ? 'Without your key you won’t be able to undo it — only an emergency unlock gets you out.'
+          : 'Without your key you won’t be able to undo it. Emergency unlocks are turned off, so nothing else gets you out.'}
       </p>
       <div className="mt-4 flex justify-end gap-2">
         <Button autoFocus onClick={decline}>

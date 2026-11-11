@@ -706,3 +706,33 @@ fn adding_a_schedule_and_ending_a_break_arm() {
     e.apply(Command::StartOverrideTimed { minutes: 10 }, KEY(), &ctx).unwrap();
     assert_eq!(arming(&e, Command::ReenableAll, &ctx), vec!["Ends your break and turns blocking back on".to_string()]);
 }
+
+#[test]
+fn emergency_unlocks_can_be_switched_off_with_the_key() {
+    let mut ctx = at(10, 0);
+    let mut e = engine_with(vec![("a", blocks(&["reddit.com"]))], &ctx);
+    let set = |enabled| Command::SetEmergencyUnlocksEnabled { enabled };
+    assert!(e.snapshot(&ctx).emergency_enabled);
+    // Off needs a paired key and the key itself.
+    ctx.has_paired_keys = false;
+    assert_eq!(err_code(e.apply(set(false), KEY(), &ctx)), codes::NO_PAIRED_KEY);
+    ctx.has_paired_keys = true;
+    assert_eq!(err_code(e.apply(set(false), Auth::None, &ctx)), codes::KEY_REQUIRED);
+    e.apply(set(false), KEY(), &ctx).unwrap();
+    assert!(!e.snapshot(&ctx).emergency_enabled);
+    assert_eq!(e.state.journal.last().unwrap().kind, JournalKind::EmergencyUnlocksChanged { enabled: false });
+
+    // While off, an emergency unlock is refused and spends nothing.
+    on(&mut e, "a", &ctx);
+    assert_eq!(err_code(e.apply(Command::EmergencyUnlock, Auth::None, &ctx)), codes::EMERGENCY_DISABLED);
+    assert!(hard(&e, "reddit.com", &ctx));
+    assert_eq!(e.emergency_left(&ctx), EMERGENCY_UNLOCK_CAP);
+
+    // Back on needs the key too; a no-op toggle is free.
+    assert_eq!(e.gate(&set(false), &ctx), Gate::Free);
+    assert_eq!(err_code(e.apply(set(true), Auth::None, &ctx)), codes::KEY_REQUIRED);
+    e.apply(set(true), KEY(), &ctx).unwrap();
+    assert!(e.snapshot(&ctx).emergency_enabled);
+    e.apply(Command::EmergencyUnlock, Auth::None, &ctx).unwrap();
+    assert!(!hard(&e, "reddit.com", &ctx));
+}

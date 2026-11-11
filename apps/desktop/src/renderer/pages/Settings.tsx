@@ -24,6 +24,7 @@ import {
 } from '../lib/bridge.js';
 import { Badge, Button, Card, CardTitle, Input } from '../components/ui/index.js';
 import { EmergencyConfirm } from '../components/EmergencyConfirm.js';
+import { EmergencyToggleConfirm } from '../components/EmergencyToggleConfirm.js';
 import { runCommand } from '../lib/engine.js';
 import { confirmArming } from '../lib/armConfirm.js';
 import { cx } from '../lib/utils.js';
@@ -62,12 +63,14 @@ export function Settings() {
   const platform = useFocusStore((s) => s.platform);
   const emergencyLeft = useFocusStore((s) => s.engine.emergencyLeft);
   const emergencyRefillAtMs = useFocusStore((s) => s.engine.emergencyRefillAtMs);
+  const emergencyEnabled = useFocusStore((s) => s.engine.emergencyEnabled);
   const poolResetMinute = useFocusStore((s) => s.engine.poolResetMinute);
   const hasPairedKeys = useFocusStore((s) => s.pairedKeys.length > 0);
   const [resetDraft, setResetDraft] = useState(formatHm(poolResetMinute));
   const [resetBusy, setResetBusy] = useState(false);
   const [resetError, setResetError] = useState<string | null>(null);
   const [emergencyOpen, setEmergencyOpen] = useState(false);
+  const [emergencyToggleOpen, setEmergencyToggleOpen] = useState(false);
   const [firstRunError, setFirstRunError] = useState<string | null>(null);
   const [confirmingUninstall, setConfirmingUninstall] = useState(false);
   const [uninstallBusy, setUninstallBusy] = useState(false);
@@ -603,13 +606,45 @@ export function Settings() {
                 </span>
               )}
             </span>
-            <Button variant="danger" disabled={emergencyLeft === 0} onClick={() => setEmergencyOpen(true)}>
+            <Button
+              variant="danger"
+              disabled={!emergencyEnabled || emergencyLeft === 0}
+              onClick={() => setEmergencyOpen(true)}
+            >
               Use emergency unlock…
             </Button>
           </div>
+          <div className="flex items-center justify-between gap-3 border-t border-white/[0.06] pt-3">
+            <span className="font-medium text-slate-200">
+              Emergency unlocks:{' '}
+              <Badge tone={emergencyEnabled ? 'neutral' : 'danger'}>{emergencyEnabled ? 'Allowed' : 'Turned off'}</Badge>
+            </span>
+            <Button
+              variant="ghost"
+              disabled={!keyPresent && (emergencyEnabled || hasPairedKeys)}
+              onClick={() => setEmergencyToggleOpen(true)}
+            >
+              {emergencyEnabled ? 'Turn off…' : 'Turn back on…'}
+            </Button>
+          </div>
+          {!emergencyEnabled && (
+            <p className="text-caption text-slate-400">
+              Your paired USB key is now the only way to turn blocking off. Locked windows can’t be ended early.
+            </p>
+          )}
+          {!keyPresent && (
+            <p className="text-caption text-slate-500">
+              {hasPairedKeys
+                ? `Insert your paired USB key to turn emergency unlocks ${emergencyEnabled ? 'off' : 'back on'}.`
+                : 'Pair a USB key before turning emergency unlocks off.'}
+            </p>
+          )}
         </div>
       </Card>
       {emergencyOpen && <EmergencyConfirm onClose={() => setEmergencyOpen(false)} />}
+      {emergencyToggleOpen && (
+        <EmergencyToggleConfirm enable={!emergencyEnabled} onClose={() => setEmergencyToggleOpen(false)} />
+      )}
 
       {platform === 'darwin' && (
         <Card>

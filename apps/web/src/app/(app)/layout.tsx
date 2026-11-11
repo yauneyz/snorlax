@@ -10,7 +10,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     <div className="app-shell">
       <header className="app-header">
         <div className="brand-row">
-          <BrandLink href="/app" />
+          <BrandLink href="/" />
           <DevBadge />
         </div>
         <nav className="app-nav">

@@ -141,6 +141,7 @@ const EMPTY_SNAPSHOT: EngineSnapshot = {
   streak: { profileId: null, currentDays: 0, bestDays: 0, lastBreakLocalDate: null },
   emergencyLeft: 5,
   emergencyRefillAtMs: null,
+  emergencyEnabled: true,
   nextEvents: [],
   poolResetMinute: 0,
 };

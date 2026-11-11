@@ -67,6 +67,10 @@ pub struct EngineState {
     /// Minutes after local midnight when pool unlock counts reset (0 = midnight). Key-gated.
     #[serde(default)]
     pub pool_reset_minute: u16,
+    /// The user switched emergency unlocks off. Key-gated both ways; while set, nothing gets past a
+    /// locked window and the key is the only way out of blocking.
+    #[serde(default)]
+    pub emergency_disabled: bool,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
@@ -424,6 +428,8 @@ pub enum JournalKind {
     KeyPaired,
     KeyUnpaired,
     PoolResetChanged { minute: u16 },
+    /// Emergency unlocks were switched on or off.
+    EmergencyUnlocksChanged { enabled: bool },
     /// Written once when upgrading from a v5 state file.
     Migration,
 }
@@ -483,6 +489,7 @@ impl EngineState {
             streaks_seeded: false,
             generation: 0,
             pool_reset_minute: 0,
+            emergency_disabled: false,
         }
     }
 

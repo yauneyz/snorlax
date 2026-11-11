@@ -129,13 +129,9 @@ export async function middleware(request: NextRequest) {
     return finish(response());
   }
 
-  // marketing: only `/` reroutes logged-in users; keep /pricing, /blog, etc. browsable.
-  // Leave a root-level auth callback in place long enough for the browser client to consume it.
-  // This matters when a recovery link is opened while another session cookie still exists.
-  if (pathname === "/" && user && !request.nextUrl.searchParams.has("code")) {
-    return redirectTo(subscribed ? "/app" : "/pricing");
-  }
-
+  // marketing: always browsable, logged in or not. The header shows a Dashboard link for
+  // signed-in visitors, so `/` no longer bounces them to /app (that left no way back to
+  // the guides and other pages short of typing a URL).
   return finish(response());
 }
 

@@ -31,4 +31,9 @@ generation: number,
 /**
  * Minutes after local midnight when pool unlock counts reset (0 = midnight). Key-gated.
  */
-poolResetMinute: number, };
+poolResetMinute: number, 
+/**
+ * The user switched emergency unlocks off. Key-gated both ways; while set, nothing gets past a
+ * locked window and the key is the only way out of blocking.
+ */
+emergencyDisabled: boolean, };

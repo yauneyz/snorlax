@@ -26,7 +26,7 @@ const contacts: ContactLink[] = [
   {
     label: "Discord",
     value: "Join our server",
-    href: "https://discord.gg/QZzrM3gpt",
+    href: "https://discord.gg/HGJbj49KSh",
     external: true,
   },
 ];

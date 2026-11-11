@@ -21,7 +21,11 @@ streak: Streak, emergencyLeft: number,
 /**
  * When the next emergency unlock comes back; null while all are available.
  */
-emergencyRefillAtMs: number | null, nextEvents: Array<UpcomingEvent>, 
+emergencyRefillAtMs: number | null, 
+/**
+ * False once the user has switched emergency unlocks off.
+ */
+emergencyEnabled: boolean, nextEvents: Array<UpcomingEvent>, 
 /**
  * Minutes after local midnight when pool unlock counts reset.
  */

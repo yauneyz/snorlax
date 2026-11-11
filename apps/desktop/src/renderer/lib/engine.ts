@@ -41,7 +41,9 @@ export function gateMessage(gate: Gate, streakDays: number): string {
       return `Insert your key to do this${what}.${streak}`;
     }
     case 'locked':
-      return `A locked window holds this until ${formatClock(gate.untilMs)}. Only an emergency unlock gets past it.`;
+      return useFocusStore.getState().engine.emergencyEnabled
+        ? `A locked window holds this until ${formatClock(gate.untilMs)}. Only an emergency unlock gets past it.`
+        : `A locked window holds this until ${formatClock(gate.untilMs)}. Emergency unlocks are turned off, so nothing gets past it.`;
     case 'denied':
       return gate.message;
   }

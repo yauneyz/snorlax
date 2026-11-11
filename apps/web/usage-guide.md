@@ -186,7 +186,7 @@ Then it does this:
 - auth routes:
   - logged-in users get redirected to `/app`
 - marketing routes:
-  - `/` redirects logged-in users to `/pricing` or `/app`
+  - `/` stays the landing page for logged-in users too (header links to `/app`)
   - the rest of marketing stays publicly browsable
 - API routes:
   - pass through, because handlers do their own auth

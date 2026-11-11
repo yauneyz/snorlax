@@ -56,6 +56,8 @@ export const ErrorCode = {
   INTERNAL: 'INTERNAL',
   /** Emergency unlock refused: none left until the next monthly refill. */
   NO_EMERGENCY_LEFT: 'NO_EMERGENCY_LEFT',
+  /** Emergency unlock refused: the user switched emergency unlocks off. */
+  EMERGENCY_DISABLED: 'EMERGENCY_DISABLED',
   /** Pool unlock refused: no unlocks left in the pool today. */
   POOL_EXHAUSTED: 'POOL_EXHAUSTED',
   /** Pool unlock confirm refused: the pause (friction) hasn't elapsed. */
