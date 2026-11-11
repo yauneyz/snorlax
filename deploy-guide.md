@@ -425,9 +425,9 @@ routing before they are advertised.
 
 Windows/macOS updater behavior:
 
-- Packaged builds check 30 seconds after startup and every six hours.
-- Payloads download automatically, but `autoInstallOnAppQuit` is disabled.
-- A restart prompt appears only when Focus is inactive or the paired key is present.
+- Packaged builds check 30 seconds after startup, every six hours, and on a manual "Check for updates".
+- `autoInstallOnAppQuit` is disabled; installs only happen from the prompt.
+- Updates download automatically after the startup check, then a "Restart and update" prompt appears (regardless of Focus or key state).
 - If a new app detects an older privileged service, it runs the bundled controller with
   elevation, restarts the service, and waits up to 60 seconds for the matching version.
 - Native service install/repair is idempotent and preserves the original recovery-code

@@ -53,7 +53,9 @@ fn install() -> Result<()> {
 }
 
 fn uninstall() -> Result<()> {
-    let _ = guard_uninstall();
+    // Fail closed like the Windows controller: a service that connects but never answers must
+    // not let an uninstall through during active focus.
+    guard_uninstall()?;
     launchd::bootout();
     let _ = std::fs::remove_file(launchd::plist_path());
     talysman::enforce::extension_policy::uninstall();

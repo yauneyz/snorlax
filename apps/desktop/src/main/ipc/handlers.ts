@@ -4,7 +4,7 @@
  * Phase 3.
  */
 
-import { app, BrowserWindow, dialog, ipcMain, Notification, shell } from 'electron';
+import { app, BrowserWindow, clipboard, dialog, ipcMain, Notification, shell } from 'electron';
 import {
   ErrorCode,
   profileInput,
@@ -406,8 +406,31 @@ export async function registerIpcHandlers(ctx: HandlerContext): Promise<void> {
   ipcHandle(Channels.openExternal, async (_e, url: string) => {
     // Through the analytics bridge, so first-run's store and download links also join this
     // install to the browser that downloaded it. Hosts the bridge won't forward open directly.
-    await shell.openExternal(await bridgedLinkUrl(url));
-    return { ok: true };
+    const target = await bridgedLinkUrl(url);
+    try {
+      await shell.openExternal(target);
+      return { ok: true };
+    } catch (error) {
+      // The OS couldn't launch the default browser (seen on Windows: a broken browser install
+      // failing with 0x36B1 "side-by-side configuration is incorrect"). Nothing Talysman can
+      // repair, but the click must not just silently do nothing: hand the person the link.
+      const message = error instanceof Error ? error.message : String(error);
+      logger.warn('[openExternal] could not open link', message);
+      track('main_process_error', { message: `openExternal failed: ${message}`.slice(0, 2000), fatal: false });
+      void flushEvents();
+      const { response } = await dialog.showMessageBox({
+        type: 'warning',
+        title: 'Could not open your browser',
+        message: 'Talysman could not open this link in your default browser.',
+        detail: `${url}\n\nCopy the link and paste it into your browser instead.\n\nDetails: ${message}`,
+        buttons: ['Copy link', 'Close'],
+        defaultId: 0,
+        cancelId: 1,
+        noLink: true,
+      });
+      if (response === 0) clipboard.writeText(url);
+      return { ok: false };
+    }
   });
 
   ipcHandle(Channels.devToggleKey, () => {

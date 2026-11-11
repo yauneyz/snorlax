@@ -2,13 +2,13 @@
 
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { app, dialog, Notification } from 'electron';
+import { app, dialog } from 'electron';
 import electronUpdater, { type AppUpdater, type UpdateDownloadedEvent } from 'electron-updater';
 import { logger } from './logging.js';
-import type { ServiceConnection } from './service/connection.js';
-import { canRestartForUpdate } from './updaterPolicy.js';
 
 const STARTUP_CHECK_DELAY_MS = 30_000;
+/** Long-running installs (tray apps rarely restart) still pick up releases between launches. */
+const CHECK_INTERVAL_MS = 6 * 60 * 60 * 1_000;
 
 export type AppUpdateCheckResult =
   | { status: 'up-to-date'; version: string }
@@ -46,27 +46,7 @@ function updaterInstance(): AppUpdater {
   return electronUpdater.autoUpdater;
 }
 
-async function enforcementAllowsRestart(service: ServiceConnection): Promise<boolean> {
-  try {
-    const state = await service.request('getState', undefined);
-    return canRestartForUpdate(state);
-  } catch (error) {
-    logger.warn('[updater] cannot verify enforcement state; deferring update installation', error);
-    return false;
-  }
-}
-
-function notifyDeferredUpdate(version: string): void {
-  if (!Notification.isSupported()) return;
-  const notification = new Notification({
-    title: `Talysman ${version} is ready`,
-    body: 'The update will wait until Focus is off or your paired key is present.',
-    silent: true,
-  });
-  notification.show();
-}
-
-export function initUpdater(service: ServiceConnection): () => void {
+export function initUpdater(): () => void {
   if (!app.isPackaged) {
     logger.debug('[updater] skipped for unpackaged development build');
     runManualCheck = async () => ({
@@ -86,7 +66,11 @@ export function initUpdater(service: ServiceConnection): () => void {
 
   const autoUpdater = updaterInstance();
   autoUpdater.logger = logger;
-  autoUpdater.autoDownload = false;
+  // Download in the background as soon as a check finds an update, so the startup check ends in
+  // the "Restart and update" prompt below. With this off, only a manual "Check for updates"
+  // ever downloaded anything, and installs sat on old versions indefinitely (a Windows 0.8.0
+  // install was still reporting an error fixed in 0.8.1 a month after the fix shipped).
+  autoUpdater.autoDownload = true;
   // Talysman must decide when its privileged service may restart; never install merely because
   // the tray application happened to quit.
   autoUpdater.autoInstallOnAppQuit = false;
@@ -95,18 +79,9 @@ export function initUpdater(service: ServiceConnection): () => void {
   let promptOpen = false;
   let activeCheck: Promise<AppUpdateCheckResult> | null = null;
   let userDeferred = false;
-  let unsafeNotificationShown = false;
 
   const maybeOfferInstall = async (): Promise<void> => {
     if (!downloaded || promptOpen || userDeferred) return;
-    if (!(await enforcementAllowsRestart(service))) {
-      if (!unsafeNotificationShown) {
-        unsafeNotificationShown = true;
-        notifyDeferredUpdate(downloaded.version);
-      }
-      return;
-    }
-
     promptOpen = true;
     const version = downloaded.version;
     try {
@@ -133,7 +108,7 @@ export function initUpdater(service: ServiceConnection): () => void {
     }
   };
 
-  const check = (manual = false): Promise<AppUpdateCheckResult> => {
+  const check = (): Promise<AppUpdateCheckResult> => {
     if (activeCheck) return activeCheck;
 
     const nextCheck = (async (): Promise<AppUpdateCheckResult> => {
@@ -150,19 +125,7 @@ export function initUpdater(service: ServiceConnection): () => void {
           };
         }
         if (result.isUpdateAvailable) {
-          if (manual && !downloaded) {
-            const { response } = await dialog.showMessageBox({
-              type: 'info',
-              title: 'Talysman update available',
-              message: `Talysman ${result.updateInfo.version} is available.`,
-              detail: 'Download it now? Installation will still wait until enforcement can restart safely.',
-              buttons: ['Download', 'Later'],
-              defaultId: 0,
-              cancelId: 1,
-              noLink: true,
-            });
-            if (response === 0) await autoUpdater.downloadUpdate();
-          }
+          // autoDownload has already started the download; `update-downloaded` offers the install.
           return { status: 'update-available', version: result.updateInfo.version };
         }
         return { status: 'up-to-date', version: app.getVersion() };
@@ -181,7 +144,7 @@ export function initUpdater(service: ServiceConnection): () => void {
     return nextCheck;
   };
 
-  runManualCheck = () => check(true);
+  runManualCheck = () => check();
 
   autoUpdater.on('update-available', (info) => {
     logger.info(`[updater] update available: ${info.version}`);
@@ -199,7 +162,6 @@ export function initUpdater(service: ServiceConnection): () => void {
   });
   autoUpdater.on('update-downloaded', (event) => {
     downloaded = event;
-    unsafeNotificationShown = false;
     logger.info(`[updater] update downloaded: ${event.version}`);
     void maybeOfferInstall();
   });
@@ -207,17 +169,13 @@ export function initUpdater(service: ServiceConnection): () => void {
     logger.error('[updater] error', error);
   });
 
-  // A downloaded update that was blocked by active enforcement becomes eligible as soon as focus
-  // ends or the paired key appears.
-  const unsubscribeFocus = service.on('focusChanged', () => void maybeOfferInstall());
-  const unsubscribeKey = service.on('keyPresenceChanged', () => void maybeOfferInstall());
-
-  const startupTimer = setTimeout(() => void check(false), STARTUP_CHECK_DELAY_MS);
+  const startupTimer = setTimeout(() => void check(), STARTUP_CHECK_DELAY_MS);
   startupTimer.unref();
+  const interval = setInterval(() => void check(), CHECK_INTERVAL_MS);
+  interval.unref();
 
   return () => {
     clearTimeout(startupTimer);
-    unsubscribeFocus();
-    unsubscribeKey();
+    clearInterval(interval);
   };
 }

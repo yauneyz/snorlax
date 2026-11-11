@@ -84,25 +84,63 @@ async function waitForServiceVersion(service: ServiceConnection, expectedVersion
   );
 }
 
+/** The user dismissed the OS administrator prompt (macOS osascript -128, Windows UAC "No"). */
+export function isElevationCancelled(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  return /User cancell?ed|\(-128\)|canceled by the user/i.test(message);
+}
+
+/**
+ * The person chose Quit at the approval prompt. bootstrap() treats this as a deliberate exit, not
+ * a startup failure: no "could not start" dialog and no bootstrap_failed in the error log.
+ */
+export class ServiceInstallDeclinedError extends Error {
+  constructor() {
+    super('Administrator approval for the Talysman service was declined.');
+    this.name = 'ServiceInstallDeclinedError';
+  }
+}
+
 /**
  * Ensure first-run macOS installs have a LaunchDaemon before the initial pipe connection.
  * Windows NSIS and Linux packages perform this step in their installer hooks.
+ *
+ * Cancelling the password prompt used to fall straight through to the generic "Talysman could
+ * not start" dialog with a raw osascript error. Now it explains why approval is needed and offers
+ * a retry.
  */
 export async function ensureServiceInstalled(): Promise<void> {
   if (!app.isPackaged || process.platform !== 'darwin') return;
   if (await commandSucceeds('launchctl', ['print', MAC_SERVICE_LABEL])) return;
 
-  logger.info('[installer] macOS service is not installed; requesting administrator approval');
-  track('service_install_started', { platform: analyticsPlatform() });
-  try {
-    await runElevatedServiceCommand('install');
-    track('service_installed', { platform: analyticsPlatform() });
-  } catch (error) {
-    track('service_install_failed', {
-      platform: analyticsPlatform(),
-      reason: error instanceof Error ? error.message : String(error),
+  for (;;) {
+    logger.info('[installer] macOS service is not installed; requesting administrator approval');
+    track('service_install_started', { platform: analyticsPlatform() });
+    try {
+      await runElevatedServiceCommand('install');
+      track('service_installed', { platform: analyticsPlatform() });
+      return;
+    } catch (error) {
+      const cancelled = isElevationCancelled(error);
+      track('service_install_failed', {
+        platform: analyticsPlatform(),
+        reason: cancelled ? 'user_cancelled' : error instanceof Error ? error.message : String(error),
+      });
+      if (!cancelled) throw error;
+    }
+
+    const { response } = await dialog.showMessageBox({
+      type: 'warning',
+      title: 'Administrator approval needed',
+      message: 'Talysman needs your approval to finish setting up.',
+      detail:
+        'Blocking is done by a small background service that runs with system privileges, so macOS asks for your password once to install it. Talysman cannot block anything without it.',
+      buttons: ['Try again', 'Quit'],
+      defaultId: 0,
+      cancelId: 1,
+      noLink: true,
     });
-    throw error;
+    if (response !== 0) throw new ServiceInstallDeclinedError();
   }
 }
 

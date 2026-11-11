@@ -25,7 +25,12 @@ import { registerIpcHandlers } from './ipc/handlers.js';
 import { PipeServiceConnection } from './service/client.js';
 import { MockServiceConnection } from './service/mockService.js';
 import type { ServiceConnection } from './service/connection.js';
-import { ensureServiceCurrent, ensureServiceInstalled, repairUnreachableService } from './service/installer.js';
+import {
+  ensureServiceCurrent,
+  ensureServiceInstalled,
+  repairUnreachableService,
+  ServiceInstallDeclinedError,
+} from './service/installer.js';
 import { initUpdater } from './updater.js';
 import { appMessagesForFailureDialog, initAppMessages, refreshAppMessages } from './appMessages.js';
 import { initSmartFiltering } from './smartFiltering.js';
@@ -182,7 +187,7 @@ async function bootstrap(): Promise<void> {
   recordAppOpen();
   // Linux has its own standalone tray helper (see file header); avoid a duplicate icon there.
   if (process.platform !== 'linux') createTray(service, mock);
-  initUpdater(service);
+  initUpdater();
   initAppMessages();
 
   // Cold start launched via a deep link (e.g. Windows protocol activation): the URL arrives
@@ -218,6 +223,13 @@ if (!gotLock) {
   });
 
   app.whenReady().then(bootstrap).catch(async (e) => {
+    if (e instanceof ServiceInstallDeclinedError) {
+      // A choice, not a failure: service_install_failed (reason user_cancelled) already records it.
+      logger.info('[main] quitting: service install declined');
+      await shutdownFlush();
+      app.quit();
+      return;
+    }
     logger.error('[main] bootstrap failed', e);
     const error = e instanceof Error ? e : new Error(String(e));
     track('bootstrap_failed', { message: error.message, stack: error.stack?.slice(0, 4000) });
