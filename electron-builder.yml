@@ -68,6 +68,12 @@ nsis:
   artifactName: ${productName}-Setup-${version}-${arch}.${ext}
 
 mac:
+  # Both temporary architecture bundles must embed identical updater configuration before
+  # @electron/universal merges them. The published feed contains the universal zip.
+  publish:
+    provider: generic
+    url: ${env.UPDATE_FEED_URL}/mac/universal
+    useMultipleRangeRequest: false
   # One universal dmg runs natively on Apple Silicon and Intel, so the website never has to guess
   # a visitor's CPU (Safari reports "Intel" on every Mac). The zip is the electron-updater payload.
   target:

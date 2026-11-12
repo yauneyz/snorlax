@@ -524,6 +524,18 @@ certificate_password = "the password used when exporting the p12"
 keychain_profile = "talysman-notary"
 ```
 
+The macOS release is universal, including its native Rust service binaries. An Apple Silicon
+Mac can build both slices with Xcode's macOS SDK and a rustup toolchain containing both targets:
+
+```bash
+rustup target add aarch64-apple-darwin x86_64-apple-darwin
+```
+
+If Rust was installed through Homebrew, install `rustup` with `brew install rustup`, put
+`$(brew --prefix rustup)/bin` first in `PATH` (also in your shell startup file), then run
+`rustup toolchain install stable --profile minimal --target aarch64-apple-darwin --target x86_64-apple-darwin`.
+Homebrew's standalone `rust` package does not include the Intel target on Apple Silicon.
+
 Environment variables take precedence over `.credentials`, which keeps the GitHub Actions
 secret contract unchanged. Local releases can alternatively use the App Store Connect API-key or
 Apple-ID variables supported by electron-builder. `release:upload` validates the signing inputs
