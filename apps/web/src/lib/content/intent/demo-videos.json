@@ -1,9 +1,25 @@
 {
+  "adult-website-blocker": {
+    "description": "An adult site blocked by Talysman in Chrome, in a private window and in a second browser, then turning the blocker off refused without the USB key, which is in a drawer two rooms away.",
+    "duration": "PT32S",
+    "seconds": 32.2,
+    "uploadDate": "2026-11-12",
+    "width": 1920,
+    "height": 1080
+  },
   "app-blocker-pc": {
     "description": "Talysman’s blocklist with Discord, Steam and Slack, Discord closing each time it’s opened during focus with the app’s blocked popup, discord.com blocked in the browser, and turning focus off refused without the USB key.",
     "duration": "PT34S",
     "seconds": 34.2,
     "uploadDate": "2026-10-07",
+    "width": 1920,
+    "height": 1080
+  },
+  "block-adult-websites-on-phone": {
+    "description": "The free phone settings that block adult sites (Android Private DNS, iPhone Screen Time, SafeSearch), then on the computer an adult site blocked by Talysman and turning the blocker off refused while the USB key is with a friend.",
+    "duration": "PT32S",
+    "seconds": 32.2,
+    "uploadDate": "2026-11-12",
     "width": 1920,
     "height": 1080
   },
@@ -124,6 +140,14 @@
     "duration": "PT46S",
     "seconds": 45.5,
     "uploadDate": "2026-10-07",
+    "width": 1920,
+    "height": 1080
+  },
+  "pornography-blocker": {
+    "description": "Talysman’s block page in a private window and in a second browser, the NSFW list holding against the usual workarounds, turning the blocker off refused without the USB key, and the key in the car.",
+    "duration": "PT35S",
+    "seconds": 35.2,
+    "uploadDate": "2026-11-12",
     "width": 1920,
     "height": 1080
   },

@@ -50,8 +50,10 @@ body {
 }
 
 .desktop-sidebar {
-  background: linear-gradient(180deg, rgb(var(--color-panel)/0.96), rgb(var(--color-background)/0.94));
-  box-shadow: inset -1px 0 rgb(var(--color-white)/0.015);
+  background:
+    radial-gradient(120% 34% at 0% 0%, rgb(var(--color-signal)/0.07), transparent 70%),
+    linear-gradient(180deg, rgb(var(--color-panel)/0.96), rgb(var(--color-background)/0.94));
+  box-shadow: inset -1px 0 rgb(var(--color-white)/0.02);
 }
 
 .desktop-brand-name {
@@ -66,19 +68,103 @@ body {
   position: relative;
 }
 
-.desktop-nav-item::after {
+.desktop-nav-item svg {
+  flex: none;
+  opacity: 0.7;
+  transition:
+    opacity 160ms ease,
+    color 160ms ease;
+}
+
+.desktop-nav-item:hover svg {
+  opacity: 1;
+}
+
+/* The current route: a lit pane with the action signal riding its left edge. */
+.desktop-nav-item[aria-current='page'] {
+  background: linear-gradient(90deg, rgb(var(--color-signal)/0.11), rgb(var(--color-white)/0.035) 62%);
+  box-shadow:
+    inset 0 0 0 1px rgb(var(--color-white)/0.06),
+    inset 0 1px rgb(var(--color-white)/0.05);
+}
+
+.desktop-nav-item[aria-current='page'] svg {
+  color: var(--signal);
+  opacity: 1;
+}
+
+.desktop-nav-item[aria-current='page']::before {
   content: '';
   position: absolute;
-  inset: auto 12px 0;
+  left: -10px;
+  top: 9px;
+  bottom: 9px;
+  width: 3px;
+  border-radius: 0 3px 3px 0;
+  background: var(--signal);
+  box-shadow: 0 0 12px rgb(var(--color-signal)/0.7);
+}
+
+/* The always-on readout at the foot of the rail. */
+.desktop-mode-readout {
+  border: 1px solid rgb(var(--color-white)/0.06);
+  border-radius: 12px;
+  background: linear-gradient(180deg, rgb(var(--color-white)/0.04), rgb(var(--color-white)/0.012));
+  box-shadow: inset 0 1px rgb(var(--color-white)/0.04);
+}
+
+/* A hairline that is brightest where the route title sits and gone by the far edge. */
+.desktop-header {
+  position: relative;
+}
+
+.desktop-header::after {
+  content: '';
+  position: absolute;
+  inset: auto 0 0;
   height: 1px;
-  background: linear-gradient(90deg, transparent, rgb(var(--color-white)/0.045), transparent);
+  background: linear-gradient(
+    90deg,
+    rgb(var(--color-signal)/0.28),
+    rgb(var(--color-white)/0.07) 28%,
+    rgb(var(--color-white)/0.03)
+  );
 }
 
 .desktop-route-title {
   color: rgb(var(--color-foreground-strong));
   font-size: 18px;
   font-weight: 600;
-  letter-spacing: -0.01em;
+  letter-spacing: -0.015em;
+}
+
+/* Depth behind the working area: a breath of the signal overhead and a fine dot lattice that
+   fades out before it reaches the content's lower half. Purely decorative, never interactive. */
+.desktop-pane {
+  isolation: isolate;
+}
+
+.desktop-pane::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(70% 46% at 62% -12%, rgb(var(--color-signal)/0.085), transparent 70%),
+    radial-gradient(40% 30% at 100% 100%, rgb(var(--color-brand)/0.03), transparent 70%);
+}
+
+.desktop-pane::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background-image: radial-gradient(rgb(var(--color-white)/0.07) 1px, transparent 1.5px);
+  background-size: 22px 22px;
+  -webkit-mask-image: radial-gradient(90% 60% at 60% 0%, black, transparent 78%);
+  mask-image: radial-gradient(90% 60% at 60% 0%, black, transparent 78%);
 }
 
 .dashboard-stage {
@@ -91,8 +177,9 @@ body {
   overflow: hidden;
   background: linear-gradient(150deg, rgb(var(--color-white)/0.055), rgb(var(--color-white)/0.014));
   box-shadow:
-    inset 0 1px rgb(var(--color-white)/0.045),
-    0 12px 30px -22px rgb(var(--color-black)/0.95);
+    inset 0 1px rgb(var(--color-white)/0.06),
+    0 18px 40px -26px rgb(var(--color-black)/0.95);
+  backdrop-filter: blur(6px);
 }
 
 .instrument-card::after {
@@ -151,6 +238,145 @@ body {
 .desktop-pane {
   height: min(100%, 820px);
   margin-block: auto;
+}
+
+@layer components {
+  /* Every Card: a glass pane whose top edge catches the light. */
+  .surface-card {
+    position: relative;
+    border: 1px solid rgb(var(--color-white)/0.075);
+    border-radius: 16px;
+    background: linear-gradient(180deg, rgb(var(--color-white)/0.05), rgb(var(--color-white)/0.014));
+    box-shadow:
+      inset 0 1px rgb(var(--color-white)/0.06),
+      0 22px 44px -30px rgb(var(--color-black)/0.95);
+  }
+
+  .surface-card::before {
+    content: '';
+    position: absolute;
+    inset: -1px 18% auto;
+    height: 1px;
+    pointer-events: none;
+    background: linear-gradient(90deg, transparent, rgb(var(--color-white)/0.2), transparent);
+  }
+
+  /* The seal — the dashboard's one big instrument. Layers, outside in:
+       halo   a soft bloom that only exists while focus is on
+       ticks  a bezel of 60 graduations
+       ring   a hairline band; while focused, a lit arc sweeps around it
+       disc   the glass face the status is read from */
+  .seal__halo,
+  .seal__ticks,
+  .seal__ring,
+  .seal__disc {
+    position: absolute;
+    border-radius: 999px;
+    pointer-events: none;
+  }
+
+  .seal__halo {
+    inset: -56px;
+    opacity: 0;
+    background: radial-gradient(
+      closest-side,
+      rgb(var(--color-signal)/0.2),
+      rgb(var(--color-success)/0.07) 55%,
+      transparent 74%
+    );
+    transition: opacity 600ms ease;
+  }
+
+  .seal--on .seal__halo {
+    opacity: 1;
+    animation: seal-breathe 5.2s ease-in-out infinite;
+  }
+
+  .seal__ticks {
+    inset: 0;
+    background: repeating-conic-gradient(
+      from -0.4deg,
+      rgb(var(--color-white)/0.2) 0deg 0.8deg,
+      transparent 0.8deg 6deg
+    );
+    -webkit-mask-image: radial-gradient(closest-side, transparent calc(100% - 7px), black calc(100% - 6px));
+    mask-image: radial-gradient(closest-side, transparent calc(100% - 7px), black calc(100% - 6px));
+    transition: background 400ms ease;
+  }
+
+  .seal--on .seal__ticks {
+    background: repeating-conic-gradient(
+      from -0.4deg,
+      rgb(var(--color-signal)/0.55) 0deg 0.8deg,
+      transparent 0.8deg 6deg
+    );
+  }
+
+  .seal__ring {
+    inset: 13px;
+    border: 1px solid rgb(var(--color-white)/0.1);
+  }
+
+  .seal--on .seal__ring {
+    border-color: transparent;
+    background: conic-gradient(
+      from 0deg,
+      rgb(var(--color-success)/0.15),
+      rgb(var(--color-success)/0.7) 28%,
+      rgb(var(--color-signal)) 50%,
+      rgb(var(--color-signal-high)) 52%,
+      rgb(var(--color-success)/0.15) 53%,
+      rgb(var(--color-success)/0.15)
+    );
+    -webkit-mask-image: radial-gradient(closest-side, transparent calc(100% - 2.5px), black calc(100% - 2px));
+    mask-image: radial-gradient(closest-side, transparent calc(100% - 2.5px), black calc(100% - 2px));
+    animation: tal-spin 9s linear infinite;
+  }
+
+  .seal__disc {
+    inset: 24px;
+    border: 1px solid rgb(var(--color-white)/0.07);
+    background:
+      radial-gradient(90% 70% at 50% 0%, rgb(var(--color-white)/0.075), transparent 62%),
+      linear-gradient(180deg, rgb(var(--color-panel-raised)), rgb(var(--color-background)));
+    box-shadow:
+      inset 0 1px rgb(var(--color-white)/0.09),
+      inset 0 -18px 40px -22px rgb(var(--color-black)/0.9),
+      0 26px 50px -24px rgb(var(--color-black));
+    transition:
+      border-color 400ms ease,
+      box-shadow 400ms ease;
+  }
+
+  .seal--on .seal__disc {
+    border-color: rgb(var(--color-signal)/0.2);
+    background:
+      radial-gradient(90% 70% at 50% 0%, rgb(var(--color-signal)/0.13), transparent 62%),
+      linear-gradient(180deg, rgb(var(--color-panel-raised)), rgb(var(--color-background)));
+    box-shadow:
+      inset 0 1px rgb(var(--color-signal)/0.22),
+      inset 0 -18px 40px -22px rgb(var(--color-black)/0.9),
+      0 26px 50px -24px rgb(var(--color-black));
+  }
+
+  .seal__status {
+    background: linear-gradient(180deg, rgb(var(--color-white)), rgb(var(--color-foreground-soft)));
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+}
+
+@keyframes seal-breathe {
+  0%,
+  100% {
+    transform: scale(0.96);
+    opacity: 0.75;
+  }
+  50% {
+    transform: scale(1.03);
+    opacity: 1;
+  }
 }
 
 /* Numbers, hostnames, and metadata kickers are monospaced — they're the
@@ -231,15 +457,24 @@ body {
   width: 10px;
   height: 10px;
 }
+/* The transparent border insets the thumb, so it floats rather than filling its gutter. */
 ::-webkit-scrollbar-thumb {
-  background: rgb(var(--color-white)/0.08);
-  border-radius: 6px;
+  background: rgb(var(--color-white)/0.1);
+  background-clip: padding-box;
+  border: 3px solid transparent;
+  border-radius: 999px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: rgb(var(--color-white)/0.14);
+  background: rgb(var(--color-white)/0.2);
+  background-clip: padding-box;
 }
 ::-webkit-scrollbar-track {
   background: transparent;
+}
+
+::selection {
+  background: rgb(var(--color-signal)/0.28);
+  color: rgb(var(--color-white));
 }
 
 /* Focus ring follows the landing page's action signal, never browser-default blue. */
@@ -255,7 +490,9 @@ input[type='time']::-webkit-calendar-picker-indicator {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .desktop-workspace--dev::after {
+  .desktop-workspace--dev::after,
+  .seal--on .seal__halo,
+  .seal--on .seal__ring {
     animation: none;
   }
 }

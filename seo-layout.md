@@ -89,6 +89,21 @@ other; guides link to at least one comparison; everything links back toward the 
 | `/blocker-for-people-who-bypass-blockers` | Use cases | best website blocker if I keep turning my blocker off | Retitled |
 | `/turn-a-usb-drive-into-a-distraction-blocker` | Guides | turn a USB drive into a distraction blocker | Unchanged apart from fixes |
 
+### Unlisted pages (adult-content entry points, added 2026-11-11)
+
+Served, in the sitemap, and cross-linked with each other, but **not in the footer** (`unlisted:
+true`). They target `marketing/keywords/adult-content-blocker.csv` (UTF-16 Keyword Planner
+export) without making adult content part of the main pitch. No existing page links to them.
+
+| URL | Primary queries | Angle |
+|---|---|---|
+| `/pornography-blocker` | pornography blocker (5k), apps to block pornography (5k), pornography blocking apps (5k), best pornography blocker, pornography filter, free / AI porn blocker | Kinds of blocker compared by their off switch; NSFW list (Pro) + key |
+| `/adult-website-blocker` | adult site/website blocker(s), best/free adult site blocker, block adult websites on chrome/firefox/mac | Free Chrome/Firefox/Windows/Mac settings first, then where a single-browser block stops working |
+| `/block-adult-websites-on-phone` | how to block adult websites on my phone/android, 18+ websites on android | Free Android Private DNS + iPhone Screen Time how-to; says plainly Talysman has no phone app |
+
+Template options they introduced: `unlisted`, `ctaLabel` (download button text) and
+`demoInPlace` (don't lift the demo above the page's own steps).
+
 Titles and meta descriptions follow the "first twenty pages" brief exactly where it gave them.
 `#20 /research/physical-friction-focus-experiment` was **skipped on purpose**. It needs real data,
 and publishing a study without results would be fabrication.

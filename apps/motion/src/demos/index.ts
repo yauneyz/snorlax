@@ -1,4 +1,6 @@
+import { adultWebsiteBlocker } from './adult-website-blocker';
 import { appBlockerPc } from './app-blocker-pc';
+import { blockAdultWebsitesOnPhone } from './block-adult-websites-on-phone';
 import { blockRedditWhileWorking } from './block-reddit-while-working';
 import { blockSocialMediaOnComputer } from './block-social-media-on-computer';
 import { blockYoutubeWhileWorking } from './block-youtube-while-working';
@@ -14,6 +16,7 @@ import { focusAppWriters } from './focus-app-writers';
 import { focusmeAlternative } from './focusme-alternative';
 import { freedomAlternative } from './freedom-alternative';
 import { physicalWebsiteBlocker } from './physical-website-blocker';
+import { pornographyBlocker } from './pornography-blocker';
 import { stopDisablingWebsiteBlocker } from './stop-disabling-website-blocker';
 import { turnAUsbDriveIntoADistractionBlocker } from './turn-a-usb-drive-into-a-distraction-blocker';
 import { websiteBlockerLinux } from './website-blocker-linux';
@@ -51,4 +54,7 @@ export const DEMOS: Demo[] = [
   focusAppDevelopers,
   focusAppWriters,
   focusAppRemoteWork,
+  pornographyBlocker,
+  adultWebsiteBlocker,
+  blockAdultWebsitesOnPhone,
 ];

@@ -147,6 +147,19 @@ export type IntentPage = {
   /** URL segment, served at the site root: `/website-blocker-you-cant-turn-off`. */
   slug: string;
   group: IntentGroup;
+  /**
+   * Served, in the sitemap and linked from its own related pages, but left out of the footer
+   * directory. For search entry points that aren't part of the main pitch (the adult-content
+   * pages), so they find people without becoming what the site is about.
+   */
+  unlisted?: boolean;
+  /** Label for the page's download buttons. Defaults to "Start focusing free". */
+  ctaLabel?: string;
+  /**
+   * Keep the demo section where the page file lists it instead of lifting it to just after the
+   * answer. For a page whose demo isn't the answer: the phone guide, where the steps come first.
+   */
+  demoInPlace?: boolean;
   /** One line for related-page cards. Says what the page answers, not what it sells. */
   summary: string;
   /**

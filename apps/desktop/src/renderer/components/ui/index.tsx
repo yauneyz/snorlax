@@ -10,7 +10,7 @@ export function Card({ className, children }: { className?: string; children: Re
   return (
     <div
       className={cx(
-        'rounded-[14px] border border-white/[0.08] bg-gradient-to-br from-white/[0.045] to-white/[0.012] p-5 backdrop-blur-[2px] shadow-[0_1px_0_rgb(var(--color-white)/0.05)_inset,0_12px_34px_-22px_rgb(var(--color-black)/0.95)]',
+        'surface-card p-5 backdrop-blur-[2px]',
         className,
       )}
     >
@@ -36,7 +36,7 @@ export function Kicker({ children, className }: { children: React.ReactNode; cla
 export function CardTitle({ children, hint }: { children: React.ReactNode; hint?: string }) {
   return (
     <div className="mb-3">
-      <h2 className="text-heading font-semibold text-slate-400">
+      <h2 className="text-heading font-semibold tracking-[-0.01em] text-slate-100">
         {children}
       </h2>
       {hint && <p className="mt-2 text-body leading-relaxed text-slate-400">{hint}</p>}
@@ -51,16 +51,17 @@ type ButtonProps = React.ButtonHTMLAttributes<HTMLButtonElement> & {
 
 export function Button({ variant = 'primary', className, ...props }: ButtonProps) {
   const base =
-    'inline-flex items-center justify-center rounded-full px-4 py-2 text-body font-semibold transition disabled:cursor-not-allowed disabled:opacity-45';
+    'inline-flex items-center justify-center rounded-full px-4 py-2 text-body font-semibold transition duration-150 enabled:active:translate-y-px enabled:active:scale-[0.985] disabled:cursor-not-allowed disabled:opacity-45';
+  // The filled variants are lit from above (an inset highlight) and cast their own colour below.
   const variants = {
     primary:
-      'border border-signal bg-signal text-signalInk shadow-[0_8px_24px_rgb(var(--color-signal)/0.10)] hover:border-signalHi hover:bg-signalHi',
+      'border border-signal bg-gradient-to-b from-signalHi/90 via-signal to-signal text-signalInk shadow-[inset_0_1px_0_rgb(var(--color-white)/0.45),0_10px_26px_-10px_rgb(var(--color-signal)/0.55)] enabled:hover:border-signalHi enabled:hover:shadow-[inset_0_1px_0_rgb(var(--color-white)/0.55),0_12px_32px_-8px_rgb(var(--color-signal)/0.7)] enabled:hover:brightness-110',
     hero:
-      'border border-signal bg-signal text-signalInk shadow-[0_8px_28px_rgb(var(--color-signal)/0.13)] hover:border-signalHi hover:bg-signalHi',
+      'border border-signal bg-gradient-to-b from-signalHi/90 via-signal to-signal text-signalInk shadow-[inset_0_1px_0_rgb(var(--color-white)/0.45),0_14px_36px_-10px_rgb(var(--color-signal)/0.6)] enabled:hover:border-signalHi enabled:hover:shadow-[inset_0_1px_0_rgb(var(--color-white)/0.55),0_16px_44px_-8px_rgb(var(--color-signal)/0.78)] enabled:hover:brightness-110',
     ghost:
-      'border border-white/[0.10] bg-white/[0.04] text-slate-200 backdrop-blur-sm hover:bg-white/[0.08] hover:text-white',
+      'border border-white/[0.10] bg-white/[0.045] text-slate-200 shadow-[inset_0_1px_0_rgb(var(--color-white)/0.06)] backdrop-blur-sm hover:border-white/[0.18] hover:bg-white/[0.085] hover:text-white',
     danger:
-      'border border-danger/35 bg-danger/[0.12] text-dangerInk hover:border-danger/50 hover:bg-danger/[0.18]',
+      'border border-danger/35 bg-danger/[0.12] text-dangerInk shadow-[inset_0_1px_0_rgb(var(--color-white)/0.05)] hover:border-danger/55 hover:bg-danger/[0.2]',
   };
   return <button className={cx(base, variants[variant], className)} {...props} />;
 }
@@ -92,7 +93,7 @@ export function Badge({
 }
 
 const FIELD =
-  'w-full rounded-[9px] border border-white/[0.09] bg-white/[0.035] px-3 py-2 text-body text-white outline-none transition placeholder:text-slate-600 focus:border-white/25 focus:bg-white/[0.06] disabled:cursor-not-allowed disabled:opacity-50';
+  'w-full rounded-[10px] border border-white/[0.09] bg-black/25 px-3 py-2 text-body text-white shadow-[inset_0_1px_2px_rgb(var(--color-black)/0.5)] outline-none transition placeholder:text-slate-600 hover:border-white/[0.14] focus:border-signal/60 focus:bg-black/35 focus:shadow-[inset_0_1px_2px_rgb(var(--color-black)/0.5),0_0_0_3px_rgb(var(--color-signal)/0.14)] disabled:cursor-not-allowed disabled:opacity-50';
 
 export function Select(props: React.SelectHTMLAttributes<HTMLSelectElement>) {
   return (
@@ -162,15 +163,15 @@ export function Modal({
       <button
         aria-label="Close"
         onClick={onClose}
-        className="absolute inset-0 bg-[rgb(var(--color-background)/0.82)] backdrop-blur-md"
+        className="absolute inset-0 bg-[rgb(var(--color-background)/0.78)] backdrop-blur-md"
       />
       <div
-        className="relative max-h-full overflow-y-auto rounded-[16px] border border-white/[0.10] bg-[rgb(var(--color-panel)/0.97)] p-5 shadow-[0_24px_60px_rgb(var(--color-black)/0.6)]"
+        className="relative max-h-full animate-rise overflow-y-auto rounded-[18px] border border-white/[0.10] bg-[linear-gradient(180deg,rgb(var(--color-panel-raised)/0.98),rgb(var(--color-panel)/0.98))] p-5 shadow-[inset_0_1px_0_rgb(var(--color-white)/0.08),0_32px_80px_rgb(var(--color-black)/0.7),0_0_0_1px_rgb(var(--color-black)/0.4)]"
         style={{ width }}
       >
         <div className="mb-3 flex items-center">
           <h2 className="text-heading font-semibold text-slate-100">{title}</h2>
-          <button onClick={onClose} className="ml-auto rounded px-2 py-0.5 text-caption text-slate-400 hover:text-slate-200">
+          <button onClick={onClose} className="ml-auto rounded-full px-2.5 py-1 text-caption text-slate-400 transition hover:bg-white/[0.06] hover:text-slate-100">
             Close
           </button>
         </div>
@@ -211,14 +212,14 @@ export function Switch({ on, className }: { on: boolean; className?: string }) {
     <span
       aria-hidden
       className={cx(
-        'relative block h-5 w-9 shrink-0 rounded-full transition',
-        on ? 'bg-seal/70' : 'bg-white/10',
+        'relative block h-5 w-9 shrink-0 rounded-full shadow-[inset_0_1px_2px_rgb(var(--color-black)/0.45)] transition',
+        on ? 'bg-seal/80 shadow-[inset_0_1px_2px_rgb(var(--color-black)/0.25),0_0_12px_rgb(var(--color-signal)/0.35)]' : 'bg-white/10',
         className,
       )}
     >
       <span
         className={cx(
-          'absolute top-0.5 h-4 w-4 rounded-full bg-white transition-all',
+          'absolute top-0.5 h-4 w-4 rounded-full bg-white shadow-[0_1px_3px_rgb(var(--color-black)/0.5)] transition-all',
           on ? 'left-[18px]' : 'left-0.5',
         )}
       />
@@ -236,7 +237,7 @@ export function StatusLabel({ on, tone = 'signal' }: { on: boolean; tone?: 'sign
   const colors = tones[tone];
   return (
     <span className={cx('inline-flex shrink-0 items-center gap-2 text-caption font-medium', on ? colors.text : 'text-slate-450')}>
-      <span aria-hidden="true" className={cx('h-2 w-2 shrink-0 rounded-full', on ? colors.dot : 'bg-white/20')} />
+      <span aria-hidden="true" className={cx('h-2 w-2 shrink-0 rounded-full', on ? cx(colors.dot, 'shadow-[0_0_8px_currentColor]') : 'bg-white/20')} />
       {on ? 'On' : 'Off'}
     </span>
   );

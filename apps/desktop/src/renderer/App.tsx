@@ -22,7 +22,52 @@ import { cx, effectiveAction } from './lib/utils.js';
 
 export type Route = 'dashboard' | 'stats' | 'blocklists' | 'schedule' | 'keys' | 'account' | 'plans' | 'settings';
 
-const NAV: { route: Route; label: string }[] = [
+/** Nav glyphs: 24-unit line drawings, sized and coloured by the nav item they sit in. */
+const NAV_ICONS = {
+  dashboard: (
+    <>
+      <rect x="3" y="3" width="7" height="9" rx="1.5" />
+      <rect x="14" y="3" width="7" height="5" rx="1.5" />
+      <rect x="14" y="12" width="7" height="9" rx="1.5" />
+      <rect x="3" y="16" width="7" height="5" rx="1.5" />
+    </>
+  ),
+  stats: <path d="M5 20v-7M12 20V4M19 20v-10" />,
+  blocklists: (
+    <>
+      <circle cx="12" cy="12" r="9" />
+      <path d="m5.7 5.7 12.6 12.6" />
+    </>
+  ),
+  schedule: (
+    <>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M12 7v5l3.2 2" />
+    </>
+  ),
+  keys: (
+    <>
+      <circle cx="7.5" cy="15.5" r="4.5" />
+      <path d="M10.7 12.3 20 3M16.5 6.5l3 3M13.5 9.5l2 2" />
+    </>
+  ),
+  account: (
+    <>
+      <circle cx="12" cy="8" r="4" />
+      <path d="M4 21a8 8 0 0 1 16 0" />
+    </>
+  ),
+  settings: (
+    <>
+      <path d="M4 6h9M19 6h1M4 12h2M12 12h8M4 18h11M20 18h0" />
+      <circle cx="16" cy="6" r="2.2" />
+      <circle cx="9" cy="12" r="2.2" />
+      <circle cx="17.5" cy="18" r="2.2" />
+    </>
+  ),
+} satisfies Partial<Record<Route, React.ReactNode>>;
+
+const NAV: { route: keyof typeof NAV_ICONS; label: string }[] = [
   { route: 'dashboard', label: 'Dashboard' },
   { route: 'stats', label: 'Stats' },
   { route: 'blocklists', label: 'Blocklists' },
@@ -31,6 +76,24 @@ const NAV: { route: Route; label: string }[] = [
   { route: 'account', label: 'Account' },
   { route: 'settings', label: 'Settings' },
 ];
+
+function NavIcon({ route }: { route: keyof typeof NAV_ICONS }) {
+  return (
+    <svg
+      width="16"
+      height="16"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      {NAV_ICONS[route]}
+    </svg>
+  );
+}
 
 /** A short label summarizing the sidebar's active policy — mirrors the presets in Blocklists.tsx. */
 function policyModeLabel(policy: Policy, aiMode: boolean): string {
@@ -105,8 +168,8 @@ export default function App({ initialRoute = 'dashboard' }: { initialRoute?: Rou
 
       {/* Nav rail. */}
       <aside className="desktop-sidebar relative flex w-44 shrink-0 flex-col border-r border-white/[0.07] backdrop-blur-xl">
-        <div className="flex items-center gap-2.5 px-[18px] pb-[17px] pt-[18px]">
-          <TalysmanMark size={20} className="opacity-90" />
+        <div className="flex items-center gap-2.5 px-[18px] pb-[19px] pt-[19px]">
+          <TalysmanMark size={22} className="drop-shadow-[0_0_10px_rgb(var(--color-signal)/0.22)]" />
           <span className="desktop-brand-name">Talysman</span>
           {IS_DEV && (
             <span className="dev-mode-label" aria-label="Development mode">
@@ -115,27 +178,27 @@ export default function App({ initialRoute = 'dashboard' }: { initialRoute?: Rou
           )}
         </div>
 
-        <nav className="flex flex-col gap-0.5 px-2.5">
+        <nav className="flex flex-col gap-1 px-2.5">
           {NAV.map((n) => {
             const on = route === n.route;
             return (
               <button
                 key={n.route}
                 onClick={() => setRoute(n.route)}
+                aria-current={on ? 'page' : undefined}
                 className={cx(
-                  'desktop-nav-item flex items-center gap-2.5 rounded-[10px] px-[11px] py-[9px] text-left text-body font-medium transition',
-                  on
-                    ? 'bg-white/[0.065] text-white shadow-[inset_0_1px_rgb(var(--color-white)/0.035)]'
-                    : 'text-slate-400 hover:bg-white/[0.04] hover:text-slate-200',
+                  'desktop-nav-item flex items-center gap-2.5 rounded-[10px] px-[11px] py-[8px] text-left text-body font-medium transition',
+                  on ? 'text-white' : 'text-slate-400 hover:bg-white/[0.045] hover:text-slate-100',
                 )}
               >
+                <NavIcon route={n.route} />
                 {n.label}
               </button>
             );
           })}
         </nav>
 
-        <div className="mt-auto flex items-center gap-2.5 border-t border-white/[0.06] px-4 pb-[15px] pt-[13px]">
+        <div className="desktop-mode-readout m-2.5 mt-auto flex items-center gap-2.5 px-3 py-2.5">
           <ProfileDot
             color={focusActive ? desktopPaletteColor('signal') : palette.colors.foregroundFaint}
             glow={focusActive}
@@ -150,7 +213,7 @@ export default function App({ initialRoute = 'dashboard' }: { initialRoute?: Rou
       </aside>
 
       <div className="desktop-pane relative flex min-w-0 flex-1 flex-col">
-        <header className="flex h-14 shrink-0 items-center border-b border-white/[0.035] px-5">
+        <header className="desktop-header flex h-14 shrink-0 items-center px-5">
           <div className="mx-auto flex w-full max-w-[960px] items-center gap-2.5">
             <div className="flex items-center gap-2.5">
               <span
@@ -166,10 +229,10 @@ export default function App({ initialRoute = 'dashboard' }: { initialRoute?: Rou
             <button
               onClick={() => setRoute('keys')}
               className={cx(
-                'ml-auto flex items-center gap-2 rounded-full border py-1.5 pl-2.5 pr-3 backdrop-blur-sm transition',
+                'ml-auto flex items-center gap-2 rounded-full border py-1.5 pl-2.5 pr-3 shadow-[inset_0_1px_rgb(var(--color-white)/0.06)] backdrop-blur-sm transition',
                 keyPresent
-                  ? 'border-ok/30 bg-ok/[0.09] hover:bg-ok/[0.14]'
-                  : 'border-danger/30 bg-danger/[0.10] hover:bg-danger/[0.16]',
+                  ? 'border-ok/30 bg-ok/[0.09] hover:border-ok/45 hover:bg-ok/[0.14]'
+                  : 'border-danger/30 bg-danger/[0.10] hover:border-danger/45 hover:bg-danger/[0.16]',
               )}
             >
               <span

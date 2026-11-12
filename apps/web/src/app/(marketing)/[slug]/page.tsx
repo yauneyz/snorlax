@@ -283,7 +283,7 @@ export default async function IntentLandingPage({ params }: PageProps) {
   const graphic = hasGraphic(page) ? { ...page.graphic, ...graphicSize(page) } : null;
   // The demo is the centerpiece, so it comes straight after the answer wherever the page
   // file lists it; everything else keeps its written order.
-  const demo = page.sections.find((section) => section.kind === "demo");
+  const demo = page.demoInPlace ? undefined : page.sections.find((section) => section.kind === "demo");
   const rest = page.sections.filter((section) => section !== demo);
 
   // A plain <div>, not an <article>: `.marketing-main article` carries the rendered-markdown
@@ -302,7 +302,7 @@ export default async function IntentLandingPage({ params }: PageProps) {
         <div className="intent__lede">{page.lede}</div>
         <div className="intent__ctas">
           <Link href={downloadHref(page.slug)} className="landing__cta landing__cta--primary">
-            Start focusing free
+            {page.ctaLabel ?? "Start focusing free"}
           </Link>
           <a href="#demo" className="landing__cta landing__cta--secondary">
             See how it works
@@ -360,7 +360,7 @@ export default async function IntentLandingPage({ params }: PageProps) {
             "Pair a key, put it somewhere inconvenient, and get back to work."}
         </p>
         <Link href={downloadHref(page.slug)} className="landing__cta landing__cta--primary">
-          Start focusing free
+          {page.ctaLabel ?? "Start focusing free"}
         </Link>
         <p className="cta-band__note">
           Free forever, no card. Want schedules and app blocking?{" "}

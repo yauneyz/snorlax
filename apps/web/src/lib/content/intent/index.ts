@@ -1,4 +1,6 @@
+import { adultWebsiteBlocker } from "./adult-website-blocker";
 import { appBlockerPc } from "./app-blocker-pc";
+import { blockAdultWebsitesOnPhone } from "./block-adult-websites-on-phone";
 import { blockRedditWhileWorking } from "./block-reddit-while-working";
 import { blockSocialMediaOnComputer } from "./block-social-media-on-computer";
 import { blockYoutubeWhileWorking } from "./block-youtube-while-working";
@@ -14,6 +16,7 @@ import { focusAppWriters } from "./focus-app-writers";
 import { focusmeAlternative } from "./focusme-alternative";
 import { freedomAlternative } from "./freedom-alternative";
 import { physicalWebsiteBlocker } from "./physical-website-blocker";
+import { pornographyBlocker } from "./pornography-blocker";
 import { stopDisablingWebsiteBlocker } from "./stop-disabling-website-blocker";
 import { turnAUsbDriveIntoADistractionBlocker } from "./turn-a-usb-drive-into-a-distraction-blocker";
 import { websiteBlockerLinux } from "./website-blocker-linux";
@@ -56,6 +59,10 @@ export const intentPages: IntentPage[] = [
   focusAppDevelopers,
   focusAppWriters,
   focusAppRemoteWork,
+  // unlisted: served and in the sitemap, left out of the footer
+  pornographyBlocker,
+  adultWebsiteBlocker,
+  blockAdultWebsitesOnPhone,
 ];
 
 export const GROUP_LABELS: Record<IntentGroup, string> = {
@@ -64,8 +71,9 @@ export const GROUP_LABELS: Record<IntentGroup, string> = {
   "use-cases": "Use cases",
 };
 
+/** The pages listed under a footer column. Unlisted pages are served but not listed. */
 export function pagesInGroup(group: IntentGroup): IntentPage[] {
-  return intentPages.filter((page) => page.group === group);
+  return intentPages.filter((page) => page.group === group && !page.unlisted);
 }
 
 const bySlug = new Map(intentPages.map((page) => [page.slug, page]));

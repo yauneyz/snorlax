@@ -92,32 +92,30 @@ export function FocusToggle() {
 
   return (
     <div className="flex flex-col items-center">
-      <div className="relative flex items-center justify-center" style={{ width: RING, height: RING }}>
-        <div
-          data-focus-glow
-          className={cx(
-            'absolute inset-0 rounded-full border',
-            focusActive
-              ? 'border-ok/40 shadow-[0_0_42px_rgb(var(--color-success)/0.14),inset_0_0_44px_rgb(var(--color-success)/0.06)]'
-              : 'border-white/[0.10] shadow-[inset_0_1px_0_rgb(var(--color-white)/0.08)]',
-          )}
-        />
-        <div className="absolute inset-4 rounded-full border border-dashed border-white/[0.06]" />
+      <div
+        className={cx('relative flex items-center justify-center', focusActive && 'seal--on')}
+        style={{ width: RING, height: RING }}
+      >
+        <div data-focus-glow className="seal__halo" />
+        <div className="seal__ticks" />
+        <div className="seal__ring" />
+        <div className="seal__disc" />
         <div className="relative flex flex-col items-center gap-1.5">
           <TalysmanMark
             data-focus-glow
             size={46}
             className={cx(
-              focusActive ? 'drop-shadow-[0_0_16px_rgb(var(--color-signal)/0.32)]' : 'opacity-75 grayscale-[0.5]',
+              'transition duration-500',
+              focusActive ? 'drop-shadow-[0_0_18px_rgb(var(--color-signal)/0.45)]' : 'opacity-70 grayscale-[0.5]',
             )}
           />
-          <div className="mt-2 text-display font-bold tracking-[-0.025em] text-slate-100">
+          <div className="seal__status mt-2 text-display font-bold tracking-[-0.025em]">
             {focusActive ? 'FOCUSED' : pausedUntil ? 'PAUSED' : 'UNPROTECTED'}
           </div>
 
           <button
             onClick={() => setListOpen(true)}
-            className="flex items-center gap-2 rounded-full border border-white/[0.12] bg-white/[0.05] px-3 py-1 transition hover:bg-white/[0.09]"
+            className="flex items-center gap-2 rounded-full border border-white/[0.12] bg-white/[0.05] px-3 py-1 shadow-[inset_0_1px_0_rgb(var(--color-white)/0.07)] transition hover:border-white/[0.2] hover:bg-white/[0.09]"
           >
             {active.length === 0 ? (
               <ProfileDot color={next?.color ?? palette.colors.foregroundFaint} size={7} />
@@ -135,7 +133,7 @@ export function FocusToggle() {
         </div>
       </div>
 
-      <div className="mt-[18px] flex flex-col items-center gap-[9px]">
+      <div className="mt-[22px] flex flex-col items-center gap-[10px]">
         <div className="flex gap-2">
           {focusActive ? (
             <>
@@ -153,7 +151,7 @@ export function FocusToggle() {
                 disabled={busy}
                 aria-label={keyPresent ? 'Pause until…' : 'Temporary unlock'}
                 title={keyPresent ? 'Pause until…' : 'Temporary unlock'}
-                className="flex h-11 w-11 items-center justify-center rounded-full border border-white/[0.14] bg-white/[0.05] text-slate-200 transition hover:bg-white/[0.10] disabled:opacity-50"
+                className="flex h-11 w-11 items-center justify-center rounded-full border border-white/[0.14] bg-white/[0.05] text-slate-200 shadow-[inset_0_1px_0_rgb(var(--color-white)/0.07)] transition hover:border-white/[0.22] hover:bg-white/[0.10] hover:text-white active:scale-95 disabled:opacity-50"
               >
                 {keyPresent ? <PauseIcon /> : <UnlockIcon />}
               </button>
